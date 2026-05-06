@@ -1,0 +1,72 @@
+{
+    "name": "craftpulse/craft-cortex",
+    "description": "MCP (Model Context Protocol) server for Craft CMS 5. Exposes Craft internals to AI agents over stdio (Free) and Streamable HTTP (Pro).",
+    "type": "craft-plugin",
+    "license": "proprietary",
+    "support": {
+        "email": "support@craftpulse.com",
+        "issues": "https://github.com/craftpulse/craft-cortex/issues",
+        "source": "https://github.com/craftpulse/craft-cortex",
+        "docs": "https://github.com/craftpulse/craft-cortex"
+    },
+    "authors": [
+        {
+            "name": "Craftpulse",
+            "homepage": "https://craftpulse.com"
+        }
+    ],
+    "keywords": [
+        "craft",
+        "cms",
+        "craftcms",
+        "craft-plugin",
+        "mcp",
+        "model-context-protocol",
+        "ai",
+        "claude"
+    ],
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "require": {
+        "php": ">=8.2",
+        "craftcms/cms": "^5.0",
+        "michtio/craftcms-claude-skills": "^1.4"
+    },
+    "require-dev": {
+        "craftcms/ecs": "dev-main",
+        "craftcms/phpstan": "dev-main",
+        "pestphp/pest": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "craftpulse\\cortex\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "craftpulse\\cortex\\tests\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "craftcms/plugin-installer": true,
+            "yiisoft/yii2-composer": true,
+            "pestphp/pest-plugin": true
+        },
+        "sort-packages": true
+    },
+    "scripts": {
+        "check-cs": "ecs check",
+        "fix-cs": "ecs check --fix",
+        "phpstan": "phpstan analyse --memory-limit=1G",
+        "test": "@php vendor/bin/pest --configuration=vendor/craftpulse/craft-cortex/phpunit.xml.dist"
+    },
+    "extra": {
+        "name": "Cortex",
+        "handle": "cortex",
+        "developer": "Craftpulse",
+        "developerUrl": "https://craftpulse.com",
+        "documentationUrl": "https://github.com/craftpulse/craft-cortex",
+        "class": "craftpulse\\cortex\\Plugin"
+    }
+}

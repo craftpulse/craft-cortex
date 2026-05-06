@@ -1,0 +1,15 @@
+/vendor/
+/composer.lock
+/.phpunit.result.cache
+/.phpunit.cache/
+
+# Personal Claude Code settings (per-developer permissions, not shared)
+/.claude/settings.local.json
+/.claude/memory/
+
+# OS / editor cruft
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo

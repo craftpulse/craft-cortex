@@ -1,0 +1,39 @@
+# PHPStan config for cortex.
+#
+# Run from the playground:
+#
+#   ddev exec --dir=/var/www/html/cms vendor/bin/phpstan analyse \
+#     --memory-limit=1G -c vendor/craftpulse/craft-cortex/phpstan.neon
+#
+# Level 8 — fully strict. The lean exclusions below cover patterns
+# where Craft / Yii's stubs are conservatively typed but the real
+# runtime values are non-null (e.g. `Section::$handle` typed as
+# `?string` though never null in practice).
+
+includes:
+    - /var/www/html/cms/vendor/craftcms/phpstan/phpstan.neon
+
+parameters:
+    level: 8
+    paths:
+        - src
+    excludePaths:
+        - tests/Bootstrap.php
+    treatPhpDocTypesAsCertain: false
+    ignoreErrors:
+        # Tools take MCP-shaped `array<string,mixed>` arguments. Annotating
+        # every private helper that re-receives that array adds noise
+        # without surfacing real issues.
+        - identifier: missingType.iterableValue
+          path: src/tools/*
+
+        # Plugin::config() returns Yii's generic component-config array;
+        # the schema isn't worth pinning down for one method.
+        - identifier: missingType.iterableValue
+          path: src/Plugin.php
+
+        # Craft's element-query classes use generic templates we don't
+        # need to forward in private builder helpers.
+        - identifier: missingType.generics
+          path: src/tools/content/*
+
