@@ -1,0 +1,77 @@
+<?php
+
+namespace craftpulse\cortex\models;
+
+use craft\base\Model;
+
+/**
+ * =========================================================================
+ * Cortex plugin settings.
+ *
+ * Loaded by Craft from `plugins.cortex.settings.*` in project config and
+ * merged with overrides from `config/cortex.php`. The settings model is
+ * the single source of truth for tool-level configuration that should
+ * sync across environments — currently the `craft_command` allowlist
+ * and `craft_exec` toggles.
+ *
+ * Runtime overrides (admin-editable, auto-expiring) live in the
+ * `cortex_runtime_overrides` DB table and are layered on top at lookup
+ * time. That layer ships in Gate 6 alongside the CP settings UI;
+ * Gate 5 only honours project-config + file overrides.
+ * =========================================================================
+ *
+ * @author Craftpulse
+ * @since  0.1.0
+ */
+class Settings extends Model
+{
+    // Public Properties
+    // =========================================================================
+
+    /**
+     * @var string[] Default allowlist of command-route glob patterns the
+     *               `craft_command` tool may dispatch. Source of truth
+     *               per PLANNING.md 4.9. Override via project config or
+     *               `config/cortex.php`.
+     */
+    public array $allowedCommands = [
+        'resave/*',
+        'project-config/*',
+        'cache/*',
+        'invalidate-tags/*',
+        'migrate/*',
+        'up',
+        'index-assets/*',
+        'gc',
+        'make/*',
+        'fixture/*',
+        'sections/*',
+        'fields/*',
+        'users/create',
+        'entrify/*',
+        'db/backup',
+        'db/restore',
+        'utils/*',
+        'clear-deprecations',
+        'mailer/test',
+    ];
+
+    /**
+     * @var bool Whether the `craft_exec` tool is enabled. Defaults to
+     *           true; flip to false to remove `craft_exec` from
+     *           `tools/list` entirely (the registry honours it). The
+     *           planning docs treat exec as a stdio-only opt-in
+     *           fallback — operators that want a stricter posture can
+     *           disable it without losing the rest of the dev surface.
+     */
+    public bool $execEnabled = true;
+
+    /**
+     * @var bool Whether `craft_exec` defaults to dry-run. Even with
+     *           dry-run on, callers can still set `confirm: true` per
+     *           call to actually evaluate. Flip to false to make
+     *           evaluation the default — the destructive-op guard
+     *           still applies and still requires explicit `dangerous: true`.
+     */
+    public bool $execDryRunDefault = true;
+}
