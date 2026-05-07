@@ -92,3 +92,174 @@ it('returns empty string for an unknown client', function () {
 
     expect($body)->toBe('');
 });
+
+// -----------------------------------------------------------------------------
+// Apply action — merge semantics
+// -----------------------------------------------------------------------------
+
+it('merges a cortex entry into an empty mcpServers JSON config', function () {
+    $result = $this->controller->buildMergedConfig('claude-desktop', null, $this->command);
+
+    expect($result)->not->toBeNull();
+    [$contents, $action] = $result;
+    expect($action)->toContain('create file with cortex entry');
+
+    $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+    expect($decoded)
+        ->toHaveKey('mcpServers')
+        ->and($decoded['mcpServers'])->toHaveKey('cortex')
+        ->and($decoded['mcpServers']['cortex']['command'])->toBe('docker')
+        ->and($decoded['mcpServers']['cortex']['args'])->toBeArray()->not->toBeEmpty();
+});
+
+it('preserves other servers when merging into a populated mcpServers JSON', function () {
+    $existing = json_encode([
+        'mcpServers' => [
+            'filesystem' => [
+                'command' => 'npx',
+                'args' => ['-y', '@modelcontextprotocol/server-filesystem'],
+            ],
+        ],
+    ]);
+
+    $result = $this->controller->buildMergedConfig('claude-desktop', $existing, $this->command);
+
+    expect($result)->not->toBeNull();
+    [$contents] = $result;
+
+    $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+    expect($decoded['mcpServers'])
+        ->toHaveKey('filesystem')
+        ->toHaveKey('cortex')
+        ->and($decoded['mcpServers']['filesystem']['command'])->toBe('npx');
+});
+
+it('refuses to overwrite an existing cortex entry without --force', function () {
+    $existing = json_encode([
+        'mcpServers' => [
+            'cortex' => ['command' => 'old', 'args' => []],
+        ],
+    ]);
+
+    $result = $this->controller->buildMergedConfig('claude-desktop', $existing, $this->command);
+
+    expect($result)->toBeNull();
+});
+
+it('overwrites an existing cortex entry with --force', function () {
+    $existing = json_encode([
+        'mcpServers' => [
+            'cortex' => ['command' => 'old', 'args' => []],
+        ],
+    ]);
+
+    $this->controller->force = true;
+    $result = $this->controller->buildMergedConfig('claude-desktop', $existing, $this->command);
+
+    expect($result)->not->toBeNull();
+    [$contents, $action] = $result;
+    expect($action)->toContain('overwrite');
+
+    $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+    expect($decoded['mcpServers']['cortex']['command'])->toBe('docker');
+});
+
+it('throws when the existing JSON is malformed', function () {
+    expect(fn () => $this->controller->buildMergedConfig('claude-desktop', '{ not valid json', $this->command))
+        ->toThrow(RuntimeException::class);
+});
+
+it('zed merger uses the context_servers top-level key', function () {
+    $result = $this->controller->buildMergedConfig('zed', null, $this->command);
+
+    expect($result)->not->toBeNull();
+    [$contents] = $result;
+
+    $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+    expect($decoded)->toHaveKey('context_servers');
+    expect($decoded)->not->toHaveKey('mcpServers');
+});
+
+it('continue merger renders a standalone YAML with the required metadata', function () {
+    $result = $this->controller->buildMergedConfig('continue', null, $this->command);
+
+    expect($result)->not->toBeNull();
+    [$contents] = $result;
+
+    expect($contents)
+        ->toContain('name: cortex')
+        ->toContain('version: 0.0.1')
+        ->toContain('schema: v1')
+        ->toContain('mcpServers:')
+        ->toContain('- name: cortex');
+});
+
+it('continue merger refuses an existing differing file without --force', function () {
+    $existing = "name: cortex\nversion: 0.0.1\nschema: v1\nmcpServers:\n  - name: cortex\n    command: old\n    args:\n      - foo\n";
+
+    $result = $this->controller->buildMergedConfig('continue', $existing, $this->command);
+
+    expect($result)->toBeNull();
+});
+
+it('continue merger overwrites with --force', function () {
+    $existing = "name: cortex\nversion: 0.0.1\nschema: v1\nmcpServers:\n  - name: cortex\n    command: old\n    args:\n      - foo\n";
+
+    $this->controller->force = true;
+    $result = $this->controller->buildMergedConfig('continue', $existing, $this->command);
+
+    expect($result)->not->toBeNull();
+    [$contents] = $result;
+    expect($contents)->toContain('command: docker');
+});
+
+// -----------------------------------------------------------------------------
+// Apply action — path resolution
+// -----------------------------------------------------------------------------
+
+it('resolves claude-desktop config to an OS-appropriate path', function () {
+    $path = $this->controller->resolveConfigPath('claude-desktop');
+
+    expect($path)->toBeString()->not->toBeEmpty()
+        ->toContain('claude_desktop_config.json');
+});
+
+it('resolves cursor config to ~/.cursor/mcp.json', function () {
+    $path = $this->controller->resolveConfigPath('cursor');
+
+    expect($path)
+        ->toBeString()
+        ->toEndWith(DIRECTORY_SEPARATOR . '.cursor' . DIRECTORY_SEPARATOR . 'mcp.json');
+});
+
+it('resolves continue config to standalone cortex.yaml under mcpServers/', function () {
+    $path = $this->controller->resolveConfigPath('continue');
+
+    expect($path)
+        ->toBeString()
+        ->toContain('.continue')
+        ->toEndWith('mcpServers' . DIRECTORY_SEPARATOR . 'cortex.yaml');
+});
+
+it('resolves windsurf config to ~/.codeium/windsurf/mcp_config.json', function () {
+    $path = $this->controller->resolveConfigPath('windsurf');
+
+    expect($path)
+        ->toBeString()
+        ->toContain('.codeium')
+        ->toEndWith('windsurf' . DIRECTORY_SEPARATOR . 'mcp_config.json');
+});
+
+it('resolves claude-code config to a project-scoped .mcp.json in cwd', function () {
+    $path = $this->controller->resolveConfigPath('claude-code');
+
+    expect($path)
+        ->toBeString()
+        ->toEndWith(DIRECTORY_SEPARATOR . '.mcp.json');
+});
+
+it('returns null for an unknown client', function () {
+    $path = $this->controller->resolveConfigPath('unknown-client');
+
+    expect($path)->toBeNull();
+});
