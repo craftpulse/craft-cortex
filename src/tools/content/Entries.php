@@ -5,8 +5,11 @@ namespace craftpulse\cortex\tools\content;
 use Craft;
 use craft\elements\db\EntryQuery;
 use craft\elements\Entry;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\ElementSerializer;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 
 /**
@@ -42,6 +45,8 @@ use craftpulse\cortex\tools\ToolException;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class Entries extends AbstractTool
 {
     // Constants
@@ -89,41 +94,34 @@ class Entries extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'id' => ['description' => 'Single entry id, or array of ids.'],
-                'uid' => ['description' => 'Single uid, or array of uids.'],
-                'slug' => ['type' => 'string'],
-                'title' => ['type' => 'string'],
-                'section' => ['description' => 'Section handle, id, array, or `null` for sectionless (nested) entries.'],
-                'type' => ['description' => 'Entry-type handle, id, or array.'],
-                'status' => ['description' => 'Status string or array (live, pending, expired, disabled, …).'],
-                'enabled' => ['type' => 'boolean'],
-                'authorId' => ['description' => 'Author user id, or array of ids.'],
-                'relatedTo' => ['description' => 'Craft relation syntax: single id, array of ids, or hash {targetElement|sourceElement|field}. AND/OR also supported as nested arrays.'],
-                'search' => ['type' => 'string'],
-                'with' => [
-                    'type' => 'array',
-                    'items' => ['type' => 'string'],
-                    'description' => 'Eager-loaded relational field handles. Without this, relational fields appear as `{loaded: false}` stubs to prevent N+1.',
-                ],
-                'orderBy' => ['type' => 'string'],
-                'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => self::MAX_LIMIT],
-                'offset' => ['type' => 'integer', 'minimum' => 0],
-                'before' => ['description' => 'postDate < this value (Craft date string).'],
-                'after' => ['description' => 'postDate >= this value.'],
-                'level' => ['description' => 'Structure level (int or comparison string like ">2").'],
-                'hasDescendants' => ['type' => 'boolean'],
-                'leaves' => ['type' => 'boolean'],
-                'descendantOf' => ['description' => 'Element id or instance.'],
-                'ancestorOf' => ['description' => 'Element id or instance.'],
-                'siblingOf' => ['description' => 'Element id or instance.'],
-                'site' => ['description' => 'Site handle, id, or "*" for all sites.'],
-                'count' => ['type' => 'boolean'],
-            ],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'id' => Schema::any()->description('Single entry id, or array of ids.'),
+            'uid' => Schema::any()->description('Single uid, or array of uids.'),
+            'slug' => Schema::string(),
+            'title' => Schema::string(),
+            'section' => Schema::any()->description('Section handle, id, array, or `null` for sectionless (nested) entries.'),
+            'type' => Schema::any()->description('Entry-type handle, id, or array.'),
+            'status' => Schema::any()->description('Status string or array (live, pending, expired, disabled, …).'),
+            'enabled' => Schema::boolean(),
+            'authorId' => Schema::any()->description('Author user id, or array of ids.'),
+            'relatedTo' => Schema::any()->description('Craft relation syntax: single id, array of ids, or hash {targetElement|sourceElement|field}. AND/OR also supported as nested arrays.'),
+            'search' => Schema::string(),
+            'with' => Schema::array(Schema::string())
+                ->description('Eager-loaded relational field handles. Without this, relational fields appear as `{loaded: false}` stubs to prevent N+1.'),
+            'orderBy' => Schema::string(),
+            'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
+            'offset' => Schema::integer()->minimum(0),
+            'before' => Schema::any()->description('postDate < this value (Craft date string).'),
+            'after' => Schema::any()->description('postDate >= this value.'),
+            'level' => Schema::any()->description('Structure level (int or comparison string like ">2").'),
+            'hasDescendants' => Schema::boolean(),
+            'leaves' => Schema::boolean(),
+            'descendantOf' => Schema::any()->description('Element id or instance.'),
+            'ancestorOf' => Schema::any()->description('Element id or instance.'),
+            'siblingOf' => Schema::any()->description('Element id or instance.'),
+            'site' => Schema::any()->description('Site handle, id, or "*" for all sites.'),
+            'count' => Schema::boolean(),
+        ])->toArray();
     }
 
     /**
