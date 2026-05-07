@@ -3,6 +3,7 @@
 namespace craftpulse\cortex\services;
 
 use craftpulse\cortex\events\RegisterResourcesEvent;
+use craftpulse\cortex\resources\AgentResource;
 use craftpulse\cortex\resources\ResourceInterface;
 use craftpulse\cortex\resources\ResourceTemplateInterface;
 use craftpulse\cortex\resources\SkillResource;
@@ -209,6 +210,16 @@ class Resources extends Component
             foreach (Skills::references($skill) as $reference) {
                 $registry[] = new SkillResource(skill: $skill, reference: $reference);
             }
+        }
+
+        // Agent resources from `michtio/craftcms-claude-skills` v1.4.2+
+        // surface alongside skills. The companion package's helper
+        // returns `[]` from agentNames() if the package is older than
+        // 1.4.2 or the agents/ directory is absent — the loop is a
+        // no-op in that case, so cortex still boots cleanly against an
+        // older install.
+        foreach (Skills::agentNames() as $agent) {
+            $registry[] = new AgentResource(agent: $agent);
         }
 
         return $registry;
