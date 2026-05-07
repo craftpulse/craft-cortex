@@ -74,4 +74,14 @@ class Settings extends Model
      *           still applies and still requires explicit `dangerous: true`.
      */
     public bool $execDryRunDefault = true;
+
+    /**
+     * @var int Default TTL (in seconds) applied to a new runtime
+     *          allowlist override when none is supplied at creation
+     *          time. Default: 7 days. Expired overrides are still
+     *          stored but no longer count toward the effective
+     *          allowlist; the cleanup queue job prunes them in the
+     *          background.
+     */
+    public int $runtimeOverrideTtl = 604800;
 }
