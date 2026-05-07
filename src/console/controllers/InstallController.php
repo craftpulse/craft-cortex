@@ -223,13 +223,19 @@ class InstallController extends Controller
             return ExitCode::IOERR;
         }
 
-        // Precondition: the parent directory must exist. We don't ghost-
-        // create config dirs — their absence is the canonical "client not
-        // installed" signal, and silently scaffolding them would mask
-        // typos and produce non-functional config alongside an actual
-        // install elsewhere on the system.
+        // Precondition for real writes: the parent directory must exist.
+        // We don't ghost-create config dirs — their absence is the
+        // canonical "client not installed" signal, and silently
+        // scaffolding them would mask typos and produce non-functional
+        // config alongside an actual install elsewhere on the system.
+        // For dry-run, we surface the missing-parent state as a warning
+        // and still print the would-be diff — the user is asking what
+        // *would* happen, not what *can* happen, and dry-run from inside
+        // a container that doesn't see the host config dir is the
+        // canonical "preview from a different filesystem" case.
         $parent = dirname($path);
-        if (!is_dir($parent)) {
+        $parentMissing = !is_dir($parent);
+        if ($parentMissing && !$this->dryRun) {
             $this->stderr(sprintf(
                 "%s config directory not found at %s.\n",
                 $label,
@@ -239,6 +245,11 @@ class InstallController extends Controller
                 "Install %s first, or use the manual snippet:\n  ddev craft cortex/install --client=%s\n",
                 $label,
                 $this->client,
+            ), Console::FG_GREY);
+            $this->stderr(sprintf(
+                "If you're running this inside a container (e.g. DDEV) and your MCP\n" .
+                "client lives on the host, the manual snippet form is the right path —\n" .
+                "the auto-config writer can only see the container's filesystem.\n",
             ), Console::FG_GREY);
             return ExitCode::CONFIG;
         }
@@ -265,6 +276,20 @@ class InstallController extends Controller
             $this->stdout("{$path}\n");
             $this->stdout("Action: ", Console::FG_GREY);
             $this->stdout("{$action}\n\n");
+
+            if ($parentMissing) {
+                $this->stdout("Note: parent directory ", Console::FG_YELLOW);
+                $this->stdout("{$parent}", Console::FG_YELLOW);
+                $this->stdout(" does not exist on this filesystem.\n", Console::FG_YELLOW);
+                $this->stdout("A real write would refuse — this dry-run is a preview only.\n", Console::FG_YELLOW);
+                if ($this->_detectDdev()) {
+                    $this->stdout("(You're running inside DDEV. The container's filesystem isn't your host's; copy the\n", Console::FG_GREY);
+                    $this->stdout("AFTER block below into your host MCP client config manually.)\n\n", Console::FG_GREY);
+                } else {
+                    $this->stdout("\n");
+                }
+            }
+
             $this->stdout("--- BEFORE ---\n", Console::FG_GREY);
             $this->stdout($existing !== null ? rtrim($existing) . "\n" : "(file does not exist)\n");
             $this->stdout("\n--- AFTER ---\n", Console::FG_GREY);
