@@ -5,7 +5,10 @@ namespace craftpulse\cortex\tools\schema;
 use Craft;
 use craft\models\CategoryGroup;
 use craft\models\CategoryGroup_SiteSettings;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 
 /**
@@ -22,6 +25,8 @@ use craftpulse\cortex\tools\ToolException;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class CategoryGroups extends AbstractTool
 {
     // Public Methods
@@ -59,14 +64,10 @@ class CategoryGroups extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'handle' => ['type' => 'string'],
-                'count' => ['type' => 'boolean'],
-            ],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'handle' => Schema::string(),
+            'count' => Schema::boolean(),
+        ])->toArray();
     }
 
     /**

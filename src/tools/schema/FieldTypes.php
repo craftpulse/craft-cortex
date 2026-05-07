@@ -5,6 +5,8 @@ namespace craftpulse\cortex\tools\schema;
 use Craft;
 use craft\base\FieldInterface;
 use craft\base\RelationalFieldInterface;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
 
 /**
@@ -23,6 +25,8 @@ use craftpulse\cortex\tools\AbstractTool;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class FieldTypes extends AbstractTool
 {
     // Public Methods
