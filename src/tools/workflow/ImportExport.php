@@ -21,14 +21,21 @@ use Throwable;
  * 4.7) for cross-environment content sync, gated behind
  * `saveEntries:{section}` permissions and dry-run-by-default.
  *
- * Output shape:
+ * Output shape (format 2 — see `FORMAT_VERSION` const for version
+ * lifecycle):
  *
  * ```
  * {
- *   "format": 1,
+ *   "format": 2,
  *   "mode": "export",
  *   "exportedAt": "2026-05-07T15:00:00+00:00",
+ *   "craftVersion": "5.x.x",
+ *   "craftEdition": "Pro",
+ *   "schemaVersion": "...",
  *   "count": 12,
+ *   "totalCount": 87,
+ *   "limit": 100,
+ *   "offset": 0,
  *   "entries": [
  *     {
  *       "uid": "...",
@@ -39,9 +46,15 @@ use Throwable;
  *       "type": "post",
  *       "site": "default",
  *       "enabled": true,
+ *       "enabledForSite": true,
  *       "authorId": 5,
+ *       "authorIds": ["uid-of-author"],
+ *       "parentUid": null,
+ *       "level": 1,
  *       "postDate": "2026-...",
  *       "expiryDate": null,
+ *       "dateCreated": "2026-...",
+ *       "dateUpdated": "2026-...",
  *       "fields": { ... }
  *     },
  *     ...
@@ -60,8 +73,12 @@ use Throwable;
  *   - `id` — single entry id or array of ids (overrides `section`)
  *   - `site` — site handle (defaults to primary)
  *
- * `format: 1` is the schema version. Future schema bumps stay
- * backwards-compatible by version detection on import.
+ * The envelope includes Craft fingerprints (`craftVersion`,
+ * `craftEdition`, `schemaVersion`) so a Pro importer can refuse a
+ * cross-major or cross-edition payload before walking the entries.
+ * Future schema bumps stay backwards-compatible via the `format`
+ * version field; format 1 existed only briefly during Gate 6.5 and is
+ * not expected in the wild.
  * =========================================================================
  *
  * @author Craftpulse

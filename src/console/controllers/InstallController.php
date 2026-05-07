@@ -300,8 +300,11 @@ class InstallController extends Controller
 
     /**
      * Resolve the per-platform config path for a client. Returns null if
-     * the platform / client combination has no defined path. Public so
-     * the test suite can assert resolution without driving the action.
+     * the platform / client combination has no defined path.
+     *
+     * @internal Public for test access only. Not part of the stable
+     *           extension API — third-party plugins should not pin
+     *           against this method.
      *
      * Path notes:
      *   - claude-desktop: macOS uses ~/Library/Application Support/Claude,
@@ -367,9 +370,11 @@ class InstallController extends Controller
      * Build the merged config string for a client given its existing file
      * contents (or null) and the cortex invocation command. Returns
      * `[contents, action-summary]` on success or `null` when the cortex
-     * entry already exists and `--force` is not set. Public so the test
-     * suite can assert merge semantics without filesystem I/O.
+     * entry already exists and `--force` is not set.
      *
+     * @internal Public for test access only. Not part of the stable
+     *           extension API — third-party plugins should not pin
+     *           against this method.
      * @return array{0: string, 1: string}|null
      * @throws \RuntimeException When the existing file is malformed.
      *

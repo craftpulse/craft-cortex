@@ -15,6 +15,15 @@ use Throwable;
  * tool_error / internal_error), duration in milliseconds, secret-
  * redacted arguments, and the error message when applicable.
  *
+ * Phase 1 deliberately omits user attribution. The stdio transport is
+ * single-process and runs as the local OS user — there's no per-request
+ * Craft user to log. Phase 2's HTTP transport authenticates against a
+ * Craft user via OAuth 2.1 / bearer tokens; the audit log surface adds
+ * a `userId` field at that point and the wire format bumps from
+ * `tool=... kind=... duration_ms=... args=...` to include `user=`. The
+ * security rule (`.claude/rules/security.md`) lists user attribution as
+ * a Phase 2 ship requirement, not a Phase 1 one.
+ *
  * Phase 1 ships logger-backed only — operators tail
  * `storage/logs/web.log` (or wire a Yii log target however they like)
  * to retroactively investigate "what did the LLM do." Phase 2's HTTP
