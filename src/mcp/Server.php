@@ -4,6 +4,7 @@ namespace craftpulse\cortex\mcp;
 
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\support\AttributeReader;
+use craftpulse\cortex\tools\support\InvocationLogger;
 use craftpulse\cortex\tools\ToolException;
 use Generator;
 use Throwable;
@@ -323,14 +324,17 @@ class Server
             return $this->_errorResponse($id, -32602, 'Invalid params: tools/call `arguments` must be an object');
         }
 
+        $startNs = hrtime(true);
         try {
             $result = $tool->execute($arguments);
             if ($result instanceof Generator) {
                 $result = $this->_consumeGenerator($result);
             }
         } catch (ToolException $e) {
+            InvocationLogger::logCall($name, $arguments, $e, $this->_elapsedMs($startNs));
             return $this->_successResponse($id, $this->_toolErrorEnvelope($e->getMessage()));
         } catch (Throwable $e) {
+            InvocationLogger::logCall($name, $arguments, $e, $this->_elapsedMs($startNs));
             // Unexpected exception — surface as JSON-RPC internal error.
             return $this->_errorResponse(
                 $id,
@@ -339,7 +343,27 @@ class Server
             );
         }
 
+        InvocationLogger::logCall($name, $arguments, null, $this->_elapsedMs($startNs));
+
         return $this->_successResponse($id, $this->_toolResultEnvelope($result));
+    }
+
+    /**
+     * Convert an `hrtime(true)` start mark into elapsed milliseconds,
+     * capped at non-negative. `hrtime` returns nanoseconds; integer
+     * division loses sub-millisecond resolution which is fine for the
+     * invocation-log granularity.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    private function _elapsedMs(int $startNs): int
+    {
+        $elapsed = (hrtime(true) - $startNs);
+        if ($elapsed < 0) {
+            return 0;
+        }
+        return (int) ($elapsed / 1_000_000);
     }
 
     /**
