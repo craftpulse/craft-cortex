@@ -9,7 +9,7 @@ use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function () {
-    $this->tool = Plugin::getInstance()->tools->getByName('diagnostics');
+    $this->tool = Plugin::getInstance()->tools->getByName('system_diagnostics');
 });
 
 it('throws when type is missing', function () {

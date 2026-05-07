@@ -65,7 +65,7 @@ class Audit extends AbstractTool
      */
     public static function getName(): string
     {
-        return 'audit';
+        return 'content_audit';
     }
 
     /**

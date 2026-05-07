@@ -58,7 +58,7 @@ class Diagnostics extends AbstractTool
      */
     public static function getName(): string
     {
-        return 'diagnostics';
+        return 'system_diagnostics';
     }
 
     /**

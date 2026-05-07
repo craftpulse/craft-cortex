@@ -9,7 +9,7 @@ Skills authored from years of Craft work ship as MCP prompts and resources, so t
 
 ## Highlights
 
-- **31 tools, lean by design.** List/get pairs collapsed behind a single optional `handle`. Mode-driven write-side. Same coverage as competitors with half the tool count, faster LLM tool selection, fewer tokens consumed by `tools/list`.
+- **32 tools, lean by design.** List/get pairs collapsed behind a single optional `handle`. Mode-driven write-side. Same coverage as competitors with half the tool count, faster LLM tool selection, fewer tokens consumed by `tools/list`.
 - **Skills moat.** Eight bundled skills from `michtio/craftcms-claude-skills` ship as MCP prompts (and 72 resources for deep-dives). LLMs route through the prompts; cortex serves the matching skill content inline.
 - **Schema-DSL authored tool inputs.** Every tool's argument schema is built with a fluent JSON Schema DSL — `Schema::object([...])->required()`. Same wire format MCP clients expect, friendlier authoring.
 - **Attribute-based annotations.** PHP 8 attributes — `#[IsReadOnly]`, `#[IsDestructive]`, `#[IsIdempotent]`, `#[IsOpenWorld]`, `#[IsStdioOnly]`, `#[Title]` — replace boilerplate static methods. Surface metadata at the class declaration, not buried in method bodies.
@@ -52,10 +52,10 @@ Reload your client. `cortex` shows up alongside whatever else you've registered.
 |---|---|---|
 | Schema & Structure | 10 | `sections`, `entry_types`, `fields`, `field_types`, `category_groups`, `tag_groups`, `volumes_and_filesystems`, `sites`, `image_transforms`, `element_types` |
 | Content Reading | 5 | `entries`, `assets`, `categories`, `tags`, `globals` |
-| System & Diagnostics | 8 | `system_info`, `config`, `plugins`, `routes`, `diagnostics`, `database_schema`, `extensibility`, `permissions_and_groups` |
+| System & Diagnostics | 9 | `system_info`, `config`, `plugins`, `routes`, `system_diagnostics`, `database_schema`, `extensibility`, `permissions_and_groups`, `search_skills` |
 | GraphQL | 1 | `graphql` |
 | Dev Actions | 4 | `craft_command`, `craft_exec`, `clear_caches`, `resave` |
-| Workflow & Audit | 3 | `drafts_and_revisions`, `audit`, `import_export` |
+| Workflow & Audit | 3 | `drafts_and_revisions`, `content_audit`, `import_export` |
 
 Plus 8 prompts and 72 resources covering the full bundled-skills surface.
 
@@ -156,7 +156,7 @@ The `initialize` handshake should succeed (`cortex 0.1.0`, protocol `2025-06-18`
 
 ## Roadmap
 
-- **Phase 1 — Free.** 31 tools, 8 prompts, 72 resources, stdio transport, allowlist UI, install command, docs generators, extension events. Shipping.
+- **Phase 1 — Free.** 32 tools, 8 prompts, 77 resources (8 skill routers + 64 references + 5 agents), stdio transport, allowlist UI, install command, docs generators, extension events. Shipping.
 - **Phase 2 — Pro.** HTTP transport with OAuth 2.1, permission filtering, audit log, 7 net-new write tools, mode unlocks on Free tools (drafts/audit/import-export apply / fix / import), Pro-exclusive custom-skills element type, minimal CP UI (tokens / activity / connection).
 - **Phase 3 — Polish.** Install wizard auto-detecting installed clients, formal real-LLM E2E harness, vectorised docs search, third-party tool registration documented and battle-tested, skill remote-fetch.
 
