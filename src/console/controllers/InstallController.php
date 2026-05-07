@@ -190,7 +190,22 @@ class InstallController extends Controller
         $this->stdout("{$label}\n", \yii\helpers\Console::FG_YELLOW);
         $this->stdout(str_repeat('-', 70) . "\n");
 
-        match ($handle) {
+        $body = $this->buildSnippet($handle, $command);
+        $this->stdout($body . "\n\n");
+    }
+
+    /**
+     * Build the per-client copy-paste block as a plain string. Public so
+     * the test suite can assert each client's output without driving the
+     * action through Yii's console output. Returns an empty string for
+     * unknown clients.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    public function buildSnippet(string $handle, string $command): string
+    {
+        return match ($handle) {
             'claude-desktop' => $this->_claudeDesktop($command),
             'claude-code' => $this->_claudeCode($command),
             'cursor' => $this->_cursor($command),
@@ -198,94 +213,151 @@ class InstallController extends Controller
             'cline' => $this->_cline($command),
             'zed' => $this->_zed($command),
             'windsurf' => $this->_windsurf($command),
-            default => null,
+            default => '',
         };
-
-        $this->stdout("\n");
     }
 
     /**
      * @author Craftpulse
      * @since  0.1.0
      */
-    private function _claudeDesktop(string $command): void
+    private function _claudeDesktop(string $command): string
     {
-        $this->stdout("Config file:\n");
-        $this->stdout("  macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json\n", \yii\helpers\Console::FG_GREY);
-        $this->stdout("  Windows: %APPDATA%\\Claude\\claude_desktop_config.json\n", \yii\helpers\Console::FG_GREY);
-        $this->stdout("  Linux:   ~/.config/Claude/claude_desktop_config.json\n", \yii\helpers\Console::FG_GREY);
-        $this->stdout("\nAdd to the `mcpServers` object:\n\n");
-        $this->stdout($this->_jsonSnippet($command));
+        $snippet = $this->_jsonSnippet($command);
+
+        return <<<TXT
+Config file:
+  macOS:   ~/Library/Application Support/Claude/claude_desktop_config.json
+  Windows: %APPDATA%\\Claude\\claude_desktop_config.json
+  Linux:   ~/.config/Claude/claude_desktop_config.json
+
+Add to the `mcpServers` object:
+
+{$snippet}
+TXT;
+    }
+
+    /**
+     * Claude Code uses `claude mcp add --transport stdio <name> -- <cmd...>`.
+     * The `--` separator is mandatory: it prevents Claude Code from
+     * parsing the wrapped command's flags (e.g. `-i` on `docker exec`) as
+     * its own. Verified against https://code.claude.com/docs/en/mcp.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    private function _claudeCode(string $command): string
+    {
+        $snippet = $this->_jsonSnippet($command);
+
+        return <<<TXT
+Run from your project directory:
+
+  claude mcp add --transport stdio cortex -- {$command}
+
+Or add to project-level `.mcp.json`:
+
+{$snippet}
+TXT;
     }
 
     /**
      * @author Craftpulse
      * @since  0.1.0
      */
-    private function _claudeCode(string $command): void
+    private function _cursor(string $command): string
     {
-        $parts = $this->_splitCommand($command);
-        $this->stdout("Run from your project directory:\n\n");
-        $this->stdout("  claude mcp add cortex {$command}\n", \yii\helpers\Console::FG_CYAN);
-        $this->stdout("\nOr add to project-level `.mcp.json`:\n\n");
-        $this->stdout($this->_jsonSnippet($command));
+        $snippet = $this->_jsonSnippet($command);
+
+        return <<<TXT
+Config file: ~/.cursor/mcp.json (or project-level .cursor/mcp.json)
+
+Add to the `mcpServers` object:
+
+{$snippet}
+TXT;
+    }
+
+    /**
+     * Continue.dev moved to YAML config under `mcpServers:` at the top
+     * level of `~/.continue/config.yaml` — the previous JSON form under
+     * `experimental.modelContextProtocolServers` is deprecated. Verified
+     * against https://docs.continue.dev/customize/deep-dives/mcp.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    private function _continue(string $command): string
+    {
+        $snippet = $this->_yamlSnippet($command);
+
+        return <<<TXT
+Config file: ~/.continue/config.yaml (or project-level .continue/config.yaml).
+Standalone form: ~/.continue/mcpServers/cortex.yaml with the same `mcpServers:`
+list at top level.
+
+Add under `mcpServers:`:
+
+{$snippet}
+TXT;
     }
 
     /**
      * @author Craftpulse
      * @since  0.1.0
      */
-    private function _cursor(string $command): void
+    private function _cline(string $command): string
     {
-        $this->stdout("Config file: ~/.cursor/mcp.json (or project-level .cursor/mcp.json)\n");
-        $this->stdout("\nAdd to the `mcpServers` object:\n\n");
-        $this->stdout($this->_jsonSnippet($command));
+        $snippet = $this->_jsonSnippet($command);
+
+        return <<<TXT
+Config file (macOS):
+  ~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json
+
+Note: Cline's MCP support has been less stable than other clients. If config doesn't apply, restart VS Code.
+
+Add to the `mcpServers` object:
+
+{$snippet}
+TXT;
+    }
+
+    /**
+     * Zed uses `context_servers` at the top level of `settings.json`. The
+     * legacy `assistant.mcp_servers` key is not the current shape.
+     * Verified against https://zed.dev/docs/ai/mcp.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    private function _zed(string $command): string
+    {
+        $snippet = $this->_jsonSnippet($command);
+
+        return <<<TXT
+Config file: ~/.config/zed/settings.json
+
+Add under `context_servers` at the top level:
+
+{$snippet}
+TXT;
     }
 
     /**
      * @author Craftpulse
      * @since  0.1.0
      */
-    private function _continue(string $command): void
+    private function _windsurf(string $command): string
     {
-        $this->stdout("Config file: ~/.continue/config.json\n");
-        $this->stdout("\nAdd under `experimental.modelContextProtocolServers`:\n\n");
-        $this->stdout($this->_jsonSnippet($command));
-    }
+        $snippet = $this->_jsonSnippet($command);
 
-    /**
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    private function _cline(string $command): void
-    {
-        $this->stdout("Config file (macOS):\n");
-        $this->stdout("  ~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json\n", \yii\helpers\Console::FG_GREY);
-        $this->stdout("\nNote: Cline's MCP support has been less stable than other clients. If config doesn't apply, restart VS Code.\n", \yii\helpers\Console::FG_YELLOW);
-        $this->stdout("\nAdd to the `mcpServers` object:\n\n");
-        $this->stdout($this->_jsonSnippet($command));
-    }
+        return <<<TXT
+Config file: ~/.codeium/windsurf/mcp_config.json
 
-    /**
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    private function _zed(string $command): void
-    {
-        $this->stdout("Config file: ~/.config/zed/settings.json\n");
-        $this->stdout("\nAdd under `assistant.mcp_servers`:\n\n");
-        $this->stdout($this->_jsonSnippet($command));
-    }
+Add to the `mcpServers` object:
 
-    /**
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    private function _windsurf(string $command): void
-    {
-        $this->stdout("Config file: ~/.codeium/windsurf/mcp_config.json\n");
-        $this->stdout("\nAdd to the `mcpServers` object:\n\n");
-        $this->stdout($this->_jsonSnippet($command));
+{$snippet}
+TXT;
     }
 
     /**
@@ -306,8 +378,51 @@ class InstallController extends Controller
     "command": {$cmdJson},
     "args": {$argsJson}
   }
-
 JSON;
+    }
+
+    /**
+     * Build the YAML snippet for clients that consume YAML config. Used
+     * by Continue.dev. Indentation is two-space per the YAML 1.2 spec
+     * conventions Continue's config follows.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    private function _yamlSnippet(string $command): string
+    {
+        $parts = $this->_splitCommand($command);
+        $cmd = $parts[0];
+        $args = array_slice($parts, 1);
+
+        $argsYaml = '';
+        foreach ($args as $arg) {
+            $argsYaml .= "      - " . $this->_yamlScalar($arg) . "\n";
+        }
+
+        return rtrim(
+            "  - name: cortex\n" .
+            "    command: " . $this->_yamlScalar($cmd) . "\n" .
+            "    args:\n" .
+            $argsYaml,
+            "\n",
+        );
+    }
+
+    /**
+     * Quote a YAML scalar when it contains characters that would otherwise
+     * need escaping (whitespace, leading dash, special chars). Keeps
+     * the snippet copy-paste safe without overquoting plain identifiers.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    private function _yamlScalar(string $value): string
+    {
+        if ($value === '' || preg_match('/[\s:#\\\\"\'@`,\\[\\]\\{\\}]/', $value) || str_starts_with($value, '-')) {
+            return '"' . addcslashes($value, '"\\') . '"';
+        }
+        return $value;
     }
 
     /**
