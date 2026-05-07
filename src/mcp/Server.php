@@ -4,6 +4,7 @@ namespace craftpulse\cortex\mcp;
 
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\support\AttributeReader;
+use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\support\InvocationLogger;
 use craftpulse\cortex\tools\ToolException;
 use Generator;
@@ -47,6 +48,15 @@ class Server
      *             reject stdio-only tools (e.g. `craft_exec`) on HTTP.
      */
     private string $_transport;
+
+    /**
+     * @var string|null Client name from the most recent `initialize`
+     *                  handshake's `clientInfo.name`. Stamped onto every
+     *                  invocation context so audit log lines carry which
+     *                  MCP client made the call. Null until initialize
+     *                  fires.
+     */
+    private ?string $_clientName = null;
 
     // Public Methods
     // =========================================================================
@@ -106,7 +116,7 @@ class Server
         }
 
         return match ($method) {
-            'initialize' => $this->_successResponse($id, $this->_initializeResult()),
+            'initialize' => $this->_successResponse($id, $this->_initializeResult($params)),
             'tools/list' => $this->_successResponse($id, $this->_toolsList()),
             'tools/call' => $this->_handleToolsCall($id, $params),
             'prompts/list' => $this->_successResponse($id, $this->_promptsList()),
@@ -122,13 +132,28 @@ class Server
     // =========================================================================
 
     /**
+     * Build the `initialize` response and side-effect: capture the
+     * `clientInfo.name` so subsequent invocation contexts carry it
+     * through the audit log. The MCP spec lets clients reconnect /
+     * re-handshake; we just overwrite from the latest handshake.
+     *
+     * @param array<string,mixed> $params Initialize request params per
+     *                                    MCP 2025-06-18 — typically
+     *                                    `{protocolVersion, capabilities,
+     *                                    clientInfo: {name, version}}`.
      * @return array<string,mixed>
      *
      * @author Craftpulse
      * @since  0.1.0
      */
-    private function _initializeResult(): array
+    private function _initializeResult(array $params): array
     {
+        $clientInfo = $params['clientInfo'] ?? null;
+        if (is_array($clientInfo)) {
+            $name = $clientInfo['name'] ?? null;
+            $this->_clientName = is_string($name) && $name !== '' ? $name : null;
+        }
+
         return [
             'protocolVersion' => self::PROTOCOL_VERSION,
             'capabilities' => [
@@ -324,6 +349,8 @@ class Server
             return $this->_errorResponse($id, -32602, 'Invalid params: tools/call `arguments` must be an object');
         }
 
+        $context = $this->_invocationContext($id);
+
         $startNs = hrtime(true);
         try {
             $result = $tool->execute($arguments);
@@ -331,10 +358,10 @@ class Server
                 $result = $this->_consumeGenerator($result);
             }
         } catch (ToolException $e) {
-            InvocationLogger::logCall($name, $arguments, $e, $this->_elapsedMs($startNs));
+            InvocationLogger::logCall($name, $arguments, $e, $this->_elapsedMs($startNs), $context);
             return $this->_successResponse($id, $this->_toolErrorEnvelope($e->getMessage()));
         } catch (Throwable $e) {
-            InvocationLogger::logCall($name, $arguments, $e, $this->_elapsedMs($startNs));
+            InvocationLogger::logCall($name, $arguments, $e, $this->_elapsedMs($startNs), $context);
             // Unexpected exception — surface as JSON-RPC internal error.
             return $this->_errorResponse(
                 $id,
@@ -343,9 +370,29 @@ class Server
             );
         }
 
-        InvocationLogger::logCall($name, $arguments, null, $this->_elapsedMs($startNs));
+        InvocationLogger::logCall($name, $arguments, null, $this->_elapsedMs($startNs), $context);
 
         return $this->_successResponse($id, $this->_toolResultEnvelope($result));
+    }
+
+    /**
+     * Build an `InvocationContext` for the current dispatch. Phase 1
+     * stdio populates transport, request id, and client name (when
+     * captured from initialize); user is always null. Phase 2's HTTP
+     * transport will subclass / extend the dispatcher to populate the
+     * authenticated user before constructing the context.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    private function _invocationContext(string|int|null $requestId): InvocationContext
+    {
+        return new InvocationContext(
+            transport: $this->_transport,
+            requestId: $requestId,
+            userId: null,
+            clientName: $this->_clientName,
+        );
     }
 
     /**

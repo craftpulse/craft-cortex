@@ -11,26 +11,34 @@ use Throwable;
  * Per-invocation logger for cortex tool calls.
  *
  * Writes a single structured line per tool call to Craft's logger under
- * the `cortex` category. Captures: tool name, outcome kind (success /
- * tool_error / internal_error), duration in milliseconds, secret-
- * redacted arguments, and the error message when applicable.
+ * the `cortex` category. The line shape is locked across Phase 1 and
+ * Phase 2 so log consumers (operators tailing `storage/logs/web.log`,
+ * the Pro audit dashboard, external SIEM forwarders) don't break on
+ * the transport upgrade. Format:
  *
- * Phase 1 deliberately omits user attribution. The stdio transport is
- * single-process and runs as the local OS user — there's no per-request
- * Craft user to log. Phase 2's HTTP transport authenticates against a
- * Craft user via OAuth 2.1 / bearer tokens; the audit log surface adds
- * a `userId` field at that point and the wire format bumps from
- * `tool=... kind=... duration_ms=... args=...` to include `user=`. The
- * security rule (`.claude/rules/security.md`) lists user attribution as
- * a Phase 2 ship requirement, not a Phase 1 one.
+ *   tool=<name> kind=<success|tool_error|internal_error>
+ *   duration_ms=<int> transport=<stdio|http> request_id=<id|->
+ *   user=<id|-> client=<name|-> args=<redacted-json>
  *
- * Phase 1 ships logger-backed only — operators tail
- * `storage/logs/web.log` (or wire a Yii log target however they like)
- * to retroactively investigate "what did the LLM do." Phase 2's HTTP
- * transport adds the DB-backed `cortex_invocations` audit table with a
- * VueAdminTable UI; it consumes the same call shape, so this class
- * stays the dispatcher's hook point and the Pro layer subscribes to
- * the same data.
+ * Unknown fields emit `-`; the line is one space-separated KV record
+ * per call. Adding a field is backward-compatible by definition (a
+ * positional regex would break, but space/`=`-splitting parsers stay
+ * happy).
+ *
+ * Field lifecycle is documented on `InvocationContext`. The summary:
+ *   - `transport` — always populated by the dispatcher.
+ *   - `request_id` — JSON-RPC id, present from Phase 1.
+ *   - `user` — null until Phase 2's HTTP transport authenticates a
+ *     Craft user (stdio is single-process, runs as local OS user, no
+ *     per-request Craft identity).
+ *   - `client` — from MCP `initialize`'s `clientInfo.name`; populates
+ *     once per session, after handshake.
+ *
+ * Phase 1 ships logger-backed only — operators tail Craft logs to
+ * retroactively investigate "what did the LLM do." Phase 2 adds a
+ * DB-backed `cortex_invocations` audit table; it consumes the same
+ * call shape, so this class stays the dispatcher's hook point and the
+ * Pro layer subscribes to the same data.
  *
  * Logger output stays off STDOUT in `cortex/serve` — `ServeController`
  * caps log levels to error+warning during stdio sessions, so info-level
@@ -65,6 +73,11 @@ final class InvocationLogger
      * the client as `isError: true`; any other Throwable is an internal
      * error surfaced as JSON-RPC -32603. Null means the call succeeded.
      *
+     * `$context` is optional for backward compatibility with in-process
+     * callers; the dispatcher always passes one with at least the
+     * transport set. Omitting it emits `-` placeholders for all
+     * context fields.
+     *
      * @param array<string,mixed> $arguments
      *
      * @author Craftpulse
@@ -75,9 +88,10 @@ final class InvocationLogger
         array $arguments,
         ?Throwable $error,
         int $durationMs,
+        ?InvocationContext $context = null,
     ): void {
         $kind = self::_resolveKind($error);
-        $entry = self::formatEntry($toolName, $arguments, $error, $durationMs, $kind);
+        $entry = self::formatEntry($toolName, $arguments, $error, $durationMs, $context, $kind);
 
         // Errors get a higher log level so default targets capture them
         // even when info filtering is on.
@@ -107,17 +121,24 @@ final class InvocationLogger
         array $arguments,
         ?Throwable $error,
         int $durationMs,
+        ?InvocationContext $context = null,
         ?string $kindOverride = null,
     ): string {
         $kind = $kindOverride ?? self::_resolveKind($error);
         $redacted = SecretRedactor::redactArray($arguments);
         $argsJson = (string) json_encode($redacted, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
+        $ctx = $context ?? new InvocationContext(transport: 'unknown');
+
         $line = sprintf(
-            'tool=%s kind=%s duration_ms=%d args=%s',
+            'tool=%s kind=%s duration_ms=%d transport=%s request_id=%s user=%s client=%s args=%s',
             $toolName,
             $kind,
             $durationMs,
+            $ctx->transport,
+            self::_orDash($ctx->requestId),
+            self::_orDash($ctx->userId),
+            self::_orDash($ctx->clientName),
             $argsJson,
         );
 
@@ -148,6 +169,23 @@ final class InvocationLogger
             return self::KIND_TOOL_ERROR;
         }
         return self::KIND_INTERNAL_ERROR;
+    }
+
+    /**
+     * Render a context field for inclusion in the log line. Null becomes
+     * the literal `-` (Apache-style "not applicable / not yet known"
+     * placeholder) so the field is always present and the line shape
+     * stays stable across Phase 1 / Phase 2.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    private static function _orDash(string|int|null $value): string
+    {
+        if ($value === null || $value === '') {
+            return '-';
+        }
+        return (string) $value;
     }
 
     /**
