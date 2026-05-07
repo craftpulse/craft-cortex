@@ -2,7 +2,7 @@
 
 /**
  * =========================================================================
- * `audit` tool tests.
+ * `content_audit` tool tests.
  *
  * Verifies argument validation, payload shape, and that each mode returns
  * a paginated envelope. Real-data assertions are limited because the
@@ -19,12 +19,12 @@ use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function () {
-    $this->tool = Plugin::getInstance()->tools->getByName('audit');
+    $this->tool = Plugin::getInstance()->tools->getByName('content_audit');
 });
 
 it('is registered on the tool registry', function () {
     expect($this->tool)->not->toBeNull();
-    expect($this->tool::getName())->toBe('audit');
+    expect($this->tool::getName())->toBe('content_audit');
 });
 
 it('throws when mode is missing', function () {
@@ -70,7 +70,7 @@ it('clamps limit to MAX_LIMIT', function () {
 it('appears in the registry tools/list payload with annotations', function () {
     $payload = Plugin::getInstance()->tools->asListPayload();
 
-    $entry = collect($payload)->firstWhere('name', 'audit');
+    $entry = collect($payload)->firstWhere('name', 'content_audit');
     expect($entry)->not->toBeNull();
     expect($entry)->toBeMcpToolListItem();
     expect($entry['annotations'] ?? [])->toHaveKeys(['readOnlyHint', 'idempotentHint']);

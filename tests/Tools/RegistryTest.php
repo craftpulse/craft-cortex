@@ -38,7 +38,7 @@ it('registers all Phase-1 tools by name', function () {
         'config',
         'plugins',
         'routes',
-        'diagnostics',
+        'system_diagnostics',
         'database_schema',
         'extensibility',
         'permissions_and_groups',
@@ -53,7 +53,7 @@ it('registers all Phase-1 tools by name', function () {
 
         // Workflow & Audit — read modes (Gate 6.5)
         'drafts_and_revisions',
-        'audit',
+        'content_audit',
         'import_export',
     ];
 
