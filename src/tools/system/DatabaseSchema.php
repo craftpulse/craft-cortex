@@ -4,7 +4,10 @@ namespace craftpulse\cortex\tools\system;
 
 use Craft;
 use craft\helpers\StringHelper;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 use yii\db\TableSchema;
 
@@ -27,6 +30,8 @@ use yii\db\TableSchema;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class DatabaseSchema extends AbstractTool
 {
     // Public Methods
@@ -65,21 +70,11 @@ class DatabaseSchema extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'mode' => [
-                    'type' => 'string',
-                    'enum' => ['default', 'list'],
-                ],
-                'tables' => [
-                    'type' => 'array',
-                    'items' => ['type' => 'string'],
-                    'description' => 'Limit output to these table names (with or without prefix).',
-                ],
-            ],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'mode' => Schema::string()->enum(['default', 'list']),
+            'tables' => Schema::array(Schema::string())
+                ->description('Limit output to these table names (with or without prefix).'),
+        ])->toArray();
     }
 
     /**
