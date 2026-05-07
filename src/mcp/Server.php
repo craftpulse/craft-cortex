@@ -5,6 +5,7 @@ namespace craftpulse\cortex\mcp;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\ToolException;
+use Generator;
 use Throwable;
 
 /**
@@ -305,6 +306,9 @@ class Server
 
         try {
             $result = $tool->execute($arguments);
+            if ($result instanceof Generator) {
+                $result = $this->_consumeGenerator($result);
+            }
         } catch (ToolException $e) {
             return $this->_successResponse($id, $this->_toolErrorEnvelope($e->getMessage()));
         } catch (Throwable $e) {
@@ -317,6 +321,47 @@ class Server
         }
 
         return $this->_successResponse($id, $this->_toolResultEnvelope($result));
+    }
+
+    /**
+     * Eagerly drain a tool's `Generator` and return the final result.
+     * Phase 1 dispatchers do NOT forward intermediate yields as MCP
+     * progress notifications — that's Phase 2 transport work, gated on
+     * the HTTP / SSE adapter. The interface change is forward-compatible:
+     * tools can already return `Generator`, but only the final value is
+     * surfaced to the client.
+     *
+     * The final value is taken from the generator's return value
+     * (`$gen->getReturn()`) when present; otherwise from the last
+     * yielded value. Tools should prefer the explicit `return` form so
+     * the contract is unambiguous.
+     *
+     * @param Generator<int,mixed,mixed,array<int|string,mixed>> $gen
+     * @return array<int|string,mixed>
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    private function _consumeGenerator(Generator $gen): array
+    {
+        $last = null;
+        foreach ($gen as $value) {
+            $last = $value;
+        }
+
+        $return = $gen->getReturn();
+        if (is_array($return)) {
+            return $return;
+        }
+
+        if (is_array($last)) {
+            return $last;
+        }
+
+        return [
+            'mode' => 'streamed',
+            'note' => 'Tool returned a Generator with no terminal array value. Phase 2 streaming will surface yields.',
+        ];
     }
 
     /**

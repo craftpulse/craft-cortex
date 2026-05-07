@@ -185,6 +185,11 @@ final class Schema
     private bool $_additionalPropertiesExplicit = false;
 
     /**
+     * @var list<mixed>|null
+     */
+    private ?array $_examples = null;
+
+    /**
      * @var list<self>
      *
      * @author Craftpulse
@@ -619,6 +624,26 @@ final class Schema
         return $this;
     }
 
+    /**
+     * Set the JSON Schema `examples` keyword (a list of valid sample
+     * values for this schema). LLMs use these to anchor reasoning about
+     * what shapes the tool accepts. Empty list is rejected — pass
+     * `null` semantics by simply not calling `examples()`.
+     *
+     * @param list<mixed> $values
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    public function examples(array $values): self
+    {
+        if ($values === []) {
+            throw new InvalidArgumentException('Schema::examples() requires at least one value.');
+        }
+        $this->_examples = array_values($values);
+        return $this;
+    }
+
     // Public Methods — Introspection
     // =========================================================================
 
@@ -734,6 +759,10 @@ final class Schema
             $out['additionalProperties'] = $this->_additionalProperties instanceof self
                 ? $this->_additionalProperties->toArray()
                 : $this->_additionalProperties;
+        }
+
+        if ($this->_examples !== null) {
+            $out['examples'] = $this->_examples;
         }
 
         if ($this->_anyOf !== []) {

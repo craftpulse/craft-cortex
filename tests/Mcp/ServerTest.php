@@ -373,3 +373,78 @@ it('responds to ping with an empty result', function () {
     expect($response)->toHaveKey('result');
     expect((array) $response['result'])->toBe([]);
 });
+
+// -----------------------------------------------------------------------------
+// Generator return type — eager consume (Phase 1; Phase 2 streams notifications)
+// -----------------------------------------------------------------------------
+
+it('eagerly consumes a Generator-returning tool and surfaces the return value', function () {
+    $listener = function (\craftpulse\cortex\events\RegisterToolsEvent $event): void {
+        $event->tools[] = new class extends \craftpulse\cortex\tools\AbstractTool {
+            public static function getName(): string
+            {
+                return '_fake_streaming_tool';
+            }
+
+            public static function getDescription(): string
+            {
+                return 'Fixture that yields progress and returns final.';
+            }
+
+            public function execute(array $arguments): \Generator
+            {
+                yield ['progress' => 0.5];
+                yield ['progress' => 1.0];
+                return ['done' => true, 'count' => 2];
+            }
+        };
+    };
+    \yii\base\Event::on(
+        \craftpulse\cortex\services\Tools::class,
+        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        $listener,
+    );
+
+    try {
+        // Build a fresh service so the fresh listener is in effect.
+        $service = new \craftpulse\cortex\services\Tools();
+        $service->init();
+        $tool = $service->getByName('_fake_streaming_tool');
+        expect($tool)->not->toBeNull();
+
+        // The dispatcher operates on Plugin::getInstance()->tools, so to
+        // exercise the Generator path through the dispatcher we call the
+        // tool directly via a Server instance after temporarily swapping
+        // the plugin's registry. Simpler: assert via the dispatcher by
+        // re-registering on the global service for the duration.
+        // For Phase 1 the stronger contract is "no exception, final
+        // return is surfaced" — assert that against the inner consumer.
+
+        $reflection = new ReflectionClass($this->server);
+        $method = $reflection->getMethod('_consumeGenerator');
+        $method->setAccessible(true);
+        $result = $method->invoke($this->server, $tool->execute([]));
+
+        expect($result)->toBe(['done' => true, 'count' => 2]);
+    } finally {
+        \yii\base\Event::off(
+            \craftpulse\cortex\services\Tools::class,
+            \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+            $listener,
+        );
+    }
+});
+
+it('falls back to the last yielded value when a Generator has no explicit return', function () {
+    $gen = (function () {
+        yield ['progress' => 0.5];
+        yield ['done' => true];
+    })();
+
+    $reflection = new ReflectionClass($this->server);
+    $method = $reflection->getMethod('_consumeGenerator');
+    $method->setAccessible(true);
+    $result = $method->invoke($this->server, $gen);
+
+    expect($result)->toBe(['done' => true]);
+});
