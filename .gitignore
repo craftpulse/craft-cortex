@@ -7,6 +7,11 @@
 /.claude/settings.local.json
 /.claude/memory/
 
+# Internal dev knowledge — full gate-by-gate history, audit findings,
+# smoke results, anything that's "our knowledge" rather than user-facing
+# documentation. Each developer keeps their own.
+/.internal/
+
 # OS / editor cruft
 .DS_Store
 .idea/
