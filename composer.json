@@ -34,6 +34,7 @@
     },
     "require-dev": {
         "craftcms/ecs": "dev-main",
+        "craftcms/generator": "^2.0",
         "craftcms/phpstan": "dev-main",
         "pestphp/pest": "^3.0"
     },
