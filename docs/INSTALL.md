@@ -213,6 +213,16 @@ A successful `initialize` handshake reports `cortex 0.1.0` and protocol `2025-06
 
 Cortex won't ghost-create config directories — their absence is the canonical "client not installed" signal. Either install the client first, or use the manual snippet form (`cortex/install --client=<name>`) and paste into a config file you create yourself.
 
+### `apply` refuses inside DDEV but my client IS installed (on the host)
+
+If you're running `ddev craft cortex/install/apply` from inside a DDEV container, the auto-config writer can only see the container's filesystem — not your host's. Your MCP client lives on the host, so its config directory looks "missing" from the container's perspective.
+
+Two ways to handle it:
+
+1. **`--dry-run` to preview, then copy-paste.** Inside DDEV, run with `--dry-run`. Cortex prints the would-be `AFTER` block including the correct `docker exec` invocation. Copy it into your host MCP client's config file manually.
+
+2. **Use the manual snippet form** — `ddev craft cortex/install --client=<name>` — which is designed to be DDEV-friendly and prints the same content with the surrounding context lines.
+
 ### The `apply` command refuses with "Cortex entry already present"
 
 The action is idempotent by default. Re-run with `--force` to overwrite the existing entry. Cortex makes a fresh backup before writing.
