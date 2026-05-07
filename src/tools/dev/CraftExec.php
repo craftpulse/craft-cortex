@@ -2,6 +2,11 @@
 
 namespace craftpulse\cortex\tools\dev;
 
+use craftpulse\cortex\attributes\IsDestructive;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsOpenWorld;
+use craftpulse\cortex\attributes\IsStdioOnly;
+use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\SecretRedactor;
@@ -29,9 +34,9 @@ use Throwable;
  *      `truncate*`, `Elements::deleteElement`, `migrate/down` require
  *      both `confirm: true` AND `dangerous: true` — `confirm` alone is
  *      not enough for a destructive expression.
- *   5. **stdio only.** `isStdioOnly()` returns true; the dispatcher
- *      hard-rejects HTTP requests for this tool regardless of token
- *      scope or permissions.
+ *   5. **stdio only.** `#[IsStdioOnly]` attribute on the class; the
+ *      dispatcher hard-rejects HTTP requests for this tool regardless
+ *      of token scope or permissions.
  *   6. **Tool annotation.** `destructiveHint: true` on the tool so
  *      spec-compliant clients can warn the user before invoking.
  *
@@ -45,6 +50,11 @@ use Throwable;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[Title('Evaluate Craft Expression')]
+#[IsDestructive]
+#[IsIdempotent(false)]
+#[IsOpenWorld(false)]
+#[IsStdioOnly]
 class CraftExec extends AbstractTool
 {
     // Constants
@@ -74,37 +84,6 @@ class CraftExec extends AbstractTool
 
     // Public Methods
     // =========================================================================
-
-    /**
-     * @inheritdoc
-     *
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    public static function isStdioOnly(): bool
-    {
-        // Gate 5: hard-reject on HTTP at the dispatcher.
-        return true;
-    }
-
-    /**
-     * @inheritdoc
-     *
-     * Gate 6: spec-compliant clients (Claude Code, Inspector) honour
-     * `destructiveHint` to warn the user before invocation.
-     *
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    public static function getAnnotations(): array
-    {
-        return [
-            'title' => 'Evaluate Craft Expression',
-            'destructiveHint' => true,
-            'idempotentHint' => false,
-            'openWorldHint' => false,
-        ];
-    }
 
     /**
      * @inheritdoc

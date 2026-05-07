@@ -2,6 +2,10 @@
 
 namespace craftpulse\cortex\tools\dev;
 
+use craftpulse\cortex\attributes\IsDestructive;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsOpenWorld;
+use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\ConsoleRunner;
 use craftpulse\cortex\tools\ToolException;
@@ -29,6 +33,10 @@ use craftpulse\cortex\tools\ToolException;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[Title('Resave Elements')]
+#[IsDestructive]
+#[IsIdempotent]
+#[IsOpenWorld(false)]
 class Resave extends AbstractTool
 {
     // Constants
@@ -45,27 +53,6 @@ class Resave extends AbstractTool
         'users' => 'resave/users',
         'addresses' => 'resave/addresses',
     ];
-
-    /**
-     * @inheritdoc
-     *
-     * Mutating action — clients that respect `destructiveHint` will
-     * prompt the user before invoking. Even though resaves are
-     * recoverable, they touch every matched element and trigger
-     * downstream events (search re-index, propagation, plugin hooks).
-     *
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    public static function getAnnotations(): array
-    {
-        return [
-            'title' => 'Resave Elements',
-            'destructiveHint' => true,
-            'idempotentHint' => true,
-            'openWorldHint' => false,
-        ];
-    }
 
     /**
      * @inheritdoc

@@ -190,16 +190,16 @@ it('Gate 4: non-destructive expressions report isDestructive=false', function ()
 // Gate 5 — stdio-only (asserted at the dispatcher level too — see Mcp/ServerTest)
 // -----------------------------------------------------------------------------
 
-it('Gate 5: declares isStdioOnly = true at the tool layer', function () {
-    expect($this->tool::isStdioOnly())->toBeTrue();
+it('Gate 5: declares isStdioOnly = true via attribute', function () {
+    expect(\craftpulse\cortex\tools\support\AttributeReader::isStdioOnly($this->tool))->toBeTrue();
 });
 
 // -----------------------------------------------------------------------------
 // Gate 6 — Annotation
 // -----------------------------------------------------------------------------
 
-it('Gate 6: exposes destructiveHint:true via getAnnotations', function () {
-    $annotations = $this->tool::getAnnotations();
+it('Gate 6: exposes destructiveHint:true via attribute reader', function () {
+    $annotations = \craftpulse\cortex\tools\support\AttributeReader::annotationsFor($this->tool);
     expect($annotations)->toHaveKey('destructiveHint', true);
     expect($annotations)->toHaveKey('idempotentHint', false);
 });
