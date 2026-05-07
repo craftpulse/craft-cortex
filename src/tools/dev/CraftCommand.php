@@ -9,6 +9,7 @@ use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\ConsoleRunner;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 
 /**
@@ -80,26 +81,16 @@ class CraftCommand extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'mode' => [
-                    'type' => 'string',
-                    'enum' => ['list', 'run'],
-                    'description' => 'Optional. `list` returns the active allowlist; `run` (default) dispatches.',
-                ],
-                'command' => [
-                    'type' => 'string',
-                    'description' => 'Console route to dispatch. Required when mode=run.',
-                ],
-                'options' => [
-                    'type' => 'object',
-                    'description' => 'Object of CLI option overrides bound to the controller properties.',
-                    'additionalProperties' => true,
-                ],
-            ],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'mode' => Schema::string()
+                ->enum(['list', 'run'])
+                ->description('Optional. `list` returns the active allowlist; `run` (default) dispatches.'),
+            'command' => Schema::string()
+                ->description('Console route to dispatch. Required when mode=run.'),
+            'options' => Schema::object()
+                ->additionalProperties(true)
+                ->description('Object of CLI option overrides bound to the controller properties.'),
+        ])->toArray();
     }
 
     /**

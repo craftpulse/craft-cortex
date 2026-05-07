@@ -6,7 +6,10 @@ use Craft;
 use craft\helpers\DateTimeHelper;
 use craft\models\GqlSchema;
 use craft\models\GqlToken;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 use GraphQL\Utils\SchemaPrinter;
 use Throwable;
@@ -30,6 +33,8 @@ use Throwable;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class Graphql extends AbstractTool
 {
     // Public Methods
@@ -68,22 +73,14 @@ class Graphql extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'mode' => [
-                    'type' => 'string',
-                    'enum' => ['list_schemas', 'get_sdl', 'list_tokens'],
-                    'description' => 'Required.',
-                ],
-                'name' => [
-                    'type' => 'string',
-                    'description' => 'For `get_sdl`: schema name. Omit for the public schema.',
-                ],
-            ],
-            'required' => ['mode'],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'mode' => Schema::string()
+                ->enum(['list_schemas', 'get_sdl', 'list_tokens'])
+                ->description('Required.')
+                ->required(),
+            'name' => Schema::string()
+                ->description('For `get_sdl`: schema name. Omit for the public schema.'),
+        ])->toArray();
     }
 
     /**

@@ -9,6 +9,7 @@ use craftpulse\cortex\attributes\IsStdioOnly;
 use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\support\SecretRedactor;
 use craftpulse\cortex\tools\ToolException;
 use ParseError;
@@ -120,25 +121,15 @@ class CraftExec extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'expression' => [
-                    'type' => 'string',
-                    'description' => 'PHP expression to evaluate. `<?php` prefix optional. Required.',
-                ],
-                'confirm' => [
-                    'type' => 'boolean',
-                    'description' => 'Required to actually evaluate (otherwise returns dry-run analysis).',
-                ],
-                'dangerous' => [
-                    'type' => 'boolean',
-                    'description' => 'Required in addition to `confirm` for destructive expressions.',
-                ],
-            ],
-            'required' => ['expression'],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'expression' => Schema::string()
+                ->required()
+                ->description('PHP expression to evaluate. `<?php` prefix optional. Required.'),
+            'confirm' => Schema::boolean()
+                ->description('Required to actually evaluate (otherwise returns dry-run analysis).'),
+            'dangerous' => Schema::boolean()
+                ->description('Required in addition to `confirm` for destructive expressions.'),
+        ])->toArray();
     }
 
     /**
