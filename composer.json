@@ -30,7 +30,7 @@
     "require": {
         "php": ">=8.2",
         "craftcms/cms": "^5.0",
-        "michtio/craftcms-claude-skills": "^1.4"
+        "michtio/craftcms-claude-skills": "^1.4.2"
     },
     "require-dev": {
         "craftcms/ecs": "dev-main",

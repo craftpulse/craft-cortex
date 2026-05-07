@@ -10,12 +10,13 @@
  */
 
 use craftpulse\cortex\Plugin;
+use craftpulse\cortex\resources\AgentResource;
 use craftpulse\cortex\resources\ResourceInterface;
 use craftpulse\cortex\resources\SkillResource;
 use Michtio\CraftCmsClaudeSkills\Skills;
 
-it('registers one resource per skill plus one per reference (8 + sum-of-references)', function () {
-    $expected = 0;
+it('registers one resource per skill plus one per reference plus one per agent', function () {
+    $expected = count(Skills::agentNames());
     foreach (Skills::skillNames() as $skill) {
         $expected += 1 + count(Skills::references($skill));
     }
@@ -82,4 +83,34 @@ it('builds a spec-shaped resources/list payload', function () {
             ->and($item['uri'])->toBeString()->toStartWith('craft-skills://')
             ->and($item['mimeType'])->toBe('text/markdown');
     }
+});
+
+it('registers an agent resource for every bundled agent', function () {
+    $resources = Plugin::getInstance()->resources;
+
+    foreach (Skills::agentNames() as $agent) {
+        $uri = sprintf('%s://%s/%s', AgentResource::URI_SCHEME, AgentResource::URI_PREFIX, $agent);
+        expect($resources->getByUri($uri))
+            ->not->toBeNull()
+            ->toBeInstanceOf(AgentResource::class);
+    }
+});
+
+it('agent resource read returns the agent file content', function () {
+    $agents = Skills::agentNames();
+    if ($agents === []) {
+        // Older skills package; agent surface unavailable.
+        $this->markTestSkipped('No agents in the bundled skills package.');
+    }
+
+    $first = $agents[0];
+    $uri = sprintf('%s://%s/%s', AgentResource::URI_SCHEME, AgentResource::URI_PREFIX, $first);
+    $resource = Plugin::getInstance()->resources->getByUri($uri);
+    $block = $resource->read();
+
+    expect($block)
+        ->toHaveKey('uri', $uri)
+        ->toHaveKey('mimeType', 'text/markdown')
+        ->toHaveKey('text');
+    expect($block['text'])->toContain('---'); // frontmatter delimiter
 });
