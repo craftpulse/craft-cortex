@@ -29,6 +29,7 @@ use craftpulse\cortex\tools\system\Extensibility;
 use craftpulse\cortex\tools\system\PermissionsAndGroups;
 use craftpulse\cortex\tools\system\Plugins;
 use craftpulse\cortex\tools\system\Routes;
+use craftpulse\cortex\tools\system\SearchSkills;
 use craftpulse\cortex\tools\system\SystemInfo;
 use craftpulse\cortex\tools\workflow\Audit;
 use craftpulse\cortex\tools\workflow\DraftsAndRevisions;
@@ -234,6 +235,7 @@ class Tools extends Component
             new DatabaseSchema(),
             new Extensibility(),
             new PermissionsAndGroups(),
+            new SearchSkills(),
 
             // Gate 5 — GraphQL & Dev Actions (5 tools).
             new Graphql(),
