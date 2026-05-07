@@ -30,6 +30,7 @@ use craftpulse\cortex\tools\system\PermissionsAndGroups;
 use craftpulse\cortex\tools\system\Plugins;
 use craftpulse\cortex\tools\system\Routes;
 use craftpulse\cortex\tools\system\SystemInfo;
+use craftpulse\cortex\tools\workflow\Audit;
 use craftpulse\cortex\tools\workflow\DraftsAndRevisions;
 use craftpulse\cortex\events\RegisterToolsEvent;
 use craftpulse\cortex\tools\support\AttributeReader;
@@ -233,6 +234,7 @@ class Tools extends Component
 
             // Gate 6.5 — Workflow & Audit (read modes).
             new DraftsAndRevisions(),
+            new Audit(),
         ];
     }
 }
