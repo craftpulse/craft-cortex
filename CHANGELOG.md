@@ -6,6 +6,136 @@ All notable changes to Cortex are documented here. Format follows
 
 ## [Unreleased]
 
+### Added — Gate 6.5 ship-prep close-out (Phase 1 final pass)
+
+Audit-driven follow-up to the Gate 6.5 build below. An adversarial review
+flagged two ship blockers in the existing surface and a set of Phase 2
+contracts that were cheaper to lock in now than to deprecate later. The
+close-out lands the fixes, freezes the public extension surface, and
+adds the architecture tests that catch convention drift.
+
+#### BLOCKER fixes
+
+- `tools/dev/CraftExec` — `execDryRunDefault` setting was wired into
+  the CP toggle but never read by the tool. The default now correctly
+  cascades into `execute()` so a user setting "dry-run by default" in
+  the CP actually applies. Was masked because the tests passed
+  `confirm: true` explicitly; added a regression test that hits the
+  default code path.
+- `console/InstallController` — three of the seven generated client
+  snippets were wrong against current upstream docs:
+  - Claude Code missed the `--` separator on `claude mcp add`,
+    causing the wrapped `docker exec -i` to parse `-i` as a Claude
+    flag.
+  - Continue.dev still pointed at the deprecated
+    `experimental.modelContextProtocolServers` JSON form instead of
+    the modern YAML `mcpServers:` key.
+  - Zed snippet used the wrong key (`assistant.mcp_servers` vs
+    `context_servers`).
+
+#### Phase 2 lock-in (interfaces and contracts frozen ahead of ship)
+
+- `ToolInterface` extended with two new methods, both defaulted on
+  `AbstractTool` so existing tools require no change:
+  - `outputSchema(): array` — JSON Schema for the structured tool
+    response. Empty array means "no output schema declared." Pro
+    tools and any tool that benefits from advertising response shape
+    override.
+  - `shouldRegister(): bool` — return `false` to opt the tool out of
+    the registry for the current request. Phase 2 Pro tools use this
+    to gate visibility on Craft permissions per-user.
+  - `execute()` return type widened from `array` to `array|\Generator`
+    so Phase 2's HTTP transport can forward intermediate yields as
+    `notifications/progress`. Phase 1 dispatchers consume the
+    Generator eagerly — final yield becomes the wire response.
+- `resources/ResourceTemplateInterface` — Phase 1 addition for
+  dynamic URI resolution. `getUriTemplate()` / `matches(string $uri)`
+  / `read(string $uri)`. Templates are consulted only when a
+  concrete-URI lookup misses, so they don't shadow built-in
+  resources. `services/Resources` now exposes `matchTemplate()` and
+  `getTemplates()`.
+- `Schema` DSL adds `examples(array)` — the only JSON Schema fluent
+  setter that was missing. Locking the surface ahead of Phase 2.
+
+#### New surfaces
+
+- 5 bundled agents from `michtio/craftcms-claude-skills` v1.4.2+
+  surface as MCP resources under
+  `craft-skills://agents/<agent-name>`. The companion package's
+  `Skills::agentNames()` / `Skills::agentContent()` helpers are
+  optional — the loop is a no-op against an older companion install,
+  so cortex still boots cleanly for users who haven't upgraded.
+- `tools/system/SearchSkills` — new `search_skills` tool. Keyword
+  search across the bundled skills corpus with snippet
+  highlighting. Pulls the LLM toward "search the moat content" rather
+  than "ask cortex to read every skill in turn."
+- `tools/support/InvocationLogger` — emits per-tool-call audit lines
+  to the `cortex` log channel. Tool name, user (when available),
+  argument fingerprint (secrets redacted), elapsed ms, success /
+  error. Wired into `mcp/Server::dispatchTool()`. Phase 2's HTTP
+  transport extends the same channel for cross-request audit.
+
+#### Renames (frozen-surface naming pass)
+
+- `diagnostics` → `system_diagnostics`. Pairs with `system_info`; the
+  LLM groups them naturally at tool selection. The plain
+  `diagnostics` name was generic enough to be ambiguous against
+  future audit categories (security, permission, log).
+- `audit` → `content_audit`. The tool's modes are content / data-
+  integrity audits; the verbose name distinguishes from any future
+  audit category.
+- Both renames documented in the locked-decisions auto-memory; third-
+  party tools registering after Phase 1 ship pin against these names.
+
+#### Audit envelope upgrade
+
+- `tools/workflow/ImportExport` — export envelope bumped to format 2.
+  Adds a manifest header (export timestamp, source site UID, format
+  version) and per-entry section / type identity headers so a Pro
+  `import` mode can do a round-trip without a separate manifest
+  file. Phase 1 still only exposes `export`; the format-versioned
+  envelope is forward-compatible with the Pro import surface.
+
+#### Architecture tests
+
+- `tests/Architecture/ConventionsTest` adds three enforcers:
+  - Every class file in `src/` carries at least one `@since` tag.
+  - Every private method and property on a concrete class uses the
+    underscore prefix (skips magic methods, only walks members
+    declared on the class itself).
+  - No tool's `execute()` declares `mixed` as the return type —
+    PLANNING.md 4.10 calls this out; the dispatcher branches on
+    array vs `\Generator` so `mixed` defeats the contract.
+
+#### Registry collision warnings
+
+- `services/Tools::init`, `Prompts::init`, `Resources::init` —
+  duplicate-name registrations were silently skipped with a "logging
+  is left to a future audit pass" comment. Wired `Craft::warning()`
+  log lines (channel `cortex`) so collisions surface to third-party
+  plugin authors. First-registration-wins behaviour stays — bundled
+  cortex registrations always trump.
+
+#### Auto-config writer
+
+- `console/InstallController::actionApply` —
+  `cortex/install/apply --client=<name>` writes the cortex MCP
+  server entry directly into the target client's config file.
+  Cross-platform path resolution for all seven supported clients
+  (macOS / Linux / Windows / WSL). Atomic write (temp file +
+  rename), `<file>.bak.<unix-timestamp>` backup. `--force` to
+  overwrite an existing cortex entry; `--dry-run` to see the would-
+  be diff without writing. Refuses to ghost-create when the parent
+  config dir is missing — that's the canonical "client not
+  installed" signal. Existing snippet-printer (`cortex/install`)
+  unchanged; remains the documented manual fallback. Per-client
+  paths verified against current upstream docs.
+
+#### Test surface
+
+- 324 Pest tests passing, 5 conditional skips, ~2.5s. PHPStan level
+  8 clean. Architecture conventions green (7 enforcers).
+
 ### Added — Gate 6.5 (Phase 1, DX Pass + Workflow & Audit + Ship-readiness)
 
 Phase 1 shippable. The DX foundation (Schema DSL, attribute-based
