@@ -30,6 +30,7 @@ use craftpulse\cortex\tools\system\PermissionsAndGroups;
 use craftpulse\cortex\tools\system\Plugins;
 use craftpulse\cortex\tools\system\Routes;
 use craftpulse\cortex\tools\system\SystemInfo;
+use craftpulse\cortex\events\RegisterToolsEvent;
 use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\ToolInterface;
 use yii\base\Component;
@@ -50,6 +51,17 @@ use yii\base\Component;
  */
 class Tools extends Component
 {
+    // Constants
+    // =========================================================================
+
+    /**
+     * Event fired during boot to allow third-party plugins to register
+     * their own tools. Listeners append `ToolInterface` instances to
+     * `RegisterToolsEvent::$tools`. See `events/RegisterToolsEvent` for
+     * the contract and security guidance.
+     */
+    public const EVENT_REGISTER_TOOLS = 'registerTools';
+
     // Private Properties
     // =========================================================================
 
@@ -76,9 +88,23 @@ class Tools extends Component
     {
         parent::init();
 
-        foreach ($this->_buildRegistry() as $tool) {
+        $event = new RegisterToolsEvent();
+        $event->tools = $this->_buildRegistry();
+        $this->trigger(self::EVENT_REGISTER_TOOLS, $event);
+
+        foreach ($event->tools as $tool) {
+            if (!$tool instanceof ToolInterface) {
+                continue;
+            }
+            $name = $tool::getName();
+            if (isset($this->_byName[$name])) {
+                // First registration wins — don't let third-party tools
+                // shadow bundled ones, and don't let collisions silently
+                // overwrite. Logging is left to a future audit pass.
+                continue;
+            }
             $this->_tools[] = $tool;
-            $this->_byName[$tool::getName()] = $tool;
+            $this->_byName[$name] = $tool;
         }
     }
 
