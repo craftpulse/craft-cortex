@@ -2,6 +2,7 @@
 
 namespace craftpulse\cortex\services;
 
+use craftpulse\cortex\events\RegisterResourcesEvent;
 use craftpulse\cortex\resources\ResourceInterface;
 use craftpulse\cortex\resources\SkillResource;
 use Michtio\CraftCmsClaudeSkills\Skills;
@@ -25,6 +26,15 @@ use yii\base\Component;
  */
 class Resources extends Component
 {
+    // Constants
+    // =========================================================================
+
+    /**
+     * Event fired during boot to allow third-party plugins to register
+     * their own resources. See `events/RegisterResourcesEvent`.
+     */
+    public const EVENT_REGISTER_RESOURCES = 'registerResources';
+
     // Private Properties
     // =========================================================================
 
@@ -51,9 +61,20 @@ class Resources extends Component
     {
         parent::init();
 
-        foreach ($this->_buildRegistry() as $resource) {
+        $event = new RegisterResourcesEvent();
+        $event->resources = $this->_buildRegistry();
+        $this->trigger(self::EVENT_REGISTER_RESOURCES, $event);
+
+        foreach ($event->resources as $resource) {
+            if (!$resource instanceof ResourceInterface) {
+                continue;
+            }
+            $uri = $resource->getUri();
+            if (isset($this->_byUri[$uri])) {
+                continue;
+            }
             $this->_resources[] = $resource;
-            $this->_byUri[$resource->getUri()] = $resource;
+            $this->_byUri[$uri] = $resource;
         }
     }
 

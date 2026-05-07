@@ -2,6 +2,7 @@
 
 namespace craftpulse\cortex\services;
 
+use craftpulse\cortex\events\RegisterPromptsEvent;
 use craftpulse\cortex\prompts\PromptInterface;
 use craftpulse\cortex\prompts\SkillPrompt;
 use Michtio\CraftCmsClaudeSkills\Skills;
@@ -26,6 +27,15 @@ use yii\base\Component;
  */
 class Prompts extends Component
 {
+    // Constants
+    // =========================================================================
+
+    /**
+     * Event fired during boot to allow third-party plugins to register
+     * their own prompts. See `events/RegisterPromptsEvent`.
+     */
+    public const EVENT_REGISTER_PROMPTS = 'registerPrompts';
+
     // Private Properties
     // =========================================================================
 
@@ -98,9 +108,20 @@ class Prompts extends Component
     {
         parent::init();
 
-        foreach ($this->_buildRegistry() as $prompt) {
+        $event = new RegisterPromptsEvent();
+        $event->prompts = $this->_buildRegistry();
+        $this->trigger(self::EVENT_REGISTER_PROMPTS, $event);
+
+        foreach ($event->prompts as $prompt) {
+            if (!$prompt instanceof PromptInterface) {
+                continue;
+            }
+            $name = $prompt->getName();
+            if (isset($this->_byName[$name])) {
+                continue;
+            }
             $this->_prompts[] = $prompt;
-            $this->_byName[$prompt->getName()] = $prompt;
+            $this->_byName[$name] = $prompt;
         }
     }
 
