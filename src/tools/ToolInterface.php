@@ -50,33 +50,6 @@ interface ToolInterface
     public static function getInputSchema(): array;
 
     /**
-     * MCP `ToolAnnotations` for the `tools/list` payload. Hints to the
-     * client about behavioural properties — `destructiveHint`,
-     * `idempotentHint`, `readOnlyHint`, `openWorldHint`, `title`. Spec-
-     * compliant clients can warn the user before invoking a tool flagged
-     * `destructiveHint: true`. Default `[]` (no annotations) on
-     * `AbstractTool`.
-     *
-     * @return array<string,mixed>
-     *
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    public static function getAnnotations(): array;
-
-    /**
-     * Whether this tool may only be invoked over the stdio transport.
-     * The dispatcher rejects HTTP requests for stdio-only tools at the
-     * tool-call layer with a JSON-RPC error, regardless of token scope
-     * or permission. `craft_exec` is the canonical example. Default
-     * `false` on `AbstractTool`.
-     *
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    public static function isStdioOnly(): bool;
-
-    /**
      * Execute the tool against the given arguments. Returns a structured
      * result that the dispatcher wraps in MCP's `content[]` envelope.
      *

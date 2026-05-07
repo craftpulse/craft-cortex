@@ -71,6 +71,6 @@ it('matches glob patterns and dispatches via the console runner', function () {
 });
 
 it('exposes destructiveHint annotation', function () {
-    $annotations = $this->tool::getAnnotations();
+    $annotations = \craftpulse\cortex\tools\support\AttributeReader::annotationsFor($this->tool);
     expect($annotations)->toHaveKey('destructiveHint', true);
 });

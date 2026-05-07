@@ -3,6 +3,7 @@
 namespace craftpulse\cortex\mcp;
 
 use craftpulse\cortex\Plugin;
+use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\ToolException;
 use Throwable;
 
@@ -286,7 +287,7 @@ class Server
             return $this->_errorResponse($id, -32602, "Unknown tool: {$name}");
         }
 
-        if ($tool::isStdioOnly() && $this->_transport !== self::TRANSPORT_STDIO) {
+        if (AttributeReader::isStdioOnly($tool) && $this->_transport !== self::TRANSPORT_STDIO) {
             // Hard reject. PLANNING.md 4.9: stdio-only is enforced at the
             // transport boundary regardless of caller permissions or token
             // scope, never config-driven.

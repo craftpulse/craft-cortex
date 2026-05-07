@@ -2,6 +2,10 @@
 
 namespace craftpulse\cortex\tools\dev;
 
+use craftpulse\cortex\attributes\IsDestructive;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsOpenWorld;
+use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\ConsoleRunner;
@@ -31,30 +35,14 @@ use craftpulse\cortex\tools\ToolException;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[Title('Run Craft Command')]
+#[IsDestructive]
+#[IsIdempotent(false)]
+#[IsOpenWorld(false)]
 class CraftCommand extends AbstractTool
 {
     // Public Methods
     // =========================================================================
-
-    /**
-     * @inheritdoc
-     *
-     * Mutating action — clients that respect `destructiveHint` will warn
-     * the user before invoking. Allowlist enforces the safety boundary
-     * regardless of the annotation.
-     *
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    public static function getAnnotations(): array
-    {
-        return [
-            'title' => 'Run Craft Command',
-            'destructiveHint' => true,
-            'idempotentHint' => false,
-            'openWorldHint' => false,
-        ];
-    }
 
     /**
      * @inheritdoc

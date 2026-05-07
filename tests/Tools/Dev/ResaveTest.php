@@ -68,7 +68,7 @@ it('renames entryType to the controller property `type`', function () {
 });
 
 it('exposes destructiveHint and idempotentHint annotations', function () {
-    $annotations = $this->tool::getAnnotations();
+    $annotations = \craftpulse\cortex\tools\support\AttributeReader::annotationsFor($this->tool);
     expect($annotations)->toHaveKey('destructiveHint', true);
     expect($annotations)->toHaveKey('idempotentHint', true);
 });

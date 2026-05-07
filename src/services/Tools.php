@@ -30,6 +30,7 @@ use craftpulse\cortex\tools\system\PermissionsAndGroups;
 use craftpulse\cortex\tools\system\Plugins;
 use craftpulse\cortex\tools\system\Routes;
 use craftpulse\cortex\tools\system\SystemInfo;
+use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\ToolInterface;
 use yii\base\Component;
 
@@ -140,7 +141,7 @@ class Tools extends Component
                     'inputSchema' => $t::getInputSchema(),
                 ];
 
-                $annotations = $t::getAnnotations();
+                $annotations = AttributeReader::annotationsFor($t);
                 if ($annotations !== []) {
                     $entry['annotations'] = $annotations;
                 }

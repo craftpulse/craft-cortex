@@ -38,35 +38,6 @@ abstract class AbstractTool implements ToolInterface
         ];
     }
 
-    /**
-     * @inheritdoc
-     *
-     * Default: no annotations. Tools that mutate state, are destructive,
-     * or have other notable behavioural properties override to advertise
-     * the relevant `ToolAnnotations` hints.
-     *
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    public static function getAnnotations(): array
-    {
-        return [];
-    }
-
-    /**
-     * @inheritdoc
-     *
-     * Default: tool is transport-agnostic. Override to `true` for tools
-     * that must be hard-rejected on the HTTP transport.
-     *
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    public static function isStdioOnly(): bool
-    {
-        return false;
-    }
-
     // Protected Methods
     // =========================================================================
 
