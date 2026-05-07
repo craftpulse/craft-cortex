@@ -246,21 +246,40 @@ class Server
         }
 
         $resource = Plugin::getInstance()->resources->getByUri($uri);
-        if ($resource === null) {
-            return $this->_errorResponse($id, -32602, "Unknown resource: {$uri}");
+        if ($resource !== null) {
+            try {
+                $block = $resource->read();
+            } catch (Throwable $e) {
+                return $this->_errorResponse(
+                    $id,
+                    -32603,
+                    sprintf('Internal error reading resource "%s": %s', $uri, $e->getMessage()),
+                );
+            }
+
+            return $this->_successResponse($id, ['contents' => [$block]]);
         }
 
-        try {
-            $block = $resource->read();
-        } catch (Throwable $e) {
-            return $this->_errorResponse(
-                $id,
-                -32603,
-                sprintf('Internal error reading resource "%s": %s', $uri, $e->getMessage()),
-            );
+        // Fall back to URI templates — Pro Gate 8.5 (custom skills) and
+        // any future per-element resource use these. Concrete URIs are
+        // tried first so a templated resource never shadows a bundled
+        // entry.
+        $match = Plugin::getInstance()->resources->matchTemplate($uri);
+        if ($match !== null) {
+            [$template, $captures] = $match;
+            try {
+                $block = $template->read($uri, $captures);
+            } catch (Throwable $e) {
+                return $this->_errorResponse(
+                    $id,
+                    -32603,
+                    sprintf('Internal error reading resource "%s": %s', $uri, $e->getMessage()),
+                );
+            }
+            return $this->_successResponse($id, ['contents' => [$block]]);
         }
 
-        return $this->_successResponse($id, ['contents' => [$block]]);
+        return $this->_errorResponse($id, -32602, "Unknown resource: {$uri}");
     }
 
     /**

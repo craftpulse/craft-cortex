@@ -435,6 +435,83 @@ it('eagerly consumes a Generator-returning tool and surfaces the return value', 
     }
 });
 
+// -----------------------------------------------------------------------------
+// Resource templates — dynamic URI fallback (Phase 1 plumbing for Pro)
+// -----------------------------------------------------------------------------
+
+it('reads a templated resource when no concrete URI matches', function () {
+    $listener = function (\craftpulse\cortex\events\RegisterResourcesEvent $event): void {
+        $event->resources[] = new class implements \craftpulse\cortex\resources\ResourceTemplateInterface {
+            public function getUriTemplate(): string
+            {
+                return '_fake://entries/{id}';
+            }
+
+            public function getName(): string
+            {
+                return 'fake-entry-template';
+            }
+
+            public function getDescription(): string
+            {
+                return 'Fixture template.';
+            }
+
+            public function getMimeType(): string
+            {
+                return 'text/plain';
+            }
+
+            public function matches(string $uri): ?array
+            {
+                if (preg_match('#^_fake://entries/([^/]+)$#', $uri, $m)) {
+                    return ['id' => $m[1]];
+                }
+                return null;
+            }
+
+            public function read(string $uri, array $captures): array
+            {
+                return ['uri' => $uri, 'mimeType' => 'text/plain', 'text' => "id={$captures['id']}"];
+            }
+        };
+    };
+    \yii\base\Event::on(
+        \craftpulse\cortex\services\Resources::class,
+        \craftpulse\cortex\services\Resources::EVENT_REGISTER_RESOURCES,
+        $listener,
+    );
+
+    try {
+        // Build a fresh service so the listener fires.
+        $service = new \craftpulse\cortex\services\Resources();
+        $service->init();
+        $match = $service->matchTemplate('_fake://entries/42');
+        expect($match)->not->toBeNull();
+        [$template, $captures] = $match;
+        expect($captures)->toBe(['id' => '42']);
+
+        $block = $template->read('_fake://entries/42', $captures);
+        expect($block)->toBe([
+            'uri' => '_fake://entries/42',
+            'mimeType' => 'text/plain',
+            'text' => 'id=42',
+        ]);
+    } finally {
+        \yii\base\Event::off(
+            \craftpulse\cortex\services\Resources::class,
+            \craftpulse\cortex\services\Resources::EVENT_REGISTER_RESOURCES,
+            $listener,
+        );
+    }
+});
+
+it('matchTemplate returns null when no template matches', function () {
+    $service = new \craftpulse\cortex\services\Resources();
+    $service->init();
+    expect($service->matchTemplate('_unknown://nothing'))->toBeNull();
+});
+
 it('falls back to the last yielded value when a Generator has no explicit return', function () {
     $gen = (function () {
         yield ['progress' => 0.5];

@@ -4,6 +4,7 @@ namespace craftpulse\cortex\services;
 
 use craftpulse\cortex\events\RegisterResourcesEvent;
 use craftpulse\cortex\resources\ResourceInterface;
+use craftpulse\cortex\resources\ResourceTemplateInterface;
 use craftpulse\cortex\resources\SkillResource;
 use Michtio\CraftCmsClaudeSkills\Skills;
 use yii\base\Component;
@@ -48,6 +49,13 @@ class Resources extends Component
      */
     private array $_byUri = [];
 
+    /**
+     * @var ResourceTemplateInterface[] Registered URI templates,
+     *     consulted only when a concrete-URI lookup misses. Templates
+     *     don't shadow concrete resources.
+     */
+    private array $_templates = [];
+
     // Public Methods
     // =========================================================================
 
@@ -66,16 +74,56 @@ class Resources extends Component
         $this->trigger(self::EVENT_REGISTER_RESOURCES, $event);
 
         foreach ($event->resources as $resource) {
-            if (!$resource instanceof ResourceInterface) {
+            if ($resource instanceof ResourceInterface) {
+                $uri = $resource->getUri();
+                if (isset($this->_byUri[$uri])) {
+                    continue;
+                }
+                $this->_resources[] = $resource;
+                $this->_byUri[$uri] = $resource;
                 continue;
             }
-            $uri = $resource->getUri();
-            if (isset($this->_byUri[$uri])) {
+            if ($resource instanceof ResourceTemplateInterface) {
+                $this->_templates[] = $resource;
                 continue;
             }
-            $this->_resources[] = $resource;
-            $this->_byUri[$uri] = $resource;
         }
+    }
+
+    /**
+     * Resolve a URI against any registered template. Returns a
+     * `[template, captures]` tuple on first match, or null. Concrete-URI
+     * resources should be preferred — call `getByUri()` first.
+     *
+     * @return array{0: ResourceTemplateInterface, 1: array<string,string>}|null
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    public function matchTemplate(string $uri): ?array
+    {
+        foreach ($this->_templates as $template) {
+            $captures = $template->matches($uri);
+            if ($captures !== null) {
+                return [$template, $captures];
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Registered URI templates in registration order. Used by the
+     * `resources/list` payload to surface templated entries to clients
+     * that support `resources/templates/list` (MCP 2025-06-18).
+     *
+     * @return ResourceTemplateInterface[]
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    public function getTemplates(): array
+    {
+        return $this->_templates;
     }
 
     /**
