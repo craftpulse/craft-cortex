@@ -33,7 +33,7 @@ it('registers all Phase-1 tools by name', function () {
         'tags',
         'globals',
 
-        // System & diagnostics (Gate 4)
+        // System & diagnostics (Gate 4 + Phase 1 ship-prep)
         'system_info',
         'config',
         'plugins',
@@ -42,6 +42,7 @@ it('registers all Phase-1 tools by name', function () {
         'database_schema',
         'extensibility',
         'permissions_and_groups',
+        'search_skills',
 
         // GraphQL & Dev Actions (Gate 5)
         'graphql',
