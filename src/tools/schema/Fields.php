@@ -5,7 +5,10 @@ namespace craftpulse\cortex\tools\schema;
 use Craft;
 use craft\base\FieldInterface;
 use craft\base\RelationalFieldInterface;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 
 /**
@@ -25,6 +28,8 @@ use craftpulse\cortex\tools\ToolException;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class Fields extends AbstractTool
 {
     // Public Methods
@@ -63,25 +68,13 @@ class Fields extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'handle' => [
-                    'type' => 'string',
-                    'description' => 'Field handle. Required for `mode: "usage"`.',
-                ],
-                'mode' => [
-                    'type' => 'string',
-                    'enum' => ['default', 'usage'],
-                    'description' => '"usage" returns a usage map for the given handle.',
-                ],
-                'count' => [
-                    'type' => 'boolean',
-                    'description' => 'Return only the count.',
-                ],
-            ],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'handle' => Schema::string()->description('Field handle. Required for `mode: "usage"`.'),
+            'mode' => Schema::string()
+                ->enum(['default', 'usage'])
+                ->description('"usage" returns a usage map for the given handle.'),
+            'count' => Schema::boolean()->description('Return only the count.'),
+        ])->toArray();
     }
 
     /**

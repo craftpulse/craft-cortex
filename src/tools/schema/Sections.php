@@ -5,7 +5,10 @@ namespace craftpulse\cortex\tools\schema;
 use Craft;
 use craft\models\Section;
 use craft\models\Section_SiteSettings;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 
 /**
@@ -30,6 +33,8 @@ use craftpulse\cortex\tools\ToolException;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class Sections extends AbstractTool
 {
     // Public Methods
@@ -67,20 +72,10 @@ class Sections extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'handle' => [
-                    'type' => 'string',
-                    'description' => 'Section handle. Omit to list all sections.',
-                ],
-                'count' => [
-                    'type' => 'boolean',
-                    'description' => 'Return only the count of matching sections.',
-                ],
-            ],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'handle' => Schema::string()->description('Section handle. Omit to list all sections.'),
+            'count' => Schema::boolean()->description('Return only the count of matching sections.'),
+        ])->toArray();
     }
 
     /**

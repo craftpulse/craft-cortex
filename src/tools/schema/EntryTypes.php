@@ -6,7 +6,10 @@ use Craft;
 use craft\models\EntryType;
 use craft\models\FieldLayout;
 use craft\models\FieldLayoutTab;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 
 /**
@@ -29,6 +32,8 @@ use craftpulse\cortex\tools\ToolException;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class EntryTypes extends AbstractTool
 {
     // Public Methods
@@ -67,20 +72,10 @@ class EntryTypes extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'handle' => [
-                    'type' => 'string',
-                    'description' => 'Entry type handle. Omit to list all.',
-                ],
-                'count' => [
-                    'type' => 'boolean',
-                    'description' => 'Return only the count.',
-                ],
-            ],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'handle' => Schema::string()->description('Entry type handle. Omit to list all.'),
+            'count' => Schema::boolean()->description('Return only the count.'),
+        ])->toArray();
     }
 
     /**
