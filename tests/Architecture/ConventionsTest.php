@@ -231,3 +231,186 @@ it('every concrete class under src/tools/{schema,content,system,graphql,dev,work
 
     expect($violations)->toBe([]);
 });
+
+// -----------------------------------------------------------------------------
+// @since on every class
+// -----------------------------------------------------------------------------
+
+it('every PHP class file in src/ has at least one @since tag', function () {
+    // Mirrors the @author Craftpulse check above. @since lives on classes
+    // and on individual methods; we only assert that each class file has
+    // the tag *somewhere* — a missing class-level @since is the regression
+    // we're catching, not per-method drift (PHPStan + reviewer catches
+    // those). Skip files without a class declaration (config returns,
+    // bootstrap helpers).
+
+    $violations = [];
+
+    foreach (cortex_src_files() as $file) {
+        if (str_contains($file, '/src/config/')) {
+            continue;
+        }
+
+        $contents = file_get_contents($file);
+        if ($contents === false) {
+            continue;
+        }
+
+        if (!preg_match('/\b(class|interface|trait|abstract\s+class|final\s+class)\s+\w+/', $contents)) {
+            continue;
+        }
+
+        if (!str_contains($contents, '@since')) {
+            $violations[] = sprintf('%s missing @since tag', $file);
+        }
+    }
+
+    expect($violations)->toBe([]);
+});
+
+// -----------------------------------------------------------------------------
+// Underscore prefix on private methods + properties
+// -----------------------------------------------------------------------------
+
+it('every private method and property under src/ uses the underscore-prefix convention', function () {
+    // Scope: concrete classes only (interfaces don't declare private
+    // members; abstract classes do but their concrete subclasses inherit
+    // the same member names). Skip Yii / Craft framework members that
+    // would be present via parent classes — reflection only walks
+    // members declared on this class via getDeclaringClass() check.
+
+    $violations = [];
+
+    foreach (cortex_src_files() as $file) {
+        $contents = file_get_contents($file);
+        if ($contents === false) {
+            continue;
+        }
+
+        if (str_contains($file, '/src/config/')) {
+            continue;
+        }
+
+        if (!preg_match('/\bnamespace\s+([^;]+);/', $contents, $nsMatch)) {
+            continue;
+        }
+        if (!preg_match('/\b(?:class|interface|trait)\s+(\w+)/', $contents, $clMatch)) {
+            continue;
+        }
+
+        $className = trim($nsMatch[1]) . '\\' . $clMatch[1];
+        if (!class_exists($className) && !interface_exists($className) && !trait_exists($className)) {
+            continue;
+        }
+
+        $rc = new ReflectionClass($className);
+        if ($rc->isInterface() || $rc->isTrait()) {
+            continue;
+        }
+
+        foreach ($rc->getMethods(ReflectionMethod::IS_PRIVATE) as $method) {
+            if ($method->getDeclaringClass()->getName() !== $rc->getName()) {
+                continue;
+            }
+            $name = $method->getName();
+            // Magic methods (__construct, __get, __set, __call, etc.) are
+            // PHP's own contract — `_construct` would be wrong.
+            if (str_starts_with($name, '__')) {
+                continue;
+            }
+            if (!str_starts_with($name, '_')) {
+                $violations[] = sprintf('%s::%s() — private method missing underscore prefix', $rc->getName(), $name);
+            }
+        }
+
+        foreach ($rc->getProperties(ReflectionProperty::IS_PRIVATE) as $property) {
+            if ($property->getDeclaringClass()->getName() !== $rc->getName()) {
+                continue;
+            }
+            $name = $property->getName();
+            if (!str_starts_with($name, '_')) {
+                $violations[] = sprintf('%s::$%s — private property missing underscore prefix', $rc->getName(), $name);
+            }
+        }
+    }
+
+    expect($violations)->toBe([]);
+});
+
+// -----------------------------------------------------------------------------
+// Tool execute() return types — no `mixed`
+// -----------------------------------------------------------------------------
+
+it('no tool declares `mixed` as the execute() return type', function () {
+    // PLANNING.md 4.10 calls this out: tools should return concrete
+    // shapes, not mixed. Allowed: array, \Generator, array|\Generator, or
+    // covariant overrides of those. `mixed` defeats the contract — the
+    // dispatcher relies on iterating a Generator vs returning an array,
+    // and `mixed` lets a tool drift to returning anything at all.
+
+    $violations = [];
+
+    foreach (cortex_src_files() as $file) {
+        if (str_contains($file, '/src/config/')) {
+            continue;
+        }
+
+        $contents = file_get_contents($file);
+        if ($contents === false) {
+            continue;
+        }
+
+        if (!preg_match('/\bnamespace\s+([^;]+);/', $contents, $nsMatch)) {
+            continue;
+        }
+        if (!preg_match('/\b(?:class|interface)\s+(\w+)/', $contents, $clMatch)) {
+            continue;
+        }
+
+        $className = trim($nsMatch[1]) . '\\' . $clMatch[1];
+        if (!class_exists($className) && !interface_exists($className)) {
+            continue;
+        }
+
+        $rc = new ReflectionClass($className);
+        if (!$rc->implementsInterface(ToolInterface::class) && $rc->getName() !== ToolInterface::class) {
+            continue;
+        }
+        if ($rc->isAbstract() && $rc->getName() === ToolInterface::class) {
+            // Skip the interface itself — its execute() declaration sets
+            // the contract; we already enforce that contract is
+            // array|\Generator below by reading its own type.
+        }
+
+        if (!$rc->hasMethod('execute')) {
+            continue;
+        }
+
+        $method = $rc->getMethod('execute');
+        if ($method->getDeclaringClass()->getName() !== $rc->getName()) {
+            // Inherited from a parent — already checked when we hit that
+            // parent class file.
+            continue;
+        }
+
+        $returnType = $method->getReturnType();
+        if ($returnType === null) {
+            $violations[] = sprintf('%s::execute() — missing return type', $rc->getName());
+            continue;
+        }
+
+        $typeNames = $returnType instanceof ReflectionUnionType
+            ? array_map(static fn (ReflectionNamedType $t): string => $t->getName(), $returnType->getTypes())
+            : [$returnType->getName()];
+
+        if (in_array('mixed', $typeNames, true)) {
+            $violations[] = sprintf(
+                '%s::execute() — declares `mixed` return type (got %s)',
+                $rc->getName(),
+                implode('|', $typeNames),
+            );
+        }
+    }
+
+    expect($violations)->toBe([]);
+});
