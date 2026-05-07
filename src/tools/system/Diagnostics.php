@@ -5,7 +5,10 @@ namespace craftpulse\cortex\tools\system;
 use Craft;
 use craft\helpers\FileHelper;
 use craft\queue\Queue;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 use DateTimeInterface;
 
@@ -33,6 +36,8 @@ use DateTimeInterface;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class Diagnostics extends AbstractTool
 {
     // Constants
@@ -77,32 +82,18 @@ class Diagnostics extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'type' => [
-                    'type' => 'string',
-                    'enum' => ['logs', 'last_error', 'deprecations', 'queue', 'project_config_diff'],
-                    'description' => 'Required.',
-                ],
-                'channel' => [
-                    'type' => 'string',
-                    'description' => 'Log file basename (e.g. "web", "queue"). Defaults to "web".',
-                ],
-                'minLevel' => [
-                    'type' => 'string',
-                    'enum' => ['trace', 'info', 'warning', 'error'],
-                    'description' => 'Minimum severity to include. Defaults to "warning".',
-                ],
-                'limit' => [
-                    'type' => 'integer',
-                    'minimum' => 1,
-                    'maximum' => self::MAX_LIMIT,
-                ],
-            ],
-            'required' => ['type'],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'type' => Schema::string()
+                ->enum(['logs', 'last_error', 'deprecations', 'queue', 'project_config_diff'])
+                ->description('Required.')
+                ->required(),
+            'channel' => Schema::string()
+                ->description('Log file basename (e.g. "web", "queue"). Defaults to "web".'),
+            'minLevel' => Schema::string()
+                ->enum(['trace', 'info', 'warning', 'error'])
+                ->description('Minimum severity to include. Defaults to "warning".'),
+            'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
+        ])->toArray();
     }
 
     /**

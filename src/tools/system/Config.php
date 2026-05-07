@@ -3,7 +3,10 @@
 namespace craftpulse\cortex\tools\system;
 
 use Craft;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 
 /**
@@ -28,6 +31,8 @@ use craftpulse\cortex\tools\ToolException;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class Config extends AbstractTool
 {
     // Constants
@@ -82,18 +87,12 @@ class Config extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'mode' => [
-                    'type' => 'string',
-                    'enum' => ['general', 'custom', 'db', 'email', 'system_messages'],
-                    'description' => 'Required.',
-                ],
-            ],
-            'required' => ['mode'],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'mode' => Schema::string()
+                ->enum(['general', 'custom', 'db', 'email', 'system_messages'])
+                ->description('Required.')
+                ->required(),
+        ])->toArray();
     }
 
     /**

@@ -4,6 +4,8 @@ namespace craftpulse\cortex\tools\system;
 
 use Craft;
 use craft\enums\CmsEdition;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
 
 /**
@@ -21,6 +23,8 @@ use craftpulse\cortex\tools\AbstractTool;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class SystemInfo extends AbstractTool
 {
     // Public Methods

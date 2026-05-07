@@ -5,7 +5,10 @@ namespace craftpulse\cortex\tools\system;
 use Craft;
 use craft\base\UtilityInterface;
 use craft\web\twig\variables\CraftVariable;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 use ReflectionClass;
 use Twig\TwigFilter;
@@ -36,6 +39,8 @@ use yii\base\Event;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class Extensibility extends AbstractTool
 {
     // Public Methods
@@ -74,17 +79,11 @@ class Extensibility extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'mode' => [
-                    'type' => 'string',
-                    'enum' => ['events', 'twig', 'utilities', 'commands'],
-                    'description' => 'Limit to one section. Omit for all.',
-                ],
-            ],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'mode' => Schema::string()
+                ->enum(['events', 'twig', 'utilities', 'commands'])
+                ->description('Limit to one section. Omit for all.'),
+        ])->toArray();
     }
 
     /**
