@@ -4,7 +4,10 @@ namespace craftpulse\cortex\tools\dev;
 
 use craft\helpers\FileHelper;
 use craft\utilities\ClearCaches as ClearCachesUtility;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 use Throwable;
 use yii\base\InvalidArgumentException;
@@ -33,6 +36,8 @@ use yii\base\InvalidArgumentException;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[Title('Clear Caches')]
+#[IsIdempotent]
 class ClearCaches extends AbstractTool
 {
     // Public Methods
@@ -72,16 +77,10 @@ class ClearCaches extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'mode' => [
-                    'type' => 'string',
-                    'description' => 'Optional. `list`, `all` (default), or a specific cache key.',
-                ],
-            ],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'mode' => Schema::string()
+                ->description('Optional. `list`, `all` (default), or a specific cache key.'),
+        ])->toArray();
     }
 
     /**

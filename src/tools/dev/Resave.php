@@ -8,6 +8,7 @@ use craftpulse\cortex\attributes\IsOpenWorld;
 use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\ConsoleRunner;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 
 /**
@@ -91,33 +92,27 @@ class Resave extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'type' => [
-                    'type' => 'string',
-                    'enum' => array_keys(self::TYPE_ROUTES),
-                    'description' => 'Element kind to resave. Required.',
-                ],
-                'section' => ['type' => 'string', 'description' => 'For type=entries. Comma-separated handles or `*` for all.'],
-                'entryType' => ['type' => 'string', 'description' => 'For type=entries. Comma-separated entry-type handles.'],
-                'group' => ['type' => 'string', 'description' => 'For type=categories|tags|users.'],
-                'volume' => ['type' => 'string', 'description' => 'For type=assets. Comma-separated volume handles.'],
-                'status' => ['type' => 'string', 'description' => 'Element status filter (default `any`).'],
-                'limit' => ['type' => 'integer', 'minimum' => 1],
-                'set' => ['type' => 'string', 'description' => 'Field handle to rewrite. Pair with `to`.'],
-                'to' => ['type' => 'string', 'description' => 'Replacement expression. See Craft resave docs.'],
-                'ifEmpty' => ['type' => 'boolean'],
-                'ifInvalid' => ['type' => 'boolean'],
-                'touch' => ['type' => 'boolean'],
-                'updateSearchIndex' => ['type' => 'boolean'],
-                'propagateTo' => ['type' => 'string'],
-                'queue' => ['type' => 'boolean', 'description' => 'Dispatch as a background queue job instead of running in-process.'],
-                'batchSize' => ['type' => 'integer', 'minimum' => 1],
-            ],
-            'required' => ['type'],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'type' => Schema::string()
+                ->enum(array_keys(self::TYPE_ROUTES))
+                ->description('Element kind to resave. Required.')
+                ->required(),
+            'section' => Schema::string()->description('For type=entries. Comma-separated handles or `*` for all.'),
+            'entryType' => Schema::string()->description('For type=entries. Comma-separated entry-type handles.'),
+            'group' => Schema::string()->description('For type=categories|tags|users.'),
+            'volume' => Schema::string()->description('For type=assets. Comma-separated volume handles.'),
+            'status' => Schema::string()->description('Element status filter (default `any`).'),
+            'limit' => Schema::integer()->minimum(1),
+            'set' => Schema::string()->description('Field handle to rewrite. Pair with `to`.'),
+            'to' => Schema::string()->description('Replacement expression. See Craft resave docs.'),
+            'ifEmpty' => Schema::boolean(),
+            'ifInvalid' => Schema::boolean(),
+            'touch' => Schema::boolean(),
+            'updateSearchIndex' => Schema::boolean(),
+            'propagateTo' => Schema::string(),
+            'queue' => Schema::boolean()->description('Dispatch as a background queue job instead of running in-process.'),
+            'batchSize' => Schema::integer()->minimum(1),
+        ])->toArray();
     }
 
     /**
