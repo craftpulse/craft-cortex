@@ -1,0 +1,40 @@
+# Cortex Prompts
+
+Auto-generated reference for the cortex MCP prompt surface. Run
+`ddev craft cortex/docs/prompts` to refresh.
+
+- **Total prompts:** 8
+- **Generated:** 2026-05-07T06:10:18-07:00
+
+## `craftcms_content_modeling`
+
+Content modeling principles for Craft CMS — sections, entry types, fields, matrices, relations, propagation, and how to design schemas that scale across editors and sites.
+
+## `craftcms_cp_javascript`
+
+The only written documentation for Garnish, Craft CMS's built-in Control Panel JavaScript toolkit — the class system, UI widgets (Modal, HUD, DisclosureMenu, Select), drag interactions, form components, and accessibility helpers.
+
+## `craftcms_php_standards`
+
+PHP coding standards for Craft CMS plugin and module development — PHPDocs, section headers, naming conventions, class organization, and ECS/PHPStan configuration.
+
+## `craftcms_setup`
+
+Standard project setup playbook for new Craft CMS sites — DDEV bootstrap, plugin selection, project config conventions, and getting from zero to a working dev environment.
+
+## `craftcms_templates`
+
+Complete Craft CMS front-end framework and methodology — content modeling, Twig templating, component architecture, headless setup, and 22 plugin integration guides distilled from full plugin documentation.
+
+## `craftcms_twig_standards`
+
+Twig coding standards for Craft CMS templates — template structure, naming, accessibility, performance, and how to keep templates clean as a project grows.
+
+## `craftcms_extending`
+
+Reverse-engineered Craft CMS internals: 15-step element save lifecycle, four-layer authorization model, dual-layer session architecture, plus the full plugin/module extension surface (services, controllers, queue jobs, project config, GraphQL). Far beyond official docs.
+
+## `craftcms_ddev`
+
+DDEV usage and troubleshooting for Craft CMS development — local environment setup, container management, common commands, and integration with composer/npm/craft tooling.
+
