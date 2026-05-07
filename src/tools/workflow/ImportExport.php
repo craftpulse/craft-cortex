@@ -11,6 +11,7 @@ use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 use DateTimeImmutable;
 use DateTimeInterface;
+use Throwable;
 
 /**
  * =========================================================================
@@ -73,7 +74,16 @@ class ImportExport extends AbstractTool
     // Constants
     // =========================================================================
 
-    public const FORMAT_VERSION = 1;
+    /**
+     * Envelope format version. Bumped to 2 in Phase 1 ship-prep so Pro
+     * `import` consumes the full round-trip surface (authorIds for
+     * multi-author entries, parentUid + level for Structure hierarchies,
+     * enabledForSite for the per-site enabled bit, plus craftVersion /
+     * schemaVersion / edition fingerprints on the envelope). Format 1
+     * existed only briefly in Gate 6.5 — no published consumers, no
+     * back-compat layer needed.
+     */
+    public const FORMAT_VERSION = 2;
     public const DEFAULT_LIMIT = 100;
     public const MAX_LIMIT = 1000;
 
@@ -181,10 +191,15 @@ class ImportExport extends AbstractTool
         /** @var Entry[] $entries */
         $entries = $query->all();
 
+        $info = Craft::$app->getInfo();
+
         return [
             'format' => self::FORMAT_VERSION,
             'mode' => 'export',
             'exportedAt' => (new DateTimeImmutable())->format(DateTimeInterface::ATOM),
+            'craftVersion' => $info->version,
+            'craftEdition' => Craft::$app->getEditionName(),
+            'schemaVersion' => $info->schemaVersion,
             'count' => count($entries),
             'totalCount' => $totalCount,
             'limit' => $limit,
@@ -206,6 +221,7 @@ class ImportExport extends AbstractTool
     {
         $section = $entry->getSection();
         $type = $entry->getType();
+        $parentUid = $this->_parentUid($entry);
 
         return [
             'uid' => $entry->uid,
@@ -218,10 +234,59 @@ class ImportExport extends AbstractTool
             'enabled' => $entry->enabled,
             'enabledForSite' => $entry->getEnabledForSite(),
             'authorId' => $entry->authorId,
+            'authorIds' => $this->_authorIds($entry),
+            'parentUid' => $parentUid,
+            'level' => $entry->level,
             'postDate' => $entry->postDate?->format(DateTimeInterface::ATOM),
             'expiryDate' => $entry->expiryDate?->format(DateTimeInterface::ATOM),
+            'dateCreated' => $entry->dateCreated?->format(DateTimeInterface::ATOM),
+            'dateUpdated' => $entry->dateUpdated?->format(DateTimeInterface::ATOM),
             'fields' => $entry->getSerializedFieldValues(),
         ];
+    }
+
+    /**
+     * Pull the entry's full author list as a uid array. Craft 5.0+
+     * supports multi-author entries via `getAuthorIds()` on the entry.
+     * Returns `[]` for entries with no authors. We export uids (not ids)
+     * so cross-environment import can resolve users by uid first.
+     *
+     * @return string[]
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    private function _authorIds(Entry $entry): array
+    {
+        try {
+            $authors = $entry->getAuthors();
+        } catch (Throwable) {
+            return [];
+        }
+        return array_values(array_filter(array_map(
+            static fn ($author): ?string => is_object($author) && property_exists($author, 'uid') ? (string) $author->uid : null,
+            $authors,
+        )));
+    }
+
+    /**
+     * Look up the canonical parent entry's uid for Structure-aware
+     * sections. Returns null for top-level entries or non-Structure
+     * sections. We expose uid (not id) so a cross-environment import
+     * can re-link the hierarchy without depending on auto-incrementing
+     * primary keys.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    private function _parentUid(Entry $entry): ?string
+    {
+        try {
+            $parent = $entry->getParent();
+        } catch (Throwable) {
+            return null;
+        }
+        return $parent?->uid;
     }
 
     /**

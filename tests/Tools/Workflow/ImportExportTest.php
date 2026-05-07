@@ -38,14 +38,18 @@ it('export returns an envelope with format version and entries array', function 
     $result = $this->tool->execute(['mode' => 'export', 'limit' => 5]);
 
     expect($result)->toHaveKeys([
-        'format', 'mode', 'exportedAt', 'count', 'totalCount', 'limit', 'offset', 'entries',
+        'format', 'mode', 'exportedAt', 'craftVersion', 'craftEdition', 'schemaVersion',
+        'count', 'totalCount', 'limit', 'offset', 'entries',
     ]);
     expect($result['format'])->toBe(ImportExport::FORMAT_VERSION);
+    expect($result['format'])->toBe(2);
     expect($result['mode'])->toBe('export');
     expect($result['entries'])->toBeArray();
     expect($result['count'])->toBeInt();
     expect($result['totalCount'])->toBeInt();
     expect($result['limit'])->toBe(5);
+    expect($result['craftVersion'])->toBeString()->not->toBeEmpty();
+    expect($result['schemaVersion'])->toBeString()->not->toBeEmpty();
 });
 
 it('serialised entries carry the cross-env identity surface', function () {
@@ -58,10 +62,20 @@ it('serialised entries carry the cross-env identity surface', function () {
     $entry = $result['entries'][0];
     expect($entry)->toHaveKeys([
         'uid', 'id', 'title', 'slug', 'section', 'type', 'site',
-        'enabled', 'enabledForSite', 'authorId', 'postDate', 'expiryDate', 'fields',
+        'enabled', 'enabledForSite',
+        'authorId', 'authorIds',
+        'parentUid', 'level',
+        'postDate', 'expiryDate', 'dateCreated', 'dateUpdated',
+        'fields',
     ]);
     expect($entry['uid'])->toBeString()->not->toBeEmpty();
     expect($entry['fields'])->toBeArray();
+    expect($entry['authorIds'])->toBeArray();
+    // `level` is int for Structure entries, null otherwise (channels,
+    // singles). Both are valid.
+    expect($entry['level'] === null || is_int($entry['level']))->toBeTrue();
+    // `parentUid` is string for nested Structure entries, null otherwise.
+    expect($entry['parentUid'] === null || is_string($entry['parentUid']))->toBeTrue();
 });
 
 it('clamps limit to MAX_LIMIT', function () {
