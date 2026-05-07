@@ -3,8 +3,8 @@
 Auto-generated reference for the cortex MCP resource surface. Run
 `ddev craft cortex/docs/resources` to refresh.
 
-- **Total resources:** 72
-- **Generated:** 2026-05-07T06:10:18-07:00
+- **Total resources:** 77
+- **Generated:** 2026-05-07T10:46:39-07:00
 
 | URI | Name | MIME | Description |
 | --- | ---- | ---- | ----------- |
@@ -80,3 +80,8 @@ Auto-generated reference for the cortex MCP resource surface. Run
 | `craft-skills://craftcms/sessions-and-auth` | craftcms / sessions-and-auth | `text/markdown` | Deep-dive reference document `sessions-and-auth` from the craftcms skill. |
 | `craft-skills://craftcms/testing` | craftcms / testing | `text/markdown` | Deep-dive reference document `testing` from the craftcms skill. |
 | `craft-skills://ddev` | ddev | `text/markdown` | Top-level router for the ddev skill (SKILL.md). Lists when to load each reference document and the cross-cutting pitfalls that apply across them. |
+| `craft-skills://agents/craft-code-reviewer` | agents / craft-code-reviewer | `text/markdown` | Claude Code agent definition `craft-code-reviewer` — markdown with YAML frontmatter declaring the agent's name and one-line description, plus the systemic prompt body. |
+| `craft-skills://agents/craft-debugger` | agents / craft-debugger | `text/markdown` | Claude Code agent definition `craft-debugger` — markdown with YAML frontmatter declaring the agent's name and one-line description, plus the systemic prompt body. |
+| `craft-skills://agents/craft-feature-builder` | agents / craft-feature-builder | `text/markdown` | Claude Code agent definition `craft-feature-builder` — markdown with YAML frontmatter declaring the agent's name and one-line description, plus the systemic prompt body. |
+| `craft-skills://agents/craft-planner` | agents / craft-planner | `text/markdown` | Claude Code agent definition `craft-planner` — markdown with YAML frontmatter declaring the agent's name and one-line description, plus the systemic prompt body. |
+| `craft-skills://agents/craft-site-builder` | agents / craft-site-builder | `text/markdown` | Claude Code agent definition `craft-site-builder` — markdown with YAML frontmatter declaring the agent's name and one-line description, plus the systemic prompt body. |

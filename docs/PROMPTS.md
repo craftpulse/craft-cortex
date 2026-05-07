@@ -4,7 +4,7 @@ Auto-generated reference for the cortex MCP prompt surface. Run
 `ddev craft cortex/docs/prompts` to refresh.
 
 - **Total prompts:** 8
-- **Generated:** 2026-05-07T06:10:18-07:00
+- **Generated:** 2026-05-07T10:46:39-07:00
 
 ## `craftcms_content_modeling`
 
