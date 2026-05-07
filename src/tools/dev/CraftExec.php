@@ -166,7 +166,17 @@ class CraftExec extends AbstractTool
         // its own.
         $expression = rtrim($expression, ';');
 
-        $confirm = ($arguments['confirm'] ?? false) === true;
+        // `execDryRunDefault` (default true) sets the default for `confirm`
+        // when the caller didn't pass it. Explicit `confirm: true|false` in
+        // arguments always wins over the setting. The destructive guard
+        // below still requires explicit `dangerous: true` regardless of the
+        // setting — `execDryRunDefault: false` does not bypass destructive
+        // protection, only the dry-run-by-default convenience.
+        if (array_key_exists('confirm', $arguments)) {
+            $confirm = $arguments['confirm'] === true;
+        } else {
+            $confirm = !$settings->execDryRunDefault;
+        }
         $dangerous = ($arguments['dangerous'] ?? false) === true;
         $isDestructive = $this->_isDestructive($expression);
 
