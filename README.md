@@ -1,93 +1,101 @@
-# Cortex — MCP server for Craft CMS 5
+# Cortex plugin for Craft CMS 5.x
 
-Cortex is a [Model Context Protocol](https://modelcontextprotocol.io/) server for [Craft CMS 5](https://craftcms.com/). It exposes Craft internals — sections, entry types, fields, content, drafts, audits, GraphQL, project config, and more — to AI agents over a dual transport:
+Cortex is a [Model Context Protocol](https://modelcontextprotocol.io/) server for Craft CMS 5. It connects your AI assistant — Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf — directly to your Craft project so the assistant can answer questions about your content model, run safe inspections, and learn Craft conventions from bundled expert skills.
 
-- **stdio** for local development (Claude Code, Cursor, Claude Desktop, others) — Free
-- **Streamable HTTP** for content operators — Pro (Phase 2)
+The free tier ships **32 tools**, **8 prompts**, and **77 resources** over a local stdio transport. The upcoming Pro tier (Phase 2) adds an authenticated HTTP transport with content-write capabilities for non-developer operators.
 
-Skills authored from years of Craft work ship as MCP prompts and resources, so the AI doesn't just have tools — it has expertise.
+## Requirements
 
-## Highlights
+- Craft CMS 5.0.0 or later
+- PHP 8.2 or later
+- An MCP-capable client (Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, or Windsurf)
 
-- **32 tools, lean by design.** List/get pairs collapsed behind a single optional `handle`. Mode-driven write-side. Same coverage as competitors with half the tool count, faster LLM tool selection, fewer tokens consumed by `tools/list`.
-- **Skills moat.** Eight bundled skills from `michtio/craftcms-claude-skills` ship as MCP prompts (and 72 resources for deep-dives). LLMs route through the prompts; cortex serves the matching skill content inline.
-- **Schema-DSL authored tool inputs.** Every tool's argument schema is built with a fluent JSON Schema DSL — `Schema::object([...])->required()`. Same wire format MCP clients expect, friendlier authoring.
-- **Attribute-based annotations.** PHP 8 attributes — `#[IsReadOnly]`, `#[IsDestructive]`, `#[IsIdempotent]`, `#[IsOpenWorld]`, `#[IsStdioOnly]`, `#[Title]` — replace boilerplate static methods. Surface metadata at the class declaration, not buried in method bodies.
-- **Extension events.** Third-party plugins register their own tools, prompts, and resources via `EVENT_REGISTER_TOOLS` / `EVENT_REGISTER_PROMPTS` / `EVENT_REGISTER_RESOURCES`. Cortex enforces architectural contracts (interface, transport gating, dispatch) — third-party authors are responsible for behavioural correctness, the same trust model Craft itself uses for plugins.
-- **Security gates on `craft_exec`.** Six layered gates per [PLANNING.md 4.9](https://github.com/craftpulse/craft-cortex): dry-run default, structured output, secret redaction, destructive-op guard, hard HTTP rejection (stdio-only), `destructiveHint: true` annotation. We use Craft's own `ExecController` rather than a homebrew eval blocklist.
+## Installation
 
-## Install
+To install Cortex, follow these steps:
+
+1. Open your terminal and go to your Craft project:
+
+        cd /path/to/project
+
+2. Then tell Composer to load the plugin:
+
+        composer require craftpulse/craft-cortex
+
+3. Install the plugin via `./craft plugin/install cortex` from the CLI, or in the Control Panel go to **Settings → Plugins** and click the **Install** button for Cortex.
+
+You can also install Cortex via the **Plugin Store** in the Craft Control Panel — search for *Cortex* and click **Install**.
+
+If you develop with [DDEV](https://ddev.com/), run the same commands through the container: `ddev composer require craftpulse/craft-cortex` then `ddev craft plugin/install cortex`. Cortex is DDEV-aware and emits the correct `docker exec` invocation form when generating client config.
+
+Cortex works on Craft 5.x.
+
+## Connect your MCP client
+
+After installation, run the install helper from your project root:
 
 ```bash
-composer require craftpulse/craft-cortex
-ddev craft plugin/install cortex
-```
-
-Then run `ddev craft cortex/install` to print copy-paste config snippets for every supported MCP client (Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf):
-
-```bash
-ddev craft cortex/install              # all clients
 ddev craft cortex/install --client=claude-desktop
-ddev craft cortex/install --ddev=0     # non-DDEV form
 ```
 
-For Claude Desktop on macOS, the snippet looks like:
+This prints a copy-paste config snippet for the client you named. Cortex supports seven clients today — Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf. Drop `--client=...` to print snippets for all of them.
 
-```json
-{
-  "mcpServers": {
-    "cortex": {
-      "command": "docker",
-      "args": ["exec", "-i", "ddev-myproject-web", "php", "/var/www/html/craft", "cortex/serve"]
-    }
-  }
-}
+To skip the copy-paste step entirely, use the auto-config writer:
+
+```bash
+ddev craft cortex/install/apply --client=claude-desktop --dry-run
+ddev craft cortex/install/apply --client=claude-desktop
 ```
 
-Reload your client. `cortex` shows up alongside whatever else you've registered.
+The `--dry-run` flag prints the would-be diff so you can preview before writing. Without it, Cortex writes the entry atomically (temp file + rename) and backs the original file up to `<file>.bak.<unix-timestamp>`. Re-runs are idempotent — pass `--force` if you want to overwrite an existing Cortex entry.
+
+Full per-client instructions, troubleshooting, and the manual snippet flow are in **[`docs/INSTALL.md`](docs/INSTALL.md)**.
 
 ## What the AI gets
 
-| Category | Count | Tools |
-|---|---|---|
-| Schema & Structure | 10 | `sections`, `entry_types`, `fields`, `field_types`, `category_groups`, `tag_groups`, `volumes_and_filesystems`, `sites`, `image_transforms`, `element_types` |
-| Content Reading | 5 | `entries`, `assets`, `categories`, `tags`, `globals` |
-| System & Diagnostics | 9 | `system_info`, `config`, `plugins`, `routes`, `system_diagnostics`, `database_schema`, `extensibility`, `permissions_and_groups`, `search_skills` |
-| GraphQL | 1 | `graphql` |
-| Dev Actions | 4 | `craft_command`, `craft_exec`, `clear_caches`, `resave` |
-| Workflow & Audit | 3 | `drafts_and_revisions`, `content_audit`, `import_export` |
+After Cortex is connected, your assistant can:
 
-Plus 8 prompts and 72 resources covering the full bundled-skills surface.
+- **Inspect your content model.** 32 read-only tools cover sections, entry types, fields, field types, category groups, tag groups, sites, image transforms, volumes, filesystems, plugins, routes, system info, permissions, GraphQL schemas, the database schema, and more. List/get/count modes collapse behind a single `handle` argument so the LLM picks the right tool faster and uses fewer tokens.
+- **Read your content safely.** `entries`, `assets`, `categories`, `tags`, `globals` expose the full element-query surface (filters, eager loading, pagination, count mode). Relational fields stub to `{type: "relation", loaded: false}` by default — pass `with: [...]` to materialise them, so the LLM never accidentally triggers an N+1 walk.
+- **Run safe dev actions.** `clear_caches`, `resave`, `craft_command` (allowlisted), `craft_exec` (six security gates including dry-run-default and stdio-only), and `import_export` (export-only in Free; round-trippable JSON envelope).
+- **Search 27,000+ lines of Craft expertise.** `search_skills` does keyword search across the bundled `michtio/craftcms-claude-skills` corpus — eight skills covering Craft internals, templating, content modelling, PHP/Twig standards, DDEV, project setup, and Garnish. The matching skill content is also exposed as MCP **prompts** so the LLM picks them up automatically when relevant. **Resources** expose the per-skill reference deep-dives and the five bundled Claude Code agents.
 
-For the per-tool argument schemas and annotations, see [`docs/TOOLS.md`](docs/TOOLS.md). For prompts, [`docs/PROMPTS.md`](docs/PROMPTS.md). For resources, [`docs/RESOURCES.md`](docs/RESOURCES.md). All three regenerate via `ddev craft cortex/docs/all`.
+For the full reference (per-tool argument schemas, annotations, and prompt / resource catalogue), see:
 
-### N+1 prevention
+- [`docs/TOOLS.md`](docs/TOOLS.md) — auto-generated tool reference.
+- [`docs/PROMPTS.md`](docs/PROMPTS.md) — auto-generated prompt reference.
+- [`docs/RESOURCES.md`](docs/RESOURCES.md) — auto-generated resource reference.
 
-Relational fields on element output are stubbed by default:
+All three regenerate from the live registries via `ddev craft cortex/docs/all`.
 
-```json
-{ "fields": { "image": { "type": "relation", "loaded": false } } }
-```
+## Configuration
 
-To materialise, pass `with: ["image"]` — Craft's eager-loading kicks in on the parent query, no per-entry round-trips.
+The plugin ships with sensible defaults. For environment-specific overrides, copy `vendor/craftpulse/craft-cortex/src/config/cortex.php` to your project's `config/cortex.php` and edit there. Per-environment blocks (`'production'`, `'staging'`) work the same way as Craft's other config files.
 
-## Configure
+Cortex's CP settings page (**Settings → Cortex**) provides a live editor for:
 
-The plugin ships with sensible defaults. For environment-specific overrides, copy `vendor/craftpulse/craft-cortex/src/config/cortex.php` into your project's `config/cortex.php` and edit there. The file is heavily commented; settings cover:
+- the `craft_command` allowlist (writes to project config so it syncs across environments)
+- the `craft_exec` toggles (`execEnabled`, `execDryRunDefault`)
+- runtime allowlist overrides (admin-only, auto-expiring patterns that layer on top of the project-config defaults)
 
-- `allowedCommands` — glob patterns the `craft_command` tool may dispatch
-- `execEnabled` / `execDryRunDefault` — `craft_exec` toggles
-- `runtimeOverrideTtl` — default expiry for runtime allowlist overrides
+Full configuration reference: **[`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)**.
 
-Settings → Cortex in the CP also provides:
+## Security
 
-- A live editor for the allowlist (writes to project config)
-- Toggles for the exec settings
-- Runtime-override management (admin-issued, auto-expiring patterns that layer on top of the defaults)
+Cortex's security model treats the transport as the boundary. The Phase 1 stdio transport is trusted (local user, single process). The Phase 2 HTTP transport will authenticate every request against a Craft user before dispatching.
 
-## Extend
+Highlights:
 
-Third-party plugins can register their own tools, prompts, and resources via class-level events:
+- `craft_exec` runs through Craft's own `ExecController` with six layered gates: dry-run-default, structured output, secret redaction, destructive-op guard, hard HTTP rejection, and `destructiveHint: true` annotation.
+- `craft_command` enforces an allowlist at the tool layer, layered as project-config defaults + admin-issued runtime overrides + optional `config/cortex.php` overrides.
+- No `eval` / `shell_exec` / `proc_open` / `passthru` / `popen` / backticks anywhere in the source — verified by the architecture test suite.
+- Every tool invocation emits one structured audit-log line (`cortex` channel) with secret-redacted arguments. The line shape is locked across Phase 1 and Phase 2 so log consumers stay stable through the transport upgrade.
+
+Full security reference: **[`docs/SECURITY.md`](docs/SECURITY.md)**.
+
+## Extending
+
+Third-party plugins can register their own tools, prompts, and resources via class-level events. Cortex enforces architectural contracts (interface implementation, transport gating, dispatch shape) — third-party authors are responsible for behavioural correctness, the same trust model Craft itself uses for plugin extensibility.
 
 ```php
 use craftpulse\cortex\events\RegisterToolsEvent;
@@ -103,15 +111,13 @@ Event::on(
 );
 ```
 
-Same pattern for `Prompts::EVENT_REGISTER_PROMPTS` and `Resources::EVENT_REGISTER_RESOURCES`.
-
-To scaffold a new tool against cortex's `AbstractTool` parent with the right attributes and Schema DSL stub:
+To scaffold a new tool against Cortex's `AbstractTool` parent with the right attributes and Schema DSL stub:
 
 ```bash
-ddev craft make cortex-tool --plugin=myplugin
+ddev craft make cortex-tool
 ```
 
-The generator hooks into Craft's standard `make` command via `EVENT_REGISTER_GENERATORS`. It prompts for class name, namespace, and MCP tool name, then drops a stub class with `#[IsReadOnly]` `#[IsIdempotent]` defaults and an instruction block for registering it.
+Full extension guide (events, interfaces, attributes, Schema DSL, naming conventions, generator usage): **[`docs/EXTENDING.md`](docs/EXTENDING.md)**.
 
 ## Develop
 
@@ -124,7 +130,7 @@ ddev exec --dir=/var/www/html/cms vendor/bin/pest \
   --configuration=vendor/craftpulse/craft-cortex/phpunit.xml.dist
 ```
 
-Pest covers the registry, every tool, every prompt, every resource, the JSON-RPC dispatcher, the extension events, and architectural conventions (no `eval()` / `shell_exec()` family / `declare(strict_types=1)`, every tool implements `ToolInterface`, every class file has a section header and `@author Craftpulse`).
+Pest covers the registry, every tool, every prompt, every resource, the JSON-RPC dispatcher, the extension events, and seven architectural conventions (no `eval` / shell-exec family / `declare(strict_types=1)`, every tool implements `ToolInterface`, every class has a section header + `@author Craftpulse` + `@since`, every private method/property uses the underscore prefix, no tool's `execute()` declares `mixed`).
 
 ### Static analysis
 
@@ -137,10 +143,10 @@ PHPStan level 8 — clean.
 
 ### Smoke through the inspector
 
-The [DDEV MCP Inspector add-on](https://github.com/michtio/ddev-mcp-inspector) is the visual harness:
+The [DDEV MCP Inspector add-on](https://github.com/michtio/ddev-mcp-inspector) is the visual harness for protocol-level testing:
 
 ```bash
-# In the playground:
+# In your Craft project:
 ddev add-on get michtio/ddev-mcp-inspector
 ddev restart
 ddev mcp-inspector
@@ -150,25 +156,30 @@ In the Inspector UI, point at:
 
 - **Transport Type:** STDIO
 - **Command:** `docker`
-- **Arguments:** `exec -i ddev-plugin-playground-v5-web php /var/www/html/cms/craft cortex/serve`
+- **Arguments:** `exec -i ddev-<project>-web php /var/www/html/craft cortex/serve`
 
 The `initialize` handshake should succeed (`cortex 0.1.0`, protocol `2025-06-18`), and every tool / prompt / resource shows up in the lists.
 
 ## Roadmap
 
-- **Phase 1 — Free.** 32 tools, 8 prompts, 77 resources (8 skill routers + 64 references + 5 agents), stdio transport, allowlist UI, install command, docs generators, extension events. Shipping.
-- **Phase 2 — Pro.** HTTP transport with OAuth 2.1, permission filtering, audit log, 7 net-new write tools, mode unlocks on Free tools (drafts/audit/import-export apply / fix / import), Pro-exclusive custom-skills element type, minimal CP UI (tokens / activity / connection).
-- **Phase 3 — Polish.** Install wizard auto-detecting installed clients, formal real-LLM E2E harness, vectorised docs search, third-party tool registration documented and battle-tested, skill remote-fetch.
+- **Phase 1 — Free.** 32 tools, 8 prompts, 77 resources, stdio transport, allowlist UI, install command (snippet printer + auto-config writer), docs generators, extension events. Shipping.
+- **Phase 2 — Pro.** Streamable HTTP transport with OAuth 2.1, per-user permission filtering, DB-backed audit log, 7 net-new write tools, mode unlocks on Free tools (`drafts_and_revisions` apply/discard, `content_audit` fix modes, `import_export` import), Pro-exclusive custom-skills element type, minimal CP UI for tokens / activity / connection.
+- **Phase 3 — Polish.** Install wizard auto-detecting installed clients, formal real-LLM E2E harness, vectorised docs search, third-party tool registration battle-tested across the ecosystem, skill remote-fetch.
 
-Full plan: [PLANNING.md section 4](https://github.com/craftpulse/craft-cortex) (offsite — not in this repo).
+## Support
+
+- Issues: [github.com/craftpulse/craft-cortex/issues](https://github.com/craftpulse/craft-cortex/issues)
+- Email: [support@craftpulse.com](mailto:support@craftpulse.com)
 
 ## License
 
-Free: MIT. Pro: proprietary, license-gated through the Craft Plugin Store (Phase 2).
+Free tier: MIT. Pro tier: proprietary, license-gated through the Craft Plugin Store (Phase 2).
 
 ## Credits
 
 - [Model Context Protocol](https://modelcontextprotocol.io/) — Anthropic et al.
 - [Craft CMS](https://craftcms.com/) — Pixel & Tonic
-- [`craftcms/generator`](https://github.com/craftcms/generator) — the make-system extensibility we hook into for `cortex-tool`
-- [`michtio/craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) — the skills bundle cortex serves as prompts + resources
+- [`craftcms/generator`](https://github.com/craftcms/generator) — the make-system extensibility Cortex hooks into for `cortex-tool`
+- [`michtio/craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) — the bundled skills package Cortex serves as prompts and resources
+
+Brought to you by [CraftPulse](https://craft-pulse.com/)
