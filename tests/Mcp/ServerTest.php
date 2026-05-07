@@ -44,6 +44,48 @@ it('responds to initialize with the pinned protocol version + serverInfo', funct
         ->and($response['result']['capabilities'])->toHaveKeys(['tools', 'resources', 'prompts']);
 });
 
+it('captures clientInfo.name from initialize so the audit log can stamp it', function () {
+    $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => new stdClass(),
+            'clientInfo' => ['name' => 'claude-code', 'version' => '1.0.0'],
+        ],
+    ]);
+
+    // The captured client name lives on a private property — accessed
+    // via reflection here rather than exposed publicly because it's an
+    // internal dispatcher detail, not part of the extension API. This
+    // test guards the wiring; the line format is locked in the
+    // InvocationLogger tests.
+    $rc = new ReflectionClass($this->server);
+    $prop = $rc->getProperty('_clientName');
+    $prop->setAccessible(true);
+
+    expect($prop->getValue($this->server))->toBe('claude-code');
+});
+
+it('leaves the captured client name null when initialize omits clientInfo', function () {
+    $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => new stdClass(),
+        ],
+    ]);
+
+    $rc = new ReflectionClass($this->server);
+    $prop = $rc->getProperty('_clientName');
+    $prop->setAccessible(true);
+
+    expect($prop->getValue($this->server))->toBeNull();
+});
+
 // -----------------------------------------------------------------------------
 // notifications
 // -----------------------------------------------------------------------------
