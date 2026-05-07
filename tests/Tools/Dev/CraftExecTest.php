@@ -205,6 +205,66 @@ it('Gate 6: exposes destructiveHint:true via attribute reader', function () {
 });
 
 // -----------------------------------------------------------------------------
+// Settings — execDryRunDefault toggle
+// -----------------------------------------------------------------------------
+
+it('execDryRunDefault=false makes evaluation the default when confirm is absent', function () {
+    $settings = Plugin::getInstance()->getSettings();
+    $original = $settings->execDryRunDefault;
+    $settings->execDryRunDefault = false;
+
+    try {
+        $result = $this->tool->execute([
+            'expression' => '21 + 21',
+        ]);
+
+        expect($result)->toHaveKey('mode', 'evaluated');
+        expect($result)->toHaveKey('evaluated', true);
+        expect($result)->toHaveKey('result', 42);
+    } finally {
+        $settings->execDryRunDefault = $original;
+    }
+});
+
+it('execDryRunDefault=false still respects explicit confirm=false (caller wins)', function () {
+    $settings = Plugin::getInstance()->getSettings();
+    $original = $settings->execDryRunDefault;
+    $settings->execDryRunDefault = false;
+
+    try {
+        $result = $this->tool->execute([
+            'expression' => '21 + 21',
+            'confirm' => false,
+        ]);
+
+        expect($result)->toHaveKey('mode', 'dry_run');
+        expect($result)->toHaveKey('evaluated', false);
+        expect($result)->not->toHaveKey('result');
+    } finally {
+        $settings->execDryRunDefault = $original;
+    }
+});
+
+it('execDryRunDefault=false does not bypass the destructive guard', function () {
+    $settings = Plugin::getInstance()->getSettings();
+    $original = $settings->execDryRunDefault;
+    $settings->execDryRunDefault = false;
+
+    try {
+        $result = $this->tool->execute([
+            'expression' => 'Entry::find()->one()->delete()',
+        ]);
+
+        // Even with non-dry-run default, destructive expressions still
+        // require explicit `dangerous: true`.
+        expect($result)->toHaveKey('blocked', true);
+        expect($result)->toHaveKey('isDestructive', true);
+    } finally {
+        $settings->execDryRunDefault = $original;
+    }
+});
+
+// -----------------------------------------------------------------------------
 // Sanity
 // -----------------------------------------------------------------------------
 
