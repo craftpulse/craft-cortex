@@ -380,3 +380,22 @@ it('handles nested objects with their own required arrays', function () {
         'additionalProperties' => false,
     ]);
 });
+
+
+// -----------------------------------------------------------------------------
+// examples (Phase 1 addition for Pro tools)
+// -----------------------------------------------------------------------------
+
+it('emits examples in toArray output', function () {
+    $schema = Schema::string()->examples(['small', 'medium', 'large']);
+
+    expect($schema->toArray())->toBe([
+        'type' => 'string',
+        'examples' => ['small', 'medium', 'large'],
+    ]);
+});
+
+it('rejects an empty examples list', function () {
+    Schema::string()->examples([]);
+})->throws(InvalidArgumentException::class, 'at least one value');
+

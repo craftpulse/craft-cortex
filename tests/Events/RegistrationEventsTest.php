@@ -155,6 +155,101 @@ it('does not let a third-party tool shadow a bundled tool name', function () {
     }
 });
 
+it('skips a tool whose shouldRegister() returns false', function () {
+    $listener = function (RegisterToolsEvent $event): void {
+        $event->tools[] = new class extends AbstractTool {
+            public static function getName(): string
+            {
+                return '_fake_gated_tool';
+            }
+
+            public static function getDescription(): string
+            {
+                return 'Permission-gated fixture — should never appear.';
+            }
+
+            public function shouldRegister(): bool
+            {
+                return false;
+            }
+
+            public function execute(array $arguments): array
+            {
+                return ['ok' => true];
+            }
+        };
+    };
+    Event::on(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
+
+    try {
+        $service = new Tools();
+        $service->init();
+
+        expect($service->getByName('_fake_gated_tool'))->toBeNull();
+    } finally {
+        Event::off(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
+    }
+});
+
+it('emits outputSchema in tools/list when a tool advertises one', function () {
+    $listener = function (RegisterToolsEvent $event): void {
+        $event->tools[] = new class extends AbstractTool {
+            public static function getName(): string
+            {
+                return '_fake_tool_with_output_schema';
+            }
+
+            public static function getDescription(): string
+            {
+                return 'Fixture advertising an output schema.';
+            }
+
+            public static function outputSchema(): array
+            {
+                return ['type' => 'object', 'properties' => ['ok' => ['type' => 'boolean']]];
+            }
+
+            public function execute(array $arguments): array
+            {
+                return ['ok' => true];
+            }
+        };
+    };
+    Event::on(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
+
+    try {
+        $service = new Tools();
+        $service->init();
+
+        $payload = $service->asListPayload();
+        $entry = null;
+        foreach ($payload as $row) {
+            if ($row['name'] === '_fake_tool_with_output_schema') {
+                $entry = $row;
+                break;
+            }
+        }
+
+        expect($entry)->not->toBeNull();
+        expect($entry)->toHaveKey('outputSchema');
+        expect($entry['outputSchema'])->toBe([
+            'type' => 'object',
+            'properties' => ['ok' => ['type' => 'boolean']],
+        ]);
+    } finally {
+        Event::off(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
+    }
+});
+
+it('omits outputSchema in tools/list when a tool returns []', function () {
+    // Bundled tools (none of which advertise outputSchema) — payload
+    // should never carry the key for them.
+    $payload = \craftpulse\cortex\Plugin::getInstance()->tools->asListPayload();
+    foreach ($payload as $entry) {
+        expect($entry)->not->toHaveKey('outputSchema');
+    }
+});
+
 // -----------------------------------------------------------------------------
 // Prompts
 // -----------------------------------------------------------------------------

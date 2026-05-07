@@ -99,6 +99,10 @@ class Tools extends Component
             if (!$tool instanceof ToolInterface) {
                 continue;
             }
+            if (!$tool->shouldRegister()) {
+                // Pro-tier permission gating opts a tool out per request.
+                continue;
+            }
             $name = $tool::getName();
             if (isset($this->_byName[$name])) {
                 // First registration wins — don't let third-party tools
@@ -169,6 +173,11 @@ class Tools extends Component
                     'description' => $t::getDescription(),
                     'inputSchema' => $t::getInputSchema(),
                 ];
+
+                $outputSchema = $t::outputSchema();
+                if ($outputSchema !== []) {
+                    $entry['outputSchema'] = $outputSchema;
+                }
 
                 $annotations = AttributeReader::annotationsFor($t);
                 if ($annotations !== []) {

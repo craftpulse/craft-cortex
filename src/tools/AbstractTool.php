@@ -38,6 +38,35 @@ abstract class AbstractTool implements ToolInterface
         ];
     }
 
+    /**
+     * @inheritdoc
+     *
+     * Default: no output schema declared. Override per tool when the
+     * caller benefits from advertising response shape (Pro tools, tools
+     * with strictly-shaped output the LLM can validate against).
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    public static function outputSchema(): array
+    {
+        return [];
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Default: every tool registers. Pro write tools override to gate
+     * visibility on Craft permissions for the current user.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    public function shouldRegister(): bool
+    {
+        return true;
+    }
+
     // Protected Methods
     // =========================================================================
 

@@ -11,6 +11,14 @@ namespace craftpulse\cortex\tools;
  * validate arguments before invocation. They MUST throw `ToolException`
  * for structured tool-level errors and let other exceptions propagate
  * (the dispatcher converts them to JSON-RPC internal errors).
+ *
+ * The `execute()` return type is `array|\Generator` to leave room for
+ * Phase 2 progress streaming — long-running Pro tools (resave, audit fix
+ * modes, bulk_entries, import_export import) will yield progress
+ * notifications interleaved with the final result. Phase 1 dispatchers
+ * eagerly consume any Generator (final yield = result) without
+ * surfacing intermediate notifications. Phase 2's HTTP transport adds
+ * notification forwarding.
  * =========================================================================
  *
  * @author Craftpulse
@@ -50,15 +58,49 @@ interface ToolInterface
     public static function getInputSchema(): array;
 
     /**
+     * JSON Schema describing the tool's structured response. Empty array
+     * means "no output schema declared" — the wire payload is still the
+     * usual `content[]` envelope. Pro tools and any future tools that
+     * benefit from response-shape advertising override this. Defaults to
+     * `[]` in `AbstractTool`; override per concrete tool when useful.
+     *
+     * @return array<string,mixed>
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    public static function outputSchema(): array;
+
+    /**
+     * Whether this tool should appear in the registry for the current
+     * request. Phase 1 always returns `true` from `AbstractTool`. Phase 2
+     * Pro tools override to gate visibility on Craft permissions — a user
+     * without `saveEntries:{section}` doesn't see the corresponding mode
+     * surfaces in `tools/list`. Returning `false` removes the tool
+     * entirely from the registry for that build.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    public function shouldRegister(): bool;
+
+    /**
      * Execute the tool against the given arguments. Returns a structured
      * result that the dispatcher wraps in MCP's `content[]` envelope.
      *
+     * Long-running tools may return a `\Generator` that yields progress
+     * notifications and finishes with the result via `Generator::return`
+     * (or as the final yield, whichever pattern the tool prefers). Phase 1
+     * eagerly consumes the generator — the final value becomes the wire
+     * response. Phase 2's HTTP transport forwards intermediate yields as
+     * `notifications/progress` messages per MCP spec 2025-06-18.
+     *
      * @param array<string,mixed> $arguments Validated against `getInputSchema()` upstream.
-     * @return array<int|string,mixed>
+     * @return array<int|string,mixed>|\Generator<int,mixed,mixed,array<int|string,mixed>>
      * @throws ToolException For tool-level errors (returned to client as `isError: true`).
      *
      * @author Craftpulse
      * @since  0.1.0
      */
-    public function execute(array $arguments): array;
+    public function execute(array $arguments): array|\Generator;
 }
