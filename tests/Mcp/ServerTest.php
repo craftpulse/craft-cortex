@@ -86,6 +86,39 @@ it('leaves the captured client name null when initialize omits clientInfo', func
     expect($prop->getValue($this->server))->toBeNull();
 });
 
+it('clears a previously-captured client name when a re-handshake omits clientInfo', function () {
+    // First handshake — captures the name.
+    $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => new stdClass(),
+            'clientInfo' => ['name' => 'cursor', 'version' => '1.0'],
+        ],
+    ]);
+
+    // Re-handshake — omits clientInfo. Stale capture must not survive,
+    // otherwise audit-log lines after the re-handshake carry the wrong
+    // client name.
+    $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 2,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => new stdClass(),
+        ],
+    ]);
+
+    $rc = new ReflectionClass($this->server);
+    $prop = $rc->getProperty('_clientName');
+    $prop->setAccessible(true);
+
+    expect($prop->getValue($this->server))->toBeNull();
+});
+
 // -----------------------------------------------------------------------------
 // notifications
 // -----------------------------------------------------------------------------

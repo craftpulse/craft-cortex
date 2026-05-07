@@ -41,11 +41,13 @@ use Throwable;
  *   6. **Tool annotation.** `destructiveHint: true` on the tool so
  *      spec-compliant clients can warn the user before invoking.
  *
- * Gate 7 (settings toggle): when `Settings::$execEnabled = false`, the
- * tool short-circuits with a clear error before any eval is attempted.
- * The registry still surfaces the tool — disabling at registration
- * time would prevent the LLM from getting an explanatory error if it
- * tried to call.
+ * Pre-condition (not a gate): when `Settings::$execEnabled = false`,
+ * the tool short-circuits with a clear error before any gate
+ * evaluates. The registry still surfaces the tool — disabling at
+ * registration time would prevent the LLM from getting an
+ * explanatory error if it tried to call. This is an availability
+ * switch, not a dispatch-time guardrail; the public security model
+ * is the six gates above.
  * =========================================================================
  *
  * @author Craftpulse

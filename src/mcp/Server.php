@@ -148,10 +148,19 @@ class Server
      */
     private function _initializeResult(array $params): array
     {
+        // Reset on every handshake. MCP 2025-06-18 §5.1 requires
+        // `clientInfo` on initialize; if it's absent, that's a malformed
+        // request from the client. We accept it gracefully but clear the
+        // captured name so a stale value from a prior handshake doesn't
+        // leak into subsequent audit-log lines.
+        $this->_clientName = null;
+
         $clientInfo = $params['clientInfo'] ?? null;
         if (is_array($clientInfo)) {
             $name = $clientInfo['name'] ?? null;
-            $this->_clientName = is_string($name) && $name !== '' ? $name : null;
+            if (is_string($name) && $name !== '') {
+                $this->_clientName = $name;
+            }
         }
 
         return [
