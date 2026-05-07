@@ -167,8 +167,7 @@ class CraftCommand extends AbstractTool
      */
     private function _allowlist(): array
     {
-        $settings = Plugin::getInstance()->getSettings();
-        $patterns = $settings->allowedCommands;
+        $patterns = Plugin::getInstance()->allowlist->getEffective();
 
         return array_values(array_filter(
             $patterns,

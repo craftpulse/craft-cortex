@@ -7,6 +7,7 @@ use craft\base\Plugin as BasePlugin;
 use craft\events\RegisterComponentTypesEvent;
 use craftpulse\cortex\generator\Tool as ToolGenerator;
 use craftpulse\cortex\models\Settings;
+use craftpulse\cortex\services\Allowlist;
 use craftpulse\cortex\services\Prompts;
 use craftpulse\cortex\services\Resources;
 use craftpulse\cortex\services\Tools;
@@ -32,6 +33,7 @@ use yii\base\Event;
  *
  * @method static Plugin getInstance()
  * @method Settings getSettings()
+ * @property-read Allowlist $allowlist
  * @property-read Prompts $prompts
  * @property-read Resources $resources
  * @property-read Tools $tools
@@ -69,6 +71,7 @@ class Plugin extends BasePlugin
     {
         return [
             'components' => [
+                'allowlist' => ['class' => Allowlist::class],
                 'prompts' => ['class' => Prompts::class],
                 'resources' => ['class' => Resources::class],
                 'tools' => ['class' => Tools::class],
