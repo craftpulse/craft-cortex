@@ -49,6 +49,9 @@ it('registers all Phase-1 tools by name', function () {
         'resave',
         'craft_command',
         'craft_exec',
+
+        // Workflow & Audit — read modes (Gate 6.5)
+        'drafts_and_revisions',
     ];
 
     $tools = Plugin::getInstance()->tools;

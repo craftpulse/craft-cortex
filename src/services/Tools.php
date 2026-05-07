@@ -30,6 +30,7 @@ use craftpulse\cortex\tools\system\PermissionsAndGroups;
 use craftpulse\cortex\tools\system\Plugins;
 use craftpulse\cortex\tools\system\Routes;
 use craftpulse\cortex\tools\system\SystemInfo;
+use craftpulse\cortex\tools\workflow\DraftsAndRevisions;
 use craftpulse\cortex\events\RegisterToolsEvent;
 use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\ToolInterface;
@@ -229,6 +230,9 @@ class Tools extends Component
             new Resave(),
             new CraftCommand(),
             new CraftExec(),
+
+            // Gate 6.5 — Workflow & Audit (read modes).
+            new DraftsAndRevisions(),
         ];
     }
 }
