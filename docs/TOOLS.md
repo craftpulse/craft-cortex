@@ -3,8 +3,8 @@
 Auto-generated reference for the cortex MCP tool surface. Run
 `ddev craft cortex/docs/tools` to refresh.
 
-- **Total tools:** 31
-- **Generated:** 2026-05-07T06:10:18-07:00
+- **Total tools:** 32
+- **Generated:** 2026-05-07T10:46:39-07:00
 
 ## `sections`
 
@@ -723,7 +723,7 @@ Combined route map: config-file routes (config/routes.php), project-config route
 }
 ```
 
-## `diagnostics`
+## `system_diagnostics`
 
 Combined diagnostics surface: logs, last_error, deprecations, queue jobs, and project_config_diff. Pick one via `type`. Returns at most `limit` items (default 50, max 500).
 
@@ -855,6 +855,58 @@ The full Craft permissions tree (built-in + plugin-registered) and the user-grou
 {
     "type": "object",
     "properties": {},
+    "additionalProperties": false
+}
+```
+
+## `search_skills`
+
+Full-text search across the bundled craft-skills corpus — 8 skills, their reference deep-dives, and 5 Claude Code agents. `mode: "search"` (default) returns ranked matches with a snippet and the resource URI for follow-up reads; `mode: "topics"` enumerates the corpus without scoring. Filter `kind` to `skill` / `reference` / `agent` to narrow.
+
+**Annotations:**
+
+- `readOnlyHint`: true
+- `idempotentHint`: true
+- `title`: Search Bundled Skills
+
+**Input schema:**
+
+```json
+{
+    "type": "object",
+    "properties": {
+        "mode": {
+            "type": "string",
+            "description": "Optional. `search` (default) ranks documents; `topics` enumerates without scoring.",
+            "enum": [
+                "search",
+                "topics"
+            ]
+        },
+        "query": {
+            "type": "string",
+            "description": "Free-text query. Required for `search` mode; ignored for `topics`.",
+            "examples": [
+                "element save lifecycle",
+                "matrix block field",
+                "multi-site propagation"
+            ]
+        },
+        "kind": {
+            "type": "string",
+            "description": "Optional filter. `skill` = router only; `reference` = deep dives; `agent` = Claude Code agents.",
+            "enum": [
+                "skill",
+                "reference",
+                "agent"
+            ]
+        },
+        "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+        }
+    },
     "additionalProperties": false
 }
 ```
@@ -1150,7 +1202,7 @@ Inspect entry drafts and revisions. Modes: `list_drafts` lists drafts (optionall
 }
 ```
 
-## `audit`
+## `content_audit`
 
 Read-only content health reports. Modes: `relations` lists broken relational references (target element missing or soft-deleted); `unused_assets` lists assets not referenced by any element field; `propagation` lists entries in multi-site sections that don't exist in every enabled site. Fix modes (delete broken relations, prune unused assets, force-propagate) unlock in Pro.
 
