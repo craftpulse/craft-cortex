@@ -4,8 +4,11 @@ namespace craftpulse\cortex\tools\content;
 
 use Craft;
 use craft\elements\GlobalSet;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\ElementSerializer;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 
 /**
@@ -26,6 +29,8 @@ use craftpulse\cortex\tools\ToolException;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class Globals extends AbstractTool
 {
     // Public Methods
@@ -63,15 +68,11 @@ class Globals extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'handle' => ['type' => 'string', 'description' => 'Global set handle. Omit to read all.'],
-                'site' => ['description' => 'Site handle or id. Defaults to primary.'],
-                'with' => ['type' => 'array', 'items' => ['type' => 'string']],
-            ],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'handle' => Schema::string()->description('Global set handle. Omit to read all.'),
+            'site' => Schema::any()->description('Site handle or id. Defaults to primary.'),
+            'with' => Schema::array(Schema::string()),
+        ])->toArray();
     }
 
     /**

@@ -4,8 +4,11 @@ namespace craftpulse\cortex\tools\content;
 
 use craft\elements\Category;
 use craft\elements\db\CategoryQuery;
+use craftpulse\cortex\attributes\IsIdempotent;
+use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\ElementSerializer;
+use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 
 /**
@@ -20,6 +23,8 @@ use craftpulse\cortex\tools\ToolException;
  * @author Craftpulse
  * @since  0.1.0
  */
+#[IsReadOnly]
+#[IsIdempotent]
 class Categories extends AbstractTool
 {
     // Constants
@@ -64,33 +69,29 @@ class Categories extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        return [
-            'type' => 'object',
-            'properties' => [
-                'id' => ['description' => 'Single id or array.'],
-                'uid' => ['description' => 'Single uid or array.'],
-                'slug' => ['type' => 'string'],
-                'title' => ['type' => 'string'],
-                'group' => ['description' => 'Group handle, id, or array.'],
-                'status' => ['description' => 'Status string or array.'],
-                'enabled' => ['type' => 'boolean'],
-                'level' => ['description' => 'Structure level (int or comparison string).'],
-                'hasDescendants' => ['type' => 'boolean'],
-                'leaves' => ['type' => 'boolean'],
-                'descendantOf' => ['description' => 'Element id or instance.'],
-                'ancestorOf' => ['description' => 'Element id or instance.'],
-                'siblingOf' => ['description' => 'Element id or instance.'],
-                'relatedTo' => ['description' => 'Craft relation syntax.'],
-                'search' => ['type' => 'string'],
-                'with' => ['type' => 'array', 'items' => ['type' => 'string']],
-                'orderBy' => ['type' => 'string'],
-                'limit' => ['type' => 'integer', 'minimum' => 1, 'maximum' => self::MAX_LIMIT],
-                'offset' => ['type' => 'integer', 'minimum' => 0],
-                'site' => ['description' => 'Site handle, id, or "*".'],
-                'count' => ['type' => 'boolean'],
-            ],
-            'additionalProperties' => false,
-        ];
+        return Schema::object([
+            'id' => Schema::any()->description('Single id or array.'),
+            'uid' => Schema::any()->description('Single uid or array.'),
+            'slug' => Schema::string(),
+            'title' => Schema::string(),
+            'group' => Schema::any()->description('Group handle, id, or array.'),
+            'status' => Schema::any()->description('Status string or array.'),
+            'enabled' => Schema::boolean(),
+            'level' => Schema::any()->description('Structure level (int or comparison string).'),
+            'hasDescendants' => Schema::boolean(),
+            'leaves' => Schema::boolean(),
+            'descendantOf' => Schema::any()->description('Element id or instance.'),
+            'ancestorOf' => Schema::any()->description('Element id or instance.'),
+            'siblingOf' => Schema::any()->description('Element id or instance.'),
+            'relatedTo' => Schema::any()->description('Craft relation syntax.'),
+            'search' => Schema::string(),
+            'with' => Schema::array(Schema::string()),
+            'orderBy' => Schema::string(),
+            'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
+            'offset' => Schema::integer()->minimum(0),
+            'site' => Schema::any()->description('Site handle, id, or "*".'),
+            'count' => Schema::boolean(),
+        ])->toArray();
     }
 
     /**
