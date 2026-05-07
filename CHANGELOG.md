@@ -59,12 +59,13 @@ adds the architecture tests that catch convention drift.
 
 #### New surfaces
 
-- 5 bundled agents from `michtio/craftcms-claude-skills` v1.4.2+
+- The bundled agents from `michtio/craftcms-claude-skills` v1.4.2+
   surface as MCP resources under
   `craft-skills://agents/<agent-name>`. The companion package's
   `Skills::agentNames()` / `Skills::agentContent()` helpers are
   optional — the loop is a no-op against an older companion install,
   so cortex still boots cleanly for users who haven't upgraded.
+  See `docs/RESOURCES.md` for the live count.
 - `tools/system/SearchSkills` — new `search_skills` tool. Keyword
   search across the bundled skills corpus with snippet
   highlighting. Pulls the LLM toward "search the moat content" rather
@@ -90,11 +91,14 @@ adds the architecture tests that catch convention drift.
 #### Audit envelope upgrade
 
 - `tools/workflow/ImportExport` — export envelope bumped to format 2.
-  Adds a manifest header (export timestamp, source site UID, format
-  version) and per-entry section / type identity headers so a Pro
-  `import` mode can do a round-trip without a separate manifest
-  file. Phase 1 still only exposes `export`; the format-versioned
-  envelope is forward-compatible with the Pro import surface.
+  Adds a manifest header (export timestamp, Craft version, Craft
+  edition, project schema version, paging cursors) and per-entry
+  identity headers (uid, section / type handles, site handle,
+  authorIds, parentUid + level for Structure entries, enabledForSite,
+  full date stamps) so a Pro `import` mode can do a round-trip
+  without a separate manifest file. Phase 1 still only exposes
+  `export`; the format-versioned envelope is forward-compatible with
+  the Pro import surface.
 
 #### Architecture tests
 
@@ -131,9 +135,44 @@ adds the architecture tests that catch convention drift.
   unchanged; remains the documented manual fallback. Per-client
   paths verified against current upstream docs.
 
+#### Adversarial review fixes
+
+- `events/RegisterResourcesEvent::$resources` typed widened from
+  `ResourceInterface[]` to
+  `array<int, ResourceInterface | ResourceTemplateInterface>`. The
+  registry already routed both shapes through the event; the strict
+  type forced third-party plugins through a TypeError when
+  registering a template. Also refreshes the docblock to drop the
+  pre-#12 "silently skipped" wording (collisions now warn).
+- `tools/workflow/ImportExport` — docblock example block refreshed
+  to format 2 (was still showing format 1's slimmer surface).
+- `tools/support/InvocationLogger` — docblock now documents the
+  Phase 1 "no user attribution" deferral explicitly (was implicit
+  before; the security rule lists user attribution as a Phase 2 ship
+  requirement).
+- `console/InstallController::resolveConfigPath` /
+  `buildMergedConfig` — marked `@internal` to signal that they're
+  test-touchpoints, not part of the stable public extension API.
+
+#### Audit log shape locked for Phase 2
+
+- New `tools/support/InvocationContext` value object —
+  `transport`, `requestId`, `userId`, `clientName`. Locks the audit
+  line shape across the Phase 1 stdio / Phase 2 HTTP transport
+  upgrade. Phase 2 populates `user` once OAuth resolves; the line
+  format does not change.
+- `InvocationLogger::formatEntry()` line shape:
+  `tool=<name> kind=<...> duration_ms=<int> transport=<stdio|http>
+  request_id=<id|-> user=<id|-> client=<name|-> args=<json>`.
+  Unknown fields emit `-` (Apache common-log placeholder). Field
+  order is part of the locked surface.
+- `mcp/Server` captures `clientInfo.name` from the MCP `initialize`
+  handshake (we already received it; we just weren't keeping it) and
+  stamps it on every tool invocation context.
+
 #### Test surface
 
-- 324 Pest tests passing, 5 conditional skips, ~2.5s. PHPStan level
+- 331 Pest tests passing, 5 conditional skips, ~3s. PHPStan level
   8 clean. Architecture conventions green (7 enforcers).
 
 ### Added — Gate 6.5 (Phase 1, DX Pass + Workflow & Audit + Ship-readiness)
