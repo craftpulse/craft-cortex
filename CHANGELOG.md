@@ -6,6 +6,61 @@ All notable changes to Cortex are documented here. Format follows
 
 ## [Unreleased]
 
+### Added — Gate 6 (Phase 1, Skills as Prompts + Resources)
+- 8 MCP prompts mapping the bundled
+  `michtio/craftcms-claude-skills` package one-to-one (per
+  PLANNING.md 4.6):
+  - `craftcms_extending` — `craftcms` skill (~13,000 lines).
+    Reverse-engineered Craft internals: 15-step element save
+    lifecycle, four-layer authorization model, dual-layer
+    session architecture.
+  - `craftcms_templates` — `craft-site` skill (~8,800 lines).
+    Front-end framework + 22 plugin integration guides.
+  - `craftcms_cp_javascript` — `craft-garnish` skill
+    (~2,200 lines). The only written documentation for
+    Craft's internal JS toolkit.
+  - `craftcms_content_modeling` — `craft-content-modeling`.
+  - `craftcms_php_standards` — `craft-php-guidelines`.
+  - `craftcms_twig_standards` — `craft-twig-guidelines`.
+  - `craftcms_ddev` — `ddev`.
+  - `craftcms_setup` — `craft-project-setup`.
+- 72 MCP resources covering both the SKILL.md routers and every
+  reference deep-dive across the 8 skills. URI scheme:
+  `craft-skills://<skill>[/<reference>]`. Bundled prompts use
+  the `craftcms_*` namespace; bundled resources use the
+  `craft-skills://` URI scheme — both reserved so the Pro
+  custom-skills feature (Gate 8.5) can use `custom_*` and
+  `custom-skills://` without collision.
+- **Why prompts as the primary delivery:** MCP clients reliably
+  invoke prompts as part of task execution, but rarely fetch
+  resources spontaneously. The prompt returns SKILL.md inline
+  so the LLM has the routing knowledge without having to know
+  to ask. Resources serve as the deep-dive sub-fetch the LLM
+  does on demand once a prompt routes it.
+- New registry surface mirrors the tool registry shape:
+  - `prompts/PromptInterface` + `AbstractPrompt` + concrete
+    `SkillPrompt`.
+  - `resources/ResourceInterface` + `AbstractResource` +
+    concrete `SkillResource`.
+  - `services/Prompts` (Yii Component, name-keyed lookup,
+    `asListPayload()`).
+  - `services/Resources` (Yii Component, URI-keyed lookup,
+    `asListPayload()`).
+- `mcp/Server` replaces the empty `prompts/list` and
+  `resources/list` stubs and adds `prompts/get` +
+  `resources/read` handlers. Returns JSON-RPC `-32602` on
+  unknown name/URI; `-32603` on unexpected render failures.
+- Skills consumed via the
+  `Michtio\CraftCmsClaudeSkills\Skills` static helper from the
+  companion composer package — read on demand, no double-cache.
+  Path-traversal validation lives in the helper, not duplicated
+  in the resource layer.
+- **Cumulative Phase 1: 28 tools + 8 prompts + 72 resources =
+  108 MCP entries.** 177 Pest tests passing (27 new, 5 skipped),
+  5317 assertions, ~2.7s. PHPStan level 8 clean. Smoke-verified
+  through stdio: every prompt and a representative sample of
+  resources render correct content.
+
 ### Added — Gate 5 (Phase 1, GraphQL & Dev Actions)
 - 5 new tools — Phase 1 free tier complete at **28 tools total**:
   - `graphql` — modes `list_schemas` / `get_sdl` / `list_tokens`. Token
