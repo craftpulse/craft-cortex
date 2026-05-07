@@ -4,10 +4,13 @@ namespace craftpulse\cortex;
 
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
+use craft\events\RegisterComponentTypesEvent;
+use craftpulse\cortex\generator\Tool as ToolGenerator;
 use craftpulse\cortex\models\Settings;
 use craftpulse\cortex\services\Prompts;
 use craftpulse\cortex\services\Resources;
 use craftpulse\cortex\services\Tools;
+use yii\base\Event;
 
 /**
  * =========================================================================
@@ -71,6 +74,36 @@ class Plugin extends BasePlugin
                 'tools' => ['class' => Tools::class],
             ],
         ];
+    }
+
+    // Public Methods
+    // =========================================================================
+
+    /**
+     * @inheritdoc
+     *
+     * Registers the cortex-tool generator with Craft's `make` command if
+     * the `craftcms/generator` package is installed (always present in
+     * dev / playground installs; not bundled with the production
+     * `craftcms/cms` runtime). Class-exists guard keeps cortex bootable
+     * on installs that strip dev dependencies.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    public function init(): void
+    {
+        parent::init();
+
+        if (class_exists(\craft\generator\Command::class)) {
+            Event::on(
+                \craft\generator\Command::class,
+                \craft\generator\Command::EVENT_REGISTER_GENERATORS,
+                static function (RegisterComponentTypesEvent $event): void {
+                    $event->types[] = ToolGenerator::class;
+                },
+            );
+        }
     }
 
     // Protected Methods
