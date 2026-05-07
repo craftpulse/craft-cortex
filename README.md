@@ -1,37 +1,143 @@
 # Cortex — MCP server for Craft CMS 5
 
-> Pre-Phase-1 development. Not ready for use yet. See [PLANNING.md section 4](https://github.com/craftpulse/craft-cortex) for the roadmap.
+Cortex is a [Model Context Protocol](https://modelcontextprotocol.io/) server for [Craft CMS 5](https://craftcms.com/). It exposes Craft internals — sections, entry types, fields, content, drafts, audits, GraphQL, project config, and more — to AI agents over a dual transport:
 
-Cortex is a [Model Context Protocol](https://modelcontextprotocol.io/) server for [Craft CMS 5](https://craftcms.com/). It exposes Craft internals (sections, entry types, fields, content, generators, project config, more) to AI agents over a dual transport:
+- **stdio** for local development (Claude Code, Cursor, Claude Desktop, others) — Free
+- **Streamable HTTP** for content operators — Pro (Phase 2)
 
-- **stdio** for local development (Claude Code, Cursor, Claude Desktop) — Free tier
-- **Streamable HTTP** for content operators — Pro tier (Phase 2)
+Skills authored from years of Craft work ship as MCP prompts and resources, so the AI doesn't just have tools — it has expertise.
 
-Skills authored from years of Craft work are bundled as MCP prompts and resources, so the AI doesn't just have tools — it has expertise.
+## Highlights
 
-## Status
+- **31 tools, lean by design.** List/get pairs collapsed behind a single optional `handle`. Mode-driven write-side. Same coverage as competitors with half the tool count, faster LLM tool selection, fewer tokens consumed by `tools/list`.
+- **Skills moat.** Eight bundled skills from `michtio/craftcms-claude-skills` ship as MCP prompts (and 72 resources for deep-dives). LLMs route through the prompts; cortex serves the matching skill content inline.
+- **Schema-DSL authored tool inputs.** Every tool's argument schema is built with a fluent JSON Schema DSL — `Schema::object([...])->required()`. Same wire format MCP clients expect, friendlier authoring.
+- **Attribute-based annotations.** PHP 8 attributes — `#[IsReadOnly]`, `#[IsDestructive]`, `#[IsIdempotent]`, `#[IsOpenWorld]`, `#[IsStdioOnly]`, `#[Title]` — replace boilerplate static methods. Surface metadata at the class declaration, not buried in method bodies.
+- **Extension events.** Third-party plugins register their own tools, prompts, and resources via `EVENT_REGISTER_TOOLS` / `EVENT_REGISTER_PROMPTS` / `EVENT_REGISTER_RESOURCES`. Cortex enforces architectural contracts (interface, transport gating, dispatch) — third-party authors are responsible for behavioural correctness, the same trust model Craft itself uses for plugins.
+- **Security gates on `craft_exec`.** Six layered gates per [PLANNING.md 4.9](https://github.com/craftpulse/craft-cortex): dry-run default, structured output, secret redaction, destructive-op guard, hard HTTP rejection (stdio-only), `destructiveHint: true` annotation. We use Craft's own `ExecController` rather than a homebrew eval blocklist.
 
-| Gate | What it means | Status |
+## Install
+
+```bash
+composer require craftpulse/craft-cortex
+ddev craft plugin/install cortex
+```
+
+Then run `ddev craft cortex/install` to print copy-paste config snippets for every supported MCP client (Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf):
+
+```bash
+ddev craft cortex/install              # all clients
+ddev craft cortex/install --client=claude-desktop
+ddev craft cortex/install --ddev=0     # non-DDEV form
+```
+
+For Claude Desktop on macOS, the snippet looks like:
+
+```json
+{
+  "mcpServers": {
+    "cortex": {
+      "command": "docker",
+      "args": ["exec", "-i", "ddev-myproject-web", "php", "/var/www/html/craft", "cortex/serve"]
+    }
+  }
+}
+```
+
+Reload your client. `cortex` shows up alongside whatever else you've registered.
+
+## What the AI gets
+
+| Category | Count | Tools |
 |---|---|---|
-| Gate 1 | Empty server responds to `initialize` and `tools/list` over stdio | Done |
-| Gate 2 | 10 schema tools, integration tests pass | Done (52 Pest tests, 1040 assertions) |
-| Gate 3 | 15 tools (entries, assets, categories, tags, globals); no N+1 | Done (77 Pest tests, 1446 assertions) |
-| Gate 4 | 23 tools; PHPStan 8 clean; ECS clean | Done (107 Pest tests, 3041 assertions, PHPStan 8 clean — ECS blocked upstream) |
-| Gate 5 | 28 tools; `craft_exec` security gates verified | Done (150 Pest tests, 3456 assertions, PHPStan 8 clean) |
-| Gate 6 | Skills as MCP prompts; real LLM client validates routing | Phase 1 |
-| Gate 7 | Full Pest suite; two real LLM clients validate end-to-end | Phase 1 |
-| Gate 8 | Streamable HTTP transport + permission gating | Phase 2 |
-| Gate 9 | 11 Pro tools; license-gated | Phase 2 |
-| Gate 10 | CP MCP UI usable by a non-dev tester | Phase 2 |
-| Gate 11 | Pro ready for Plugin Store | Phase 2 |
+| Schema & Structure | 10 | `sections`, `entry_types`, `fields`, `field_types`, `category_groups`, `tag_groups`, `volumes_and_filesystems`, `sites`, `image_transforms`, `element_types` |
+| Content Reading | 5 | `entries`, `assets`, `categories`, `tags`, `globals` |
+| System & Diagnostics | 8 | `system_info`, `config`, `plugins`, `routes`, `diagnostics`, `database_schema`, `extensibility`, `permissions_and_groups` |
+| GraphQL | 1 | `graphql` |
+| Dev Actions | 4 | `craft_command`, `craft_exec`, `clear_caches`, `resave` |
+| Workflow & Audit | 3 | `drafts_and_revisions`, `audit`, `import_export` |
 
-## Local development
+Plus 8 prompts and 72 resources covering the full bundled-skills surface.
 
-This plugin is developed against the test environment at
-`~/dev/craft-plugin-playground/cms_v5/`, where it gets symlinked into
-`vendor/craftpulse/craft-cortex` via a Composer path repository.
+For the per-tool argument schemas and annotations, see [`docs/TOOLS.md`](docs/TOOLS.md). For prompts, [`docs/PROMPTS.md`](docs/PROMPTS.md). For resources, [`docs/RESOURCES.md`](docs/RESOURCES.md). All three regenerate via `ddev craft cortex/docs/all`.
 
-Test the stdio transport using the [DDEV MCP Inspector add-on](https://github.com/michtio/ddev-mcp-inspector):
+### N+1 prevention
+
+Relational fields on element output are stubbed by default:
+
+```json
+{ "fields": { "image": { "type": "relation", "loaded": false } } }
+```
+
+To materialise, pass `with: ["image"]` — Craft's eager-loading kicks in on the parent query, no per-entry round-trips.
+
+## Configure
+
+The plugin ships with sensible defaults. For environment-specific overrides, copy `vendor/craftpulse/craft-cortex/src/config/cortex.php` into your project's `config/cortex.php` and edit there. The file is heavily commented; settings cover:
+
+- `allowedCommands` — glob patterns the `craft_command` tool may dispatch
+- `execEnabled` / `execDryRunDefault` — `craft_exec` toggles
+- `runtimeOverrideTtl` — default expiry for runtime allowlist overrides
+
+Settings → Cortex in the CP also provides:
+
+- A live editor for the allowlist (writes to project config)
+- Toggles for the exec settings
+- Runtime-override management (admin-issued, auto-expiring patterns that layer on top of the defaults)
+
+## Extend
+
+Third-party plugins can register their own tools, prompts, and resources via class-level events:
+
+```php
+use craftpulse\cortex\events\RegisterToolsEvent;
+use craftpulse\cortex\services\Tools;
+use yii\base\Event;
+
+Event::on(
+    Tools::class,
+    Tools::EVENT_REGISTER_TOOLS,
+    function (RegisterToolsEvent $event): void {
+        $event->tools[] = new MyPlugin\Tools\MyCustomTool();
+    },
+);
+```
+
+Same pattern for `Prompts::EVENT_REGISTER_PROMPTS` and `Resources::EVENT_REGISTER_RESOURCES`.
+
+To scaffold a new tool against cortex's `AbstractTool` parent with the right attributes and Schema DSL stub:
+
+```bash
+ddev craft make cortex-tool --plugin=myplugin
+```
+
+The generator hooks into Craft's standard `make` command via `EVENT_REGISTER_GENERATORS`. It prompts for class name, namespace, and MCP tool name, then drops a stub class with `#[IsReadOnly]` `#[IsIdempotent]` defaults and an instruction block for registering it.
+
+## Develop
+
+This plugin is developed against the test environment at `~/dev/craft-plugin-playground/cms_v5/`, where it's symlinked into `vendor/craftpulse/craft-cortex` via a Composer path repository.
+
+### Run the tests
+
+```bash
+ddev exec --dir=/var/www/html/cms vendor/bin/pest \
+  --configuration=vendor/craftpulse/craft-cortex/phpunit.xml.dist
+```
+
+Pest covers the registry, every tool, every prompt, every resource, the JSON-RPC dispatcher, the extension events, and architectural conventions (no `eval()` / `shell_exec()` family / `declare(strict_types=1)`, every tool implements `ToolInterface`, every class file has a section header and `@author Craftpulse`).
+
+### Static analysis
+
+```bash
+ddev exec --dir=/var/www/html/cms vendor/bin/phpstan analyse \
+  --memory-limit=1G -c vendor/craftpulse/craft-cortex/phpstan.neon
+```
+
+PHPStan level 8 — clean.
+
+### Smoke through the inspector
+
+The [DDEV MCP Inspector add-on](https://github.com/michtio/ddev-mcp-inspector) is the visual harness:
 
 ```bash
 # In the playground:
@@ -40,109 +146,29 @@ ddev restart
 ddev mcp-inspector
 ```
 
-In the Inspector UI:
+In the Inspector UI, point at:
 
 - **Transport Type:** STDIO
 - **Command:** `docker`
 - **Arguments:** `exec -i ddev-plugin-playground-v5-web php /var/www/html/cms/craft cortex/serve`
 
-(`craft` is a PHP script, not on `$PATH` and not chmod +x, so it has to be invoked via `php` with its full path. The path matches the playground's `composer_root: cms` in `.ddev/config.yaml`.)
+The `initialize` handshake should succeed (`cortex 0.1.0`, protocol `2025-06-18`), and every tool / prompt / resource shows up in the lists.
 
-Click **Connect**. You should see the `initialize` handshake succeed (`cortex 0.1.0`, protocol `2025-06-18`).
+## Roadmap
 
-## Tools available now (Gates 2–5 — 28 tools)
+- **Phase 1 — Free.** 31 tools, 8 prompts, 72 resources, stdio transport, allowlist UI, install command, docs generators, extension events. Shipping.
+- **Phase 2 — Pro.** HTTP transport with OAuth 2.1, permission filtering, audit log, 7 net-new write tools, mode unlocks on Free tools (drafts/audit/import-export apply / fix / import), Pro-exclusive custom-skills element type, minimal CP UI (tokens / activity / connection).
+- **Phase 3 — Polish.** Install wizard auto-detecting installed clients, formal real-LLM E2E harness, vectorised docs search, third-party tool registration documented and battle-tested, skill remote-fetch.
 
-### Schema & Structure (Gate 2)
-
-| Tool | Modes |
-|---|---|
-| `sections` | list / get-by-handle / count |
-| `entry_types` | list (summary) / get-by-handle (full field layout: tabs, fields, conditions, UI elements) / count |
-| `fields` | list / get-by-handle / `mode: "usage"` (which entry types reference this field) / count |
-| `field_types` | every registered field type class — built-in + plugin |
-| `category_groups` | list / get-by-handle / count |
-| `tag_groups` | list / get-by-handle / count |
-| `volumes_and_filesystems` | combined map of volumes with their filesystems, plus orphan filesystems |
-| `sites` | list (with groups + primary site) / get-by-handle / count |
-| `image_transforms` | list / get-by-handle / count |
-| `element_types` | every registered element type class — 8 core + plugin — with capability flags |
-
-### Content Reading (Gate 3)
-
-| Tool | Modes |
-|---|---|
-| `entries` | full query surface: section/type/status/author/relatedTo/search filters, structure params (level/hasDescendants/leaves/descendantOf/ancestorOf/siblingOf), pagination (limit hard-cap 1000), eager loading via `with: [...]`, single-by-id, count |
-| `assets` | same query surface plus `mode: "folders"` for the folder tree of a volume |
-| `categories` | list/get/count with group filter and structure params |
-| `tags` | list/get/count with group filter |
-| `globals` | read global set values by handle, optionally site-localised |
-
-### System & Diagnostics (Gate 4)
-
-| Tool | Modes |
-|---|---|
-| `system_info` | Craft + PHP + DB + sites + license snapshot |
-| `config` | `mode: general / custom / db / email / system_messages`, fully secrets-redacted |
-| `plugins` | every installed plugin with handle, version, edition, license status, enabled flag |
-| `routes` | combined config-file + project-config + section + category-group URI map |
-| `diagnostics` | `type: logs / last_error / deprecations / queue / project_config_diff` |
-| `database_schema` | tables / columns / indexes / FKs (no data queries); `mode: "list"`, `tables: [...]` filter |
-| `extensibility` | `mode: events / twig / utilities / commands` (or all four at once) |
-| `permissions_and_groups` | full permissions tree + user groups (no PII) |
-
-### GraphQL (Gate 5)
-
-| Tool | Modes |
-|---|---|
-| `graphql` | `list_schemas` / `get_sdl` (by `name`, defaults to public schema) / `list_tokens` (metadata only — never the access-token value; SHA-256 fingerprint for correlation) |
-
-### Dev Actions (Gate 5)
-
-| Tool | Notes |
-|---|---|
-| `clear_caches` | `mode: list` returns registered cache keys; `mode: all` (default) clears everything; or pass a single key (`data`, `asset`, `compiled-templates`, …) |
-| `resave` | Wrapper for `resave/*`. Required `type` ∈ entries / assets / categories / tags / users / addresses. Optional filters (section/group/volume/status/limit), field rewrite (`set`/`to`), `queue: true` for background dispatch. Output captured cleanly. |
-| `craft_command` | Allowlisted runner for the rest of the Craft / Yii console surface. `mode: list` exposes patterns, `mode: run` dispatches. Allowlist sourced from `Settings::$allowedCommands` (project-config + `config/cortex.php` overrides). |
-| `craft_exec` | Wraps Craft's `ExecController`. **stdio only.** Dry-run by default — `confirm: true` to evaluate; destructive patterns (`delete*`, `drop*`, `truncate*`, `Elements::deleteElement`, `migrate/down`) additionally require `dangerous: true`. Result JSON-serialised, secrets redacted, errors typed (`parse_error` / `runtime_error`) with class / file / line / trace. `destructiveHint: true` annotation. |
-
-### N+1 prevention
-
-Every relational field on element output is **stubbed** by default:
-
-```json
-{ "fields": { "image": { "type": "relation", "loaded": false, "note": "Pass `with: [\"<fieldHandle>\"]` to eager-load." } } }
-```
-
-To materialise the relation, the caller passes `with: ["image"]` — that triggers Craft's eager-loading on the parent query, so the field value comes back as a list of element summaries without per-entry queries.
-
-Design follows PLANNING.md section 4.13: list/get pairs collapsed behind an optional `handle` argument, `count: true` mode where useful, structured JSON output, tool-level errors returned as `isError: true` envelopes (versus protocol errors returned as JSON-RPC errors).
-
-## Running the tests
-
-Pest tests live in `tests/`. They run from the playground (where Craft is bootstrapped) but assert on cortex internals.
-
-```bash
-# From the playground (~/dev/craft-plugin-playground/cms_v5/):
-ddev exec --dir=/var/www/html/cms vendor/bin/pest \
-  --configuration=vendor/craftpulse/craft-cortex/phpunit.xml.dist
-```
-
-Tests cover the registry, every schema tool (count / list / handle / mode / error paths), and the JSON-RPC dispatcher (initialize, notifications, tools/list, tools/call envelopes, every protocol error code). Suite runs in well under a second and asserts on shape (keys + types), not on specific data — so it works against any playground state.
-
-## Static analysis
-
-```bash
-ddev exec --dir=/var/www/html/cms vendor/bin/phpstan analyse \
-  --memory-limit=1G -c vendor/craftpulse/craft-cortex/phpstan.neon
-```
-
-PHPStan level 8, clean. Three suppressions in `phpstan.neon` cover (1) the `array<string,mixed>` argument shape that's MCP's wire contract, (2) Yii element-query generics in private builder helpers, (3) Plugin's auto-discovered Yii component config schema.
+Full plan: [PLANNING.md section 4](https://github.com/craftpulse/craft-cortex) (offsite — not in this repo).
 
 ## License
 
-Free tier: MIT. Pro/Commerce tiers: proprietary, license-gated through the Craft Plugin Store. Editions and tooling land in Phase 2.
+Free: MIT. Pro: proprietary, license-gated through the Craft Plugin Store (Phase 2).
 
 ## Credits
 
 - [Model Context Protocol](https://modelcontextprotocol.io/) — Anthropic et al.
 - [Craft CMS](https://craftcms.com/) — Pixel & Tonic
+- [`craftcms/generator`](https://github.com/craftcms/generator) — the make-system extensibility we hook into for `cortex-tool`
+- [`michtio/craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) — the skills bundle cortex serves as prompts + resources
