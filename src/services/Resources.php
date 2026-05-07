@@ -2,6 +2,7 @@
 
 namespace craftpulse\cortex\services;
 
+use Craft;
 use craftpulse\cortex\events\RegisterResourcesEvent;
 use craftpulse\cortex\resources\AgentResource;
 use craftpulse\cortex\resources\ResourceInterface;
@@ -78,6 +79,18 @@ class Resources extends Component
             if ($resource instanceof ResourceInterface) {
                 $uri = $resource->getUri();
                 if (isset($this->_byUri[$uri])) {
+                    // First registration wins. See `services/Tools::init`
+                    // for the rationale; same shape on the Resources
+                    // surface, keyed by URI rather than name.
+                    Craft::warning(
+                        sprintf(
+                            'Resource URI collision on "%s" — first registration (%s) wins; ignoring %s.',
+                            $uri,
+                            $this->_byUri[$uri]::class,
+                            $resource::class,
+                        ),
+                        'cortex',
+                    );
                     continue;
                 }
                 $this->_resources[] = $resource;

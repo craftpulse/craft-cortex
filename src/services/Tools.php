@@ -34,6 +34,7 @@ use craftpulse\cortex\tools\system\SystemInfo;
 use craftpulse\cortex\tools\workflow\Audit;
 use craftpulse\cortex\tools\workflow\DraftsAndRevisions;
 use craftpulse\cortex\tools\workflow\ImportExport;
+use Craft;
 use craftpulse\cortex\events\RegisterToolsEvent;
 use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\ToolInterface;
@@ -108,7 +109,18 @@ class Tools extends Component
             if (isset($this->_byName[$name])) {
                 // First registration wins — don't let third-party tools
                 // shadow bundled ones, and don't let collisions silently
-                // overwrite. Logging is left to a future audit pass.
+                // overwrite. Surface the collision in Craft's log so the
+                // third-party plugin author can see why their tool is
+                // missing from `tools/list`.
+                Craft::warning(
+                    sprintf(
+                        'Tool name collision on "%s" — first registration (%s) wins; ignoring %s.',
+                        $name,
+                        $this->_byName[$name]::class,
+                        $tool::class,
+                    ),
+                    'cortex',
+                );
                 continue;
             }
             $this->_tools[] = $tool;

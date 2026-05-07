@@ -2,6 +2,7 @@
 
 namespace craftpulse\cortex\services;
 
+use Craft;
 use craftpulse\cortex\events\RegisterPromptsEvent;
 use craftpulse\cortex\prompts\PromptInterface;
 use craftpulse\cortex\prompts\SkillPrompt;
@@ -118,6 +119,17 @@ class Prompts extends Component
             }
             $name = $prompt->getName();
             if (isset($this->_byName[$name])) {
+                // First registration wins. See `services/Tools::init` for
+                // the rationale; same shape on the Prompts surface.
+                Craft::warning(
+                    sprintf(
+                        'Prompt name collision on "%s" — first registration (%s) wins; ignoring %s.',
+                        $name,
+                        $this->_byName[$name]::class,
+                        $prompt::class,
+                    ),
+                    'cortex',
+                );
                 continue;
             }
             $this->_prompts[] = $prompt;
