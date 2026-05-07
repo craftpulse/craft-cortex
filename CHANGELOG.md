@@ -6,6 +6,156 @@ All notable changes to Cortex are documented here. Format follows
 
 ## [Unreleased]
 
+### Added — Gate 6.5 (Phase 1, DX Pass + Workflow & Audit + Ship-readiness)
+
+Phase 1 shippable. The DX foundation (Schema DSL, attribute-based
+annotations, `make:cortex-tool`, extension events) lands alongside three
+new Free tools (drafts/revisions, audit, import-export), the runtime
+allowlist UI, the install-snippet command, and a full doc-generation
+pipeline. Locks the public extension surface ahead of Phase 2.
+
+#### DX foundation (Laravel-MCP-inspired, retrofit-touched every tool)
+
+- `tools/support/Schema` — fluent JSON Schema builder. Static entry
+  points (`Schema::string()`, `Schema::object([...])`, `Schema::any()`,
+  `Schema::anyOf(...)`, `Schema::oneOf(...)`, `Schema::allOf(...)`,
+  `Schema::not(...)`, `Schema::constant(...)`) plus chainable setters
+  (`description`, `enum`, `default`, `format`, `pattern`, `min*`,
+  `max*`, `items`, `properties`, `additionalProperties`, `required`,
+  `uniqueItems`). Property-level `->required()` bubbles into the
+  parent object's `required` array. Output is the same JSON Schema
+  array MCP clients expect, just nicer to author.
+- `attributes/IsReadOnly`, `IsDestructive`, `IsIdempotent`,
+  `IsOpenWorld`, `IsStdioOnly`, `Title` — PHP 8 attributes that
+  declare MCP `ToolAnnotations` at the class level. Default to `true`;
+  pass `false` to advertise an explicit negative
+  (`#[IsIdempotent(false)]`). Replaces the static `getAnnotations()`
+  / `isStdioOnly()` methods on `ToolInterface` and `AbstractTool` —
+  both removed; `tools/support/AttributeReader` reads the new surface
+  via reflection at registry-build time.
+- **All 28 existing tools retrofitted** to the DSL + attributes
+  patterns over four logical commits (one per category: schema,
+  content, system, graphql/dev). No behaviour change — same wire
+  format, same annotations, same security gates. Pure refactor.
+- `events/RegisterToolsEvent`, `RegisterPromptsEvent`,
+  `RegisterResourcesEvent` — third-party plugins register their own
+  tools / prompts / resources via `Tools::EVENT_REGISTER_TOOLS`,
+  `Prompts::EVENT_REGISTER_PROMPTS`, `Resources::EVENT_REGISTER_RESOURCES`.
+  First registration wins on name / URI collision; bundled cortex
+  registrations always trump shadowing attempts.
+- `ddev craft make cortex-tool` — generator hooked into Craft's
+  `make` system via `EVENT_REGISTER_GENERATORS`. Prompts for class
+  name, namespace, and MCP tool name, then scaffolds a stub against
+  `AbstractTool` with the new attribute and Schema DSL patterns.
+  Prints the registration snippet on success. `craftcms/generator`
+  added as `require-dev` (always present in dev installs via
+  `craftcms/cms`).
+
+#### Workflow & Audit — three net-new Free tools (read modes only)
+
+- `drafts_and_revisions` — modes `list_drafts` / `list_revisions` /
+  `compare`. List drafts (filterable by section / canonical entry /
+  draft creator) and revisions of a canonical entry. Compare returns
+  field-level diffs between any two entries (canonical / draft /
+  revision in any combination). Pro adds `apply` / `discard` (Phase 2).
+- `audit` — modes `relations` / `unused_assets` / `propagation`.
+  Reports broken relational references (target missing or
+  soft-deleted), unused assets (not referenced by any element field),
+  and entries in multi-site sections that don't exist in every
+  enabled site. Pure query-builder lookups; subquery filter on
+  `unused_assets` keeps it fast on big sites. Pro adds fix modes
+  (Phase 2).
+- `import_export` — mode `export`. Structured JSON envelope per
+  entry (uid + identity + serialised field values via Craft's
+  `getSerializedFieldValues()`) suitable for cross-environment sync.
+  Format-versioned (`format: 1`); the Pro `import` mode in Phase 2
+  consumes the same shape.
+
+**Phase 1 tool count: 31** (was 28). All three new tools `#[IsReadOnly]`
++ `#[IsIdempotent]`.
+
+#### Allowlist UI
+
+- `migrations/Install.php` — creates `{{%cortex_runtime_overrides}}`
+  table on plugin install: `pattern` (string, indexed), `note`,
+  `expiresAt` (indexed), `createdByUserId` (FK to users with
+  `SET NULL` on delete), `dateCreated` / `dateUpdated` /
+  `dateDeleted` (soft-delete, indexed) / `uid`. Idempotent —
+  `safeUp()` bails when the table already exists; `safeDown()`
+  reverses cleanly.
+- `db/Table::RUNTIME_OVERRIDES` constant — single source of truth
+  for the table name, mirroring Craft's `craft\db\Table` pattern.
+- `records/RuntimeOverride` — Yii ActiveRecord with full PHPDoc
+  property surface.
+- `services/Allowlist` (registered as
+  `Plugin::getInstance()->allowlist`) — `getEffective()` returns the
+  union of `Settings::$allowedCommands` and active runtime overrides;
+  `getActiveOverrides()` / `getAllOverrides()` for the CP UI;
+  `add()` / `remove()` for CRUD; `pruneExpired()` for the cleanup
+  job. Carbon throughout (services rule — never mix with
+  `DateTimeHelper` in the same class).
+- `jobs/PruneExpiredOverrides` — queue job that hard-deletes expired
+  non-deleted overrides. Designed to be scheduled via Craft gc.
+- `controllers/SettingsController` — `actionAddOverride` /
+  `actionRemoveOverride`. `requireAdmin(requireAdminChanges: true)`
+  on both — allowlist mutations are a security boundary.
+- `templates/settings.twig` — plain-Twig CP form (Settings → Cortex
+  in the CP). Two sections: Defaults (saved via Craft's standard
+  `plugins/save-plugin-settings`, syncs through project config) and
+  Runtime overrides (custom controller actions, DB-backed). Defaults
+  use Craft's `_includes/forms` macros; the override list renders
+  with cancel/expiry status; an inline form adds new patterns with
+  optional note + custom TTL.
+- `Settings::$runtimeOverrideTtl` — new field, default 7 days
+  (`604800`). Default applied to new overrides when none is supplied.
+- `tools/dev/CraftCommand` — switched its allowlist read to use
+  `Plugin::getInstance()->allowlist->getEffective()` so runtime
+  overrides take effect immediately.
+
+#### Phase 1 ship-readiness
+
+- `console/controllers/InstallController` —
+  `ddev craft cortex/install` prints copy-paste MCP client config
+  snippets for **seven** known clients: Claude Desktop, Claude Code,
+  Cursor, Continue.dev, Cline, Zed, Windsurf. Auto-detects DDEV via
+  `IS_DDEV_PROJECT` / `DDEV_PROJECT`; emits the `docker exec` form
+  when inside a container. `--client=<name>` / `--all` flags. Read-
+  only — never writes config files. Phase 3 adds the GUI auto-detect
+  wizard.
+- `console/controllers/DocsController` — `ddev craft cortex/docs/all`
+  generates `docs/TOOLS.md`, `docs/PROMPTS.md`, `docs/RESOURCES.md`
+  from the live registries. Each action also runs solo
+  (`cortex/docs/tools` / `prompts` / `resources`). `--out=<dir>`
+  overrides the output directory (used by the test suite). Output is
+  committed to the repo so consumers get a reference without booting
+  cortex.
+- `config/cortex.php` reference template — heavily commented config
+  file documenting every setting (`allowedCommands`, `execEnabled`,
+  `execDryRunDefault`, `runtimeOverrideTtl`) with environment-
+  specific override examples (production / staging).
+- **Architecture tests** in `tests/Architecture/ConventionsTest.php`:
+  - No `eval()` / `exec()` / `shell_exec()` / `proc_open()` /
+    `passthru()` / `popen()` calls anywhere in `src/` (PHP token
+    parser, not regex — false-positive-proof against docblock /
+    string occurrences).
+  - No `declare(strict_types=1)` in plugin source.
+  - Every concrete tool class implements `ToolInterface`.
+  - Every class file under `src/` has a section header (`====`
+    marker) and an `@author Craftpulse` PHPDoc tag.
+- **README rewritten** for Phase 1 ship — install, configure, what
+  the AI gets (with cross-links to `docs/TOOLS.md` etc.), extension
+  events, generator, develop, roadmap. Drops the per-gate roadmap
+  table; the gates are documentation residue at this point.
+
+#### Test surface
+
+- **266 Pest tests** (was 177 at Gate 6 — added 89 new), 5660
+  assertions, ~2.4s. PHPStan level 8 clean. Architecture conventions
+  green. ECS still blocked upstream by `craftcms/ecs dev-main`'s
+  symplify pin (documented in Gate 4). Manual smoke through Claude
+  Desktop verifies tools/list, descriptions, prompts, and a
+  representative slice of resources.
+
 ### Added — Gate 6 (Phase 1, Skills as Prompts + Resources)
 - 8 MCP prompts mapping the bundled
   `michtio/craftcms-claude-skills` package one-to-one (per
