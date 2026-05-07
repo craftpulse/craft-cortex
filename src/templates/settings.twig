@@ -1,0 +1,135 @@
+{% import "_includes/forms.twig" as forms %}
+
+{# =========================================================================
+   Cortex plugin settings.
+
+   Two sections:
+     1. Defaults — `Settings` model fields, saved via Craft's standard
+        `plugins/save-plugin-settings` action. Syncs through project
+        config.
+     2. Runtime overrides — DB-backed allowlist patterns with auto
+        expiry. Add / remove via cortex/settings/{add-override,
+        remove-override} controller actions.
+   ========================================================================= #}
+
+<h2>{{ 'Defaults'|t('cortex') }}</h2>
+
+<p class="light">
+    {{ 'These options sync to project config and apply across environments. Field-level overrides also work in `config/cortex.php`.'|t('cortex') }}
+</p>
+
+{{ forms.lightswitchField({
+    label: 'Enable craft_exec'|t('cortex'),
+    instructions: 'Disable to remove the `craft_exec` tool from `tools/list` entirely. The tool is stdio-only and gated by six security checks regardless.'|t('cortex'),
+    name: 'execEnabled',
+    on: settings.execEnabled,
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'craft_exec defaults to dry-run'|t('cortex'),
+    instructions: 'When enabled, `craft_exec` returns parsed analysis instead of evaluating until the caller passes `confirm: true`. Destructive expressions still need explicit `dangerous: true` regardless.'|t('cortex'),
+    name: 'execDryRunDefault',
+    on: settings.execDryRunDefault,
+}) }}
+
+{{ forms.textField({
+    label: 'Runtime override TTL (seconds)'|t('cortex'),
+    instructions: 'Default expiry applied to a new runtime override when none is supplied at creation time. Default 7 days (604800).'|t('cortex'),
+    name: 'runtimeOverrideTtl',
+    value: settings.runtimeOverrideTtl,
+    type: 'number',
+    min: 60,
+}) }}
+
+{{ forms.editableTableField({
+    label: 'Allowed commands'|t('cortex'),
+    instructions: 'Glob patterns the `craft_command` tool may dispatch. Per-row patterns use `fnmatch` semantics: `resave/*` matches any `resave/<x>` route; `up` matches the literal `up` command. Edit `config/cortex.php` to override per environment.'|t('cortex'),
+    name: 'allowedCommands',
+    cols: {
+        pattern: {
+            heading: 'Pattern'|t('cortex'),
+            type: 'singleline',
+        },
+    },
+    rows: settings.allowedCommands|map(p => { pattern: p }),
+    addRowLabel: 'Add a pattern'|t('cortex'),
+}) }}
+
+<hr>
+
+<h2>{{ 'Runtime overrides'|t('cortex') }}</h2>
+
+<p class="light">
+    {{ 'Admin-issued allowlist patterns that auto-expire. Layer on top of the defaults — useful for "let the content team run mailer/test until next Monday" scenarios. Expired rows fall off automatically; the cleanup queue job hard-deletes them on the next gc cycle.'|t('cortex') }}
+</p>
+
+{% if overrides|length %}
+    <table class="data fullwidth">
+        <thead>
+            <tr>
+                <th scope="col">{{ 'Pattern'|t('cortex') }}</th>
+                <th scope="col">{{ 'Expires'|t('cortex') }}</th>
+                <th scope="col">{{ 'Note'|t('cortex') }}</th>
+                <th scope="col">{{ 'Created'|t('cortex') }}</th>
+                <th scope="col"></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for override in overrides %}
+                {% set expires = override.expiresAt ? override.expiresAt|date('short', null, locale) : 'never'|t('cortex') %}
+                {% set isExpired = override.expiresAt and override.expiresAt|date('U') < now|date('U') %}
+                <tr {% if isExpired %}class="disabled"{% endif %}>
+                    <td><code>{{ override.pattern }}</code></td>
+                    <td>
+                        {{ expires }}
+                        {% if isExpired %}<span class="light">({{ 'expired'|t('cortex') }})</span>{% endif %}
+                    </td>
+                    <td>{{ override.note ?? '' }}</td>
+                    <td>{{ override.dateCreated|date('short', null, locale) }}</td>
+                    <td class="thin">
+                        <form method="post" accept-charset="utf-8" style="display:inline">
+                            {{ csrfInput() }}
+                            {{ actionInput('cortex/settings/remove-override') }}
+                            {{ redirectInput('settings/plugins/cortex') }}
+                            <input type="hidden" name="id" value="{{ override.id }}">
+                            <button type="submit" class="btn small">{{ 'Remove'|t('cortex') }}</button>
+                        </form>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+    <p class="light">{{ 'No runtime overrides yet.'|t('cortex') }}</p>
+{% endif %}
+
+<form method="post" accept-charset="utf-8" class="cortex-add-override">
+    {{ csrfInput() }}
+    {{ actionInput('cortex/settings/add-override') }}
+    {{ redirectInput('settings/plugins/cortex') }}
+
+    <div class="flex flex-nowrap" style="gap: var(--s) ; align-items: end;">
+        {{ forms.text({
+            label: 'Pattern'|t('cortex'),
+            name: 'pattern',
+            placeholder: 'e.g. mailer/test',
+            required: true,
+        }) }}
+
+        {{ forms.text({
+            label: 'Note (optional)'|t('cortex'),
+            name: 'note',
+            placeholder: 'short reason / ticket #',
+        }) }}
+
+        {{ forms.text({
+            label: 'TTL seconds (optional)'|t('cortex'),
+            name: 'ttlSeconds',
+            type: 'number',
+            min: 60,
+            placeholder: settings.runtimeOverrideTtl,
+        }) }}
+
+        <button type="submit" class="btn submit">{{ 'Add override'|t('cortex') }}</button>
+    </div>
+</form>

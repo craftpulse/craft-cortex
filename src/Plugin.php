@@ -51,7 +51,7 @@ class Plugin extends BasePlugin
     /**
      * @inheritdoc
      */
-    public bool $hasCpSettings = false;
+    public bool $hasCpSettings = true;
 
     /**
      * @inheritdoc
@@ -121,5 +121,20 @@ class Plugin extends BasePlugin
     protected function createSettingsModel(): ?Model
     {
         return new Settings();
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    protected function settingsHtml(): ?string
+    {
+        return \Craft::$app->getView()->renderTemplate('cortex/settings', [
+            'plugin' => $this,
+            'settings' => $this->getSettings(),
+            'overrides' => $this->allowlist->getAllOverrides(includeExpired: true),
+        ]);
     }
 }
