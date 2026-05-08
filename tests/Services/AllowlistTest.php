@@ -125,6 +125,19 @@ it('add() throws when the pattern exceeds the column length', function() {
         ->toThrow(Exception::class, 'Failed to save runtime override');
 });
 
+it('remove() throws when the soft-delete save fails', function() {
+    // Persist a valid override, then blank out the pattern via
+    // save(false) to bypass the required-rule check (DB accepts empty
+    // strings). Calling remove() saves with validation enabled, which
+    // surfaces the required-rule failure as a thrown Exception.
+    $override = $this->service->add('_test_/remove-fail');
+    $override->pattern = '';
+    $override->save(false);
+
+    expect(fn() => $this->service->remove($override->id))
+        ->toThrow(Exception::class, 'Failed to soft-delete');
+});
+
 it('craft_command tool resolves allowlist through the service', function() {
     $this->service->add('_test_/special-route');
 
