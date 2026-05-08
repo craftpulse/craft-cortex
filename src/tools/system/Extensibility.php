@@ -264,10 +264,6 @@ class Extensibility extends AbstractTool
         $coreControllers = $app->coreCommands();
 
         $out = [];
-        foreach ($app->getModules() as $moduleId => $module) {
-            // We only enumerate top-level controllers below.
-        }
-
         foreach ($controllerMap as $id => $config) {
             $class = is_array($config) ? ($config['class'] ?? null) : $config;
             $out[] = [
