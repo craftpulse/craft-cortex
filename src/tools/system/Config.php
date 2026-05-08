@@ -7,6 +7,7 @@ use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\Schema;
+use craftpulse\cortex\tools\support\SecretRedactor;
 use craftpulse\cortex\tools\ToolException;
 
 /**
@@ -18,10 +19,10 @@ use craftpulse\cortex\tools\ToolException;
  * `getProjectConfig()`, and `getSystemMessages()`.
  *
  * Hard rules (PLANNING.md 4.9):
- *   - No secrets in any output. The redaction set covers obvious keys:
- *     password, securityKey, token, secret, key, salt, apiKey,
- *     cookieValidationKey, accessKey, privateKey. Any matching key gets
- *     replaced with the literal string `"<redacted>"`.
+ *   - No secrets in any output. Key-based redaction is delegated to
+ *     `SecretRedactor` (the single source of truth across cortex tools);
+ *     any matching key gets replaced with the literal string
+ *     `"<redacted>"`.
  *   - The general-config payload is a curated whitelist, not the full
  *     GeneralConfig dump (which contains arbitrary plugin overrides).
  *   - DB mode never returns user, password, or DSN — host / database
@@ -35,22 +36,6 @@ use craftpulse\cortex\tools\ToolException;
 #[IsIdempotent]
 class Config extends AbstractTool
 {
-    // Constants
-    // =========================================================================
-
-    private const REDACTED = '<redacted>';
-
-    /**
-     * Lower-cased substrings that mark a key as a secret. Match is
-     * substring-anywhere so `cookieValidationKey`, `apiSecret`,
-     * `private_key`, `awsAccessKey` all redact.
-     */
-    private const SECRET_NEEDLES = [
-        'password', 'securitykey', 'token', 'secret', 'apikey',
-        'accesskey', 'privatekey', 'salt', 'cookievalidationkey',
-        'webhooksecret', 'jwt', 'oauth',
-    ];
-
     // Public Methods
     // =========================================================================
 
@@ -211,7 +196,7 @@ class Config extends AbstractTool
 
         return [
             'mode' => 'custom',
-            'values' => $this->_redact($values),
+            'values' => SecretRedactor::redactArray($values),
         ];
     }
 
@@ -251,7 +236,7 @@ class Config extends AbstractTool
 
         return [
             'mode' => 'email',
-            'config' => $this->_redact($email),
+            'config' => SecretRedactor::redactArray($email),
         ];
     }
 
@@ -277,47 +262,5 @@ class Config extends AbstractTool
             ),
             'count' => count($messages),
         ];
-    }
-
-    /**
-     * Walk an array recursively and replace any value whose key contains
-     * a secret needle with the redacted sentinel. Non-string keys pass
-     * through unchanged.
-     *
-     * @param array<int|string,mixed> $data
-     * @return array<int|string,mixed>
-     *
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    private function _redact(array $data): array
-    {
-        $out = [];
-        foreach ($data as $key => $value) {
-            if (is_string($key) && $this->_isSecretKey($key)) {
-                $out[$key] = self::REDACTED;
-                continue;
-            }
-
-            $out[$key] = is_array($value) ? $this->_redact($value) : $value;
-        }
-
-        return $out;
-    }
-
-    /**
-     * @author Craftpulse
-     * @since  0.1.0
-     */
-    private function _isSecretKey(string $key): bool
-    {
-        $needle = strtolower(str_replace(['_', '-'], '', $key));
-        foreach (self::SECRET_NEEDLES as $bad) {
-            if (str_contains($needle, $bad)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 }
