@@ -58,6 +58,13 @@ class Resources extends Component
      */
     private array $_templates = [];
 
+    /**
+     * @var array<string,ResourceTemplateInterface> URI-template-keyed
+     *     lookup used to detect duplicate template registrations and
+     *     emit a collision warning at registry build time.
+     */
+    private array $_byTemplate = [];
+
     // Public Methods
     // =========================================================================
 
@@ -98,7 +105,25 @@ class Resources extends Component
                 continue;
             }
             if ($resource instanceof ResourceTemplateInterface) {
+                $template = $resource->getUriTemplate();
+                if (isset($this->_byTemplate[$template])) {
+                    // Same first-wins behaviour as concrete resources
+                    // and the Tools registry — warn loudly so collisions
+                    // surface during boot rather than as silent
+                    // misroutes at request time.
+                    Craft::warning(
+                        sprintf(
+                            'Resource template collision on "%s" — first registration (%s) wins; ignoring %s.',
+                            $template,
+                            $this->_byTemplate[$template]::class,
+                            $resource::class,
+                        ),
+                        'cortex',
+                    );
+                    continue;
+                }
                 $this->_templates[] = $resource;
+                $this->_byTemplate[$template] = $resource;
                 continue;
             }
         }
