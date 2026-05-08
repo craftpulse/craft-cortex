@@ -2,6 +2,7 @@
 
 namespace craftpulse\cortex\mcp;
 
+use Craft;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\support\InvocationContext;
@@ -250,10 +251,11 @@ class Server
         try {
             $result = $prompt->render($arguments);
         } catch (Throwable $e) {
+            Craft::error($e->getMessage() . "\n" . $e->getTraceAsString(), 'cortex');
             return $this->_errorResponse(
                 $id,
                 -32603,
-                sprintf('Internal error rendering prompt "%s": %s', $name, $e->getMessage()),
+                sprintf('Internal error rendering prompt "%s".', $name),
             );
         }
 
@@ -285,10 +287,11 @@ class Server
             try {
                 $block = $resource->read();
             } catch (Throwable $e) {
+                Craft::error($e->getMessage() . "\n" . $e->getTraceAsString(), 'cortex');
                 return $this->_errorResponse(
                     $id,
                     -32603,
-                    sprintf('Internal error reading resource "%s": %s', $uri, $e->getMessage()),
+                    sprintf('Internal error reading resource "%s".', $uri),
                 );
             }
 
@@ -305,10 +308,11 @@ class Server
             try {
                 $block = $template->read($uri, $captures);
             } catch (Throwable $e) {
+                Craft::error($e->getMessage() . "\n" . $e->getTraceAsString(), 'cortex');
                 return $this->_errorResponse(
                     $id,
                     -32603,
-                    sprintf('Internal error reading resource "%s": %s', $uri, $e->getMessage()),
+                    sprintf('Internal error reading resource "%s".', $uri),
                 );
             }
             return $this->_successResponse($id, ['contents' => [$block]]);
@@ -371,11 +375,15 @@ class Server
             return $this->_successResponse($id, $this->_toolErrorEnvelope($e->getMessage()));
         } catch (Throwable $e) {
             InvocationLogger::logCall($name, $arguments, $e, $this->_elapsedMs($startNs), $context);
+            Craft::error($e->getMessage() . "\n" . $e->getTraceAsString(), 'cortex');
             // Unexpected exception — surface as JSON-RPC internal error.
+            // Full message + trace is logged above; the wire response
+            // stays generic so transports that ship to untrusted clients
+            // don't leak internal paths or SQL fragments.
             return $this->_errorResponse(
                 $id,
                 -32603,
-                sprintf('Internal error executing tool "%s": %s', $name, $e->getMessage()),
+                sprintf('Internal error executing tool "%s".', $name),
             );
         }
 
