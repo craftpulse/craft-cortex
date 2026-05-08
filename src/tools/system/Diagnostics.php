@@ -403,6 +403,12 @@ class Diagnostics extends AbstractTool
         // Normalise the channel — let callers pass either "web" or "web.log".
         $name = str_ends_with($channel, '.log') ? $channel : "{$channel}.log";
 
+        // Strip any path components from the channel before joining with
+        // the log directory. `FileHelper::normalizePath` resolves `../`
+        // segments, so without `basename()` a caller passing
+        // `channel: "../../config/db"` would escape the log directory.
+        $name = basename($name);
+
         return FileHelper::normalizePath("{$base}/{$name}");
     }
 
