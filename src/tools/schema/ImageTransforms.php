@@ -103,7 +103,7 @@ class ImageTransforms extends AbstractTool
 
         return [
             'imageTransforms' => array_map(
-                fn (ImageTransform $t): array => $this->_serializeTransform($t),
+                fn(ImageTransform $t): array => $this->_serializeTransform($t),
                 $transforms,
             ),
         ];

@@ -766,15 +766,15 @@ final class Schema
         }
 
         if ($this->_anyOf !== []) {
-            $out['anyOf'] = array_map(static fn (self $s): array => $s->toArray(), $this->_anyOf);
+            $out['anyOf'] = array_map(static fn(self $s): array => $s->toArray(), $this->_anyOf);
         }
 
         if ($this->_oneOf !== []) {
-            $out['oneOf'] = array_map(static fn (self $s): array => $s->toArray(), $this->_oneOf);
+            $out['oneOf'] = array_map(static fn(self $s): array => $s->toArray(), $this->_oneOf);
         }
 
         if ($this->_allOf !== []) {
-            $out['allOf'] = array_map(static fn (self $s): array => $s->toArray(), $this->_allOf);
+            $out['allOf'] = array_map(static fn(self $s): array => $s->toArray(), $this->_allOf);
         }
 
         if ($this->_not !== null) {

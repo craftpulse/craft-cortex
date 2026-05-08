@@ -60,7 +60,7 @@ function cortex_src_files(): array
 // Banned shell-exec family
 // -----------------------------------------------------------------------------
 
-it('does not use eval, shell-exec family, or backticks anywhere in src/', function () {
+it('does not use eval, shell-exec family, or backticks anywhere in src/', function() {
     // Each pattern is a function call at top-level scope (not a method
     // access or property name). Tokenise rather than regex to avoid
     // false positives on identical strings inside docblocks / comments.
@@ -138,7 +138,7 @@ it('does not use eval, shell-exec family, or backticks anywhere in src/', functi
 // strict_types ban
 // -----------------------------------------------------------------------------
 
-it('does not declare strict_types in src/', function () {
+it('does not declare strict_types in src/', function() {
     $violations = [];
     foreach (cortex_src_files() as $file) {
         $contents = file_get_contents($file);
@@ -157,7 +157,7 @@ it('does not declare strict_types in src/', function () {
 // Section header + @author Craftpulse
 // -----------------------------------------------------------------------------
 
-it('every PHP class file in src/ has a section header and @author Craftpulse', function () {
+it('every PHP class file in src/ has a section header and @author Craftpulse', function() {
     $violations = [];
     $sectionMarker = '====';
 
@@ -194,7 +194,7 @@ it('every PHP class file in src/ has a section header and @author Craftpulse', f
 // Tool implementations
 // -----------------------------------------------------------------------------
 
-it('every concrete class under src/tools/{schema,content,system,graphql,dev,workflow} implements ToolInterface', function () {
+it('every concrete class under src/tools/{schema,content,system,graphql,dev,workflow} implements ToolInterface', function() {
     $base = __DIR__ . '/../../src/tools';
     $directories = ['schema', 'content', 'system', 'graphql', 'dev', 'workflow'];
 
@@ -236,7 +236,7 @@ it('every concrete class under src/tools/{schema,content,system,graphql,dev,work
 // @since on every class
 // -----------------------------------------------------------------------------
 
-it('every PHP class file in src/ has at least one @since tag', function () {
+it('every PHP class file in src/ has at least one @since tag', function() {
     // Mirrors the @author Craftpulse check above. @since lives on classes
     // and on individual methods; we only assert that each class file has
     // the tag *somewhere* — a missing class-level @since is the regression
@@ -272,7 +272,7 @@ it('every PHP class file in src/ has at least one @since tag', function () {
 // Underscore prefix on private methods + properties
 // -----------------------------------------------------------------------------
 
-it('every private method and property under src/ uses the underscore-prefix convention', function () {
+it('every private method and property under src/ uses the underscore-prefix convention', function() {
     // Scope: concrete classes only (interfaces don't declare private
     // members; abstract classes do but their concrete subclasses inherit
     // the same member names). Skip Yii / Craft framework members that
@@ -341,7 +341,7 @@ it('every private method and property under src/ uses the underscore-prefix conv
 // Tool execute() return types — no `mixed`
 // -----------------------------------------------------------------------------
 
-it('no tool declares `mixed` as the execute() return type', function () {
+it('no tool declares `mixed` as the execute() return type', function() {
     // PLANNING.md 4.10 calls this out: tools should return concrete
     // shapes, not mixed. Allowed: array, \Generator, array|\Generator, or
     // covariant overrides of those. `mixed` defeats the contract — the
@@ -400,7 +400,7 @@ it('no tool declares `mixed` as the execute() return type', function () {
         }
 
         $typeNames = $returnType instanceof ReflectionUnionType
-            ? array_map(static fn (ReflectionNamedType $t): string => $t->getName(), $returnType->getTypes())
+            ? array_map(static fn(ReflectionNamedType $t): string => $t->getName(), $returnType->getTypes())
             : [$returnType->getName()];
 
         if (in_array('mixed', $typeNames, true)) {

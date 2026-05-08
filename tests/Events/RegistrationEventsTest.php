@@ -103,8 +103,8 @@ class _FakeThirdPartyResource implements ResourceInterface
 // Tools
 // -----------------------------------------------------------------------------
 
-it('lets a listener append a third-party tool via EVENT_REGISTER_TOOLS', function () {
-    $listener = function (RegisterToolsEvent $event): void {
+it('lets a listener append a third-party tool via EVENT_REGISTER_TOOLS', function() {
+    $listener = function(RegisterToolsEvent $event): void {
         $event->tools[] = new _FakeThirdPartyTool();
     };
     Event::on(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
@@ -121,10 +121,10 @@ it('lets a listener append a third-party tool via EVENT_REGISTER_TOOLS', functio
     }
 });
 
-it('does not let a third-party tool shadow a bundled tool name', function () {
-    $listener = function (RegisterToolsEvent $event): void {
+it('does not let a third-party tool shadow a bundled tool name', function() {
+    $listener = function(RegisterToolsEvent $event): void {
         // Anonymous class shadowing a bundled tool name.
-        $event->tools[] = new class extends AbstractTool {
+        $event->tools[] = new class() extends AbstractTool {
             public static function getName(): string
             {
                 return 'sites';
@@ -155,9 +155,9 @@ it('does not let a third-party tool shadow a bundled tool name', function () {
     }
 });
 
-it('skips a tool whose shouldRegister() returns false', function () {
-    $listener = function (RegisterToolsEvent $event): void {
-        $event->tools[] = new class extends AbstractTool {
+it('skips a tool whose shouldRegister() returns false', function() {
+    $listener = function(RegisterToolsEvent $event): void {
+        $event->tools[] = new class() extends AbstractTool {
             public static function getName(): string
             {
                 return '_fake_gated_tool';
@@ -191,9 +191,9 @@ it('skips a tool whose shouldRegister() returns false', function () {
     }
 });
 
-it('emits outputSchema in tools/list when a tool advertises one', function () {
-    $listener = function (RegisterToolsEvent $event): void {
-        $event->tools[] = new class extends AbstractTool {
+it('emits outputSchema in tools/list when a tool advertises one', function() {
+    $listener = function(RegisterToolsEvent $event): void {
+        $event->tools[] = new class() extends AbstractTool {
             public static function getName(): string
             {
                 return '_fake_tool_with_output_schema';
@@ -241,7 +241,7 @@ it('emits outputSchema in tools/list when a tool advertises one', function () {
     }
 });
 
-it('omits outputSchema in tools/list when a tool returns []', function () {
+it('omits outputSchema in tools/list when a tool returns []', function() {
     // Bundled tools (none of which advertise outputSchema) — payload
     // should never carry the key for them.
     $payload = \craftpulse\cortex\Plugin::getInstance()->tools->asListPayload();
@@ -254,8 +254,8 @@ it('omits outputSchema in tools/list when a tool returns []', function () {
 // Prompts
 // -----------------------------------------------------------------------------
 
-it('lets a listener append a third-party prompt via EVENT_REGISTER_PROMPTS', function () {
-    $listener = function (RegisterPromptsEvent $event): void {
+it('lets a listener append a third-party prompt via EVENT_REGISTER_PROMPTS', function() {
+    $listener = function(RegisterPromptsEvent $event): void {
         $event->prompts[] = new _FakeThirdPartyPrompt();
     };
     Event::on(Prompts::class, Prompts::EVENT_REGISTER_PROMPTS, $listener);
@@ -275,8 +275,8 @@ it('lets a listener append a third-party prompt via EVENT_REGISTER_PROMPTS', fun
 // Resources
 // -----------------------------------------------------------------------------
 
-it('lets a listener append a third-party resource via EVENT_REGISTER_RESOURCES', function () {
-    $listener = function (RegisterResourcesEvent $event): void {
+it('lets a listener append a third-party resource via EVENT_REGISTER_RESOURCES', function() {
+    $listener = function(RegisterResourcesEvent $event): void {
         $event->resources[] = new _FakeThirdPartyResource();
     };
     Event::on(Resources::class, Resources::EVENT_REGISTER_RESOURCES, $listener);
@@ -292,12 +292,12 @@ it('lets a listener append a third-party resource via EVENT_REGISTER_RESOURCES',
     }
 });
 
-it('skips a third-party resource that collides with a bundled URI', function () {
+it('skips a third-party resource that collides with a bundled URI', function() {
     // Pick the first bundled resource URI to collide with.
     $bundledUri = \craftpulse\cortex\Plugin::getInstance()->resources->getAll()[0]->getUri();
 
-    $listener = function (RegisterResourcesEvent $event) use ($bundledUri): void {
-        $event->resources[] = new class ($bundledUri) implements ResourceInterface {
+    $listener = function(RegisterResourcesEvent $event) use ($bundledUri): void {
+        $event->resources[] = new class($bundledUri) implements ResourceInterface {
             public function __construct(private readonly string $uri)
             {
             }

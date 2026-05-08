@@ -8,11 +8,11 @@
 use Craft;
 use craftpulse\cortex\Plugin;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('database_schema');
 });
 
-it('returns full schema by default', function () {
+it('returns full schema by default', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys(['driver', 'tablePrefix', 'tables', 'count']);
@@ -24,7 +24,7 @@ it('returns full schema by default', function () {
     }
 });
 
-it('list mode returns just names', function () {
+it('list mode returns just names', function() {
     $result = $this->tool->execute(['mode' => 'list']);
 
     expect($result)->toHaveKey('mode', 'list');
@@ -35,7 +35,7 @@ it('list mode returns just names', function () {
     }
 });
 
-it('honours the tables filter', function () {
+it('honours the tables filter', function() {
     $allTables = Craft::$app->getDb()->getSchema()->getTableNames();
     if ($allTables === []) {
         $this->markTestSkipped('No tables in DB.');
@@ -48,7 +48,7 @@ it('honours the tables filter', function () {
     expect($result['tables'][0]['name'])->toBe($sample);
 });
 
-it('serializes columns with full metadata', function () {
+it('serializes columns with full metadata', function() {
     $result = $this->tool->execute(['mode' => 'list']);
     if ($result['tables'] === []) {
         $this->markTestSkipped('No tables.');

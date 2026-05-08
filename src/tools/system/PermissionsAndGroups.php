@@ -75,7 +75,7 @@ class PermissionsAndGroups extends AbstractTool
         $allFlat = $this->_flatten($tree);
 
         $groups = array_map(
-            function (UserGroup $g) use ($permissionsService): array {
+            function(UserGroup $g) use ($permissionsService): array {
                 return [
                     'id' => $g->id,
                     'uid' => $g->uid,
@@ -115,7 +115,7 @@ class PermissionsAndGroups extends AbstractTool
     {
         $names = [];
 
-        $walk = function ($node) use (&$walk, &$names): void {
+        $walk = function($node) use (&$walk, &$names): void {
             if (is_array($node)) {
                 foreach ($node as $key => $value) {
                     if (is_string($key) && str_contains($key, ':')) {

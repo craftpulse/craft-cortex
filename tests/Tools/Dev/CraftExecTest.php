@@ -21,11 +21,11 @@
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('craft_exec');
 });
 
-it('throws when expression is missing', function () {
+it('throws when expression is missing', function() {
     $this->tool->execute([]);
 })->throws(ToolException::class, '`expression` is required');
 
@@ -33,7 +33,7 @@ it('throws when expression is missing', function () {
 // Gate 1 — Dry-run default
 // -----------------------------------------------------------------------------
 
-it('Gate 1: returns dry-run analysis without confirm — does NOT evaluate', function () {
+it('Gate 1: returns dry-run analysis without confirm — does NOT evaluate', function() {
     $result = $this->tool->execute([
         'expression' => '1 + 1',
     ]);
@@ -47,7 +47,7 @@ it('Gate 1: returns dry-run analysis without confirm — does NOT evaluate', fun
     expect($result)->not->toHaveKey('result');
 });
 
-it('Gate 1: evaluates only when confirm=true', function () {
+it('Gate 1: evaluates only when confirm=true', function() {
     $result = $this->tool->execute([
         'expression' => '1 + 1',
         'confirm' => true,
@@ -63,7 +63,7 @@ it('Gate 1: evaluates only when confirm=true', function () {
 // Gate 2 — Structured output / typed errors
 // -----------------------------------------------------------------------------
 
-it('Gate 2: structured success envelope with hasResult + result fields', function () {
+it('Gate 2: structured success envelope with hasResult + result fields', function() {
     $result = $this->tool->execute([
         'expression' => '["a" => 1, "b" => 2]',
         'confirm' => true,
@@ -74,7 +74,7 @@ it('Gate 2: structured success envelope with hasResult + result fields', functio
     expect($result['result'])->toBe(['a' => 1, 'b' => 2]);
 });
 
-it('Gate 2: parse errors are typed', function () {
+it('Gate 2: parse errors are typed', function() {
     $result = $this->tool->execute([
         'expression' => '$$$invalid$$$',
         'confirm' => true,
@@ -87,7 +87,7 @@ it('Gate 2: parse errors are typed', function () {
     expect($result['error'])->toHaveKey('trace');
 });
 
-it('Gate 2: runtime errors include class + file + line', function () {
+it('Gate 2: runtime errors include class + file + line', function() {
     $result = $this->tool->execute([
         'expression' => 'throw new \\RuntimeException("boom")',
         'confirm' => true,
@@ -106,7 +106,7 @@ it('Gate 2: runtime errors include class + file + line', function () {
 // Gate 3 — Secret redaction
 // -----------------------------------------------------------------------------
 
-it('Gate 3: redacts secret-keyed values in array results', function () {
+it('Gate 3: redacts secret-keyed values in array results', function() {
     $result = $this->tool->execute([
         'expression' => '["password" => "hunter2", "name" => "alice"]',
         'confirm' => true,
@@ -116,7 +116,7 @@ it('Gate 3: redacts secret-keyed values in array results', function () {
     expect($result['result'])->toHaveKey('name', 'alice');
 });
 
-it('Gate 3: redacts API_KEY=value patterns in string results', function () {
+it('Gate 3: redacts API_KEY=value patterns in string results', function() {
     $result = $this->tool->execute([
         'expression' => '"API_KEY=abc123 trailing"',
         'confirm' => true,
@@ -127,7 +127,7 @@ it('Gate 3: redacts API_KEY=value patterns in string results', function () {
     expect($result['result'])->not->toContain('abc123');
 });
 
-it('Gate 3: redacts secrets surfaced via stdout (echo) too', function () {
+it('Gate 3: redacts secrets surfaced via stdout (echo) too', function() {
     $result = $this->tool->execute([
         'expression' => 'echo "SECURITY_KEY=topsecret"',
         'confirm' => true,
@@ -142,7 +142,7 @@ it('Gate 3: redacts secrets surfaced via stdout (echo) too', function () {
 // Gate 4 — Destructive-op guard
 // -----------------------------------------------------------------------------
 
-it('Gate 4: detects destructive patterns and refuses with confirm alone', function () {
+it('Gate 4: detects destructive patterns and refuses with confirm alone', function() {
     $result = $this->tool->execute([
         'expression' => 'Craft::$app->elements->deleteElementById(1)',
         'confirm' => true,
@@ -156,7 +156,7 @@ it('Gate 4: detects destructive patterns and refuses with confirm alone', functi
     expect($result)->toHaveKey('isDestructive', true);
 });
 
-it('Gate 4: dangerous alone (without confirm) still treats as dry-run', function () {
+it('Gate 4: dangerous alone (without confirm) still treats as dry-run', function() {
     $result = $this->tool->execute([
         'expression' => 'Craft::$app->elements->deleteElementById(1)',
         'dangerous' => true,
@@ -165,7 +165,7 @@ it('Gate 4: dangerous alone (without confirm) still treats as dry-run', function
     expect($result)->toHaveKey('evaluated', false);
 });
 
-it('Gate 4: matches drop / truncate / migrate-down patterns', function () {
+it('Gate 4: matches drop / truncate / migrate-down patterns', function() {
     foreach ([
         'Craft::$app->db->createCommand()->dropTable("foo")',
         'Craft::$app->db->createCommand()->truncateTable("foo")',
@@ -178,7 +178,7 @@ it('Gate 4: matches drop / truncate / migrate-down patterns', function () {
     }
 });
 
-it('Gate 4: non-destructive expressions report isDestructive=false', function () {
+it('Gate 4: non-destructive expressions report isDestructive=false', function() {
     $result = $this->tool->execute([
         'expression' => 'count(Craft::$app->getEntries()->getAllSections())',
     ]);
@@ -190,7 +190,7 @@ it('Gate 4: non-destructive expressions report isDestructive=false', function ()
 // Gate 5 — stdio-only (asserted at the dispatcher level too — see Mcp/ServerTest)
 // -----------------------------------------------------------------------------
 
-it('Gate 5: declares isStdioOnly = true via attribute', function () {
+it('Gate 5: declares isStdioOnly = true via attribute', function() {
     expect(\craftpulse\cortex\tools\support\AttributeReader::isStdioOnly($this->tool))->toBeTrue();
 });
 
@@ -198,7 +198,7 @@ it('Gate 5: declares isStdioOnly = true via attribute', function () {
 // Gate 6 — Annotation
 // -----------------------------------------------------------------------------
 
-it('Gate 6: exposes destructiveHint:true via attribute reader', function () {
+it('Gate 6: exposes destructiveHint:true via attribute reader', function() {
     $annotations = \craftpulse\cortex\tools\support\AttributeReader::annotationsFor($this->tool);
     expect($annotations)->toHaveKey('destructiveHint', true);
     expect($annotations)->toHaveKey('idempotentHint', false);
@@ -208,7 +208,7 @@ it('Gate 6: exposes destructiveHint:true via attribute reader', function () {
 // Settings — execDryRunDefault toggle
 // -----------------------------------------------------------------------------
 
-it('execDryRunDefault=false makes evaluation the default when confirm is absent', function () {
+it('execDryRunDefault=false makes evaluation the default when confirm is absent', function() {
     $settings = Plugin::getInstance()->getSettings();
     $original = $settings->execDryRunDefault;
     $settings->execDryRunDefault = false;
@@ -226,7 +226,7 @@ it('execDryRunDefault=false makes evaluation the default when confirm is absent'
     }
 });
 
-it('execDryRunDefault=false still respects explicit confirm=false (caller wins)', function () {
+it('execDryRunDefault=false still respects explicit confirm=false (caller wins)', function() {
     $settings = Plugin::getInstance()->getSettings();
     $original = $settings->execDryRunDefault;
     $settings->execDryRunDefault = false;
@@ -245,7 +245,7 @@ it('execDryRunDefault=false still respects explicit confirm=false (caller wins)'
     }
 });
 
-it('execDryRunDefault=false does not bypass the destructive guard', function () {
+it('execDryRunDefault=false does not bypass the destructive guard', function() {
     $settings = Plugin::getInstance()->getSettings();
     $original = $settings->execDryRunDefault;
     $settings->execDryRunDefault = false;
@@ -268,7 +268,7 @@ it('execDryRunDefault=false does not bypass the destructive guard', function () 
 // Sanity
 // -----------------------------------------------------------------------------
 
-it('strips leading <?php and trailing semicolons before eval', function () {
+it('strips leading <?php and trailing semicolons before eval', function() {
     $result = $this->tool->execute([
         'expression' => '<?php 2 * 21;',
         'confirm' => true,
@@ -278,7 +278,7 @@ it('strips leading <?php and trailing semicolons before eval', function () {
     expect($result['expression'])->toBe('2 * 21');
 });
 
-it('returns hasResult=false when the expression is a statement (parse-error fallback)', function () {
+it('returns hasResult=false when the expression is a statement (parse-error fallback)', function() {
     // `if (true) { $x = 1; }` is not a valid expression → eval as statement.
     $result = $this->tool->execute([
         'expression' => 'if (true) { $x = 1; }',

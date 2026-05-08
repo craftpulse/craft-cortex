@@ -179,7 +179,7 @@ class SearchSkills extends AbstractTool
             ];
         }
 
-        usort($scored, static fn (array $a, array $b): int => $b['score'] <=> $a['score']);
+        usort($scored, static fn(array $a, array $b): int => $b['score'] <=> $a['score']);
         $page = array_slice($scored, 0, $limit);
 
         return [
@@ -206,7 +206,7 @@ class SearchSkills extends AbstractTool
         $index = $this->_buildIndex($kindFilter);
 
         $rows = array_map(
-            static fn (array $entry): array => [
+            static fn(array $entry): array => [
                 'kind' => $entry['kind'],
                 'uri' => $entry['uri'],
                 'skill' => $entry['skill'],

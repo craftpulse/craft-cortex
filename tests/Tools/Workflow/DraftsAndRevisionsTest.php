@@ -18,7 +18,7 @@ use craft\elements\Entry;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('drafts_and_revisions');
 });
 
@@ -26,7 +26,7 @@ beforeEach(function () {
 // Registration
 // -----------------------------------------------------------------------------
 
-it('is registered on the tool registry', function () {
+it('is registered on the tool registry', function() {
     expect($this->tool)->not->toBeNull();
     expect($this->tool::getName())->toBe('drafts_and_revisions');
 });
@@ -35,23 +35,23 @@ it('is registered on the tool registry', function () {
 // Argument validation
 // -----------------------------------------------------------------------------
 
-it('throws when mode is missing', function () {
+it('throws when mode is missing', function() {
     $this->tool->execute([]);
 })->throws(ToolException::class);
 
-it('throws on unknown mode', function () {
+it('throws on unknown mode', function() {
     $this->tool->execute(['mode' => 'wat']);
 })->throws(ToolException::class);
 
-it('throws when list_revisions is called without canonicalId', function () {
+it('throws when list_revisions is called without canonicalId', function() {
     $this->tool->execute(['mode' => 'list_revisions']);
 })->throws(ToolException::class);
 
-it('throws when compare is missing leftId/rightId', function () {
+it('throws when compare is missing leftId/rightId', function() {
     $this->tool->execute(['mode' => 'compare', 'leftId' => 1]);
 })->throws(ToolException::class);
 
-it('throws when compare ids do not resolve to entries', function () {
+it('throws when compare ids do not resolve to entries', function() {
     $this->tool->execute(['mode' => 'compare', 'leftId' => 999999, 'rightId' => 999998]);
 })->throws(ToolException::class);
 
@@ -59,7 +59,7 @@ it('throws when compare ids do not resolve to entries', function () {
 // list_drafts — payload shape
 // -----------------------------------------------------------------------------
 
-it('list_drafts returns an envelope with drafts/count/totalCount/limit/offset', function () {
+it('list_drafts returns an envelope with drafts/count/totalCount/limit/offset', function() {
     $result = $this->tool->execute(['mode' => 'list_drafts']);
 
     expect($result)->toHaveKeys(['drafts', 'count', 'totalCount', 'limit', 'offset']);
@@ -68,7 +68,7 @@ it('list_drafts returns an envelope with drafts/count/totalCount/limit/offset', 
     expect($result['totalCount'])->toBeInt();
 });
 
-it('list_drafts respects limit and offset bounds', function () {
+it('list_drafts respects limit and offset bounds', function() {
     $result = $this->tool->execute(['mode' => 'list_drafts', 'limit' => 5]);
     expect($result['limit'])->toBe(5);
 
@@ -80,7 +80,7 @@ it('list_drafts respects limit and offset bounds', function () {
 // list_revisions — payload shape (skips if no canonical entries exist)
 // -----------------------------------------------------------------------------
 
-it('list_revisions returns an envelope when given a canonical id', function () {
+it('list_revisions returns an envelope when given a canonical id', function() {
     $entry = Entry::find()->status(null)->site('*')->one();
     if (!$entry instanceof Entry) {
         $this->markTestSkipped('No entries available in the playground.');
@@ -100,7 +100,7 @@ it('list_revisions returns an envelope when given a canonical id', function () {
 // compare — verify shape against a self-comparison (no differences)
 // -----------------------------------------------------------------------------
 
-it('compare returns zero differences when comparing an entry to itself', function () {
+it('compare returns zero differences when comparing an entry to itself', function() {
     $entry = Entry::find()->status(null)->site('*')->one();
     if (!$entry instanceof Entry) {
         $this->markTestSkipped('No entries available in the playground.');
@@ -126,7 +126,7 @@ it('compare returns zero differences when comparing an entry to itself', functio
 // MCP tools/list shape
 // -----------------------------------------------------------------------------
 
-it('appears in the registry tools/list payload with annotations', function () {
+it('appears in the registry tools/list payload with annotations', function() {
     $payload = Plugin::getInstance()->tools->asListPayload();
 
     $entry = collect($payload)->firstWhere('name', 'drafts_and_revisions');

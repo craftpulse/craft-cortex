@@ -703,7 +703,7 @@ JSON;
     private function _splitCommand(string $command): array
     {
         $parts = preg_split('/\s+/', trim($command));
-        return $parts === false ? [$command] : array_values(array_filter($parts, static fn ($p): bool => $p !== ''));
+        return $parts === false ? [$command] : array_values(array_filter($parts, static fn($p): bool => $p !== ''));
     }
 
     /**

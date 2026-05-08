@@ -105,7 +105,7 @@ class CategoryGroups extends AbstractTool
 
         return [
             'categoryGroups' => array_map(
-                fn (CategoryGroup $g): array => $this->_serializeGroup($g),
+                fn(CategoryGroup $g): array => $this->_serializeGroup($g),
                 $groups,
             ),
         ];
@@ -138,7 +138,7 @@ class CategoryGroups extends AbstractTool
                 'customFieldCount' => count($layout->getCustomFields()),
             ],
             'siteSettings' => array_map(
-                static function (CategoryGroup_SiteSettings $s): array {
+                static function(CategoryGroup_SiteSettings $s): array {
                     $siteId = (int) $s->siteId;
                     return [
                         'siteId' => $siteId,

@@ -9,11 +9,11 @@ use Craft;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('sites');
 });
 
-it('lists sites with their groups + the primary site handle', function () {
+it('lists sites with their groups + the primary site handle', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys(['sites', 'siteGroups', 'primarySiteHandle']);
@@ -34,14 +34,14 @@ it('lists sites with their groups + the primary site handle', function () {
     expect($result['primarySiteHandle'])->toBe(Craft::$app->getSites()->getPrimarySite()->handle);
 });
 
-it('returns count when count: true is passed', function () {
+it('returns count when count: true is passed', function() {
     $result = $this->tool->execute(['count' => true]);
 
     expect($result)->toHaveKey('count');
     expect($result['count'])->toBe(count(Craft::$app->getSites()->getAllSites()));
 });
 
-it('returns a single site when handle is passed', function () {
+it('returns a single site when handle is passed', function() {
     $primary = Craft::$app->getSites()->getPrimarySite();
     $result = $this->tool->execute(['handle' => $primary->handle]);
 
@@ -50,6 +50,6 @@ it('returns a single site when handle is passed', function () {
     expect($result['site']['primary'])->toBeTrue();
 });
 
-it('throws ToolException for an unknown site handle', function () {
+it('throws ToolException for an unknown site handle', function() {
     $this->tool->execute(['handle' => '__cortex_no_such_site__']);
 })->throws(ToolException::class);

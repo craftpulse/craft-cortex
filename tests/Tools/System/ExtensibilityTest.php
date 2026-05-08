@@ -7,11 +7,11 @@
 
 use craftpulse\cortex\Plugin;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('extensibility');
 });
 
-it('returns all four sections by default', function () {
+it('returns all four sections by default', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys(['events', 'twig', 'utilities', 'commands']);
@@ -20,7 +20,7 @@ it('returns all four sections by default', function () {
     expect($result['commands'])->toBeArray();
 });
 
-it('twig section reports functions, filters, globals, and craft.* methods', function () {
+it('twig section reports functions, filters, globals, and craft.* methods', function() {
     $result = $this->tool->execute(['mode' => 'twig']);
 
     expect($result['twig'])->toHaveKeys(['functions', 'filters', 'globals', 'craftVariableMethods']);
@@ -28,7 +28,7 @@ it('twig section reports functions, filters, globals, and craft.* methods', func
     expect($result['twig']['filters'])->toBeArray()->not->toBeEmpty();
 });
 
-it('utilities section returns class / id / displayName per utility', function () {
+it('utilities section returns class / id / displayName per utility', function() {
     $result = $this->tool->execute(['mode' => 'utilities']);
 
     expect($result['utilities'])->toBeArray()->not->toBeEmpty();

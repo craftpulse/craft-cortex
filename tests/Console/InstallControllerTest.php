@@ -20,12 +20,12 @@
 
 use craftpulse\cortex\console\controllers\InstallController;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->controller = new InstallController('install', Craft::$app);
     $this->command = 'docker exec -i ddev-myproject-web php /var/www/html/craft cortex/serve';
 });
 
-it('claude-code snippet uses the -- separator (otherwise -i parses as a Claude flag)', function () {
+it('claude-code snippet uses the -- separator (otherwise -i parses as a Claude flag)', function() {
     $body = $this->controller->buildSnippet('claude-code', $this->command);
 
     expect($body)
@@ -33,7 +33,7 @@ it('claude-code snippet uses the -- separator (otherwise -i parses as a Claude f
         ->and($body)->not->toContain('claude mcp add cortex docker'); // pre-fix shape
 });
 
-it('continue.dev snippet uses YAML and the modern mcpServers key', function () {
+it('continue.dev snippet uses YAML and the modern mcpServers key', function() {
     $body = $this->controller->buildSnippet('continue', $this->command);
 
     expect($body)
@@ -45,7 +45,7 @@ it('continue.dev snippet uses YAML and the modern mcpServers key', function () {
         ->and($body)->not->toContain('config.json'); // JSON form is legacy / different file
 });
 
-it('zed snippet uses context_servers at the top level', function () {
+it('zed snippet uses context_servers at the top level', function() {
     $body = $this->controller->buildSnippet('zed', $this->command);
 
     expect($body)
@@ -53,7 +53,7 @@ it('zed snippet uses context_servers at the top level', function () {
         ->and($body)->not->toContain('assistant.mcp_servers'); // wrong key
 });
 
-it('claude-desktop snippet has all three platform paths and the mcpServers shape', function () {
+it('claude-desktop snippet has all three platform paths and the mcpServers shape', function() {
     $body = $this->controller->buildSnippet('claude-desktop', $this->command);
 
     expect($body)
@@ -62,7 +62,7 @@ it('claude-desktop snippet has all three platform paths and the mcpServers shape
         ->toContain('"command": "docker"');
 });
 
-it('cursor snippet references the home + project mcp.json paths', function () {
+it('cursor snippet references the home + project mcp.json paths', function() {
     $body = $this->controller->buildSnippet('cursor', $this->command);
 
     expect($body)
@@ -71,7 +71,7 @@ it('cursor snippet references the home + project mcp.json paths', function () {
         ->toContain('"command": "docker"');
 });
 
-it('cline snippet references the VS Code globalStorage path', function () {
+it('cline snippet references the VS Code globalStorage path', function() {
     $body = $this->controller->buildSnippet('cline', $this->command);
 
     expect($body)
@@ -79,7 +79,7 @@ it('cline snippet references the VS Code globalStorage path', function () {
         ->toContain('mcpServers');
 });
 
-it('windsurf snippet references the codeium config path', function () {
+it('windsurf snippet references the codeium config path', function() {
     $body = $this->controller->buildSnippet('windsurf', $this->command);
 
     expect($body)
@@ -87,7 +87,7 @@ it('windsurf snippet references the codeium config path', function () {
         ->toContain('mcpServers');
 });
 
-it('returns empty string for an unknown client', function () {
+it('returns empty string for an unknown client', function() {
     $body = $this->controller->buildSnippet('unknown-client', $this->command);
 
     expect($body)->toBe('');
@@ -97,7 +97,7 @@ it('returns empty string for an unknown client', function () {
 // Apply action — merge semantics
 // -----------------------------------------------------------------------------
 
-it('merges a cortex entry into an empty mcpServers JSON config', function () {
+it('merges a cortex entry into an empty mcpServers JSON config', function() {
     $result = $this->controller->buildMergedConfig('claude-desktop', null, $this->command);
 
     expect($result)->not->toBeNull();
@@ -112,7 +112,7 @@ it('merges a cortex entry into an empty mcpServers JSON config', function () {
         ->and($decoded['mcpServers']['cortex']['args'])->toBeArray()->not->toBeEmpty();
 });
 
-it('preserves other servers when merging into a populated mcpServers JSON', function () {
+it('preserves other servers when merging into a populated mcpServers JSON', function() {
     $existing = json_encode([
         'mcpServers' => [
             'filesystem' => [
@@ -134,7 +134,7 @@ it('preserves other servers when merging into a populated mcpServers JSON', func
         ->and($decoded['mcpServers']['filesystem']['command'])->toBe('npx');
 });
 
-it('refuses to overwrite an existing cortex entry without --force', function () {
+it('refuses to overwrite an existing cortex entry without --force', function() {
     $existing = json_encode([
         'mcpServers' => [
             'cortex' => ['command' => 'old', 'args' => []],
@@ -146,7 +146,7 @@ it('refuses to overwrite an existing cortex entry without --force', function () 
     expect($result)->toBeNull();
 });
 
-it('overwrites an existing cortex entry with --force', function () {
+it('overwrites an existing cortex entry with --force', function() {
     $existing = json_encode([
         'mcpServers' => [
             'cortex' => ['command' => 'old', 'args' => []],
@@ -164,12 +164,12 @@ it('overwrites an existing cortex entry with --force', function () {
     expect($decoded['mcpServers']['cortex']['command'])->toBe('docker');
 });
 
-it('throws when the existing JSON is malformed', function () {
-    expect(fn () => $this->controller->buildMergedConfig('claude-desktop', '{ not valid json', $this->command))
+it('throws when the existing JSON is malformed', function() {
+    expect(fn() => $this->controller->buildMergedConfig('claude-desktop', '{ not valid json', $this->command))
         ->toThrow(RuntimeException::class);
 });
 
-it('zed merger uses the context_servers top-level key', function () {
+it('zed merger uses the context_servers top-level key', function() {
     $result = $this->controller->buildMergedConfig('zed', null, $this->command);
 
     expect($result)->not->toBeNull();
@@ -180,7 +180,7 @@ it('zed merger uses the context_servers top-level key', function () {
     expect($decoded)->not->toHaveKey('mcpServers');
 });
 
-it('continue merger renders a standalone YAML with the required metadata', function () {
+it('continue merger renders a standalone YAML with the required metadata', function() {
     $result = $this->controller->buildMergedConfig('continue', null, $this->command);
 
     expect($result)->not->toBeNull();
@@ -194,7 +194,7 @@ it('continue merger renders a standalone YAML with the required metadata', funct
         ->toContain('- name: cortex');
 });
 
-it('continue merger refuses an existing differing file without --force', function () {
+it('continue merger refuses an existing differing file without --force', function() {
     $existing = "name: cortex\nversion: 0.0.1\nschema: v1\nmcpServers:\n  - name: cortex\n    command: old\n    args:\n      - foo\n";
 
     $result = $this->controller->buildMergedConfig('continue', $existing, $this->command);
@@ -202,7 +202,7 @@ it('continue merger refuses an existing differing file without --force', functio
     expect($result)->toBeNull();
 });
 
-it('continue merger overwrites with --force', function () {
+it('continue merger overwrites with --force', function() {
     $existing = "name: cortex\nversion: 0.0.1\nschema: v1\nmcpServers:\n  - name: cortex\n    command: old\n    args:\n      - foo\n";
 
     $this->controller->force = true;
@@ -217,14 +217,14 @@ it('continue merger overwrites with --force', function () {
 // Apply action — path resolution
 // -----------------------------------------------------------------------------
 
-it('resolves claude-desktop config to an OS-appropriate path', function () {
+it('resolves claude-desktop config to an OS-appropriate path', function() {
     $path = $this->controller->resolveConfigPath('claude-desktop');
 
     expect($path)->toBeString()->not->toBeEmpty()
         ->toContain('claude_desktop_config.json');
 });
 
-it('resolves cursor config to ~/.cursor/mcp.json', function () {
+it('resolves cursor config to ~/.cursor/mcp.json', function() {
     $path = $this->controller->resolveConfigPath('cursor');
 
     expect($path)
@@ -232,7 +232,7 @@ it('resolves cursor config to ~/.cursor/mcp.json', function () {
         ->toEndWith(DIRECTORY_SEPARATOR . '.cursor' . DIRECTORY_SEPARATOR . 'mcp.json');
 });
 
-it('resolves continue config to standalone cortex.yaml under mcpServers/', function () {
+it('resolves continue config to standalone cortex.yaml under mcpServers/', function() {
     $path = $this->controller->resolveConfigPath('continue');
 
     expect($path)
@@ -241,7 +241,7 @@ it('resolves continue config to standalone cortex.yaml under mcpServers/', funct
         ->toEndWith('mcpServers' . DIRECTORY_SEPARATOR . 'cortex.yaml');
 });
 
-it('resolves windsurf config to ~/.codeium/windsurf/mcp_config.json', function () {
+it('resolves windsurf config to ~/.codeium/windsurf/mcp_config.json', function() {
     $path = $this->controller->resolveConfigPath('windsurf');
 
     expect($path)
@@ -250,7 +250,7 @@ it('resolves windsurf config to ~/.codeium/windsurf/mcp_config.json', function (
         ->toEndWith('windsurf' . DIRECTORY_SEPARATOR . 'mcp_config.json');
 });
 
-it('resolves claude-code config to a project-scoped .mcp.json in cwd', function () {
+it('resolves claude-code config to a project-scoped .mcp.json in cwd', function() {
     $path = $this->controller->resolveConfigPath('claude-code');
 
     expect($path)
@@ -258,7 +258,7 @@ it('resolves claude-code config to a project-scoped .mcp.json in cwd', function 
         ->toEndWith(DIRECTORY_SEPARATOR . '.mcp.json');
 });
 
-it('returns null for an unknown client', function () {
+it('returns null for an unknown client', function() {
     $path = $this->controller->resolveConfigPath('unknown-client');
 
     expect($path)->toBeNull();

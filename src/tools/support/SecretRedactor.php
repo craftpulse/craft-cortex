@@ -108,7 +108,7 @@ class SecretRedactor
 
         return (string) preg_replace_callback(
             $pattern,
-            static function (array $m) use ($needles): string {
+            static function(array $m) use ($needles): string {
                 $normalised = strtolower(str_replace(['_', '-'], '', $m[1]));
                 foreach ($needles as $needle) {
                     if (str_contains($normalised, $needle)) {

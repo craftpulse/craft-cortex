@@ -12,7 +12,7 @@
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolInterface;
 
-it('registers all Phase-1 tools by name', function () {
+it('registers all Phase-1 tools by name', function() {
     $expected = [
         // Schema (Gate 2)
         'sections',
@@ -68,11 +68,11 @@ it('registers all Phase-1 tools by name', function () {
     }
 });
 
-it('returns null for unknown tool names', function () {
+it('returns null for unknown tool names', function() {
     expect(Plugin::getInstance()->tools->getByName('nope'))->toBeNull();
 });
 
-it('builds an MCP-shaped tools/list payload', function () {
+it('builds an MCP-shaped tools/list payload', function() {
     $payload = Plugin::getInstance()->tools->asListPayload();
 
     expect($payload)->toBeArray()->toHaveCount(Plugin::getInstance()->tools->getCount());
@@ -82,7 +82,7 @@ it('builds an MCP-shaped tools/list payload', function () {
     }
 });
 
-it('exposes every tool with a non-empty description and a JSON Schema input shape', function () {
+it('exposes every tool with a non-empty description and a JSON Schema input shape', function() {
     foreach (Plugin::getInstance()->tools->getAll() as $tool) {
         expect($tool::getDescription())
             ->toBeString()

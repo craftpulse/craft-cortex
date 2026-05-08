@@ -8,11 +8,11 @@
 use Craft;
 use craftpulse\cortex\Plugin;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('system_info');
 });
 
-it('returns a craft / php / db / sites / license snapshot', function () {
+it('returns a craft / php / db / sites / license snapshot', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys(['craft', 'php', 'db', 'sites', 'license']);

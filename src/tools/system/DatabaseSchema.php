@@ -103,7 +103,7 @@ class DatabaseSchema extends AbstractTool
                 'driver' => $db->getDriverName(),
                 'tablePrefix' => $prefix,
                 'tables' => array_map(
-                    static fn (string $name): array => ['name' => $name],
+                    static fn(string $name): array => ['name' => $name],
                     $allNames,
                 ),
                 'count' => count($allNames),
@@ -159,7 +159,7 @@ class DatabaseSchema extends AbstractTool
 
         return array_values(array_filter(
             $allNames,
-            static fn (string $name): bool => isset($needles[$name]) || isset($needles[ltrim($name, '{}%')]),
+            static fn(string $name): bool => isset($needles[$name]) || isset($needles[ltrim($name, '{}%')]),
         ));
     }
 

@@ -100,7 +100,7 @@ class ClearCaches extends AbstractTool
             return [
                 'mode' => 'list',
                 'keys' => array_map(
-                    static fn (array $o): array => [
+                    static fn(array $o): array => [
                         'key' => $o['key'],
                         'label' => $o['label'],
                         'info' => $o['info'] ?? null,
@@ -134,7 +134,7 @@ class ClearCaches extends AbstractTool
         // Single-key mode.
         $option = $this->_findOption($options, $mode);
         if ($option === null) {
-            $available = array_map(static fn (array $o): string => $o['key'], $options);
+            $available = array_map(static fn(array $o): string => $o['key'], $options);
             throw new ToolException(
                 "Unknown cache key '{$mode}'. Available: " . implode(', ', $available) . '.',
             );

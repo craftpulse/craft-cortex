@@ -15,7 +15,7 @@ use craftpulse\cortex\resources\ResourceInterface;
 use craftpulse\cortex\resources\SkillResource;
 use Michtio\CraftCmsClaudeSkills\Skills;
 
-it('registers one resource per skill plus one per reference plus one per agent', function () {
+it('registers one resource per skill plus one per reference plus one per agent', function() {
     $expected = count(Skills::agentNames());
     foreach (Skills::skillNames() as $skill) {
         $expected += 1 + count(Skills::references($skill));
@@ -27,7 +27,7 @@ it('registers one resource per skill plus one per reference plus one per agent',
     expect($expected)->toBeGreaterThan(8);
 });
 
-it('registers a router resource for every bundled skill', function () {
+it('registers a router resource for every bundled skill', function() {
     $resources = Plugin::getInstance()->resources;
 
     foreach (Skills::skillNames() as $skill) {
@@ -38,7 +38,7 @@ it('registers a router resource for every bundled skill', function () {
     }
 });
 
-it('registers a reference resource for every reference of every skill', function () {
+it('registers a reference resource for every reference of every skill', function() {
     $resources = Plugin::getInstance()->resources;
 
     foreach (Skills::skillNames() as $skill) {
@@ -51,27 +51,27 @@ it('registers a reference resource for every reference of every skill', function
     }
 });
 
-it('emits unique URIs across the entire registry', function () {
+it('emits unique URIs across the entire registry', function() {
     $uris = array_map(
-        static fn (ResourceInterface $r): string => $r->getUri(),
+        static fn(ResourceInterface $r): string => $r->getUri(),
         Plugin::getInstance()->resources->getAll(),
     );
 
     expect($uris)->toHaveCount(count(array_unique($uris)));
 });
 
-it('uses the craft-skills:// scheme for every resource', function () {
+it('uses the craft-skills:// scheme for every resource', function() {
     foreach (Plugin::getInstance()->resources->getAll() as $resource) {
         expect($resource->getUri())->toStartWith('craft-skills://');
     }
 });
 
-it('returns null for unknown URIs', function () {
+it('returns null for unknown URIs', function() {
     expect(Plugin::getInstance()->resources->getByUri('craft-skills://no-such-skill'))->toBeNull();
     expect(Plugin::getInstance()->resources->getByUri('http://example.com'))->toBeNull();
 });
 
-it('builds a spec-shaped resources/list payload', function () {
+it('builds a spec-shaped resources/list payload', function() {
     $payload = Plugin::getInstance()->resources->asListPayload();
 
     expect($payload)->toBeArray()->toHaveCount(Plugin::getInstance()->resources->getCount());
@@ -85,7 +85,7 @@ it('builds a spec-shaped resources/list payload', function () {
     }
 });
 
-it('registers an agent resource for every bundled agent', function () {
+it('registers an agent resource for every bundled agent', function() {
     $resources = Plugin::getInstance()->resources;
 
     foreach (Skills::agentNames() as $agent) {
@@ -96,7 +96,7 @@ it('registers an agent resource for every bundled agent', function () {
     }
 });
 
-it('agent resource read returns the agent file content', function () {
+it('agent resource read returns the agent file content', function() {
     $agents = Skills::agentNames();
     if ($agents === []) {
         // Older skills package; agent surface unavailable.

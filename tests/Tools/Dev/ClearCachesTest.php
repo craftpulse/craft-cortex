@@ -8,11 +8,11 @@
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('clear_caches');
 });
 
-it('lists registered cache keys when mode is `list`', function () {
+it('lists registered cache keys when mode is `list`', function() {
     $result = $this->tool->execute(['mode' => 'list']);
 
     expect($result)->toHaveKey('mode', 'list');
@@ -22,10 +22,10 @@ it('lists registered cache keys when mode is `list`', function () {
 
     // Built-in cache keys always present in a stock Craft install. Plugin-
     // registered keys may add to this set; we don't assert exclusivity.
-    $keys = array_map(fn ($k) => $k['key'], $result['keys']);
+    $keys = array_map(fn($k) => $k['key'], $result['keys']);
     foreach (['data', 'asset', 'compiled-templates', 'compiled-classes',
               'cp-resources', 'temp-files', 'transform-indexes',
-              'asset-indexing-data'] as $expected) {
+              'asset-indexing-data', ] as $expected) {
         expect($keys)->toContain($expected);
     }
 
@@ -36,7 +36,7 @@ it('lists registered cache keys when mode is `list`', function () {
     }
 });
 
-it('clears a single cache by key', function () {
+it('clears a single cache by key', function() {
     $result = $this->tool->execute(['mode' => 'data']);
 
     expect($result)->toHaveKey('mode', 'data');
@@ -44,7 +44,7 @@ it('clears a single cache by key', function () {
     expect($result)->toHaveKey('count', 1);
 });
 
-it('defaults to clearing all caches when mode is omitted', function () {
+it('defaults to clearing all caches when mode is omitted', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKey('mode', 'all');
@@ -56,6 +56,6 @@ it('defaults to clearing all caches when mode is omitted', function () {
     expect($result['count'])->toBe(count($result['cleared']));
 });
 
-it('throws on an unknown cache key with the available list in the error message', function () {
+it('throws on an unknown cache key with the available list in the error message', function() {
     $this->tool->execute(['mode' => '__definitely_not_a_cache__']);
 })->throws(ToolException::class, "Unknown cache key '__definitely_not_a_cache__'");

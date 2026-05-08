@@ -69,7 +69,7 @@ class FieldTypes extends AbstractTool
 
         return [
             'fieldTypes' => array_map(
-                static function (string $class): array {
+                static function(string $class): array {
                     /** @var class-string<FieldInterface> $class */
                     return [
                         'class' => $class,

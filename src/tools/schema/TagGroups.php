@@ -102,7 +102,7 @@ class TagGroups extends AbstractTool
 
         return [
             'tagGroups' => array_map(
-                fn (TagGroup $g): array => $this->_serializeGroup($g),
+                fn(TagGroup $g): array => $this->_serializeGroup($g),
                 $groups,
             ),
         ];

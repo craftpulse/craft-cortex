@@ -149,7 +149,7 @@ class Assets extends AbstractTool
 
         return [
             'assets' => array_map(
-                fn (Asset $a): array => $this->_serializeAsset($a, $eagerHandles, $serializer),
+                fn(Asset $a): array => $this->_serializeAsset($a, $eagerHandles, $serializer),
                 $assets,
             ),
             'count' => count($assets),
@@ -196,7 +196,7 @@ class Assets extends AbstractTool
         return [
             'volumeHandle' => $volume->handle,
             'folders' => array_map(
-                static fn (VolumeFolder $f): array => [
+                static fn(VolumeFolder $f): array => [
                     'id' => $f->id,
                     'uid' => $f->uid,
                     'name' => $f->name,
@@ -284,7 +284,7 @@ class Assets extends AbstractTool
 
         return array_values(array_filter(
             $with,
-            static fn (mixed $h): bool => is_string($h) && $h !== '',
+            static fn(mixed $h): bool => is_string($h) && $h !== '',
         ));
     }
 

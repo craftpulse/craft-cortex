@@ -102,7 +102,7 @@ class Plugin extends BasePlugin
             Event::on(
                 \craft\generator\Command::class,
                 \craft\generator\Command::EVENT_REGISTER_GENERATORS,
-                static function (RegisterComponentTypesEvent $event): void {
+                static function(RegisterComponentTypesEvent $event): void {
                     $event->types[] = ToolGenerator::class;
                 },
             );

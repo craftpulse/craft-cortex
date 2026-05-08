@@ -14,7 +14,7 @@ use craftpulse\cortex\Plugin;
 use craftpulse\cortex\resources\SkillResource;
 use Michtio\CraftCmsClaudeSkills\Skills;
 
-it('reads a skill router resource as the SKILL.md content', function () {
+it('reads a skill router resource as the SKILL.md content', function() {
     $uri = sprintf('%s://craftcms', SkillResource::URI_SCHEME);
     $resource = Plugin::getInstance()->resources->getByUri($uri);
     expect($resource)->not->toBeNull();
@@ -29,7 +29,7 @@ it('reads a skill router resource as the SKILL.md content', function () {
         ->and($block['text'])->toBe(Skills::content('craftcms'));
 });
 
-it('reads a reference resource as the corresponding references/<name>.md content', function () {
+it('reads a reference resource as the corresponding references/<name>.md content', function() {
     $uri = sprintf('%s://craftcms/elements', SkillResource::URI_SCHEME);
     $resource = Plugin::getInstance()->resources->getByUri($uri);
     expect($resource)->not->toBeNull();
@@ -41,7 +41,7 @@ it('reads a reference resource as the corresponding references/<name>.md content
     expect($block['text'])->toBe(Skills::referenceContent('craftcms', 'elements'));
 });
 
-it('reads every registered resource without raising and emits non-empty markdown', function () {
+it('reads every registered resource without raising and emits non-empty markdown', function() {
     foreach (Plugin::getInstance()->resources->getAll() as $resource) {
         $block = $resource->read();
 
@@ -50,7 +50,7 @@ it('reads every registered resource without raising and emits non-empty markdown
     }
 });
 
-it('builds the expected URI for skill-only and skill+reference cases', function () {
+it('builds the expected URI for skill-only and skill+reference cases', function() {
     $router = new SkillResource(skill: 'craftcms');
     expect($router->getUri())->toBe('craft-skills://craftcms');
 

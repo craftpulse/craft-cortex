@@ -189,7 +189,7 @@ class Resources extends Component
     public function asListPayload(): array
     {
         return array_map(
-            static fn (ResourceInterface $r): array => [
+            static fn(ResourceInterface $r): array => [
                 'uri' => $r->getUri(),
                 'name' => $r->getName(),
                 'description' => $r->getDescription(),

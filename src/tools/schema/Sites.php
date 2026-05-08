@@ -108,14 +108,14 @@ class Sites extends AbstractTool
         }
 
         return [
-            'sites' => array_map(fn (Site $s): array => $this->_serializeSite($s), $sites),
+            'sites' => array_map(fn(Site $s): array => $this->_serializeSite($s), $sites),
             'siteGroups' => array_map(
-                static fn (SiteGroup $g): array => [
+                static fn(SiteGroup $g): array => [
                     'id' => $g->id,
                     'uid' => $g->uid,
                     'name' => $g->name,
                     'siteHandles' => array_map(
-                        static fn (Site $s): string => (string) $s->handle,
+                        static fn(Site $s): string => (string) $s->handle,
                         $g->getSites(),
                     ),
                 ],

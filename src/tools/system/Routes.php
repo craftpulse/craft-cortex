@@ -3,8 +3,8 @@
 namespace craftpulse\cortex\tools\system;
 
 use Craft;
-use craft\models\Section_SiteSettings;
 use craft\models\CategoryGroup_SiteSettings;
+use craft\models\Section_SiteSettings;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;

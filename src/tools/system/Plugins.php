@@ -94,7 +94,7 @@ class Plugins extends AbstractTool
         return [
             'plugins' => $list,
             'count' => count($list),
-            'enabledCount' => count(array_filter($list, static fn (array $p): bool => $p['isEnabled'] === true)),
+            'enabledCount' => count(array_filter($list, static fn(array $p): bool => $p['isEnabled'] === true)),
         ];
     }
 }

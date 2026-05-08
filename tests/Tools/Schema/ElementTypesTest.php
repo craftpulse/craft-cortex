@@ -8,11 +8,11 @@
 use craft\base\ElementInterface;
 use craftpulse\cortex\Plugin;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('element_types');
 });
 
-it('lists every registered element type with capability flags', function () {
+it('lists every registered element type with capability flags', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys(['elementTypes', 'count']);
@@ -31,7 +31,7 @@ it('lists every registered element type with capability flags', function () {
     }
 });
 
-it('includes the 8 core element types', function () {
+it('includes the 8 core element types', function() {
     $result = $this->tool->execute([]);
     $classes = array_column($result['elementTypes'], 'class');
 

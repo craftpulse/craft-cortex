@@ -9,11 +9,11 @@ use craft\elements\Entry;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('entries');
 });
 
-it('returns an entries list with pagination metadata', function () {
+it('returns an entries list with pagination metadata', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys(['entries', 'count', 'totalCount', 'limit', 'offset']);
@@ -28,7 +28,7 @@ it('returns an entries list with pagination metadata', function () {
     }
 });
 
-it('caps limit at MAX_LIMIT and floors at 1', function () {
+it('caps limit at MAX_LIMIT and floors at 1', function() {
     $result = $this->tool->execute(['limit' => 99999]);
     expect($result['limit'])->toBe(1000);
 
@@ -36,7 +36,7 @@ it('caps limit at MAX_LIMIT and floors at 1', function () {
     expect($result['limit'])->toBe(1);
 });
 
-it('returns count as a real integer (not a string from the DB driver)', function () {
+it('returns count as a real integer (not a string from the DB driver)', function() {
     $result = $this->tool->execute(['count' => true]);
 
     expect($result)->toHaveKey('count');
@@ -44,7 +44,7 @@ it('returns count as a real integer (not a string from the DB driver)', function
     expect($result['count'])->toBe((int) Entry::find()->count());
 });
 
-it('filters by section handle', function () {
+it('filters by section handle', function() {
     $entry = Entry::find()->one();
     if ($entry === null) {
         $this->markTestSkipped('No entries in playground.');
@@ -64,7 +64,7 @@ it('filters by section handle', function () {
     }
 });
 
-it('returns a single entry when id is passed', function () {
+it('returns a single entry when id is passed', function() {
     $entry = Entry::find()->one();
     if ($entry === null) {
         $this->markTestSkipped('No entries in playground.');
@@ -76,17 +76,17 @@ it('returns a single entry when id is passed', function () {
     expect($result['entry']['id'])->toBe($entry->id);
 });
 
-it('throws ToolException when id has no match', function () {
+it('throws ToolException when id has no match', function() {
     $this->tool->execute(['id' => 99999999]);
 })->throws(ToolException::class);
 
-it('stubs relational fields when `with` is not supplied (no N+1)', function () {
+it('stubs relational fields when `with` is not supplied (no N+1)', function() {
     $entries = Entry::find()->limit(5)->all();
     if ($entries === []) {
         $this->markTestSkipped('No entries in playground.');
     }
 
-    [$result] = cortex_count_queries(fn () => $this->tool->execute(['limit' => 5]));
+    [$result] = cortex_count_queries(fn() => $this->tool->execute(['limit' => 5]));
 
     foreach ($result['entries'] as $entry) {
         foreach ($entry['fields'] as $value) {
@@ -99,7 +99,7 @@ it('stubs relational fields when `with` is not supplied (no N+1)', function () {
     }
 });
 
-it('exposes the with parameter so eager-loading is configurable', function () {
+it('exposes the with parameter so eager-loading is configurable', function() {
     $result = $this->tool->execute(['limit' => 1, 'with' => []]);
     expect($result)->toHaveKey('entries');
     // Empty `with` array is a no-op — should not throw.

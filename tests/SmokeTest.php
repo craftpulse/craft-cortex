@@ -15,18 +15,18 @@
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\services\Tools;
 
-it('boots Craft', function () {
+it('boots Craft', function() {
     expect(Craft::$app)->not->toBeNull();
     expect(class_exists(Craft::class))->toBeTrue();
 });
 
-it('registers the cortex plugin', function () {
+it('registers the cortex plugin', function() {
     $plugin = Plugin::getInstance();
     expect($plugin)->not->toBeNull();
     expect($plugin->handle)->toBe('cortex');
 });
 
-it('exposes the Tools service via the plugin component', function () {
+it('exposes the Tools service via the plugin component', function() {
     $tools = Plugin::getInstance()->tools;
     expect($tools)->toBeInstanceOf(Tools::class);
 });

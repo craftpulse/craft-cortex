@@ -8,11 +8,11 @@
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('craft_command');
 });
 
-it('lists the active allowlist', function () {
+it('lists the active allowlist', function() {
     $result = $this->tool->execute(['mode' => 'list']);
 
     expect($result)->toHaveKey('mode', 'list');
@@ -28,7 +28,7 @@ it('lists the active allowlist', function () {
     expect($result['patterns'])->toContain('up');
 });
 
-it('rejects a non-allowlisted command BEFORE reaching the runner', function () {
+it('rejects a non-allowlisted command BEFORE reaching the runner', function() {
     // `serve` is not in the default allowlist. The exception comes from
     // the tool layer, not from Yii — proving the guard runs early.
     $this->tool->execute([
@@ -37,15 +37,15 @@ it('rejects a non-allowlisted command BEFORE reaching the runner', function () {
     ]);
 })->throws(ToolException::class, "Command 'serve' is not in the allowlist");
 
-it('throws when command is missing in run mode', function () {
+it('throws when command is missing in run mode', function() {
     $this->tool->execute(['mode' => 'run']);
 })->throws(ToolException::class, '`command` is required for mode=run');
 
-it('throws on unknown mode', function () {
+it('throws on unknown mode', function() {
     $this->tool->execute(['mode' => 'kaboom']);
 })->throws(ToolException::class, "Unknown mode: 'kaboom'");
 
-it('strips a leading slash from the command before allowlist matching', function () {
+it('strips a leading slash from the command before allowlist matching', function() {
     // `/up` should normalise to `up` and match — proving the LLM passing
     // a leading slash doesn't bypass or false-fail the allowlist.
     $result = $this->tool->execute([
@@ -58,7 +58,7 @@ it('strips a leading slash from the command before allowlist matching', function
     expect($result)->toHaveKey('matchedPattern', 'up');
 });
 
-it('matches glob patterns and dispatches via the console runner', function () {
+it('matches glob patterns and dispatches via the console runner', function() {
     $result = $this->tool->execute([
         'mode' => 'run',
         'command' => 'cache/flush',
@@ -70,7 +70,7 @@ it('matches glob patterns and dispatches via the console runner', function () {
     expect($result)->toHaveKey('output');
 });
 
-it('exposes destructiveHint annotation', function () {
+it('exposes destructiveHint annotation', function() {
     $annotations = \craftpulse\cortex\tools\support\AttributeReader::annotationsFor($this->tool);
     expect($annotations)->toHaveKey('destructiveHint', true);
 });

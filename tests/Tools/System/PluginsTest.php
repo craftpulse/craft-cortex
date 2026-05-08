@@ -8,11 +8,11 @@
 use Craft;
 use craftpulse\cortex\Plugin;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('plugins');
 });
 
-it('returns plugins list with handle / name / version / enabled', function () {
+it('returns plugins list with handle / name / version / enabled', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys(['plugins', 'count', 'enabledCount']);
@@ -25,7 +25,7 @@ it('returns plugins list with handle / name / version / enabled', function () {
     }
 });
 
-it('reports cortex itself as enabled and installed', function () {
+it('reports cortex itself as enabled and installed', function() {
     $result = $this->tool->execute([]);
 
     $cortex = null;
@@ -41,7 +41,7 @@ it('reports cortex itself as enabled and installed', function () {
     expect($cortex['isEnabled'])->toBeTrue();
 });
 
-it('count matches the number of plugin info entries known to Craft', function () {
+it('count matches the number of plugin info entries known to Craft', function() {
     $result = $this->tool->execute([]);
 
     expect($result['count'])->toBe(count(Craft::$app->getPlugins()->getAllPluginInfo()));

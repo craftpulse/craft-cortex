@@ -12,7 +12,7 @@
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\prompts\PromptInterface;
 
-it('registers all eight skill-backed prompts with the planned MCP names', function () {
+it('registers all eight skill-backed prompts with the planned MCP names', function() {
     $expected = [
         'craftcms_extending',
         'craftcms_templates',
@@ -35,11 +35,11 @@ it('registers all eight skill-backed prompts with the planned MCP names', functi
     }
 });
 
-it('returns null for unknown prompt names', function () {
+it('returns null for unknown prompt names', function() {
     expect(Plugin::getInstance()->prompts->getByName('nope'))->toBeNull();
 });
 
-it('builds a spec-shaped prompts/list payload', function () {
+it('builds a spec-shaped prompts/list payload', function() {
     $payload = Plugin::getInstance()->prompts->asListPayload();
 
     expect($payload)->toBeArray()->toHaveCount(Plugin::getInstance()->prompts->getCount());
@@ -53,7 +53,7 @@ it('builds a spec-shaped prompts/list payload', function () {
     }
 });
 
-it('omits the arguments key from list entries when a prompt has none', function () {
+it('omits the arguments key from list entries when a prompt has none', function() {
     foreach (Plugin::getInstance()->prompts->asListPayload() as $item) {
         // Phase 1 ships only argumentless prompts — assert the spec-
         // optional `arguments` key is absent rather than present-but-empty.
@@ -61,7 +61,7 @@ it('omits the arguments key from list entries when a prompt has none', function 
     }
 });
 
-it('exposes every prompt with a non-empty description', function () {
+it('exposes every prompt with a non-empty description', function() {
     foreach (Plugin::getInstance()->prompts->getAll() as $prompt) {
         expect($prompt->getDescription())
             ->toBeString()

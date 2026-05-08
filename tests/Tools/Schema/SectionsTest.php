@@ -9,11 +9,11 @@ use Craft;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('sections');
 });
 
-it('lists all sections with the expected per-section shape', function () {
+it('lists all sections with the expected per-section shape', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKey('sections');
@@ -30,7 +30,7 @@ it('lists all sections with the expected per-section shape', function () {
     }
 });
 
-it('returns the count when count: true is passed', function () {
+it('returns the count when count: true is passed', function() {
     $result = $this->tool->execute(['count' => true]);
 
     expect($result)->toHaveKey('count');
@@ -38,7 +38,7 @@ it('returns the count when count: true is passed', function () {
     expect($result['count'])->toBe(count(Craft::$app->getEntries()->getAllSections()));
 });
 
-it('returns a single section when handle is passed', function () {
+it('returns a single section when handle is passed', function() {
     $allSections = Craft::$app->getEntries()->getAllSections();
     if ($allSections === []) {
         $this->markTestSkipped('No sections in playground to fetch by handle.');
@@ -51,6 +51,6 @@ it('returns a single section when handle is passed', function () {
     expect($result['section']['handle'])->toBe($handle);
 });
 
-it('throws ToolException for an unknown section handle', function () {
+it('throws ToolException for an unknown section handle', function() {
     $this->tool->execute(['handle' => '__cortex_no_such_section__']);
 })->throws(ToolException::class);

@@ -171,7 +171,7 @@ class CraftCommand extends AbstractTool
 
         return array_values(array_filter(
             $patterns,
-            static fn ($p): bool => is_string($p) && $p !== '',
+            static fn($p): bool => is_string($p) && $p !== '',
         ));
     }
 

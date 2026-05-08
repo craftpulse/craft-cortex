@@ -85,7 +85,7 @@ class VolumesAndFilesystems extends AbstractTool
         $referencedFsHandles = [];
 
         $serializedVolumes = array_map(
-            function (Volume $volume) use (&$referencedFsHandles): array {
+            function(Volume $volume) use (&$referencedFsHandles): array {
                 $fs = $volume->getFs();
                 if ($fs !== null) {
                     $referencedFsHandles[$fs->handle] = true;
@@ -112,13 +112,13 @@ class VolumesAndFilesystems extends AbstractTool
 
         $orphanFilesystems = array_values(array_filter(
             $allFs,
-            static fn (FsInterface $fs): bool => !isset($referencedFsHandles[$fs->handle]),
+            static fn(FsInterface $fs): bool => !isset($referencedFsHandles[$fs->handle]),
         ));
 
         return [
             'volumes' => $serializedVolumes,
             'orphanFilesystems' => array_map(
-                fn (FsInterface $fs): array => $this->_serializeFs($fs),
+                fn(FsInterface $fs): array => $this->_serializeFs($fs),
                 $orphanFilesystems,
             ),
             'filesystemTypes' => $this->_serializeRegisteredTypes(),
@@ -164,7 +164,7 @@ class VolumesAndFilesystems extends AbstractTool
         $types = Craft::$app->getFs()->getAllFilesystemTypes();
 
         return array_values(array_map(
-            static function (string $class): array {
+            static function(string $class): array {
                 /** @var class-string<FsInterface> $class */
                 return [
                     'class' => $class,

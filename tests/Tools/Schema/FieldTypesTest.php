@@ -9,11 +9,11 @@ use Craft;
 use craft\base\FieldInterface;
 use craftpulse\cortex\Plugin;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('field_types');
 });
 
-it('lists every registered field type class with capability flags', function () {
+it('lists every registered field type class with capability flags', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys(['fieldTypes', 'count']);
@@ -35,7 +35,7 @@ it('lists every registered field type class with capability flags', function () 
     }
 });
 
-it('includes the core PlainText field type', function () {
+it('includes the core PlainText field type', function() {
     $result = $this->tool->execute([]);
     $classes = array_column($result['fieldTypes'], 'class');
 
