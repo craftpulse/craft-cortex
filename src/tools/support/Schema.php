@@ -186,6 +186,9 @@ final class Schema
 
     /**
      * @var list<mixed>|null
+     *
+     * @author Craftpulse
+     * @since  0.1.0
      */
     private ?array $_examples = null;
 
