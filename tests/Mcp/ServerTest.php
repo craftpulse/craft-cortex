@@ -13,6 +13,7 @@
 
 use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\Plugin;
+use craftpulse\cortex\tools\AbstractTool;
 
 beforeEach(function() {
     $this->server = new Server();
@@ -282,6 +283,63 @@ it('does not reject stdio-only tools on the stdio transport', function() {
 
     expect($response)->toHaveKey('result');
     expect($response['result'])->toHaveKey('isError', false);
+});
+
+it('returns -32603 with a generic message when a tool throws an unexpected exception', function() {
+    // Inject a tool that raises a non-ToolException Throwable. The
+    // dispatcher should log the full message via Craft::error and
+    // return a generic wire envelope so the exception text never
+    // reaches the caller.
+    $secret = '__SECRET_DB_CONNECTION_STRING__';
+    $throwingTool = new class($secret) extends AbstractTool {
+        public function __construct(private string $secret)
+        {
+        }
+
+        public static function getName(): string
+        {
+            return '_throwing_test_tool';
+        }
+
+        public static function getDescription(): string
+        {
+            return 'Test fixture that throws an unexpected exception.';
+        }
+
+        public function execute(array $arguments): array
+        {
+            throw new RuntimeException($this->secret);
+        }
+    };
+
+    $tools = Plugin::getInstance()->tools;
+    $rc = new ReflectionClass($tools);
+    $byName = $rc->getProperty('_byName');
+    $byName->setAccessible(true);
+    $registry = $byName->getValue($tools);
+    $registry['_throwing_test_tool'] = $throwingTool;
+    $byName->setValue($tools, $registry);
+
+    try {
+        $response = $this->server->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 99,
+            'method' => 'tools/call',
+            'params' => [
+                'name' => '_throwing_test_tool',
+                'arguments' => [],
+            ],
+        ]);
+
+        expect($response)->toHaveKey('error');
+        expect($response['error']['code'])->toBe(-32603);
+        expect($response['error']['message'])
+            ->toContain('_throwing_test_tool')
+            ->not->toContain($secret);
+    } finally {
+        unset($registry['_throwing_test_tool']);
+        $byName->setValue($tools, $registry);
+    }
 });
 
 it('returns JSON-RPC -32600 when jsonrpc version is wrong', function() {
