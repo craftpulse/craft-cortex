@@ -84,4 +84,22 @@ class Settings extends Model
      *          background.
      */
     public int $runtimeOverrideTtl = 604800;
+
+    // Protected Methods
+    // =========================================================================
+
+    /**
+     * @inheritdoc
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    protected function defineRules(): array
+    {
+        return array_merge(parent::defineRules(), [
+            [['runtimeOverrideTtl'], 'integer', 'min' => 1],
+            [['execEnabled', 'execDryRunDefault'], 'boolean'],
+            [['allowedCommands'], 'each', 'rule' => ['string', 'min' => 1]],
+        ]);
+    }
 }
