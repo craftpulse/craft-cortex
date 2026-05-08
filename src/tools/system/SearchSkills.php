@@ -65,7 +65,7 @@ class SearchSkills extends AbstractTool
      * result's snippet. Total snippet length is roughly
      * `2 * SNIPPET_HALF_WIDTH` plus the matched run.
      */
-    private const _SNIPPET_HALF_WIDTH = 120;
+    private const SNIPPET_HALF_WIDTH = 120;
 
     // Public Methods
     // =========================================================================
@@ -338,8 +338,8 @@ class SearchSkills extends AbstractTool
      */
     private function _snippet(string $content, int $position): string
     {
-        $start = max(0, $position - self::_SNIPPET_HALF_WIDTH);
-        $length = self::_SNIPPET_HALF_WIDTH * 2;
+        $start = max(0, $position - self::SNIPPET_HALF_WIDTH);
+        $length = self::SNIPPET_HALF_WIDTH * 2;
 
         $window = mb_substr($content, $start, $length);
 

@@ -16,7 +16,7 @@ use yii\base\Component;
  * One prompt per bundled skill in `michtio/craftcms-claude-skills`.
  * The mapping from on-disk skill name (e.g. `craftcms`) to public MCP
  * name (e.g. `craftcms_extending`) plus its one-line description lives
- * in `_PROMPT_MAP` below — that's intentionally explicit so adding a
+ * in `PROMPT_MAP` below — that's intentionally explicit so adding a
  * skill requires a deliberate registry update, not implicit wiring.
  *
  * Lookups are O(1) via a name-keyed map; the registry is built once at
@@ -48,7 +48,7 @@ class Prompts extends Component
      *
      * @var array<string,array{name: string, description: string}>
      */
-    private const _PROMPT_MAP = [
+    private const PROMPT_MAP = [
         // Tier 1 — moat content (knowledge that exists nowhere else).
         'craftcms' => [
             'name' => 'craftcms_extending',
@@ -209,7 +209,7 @@ class Prompts extends Component
 
     /**
      * Build the prompt registry by joining the bundled-skills inventory
-     * with the static `_PROMPT_MAP`. Skills present on disk but absent
+     * with the static `PROMPT_MAP`. Skills present on disk but absent
      * from the map are skipped (logged-by-omission); skills in the map
      * but missing on disk are skipped as well — both situations indicate
      * a version drift that the test suite catches.
@@ -224,7 +224,7 @@ class Prompts extends Component
         $registry = [];
 
         foreach (Skills::skillNames() as $skill) {
-            $entry = self::_PROMPT_MAP[$skill] ?? null;
+            $entry = self::PROMPT_MAP[$skill] ?? null;
             if ($entry === null) {
                 continue;
             }
