@@ -17,6 +17,7 @@
 use Carbon\Carbon;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\records\RuntimeOverride;
+use yii\base\Exception;
 
 beforeEach(function() {
     $this->service = Plugin::getInstance()->allowlist;
@@ -108,6 +109,20 @@ it('pruneExpired hard-deletes expired non-deleted rows', function() {
 
     expect($patterns)->not->toContain('_test_/prune-me');
     expect($patterns)->toContain('_test_/keep-me');
+});
+
+it('add() throws when the underlying record fails validation', function() {
+    // Empty pattern violates the `required` rule on RuntimeOverride;
+    // save() returns false and add() must surface the failure rather
+    // than silently returning an unsaved record.
+    expect(fn() => $this->service->add(''))
+        ->toThrow(Exception::class, 'Failed to save runtime override');
+});
+
+it('add() throws when the pattern exceeds the column length', function() {
+    $tooLong = str_repeat('x', 300);
+    expect(fn() => $this->service->add($tooLong))
+        ->toThrow(Exception::class, 'Failed to save runtime override');
 });
 
 it('craft_command tool resolves allowlist through the service', function() {

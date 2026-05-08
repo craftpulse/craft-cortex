@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\records\RuntimeOverride;
 use yii\base\Component;
+use yii\base\Exception;
 
 /**
  * =========================================================================
@@ -103,6 +104,8 @@ class Allowlist extends Component
      * Add a runtime override. Returns the saved record. `ttlSeconds`
      * defaults to `Settings::$runtimeOverrideTtl` when null.
      *
+     * @throws Exception when the underlying record fails validation or save.
+     *
      * @author Craftpulse
      * @since  0.1.0
      */
@@ -119,13 +122,21 @@ class Allowlist extends Component
         $override->note = $note;
         $override->createdByUserId = $userId;
         $override->expiresAt = Carbon::now()->addSeconds($ttl)->toDateTimeString();
-        $override->save();
+        if (!$override->save()) {
+            throw new Exception(sprintf(
+                'Failed to save runtime override "%s": %s',
+                $pattern,
+                implode(', ', $override->getErrorSummary(true)),
+            ));
+        }
 
         return $override;
     }
 
     /**
      * Soft-delete an override by id. Returns whether a row was matched.
+     *
+     * @throws Exception when the underlying record fails to save.
      *
      * @author Craftpulse
      * @since  0.1.0
@@ -137,7 +148,13 @@ class Allowlist extends Component
             return false;
         }
         $override->dateDeleted = Carbon::now()->toDateTimeString();
-        $override->save();
+        if (!$override->save()) {
+            throw new Exception(sprintf(
+                'Failed to soft-delete runtime override #%d: %s',
+                $id,
+                implode(', ', $override->getErrorSummary(true)),
+            ));
+        }
         return true;
     }
 

@@ -44,4 +44,23 @@ class RuntimeOverride extends ActiveRecord
     {
         return Table::RUNTIME_OVERRIDES;
     }
+
+    /**
+     * @inheritdoc
+     *
+     * Mirrors the column constraints declared in `Install::safeUp()`
+     * at the model layer so save() fails cleanly via validation rather
+     * than as a raw DB exception when callers try to insert an empty
+     * or oversized pattern.
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    public function rules(): array
+    {
+        return [
+            [['pattern'], 'required'],
+            [['pattern', 'note'], 'string', 'max' => 255],
+        ];
+    }
 }
