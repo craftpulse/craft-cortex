@@ -5,7 +5,9 @@ namespace craftpulse\cortex;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\events\RegisterComponentTypesEvent;
+use craft\services\Gc;
 use craftpulse\cortex\generator\Tool as ToolGenerator;
+use craftpulse\cortex\jobs\PruneExpiredOverrides;
 use craftpulse\cortex\models\Settings;
 use craftpulse\cortex\services\Allowlist;
 use craftpulse\cortex\services\Prompts;
@@ -107,6 +109,17 @@ class Plugin extends BasePlugin
                 },
             );
         }
+
+        // Schedule expired runtime-override pruning during Craft's gc
+        // sweep. The job itself is cheap (single deleteAll) but pushing
+        // it onto the queue keeps the gc routine non-blocking.
+        Event::on(
+            Gc::class,
+            Gc::EVENT_RUN,
+            static function(): void {
+                \Craft::$app->getQueue()->push(new PruneExpiredOverrides());
+            },
+        );
     }
 
     // Protected Methods
