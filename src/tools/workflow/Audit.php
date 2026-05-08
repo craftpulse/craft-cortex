@@ -54,6 +54,14 @@ class Audit extends AbstractTool
     public const DEFAULT_LIMIT = 200;
     public const MAX_LIMIT = 1000;
 
+    /**
+     * Per-section row cap for the propagation mode's element-fetch step.
+     * Sections exceeding this row count get reported as truncated with
+     * an explicit hint to narrow with the `section` filter. Bounded to
+     * keep the worst-case memory cost predictable.
+     */
+    public const PROPAGATION_SECTION_ROW_CAP = 50000;
+
     // Public Methods
     // =========================================================================
 
@@ -252,10 +260,9 @@ class Audit extends AbstractTool
      * site the section is enabled for. Iterates entries by canonical id
      * and compares present-site set against expected-site set.
      *
-     * Loads all entries in the matched section(s) — limit is enforced
-     * on the GAPS list (output), not on the entry-fetch step. Sections
-     * with hundreds of thousands of entries should narrow with the
-     * `section` filter.
+     * Per-section row cap (`PROPAGATION_SECTION_ROW_CAP`) bounds the
+     * fetch step. Sections that exceed the cap are reported in
+     * `truncatedSections` with an explicit hint to narrow via `section`.
      *
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
@@ -285,12 +292,16 @@ class Audit extends AbstractTool
         );
 
         $gaps = [];
+        $truncatedSections = [];
         foreach ($multiSiteSections as $section) {
             $expectedSiteIds = array_values(array_map(
                 static fn($s): int => (int) $s->siteId,
                 $section->getSiteSettings(),
             ));
 
+            // Fetch one extra row so we can detect cap overflow without
+            // a second COUNT() round-trip. If the result hits the +1
+            // boundary we trim and flag the section as truncated.
             $rows = (new Query())
                 ->select([
                     'canonicalId' => 'entries.id',
@@ -308,7 +319,13 @@ class Audit extends AbstractTool
                     'elements.draftId' => null,
                     'elements.revisionId' => null,
                 ])
+                ->limit(self::PROPAGATION_SECTION_ROW_CAP + 1)
                 ->all();
+
+            if (count($rows) > self::PROPAGATION_SECTION_ROW_CAP) {
+                array_pop($rows);
+                $truncatedSections[] = $section->handle;
+            }
 
             $byCanonical = [];
             foreach ($rows as $row) {
@@ -334,7 +351,7 @@ class Audit extends AbstractTool
         $totalCount = count($gaps);
         $page = array_slice($gaps, $offset, $limit);
 
-        return [
+        $payload = [
             'mode' => 'propagation',
             'gaps' => $page,
             'count' => count($page),
@@ -342,6 +359,16 @@ class Audit extends AbstractTool
             'limit' => $limit,
             'offset' => $offset,
         ];
+
+        if ($truncatedSections !== []) {
+            $payload['truncated'] = true;
+            $payload['truncatedSections'] = $truncatedSections;
+            $payload['truncationCap'] = self::PROPAGATION_SECTION_ROW_CAP;
+            $payload['hint'] = 'One or more sections exceeded the per-section row cap. ' .
+                'Narrow the audit with the `section` filter to scan a single section without truncation.';
+        }
+
+        return $payload;
     }
 
     /**
