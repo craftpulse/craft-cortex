@@ -59,6 +59,8 @@ class Audit extends AbstractTool
      * Sections exceeding this row count get reported as truncated with
      * an explicit hint to narrow with the `section` filter. Bounded to
      * keep the worst-case memory cost predictable.
+     *
+     * @since 0.1.0
      */
     public const PROPAGATION_SECTION_ROW_CAP = 50000;
 
@@ -365,7 +367,8 @@ class Audit extends AbstractTool
             $payload['truncatedSections'] = $truncatedSections;
             $payload['truncationCap'] = self::PROPAGATION_SECTION_ROW_CAP;
             $payload['hint'] = 'One or more sections exceeded the per-section row cap. ' .
-                'Narrow the audit with the `section` filter to scan a single section without truncation.';
+                '`totalCount` reflects gaps within the scanned subset only, not the absolute total. ' .
+                'Narrow with the `section` filter for an exhaustive scan of a single section.';
         }
 
         return $payload;
