@@ -89,7 +89,7 @@ class _AttrReaderUnannotatedFixture extends AbstractTool
 // annotationsFor()
 // -----------------------------------------------------------------------------
 
-it('reads readOnlyHint, idempotentHint, and title from a read-only fixture', function () {
+it('reads readOnlyHint, idempotentHint, and title from a read-only fixture', function() {
     $annotations = AttributeReader::annotationsFor(_AttrReaderReadOnlyFixture::class);
 
     expect($annotations)->toBe([
@@ -99,7 +99,7 @@ it('reads readOnlyHint, idempotentHint, and title from a read-only fixture', fun
     ]);
 });
 
-it('reads destructive + explicit-false flags from a destructive fixture', function () {
+it('reads destructive + explicit-false flags from a destructive fixture', function() {
     $annotations = AttributeReader::annotationsFor(_AttrReaderDestructiveFixture::class);
 
     expect($annotations)->toBe([
@@ -110,11 +110,11 @@ it('reads destructive + explicit-false flags from a destructive fixture', functi
     ]);
 });
 
-it('returns an empty array when no attributes are declared', function () {
+it('returns an empty array when no attributes are declared', function() {
     expect(AttributeReader::annotationsFor(_AttrReaderUnannotatedFixture::class))->toBe([]);
 });
 
-it('accepts a tool instance as well as a class string', function () {
+it('accepts a tool instance as well as a class string', function() {
     $instance = new _AttrReaderReadOnlyFixture();
 
     expect(AttributeReader::annotationsFor($instance))
@@ -125,11 +125,11 @@ it('accepts a tool instance as well as a class string', function () {
 // isStdioOnly()
 // -----------------------------------------------------------------------------
 
-it('reports stdio-only true when the attribute is present', function () {
+it('reports stdio-only true when the attribute is present', function() {
     expect(AttributeReader::isStdioOnly(_AttrReaderDestructiveFixture::class))->toBeTrue();
 });
 
-it('reports stdio-only false when the attribute is absent', function () {
+it('reports stdio-only false when the attribute is absent', function() {
     expect(AttributeReader::isStdioOnly(_AttrReaderReadOnlyFixture::class))->toBeFalse();
     expect(AttributeReader::isStdioOnly(_AttrReaderUnannotatedFixture::class))->toBeFalse();
 });
@@ -138,7 +138,7 @@ it('reports stdio-only false when the attribute is absent', function () {
 // Real tools — verify the migrated dev tools still surface their annotations
 // -----------------------------------------------------------------------------
 
-it('reads CraftExec annotations from class-level attributes', function () {
+it('reads CraftExec annotations from class-level attributes', function() {
     $annotations = AttributeReader::annotationsFor(\craftpulse\cortex\tools\dev\CraftExec::class);
 
     expect($annotations)->toBe([
@@ -150,7 +150,7 @@ it('reads CraftExec annotations from class-level attributes', function () {
     expect(AttributeReader::isStdioOnly(\craftpulse\cortex\tools\dev\CraftExec::class))->toBeTrue();
 });
 
-it('reads CraftCommand annotations from class-level attributes', function () {
+it('reads CraftCommand annotations from class-level attributes', function() {
     $annotations = AttributeReader::annotationsFor(\craftpulse\cortex\tools\dev\CraftCommand::class);
 
     expect($annotations)->toBe([
@@ -162,7 +162,7 @@ it('reads CraftCommand annotations from class-level attributes', function () {
     expect(AttributeReader::isStdioOnly(\craftpulse\cortex\tools\dev\CraftCommand::class))->toBeFalse();
 });
 
-it('reads Resave annotations from class-level attributes', function () {
+it('reads Resave annotations from class-level attributes', function() {
     $annotations = AttributeReader::annotationsFor(\craftpulse\cortex\tools\dev\Resave::class);
 
     expect($annotations)->toBe([

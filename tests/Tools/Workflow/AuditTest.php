@@ -18,24 +18,24 @@
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('content_audit');
 });
 
-it('is registered on the tool registry', function () {
+it('is registered on the tool registry', function() {
     expect($this->tool)->not->toBeNull();
     expect($this->tool::getName())->toBe('content_audit');
 });
 
-it('throws when mode is missing', function () {
+it('throws when mode is missing', function() {
     $this->tool->execute([]);
 })->throws(ToolException::class);
 
-it('throws on unknown mode', function () {
+it('throws on unknown mode', function() {
     $this->tool->execute(['mode' => 'wat']);
 })->throws(ToolException::class);
 
-it('relations mode returns a paginated envelope', function () {
+it('relations mode returns a paginated envelope', function() {
     $result = $this->tool->execute(['mode' => 'relations', 'limit' => 10]);
 
     expect($result)->toHaveKeys(['mode', 'broken', 'count', 'totalCount', 'limit', 'offset']);
@@ -46,7 +46,7 @@ it('relations mode returns a paginated envelope', function () {
     expect($result['limit'])->toBe(10);
 });
 
-it('unused_assets mode returns a paginated envelope', function () {
+it('unused_assets mode returns a paginated envelope', function() {
     $result = $this->tool->execute(['mode' => 'unused_assets', 'limit' => 10]);
 
     expect($result)->toHaveKeys(['mode', 'assets', 'count', 'totalCount', 'limit', 'offset']);
@@ -54,7 +54,7 @@ it('unused_assets mode returns a paginated envelope', function () {
     expect($result['assets'])->toBeArray();
 });
 
-it('propagation mode returns a paginated envelope', function () {
+it('propagation mode returns a paginated envelope', function() {
     $result = $this->tool->execute(['mode' => 'propagation', 'limit' => 10]);
 
     expect($result)->toHaveKeys(['mode', 'gaps', 'count', 'totalCount', 'limit', 'offset']);
@@ -62,12 +62,12 @@ it('propagation mode returns a paginated envelope', function () {
     expect($result['gaps'])->toBeArray();
 });
 
-it('clamps limit to MAX_LIMIT', function () {
+it('clamps limit to MAX_LIMIT', function() {
     $result = $this->tool->execute(['mode' => 'relations', 'limit' => 99999]);
     expect($result['limit'])->toBeLessThanOrEqual(1000);
 });
 
-it('appears in the registry tools/list payload with annotations', function () {
+it('appears in the registry tools/list payload with annotations', function() {
     $payload = Plugin::getInstance()->tools->asListPayload();
 
     $entry = collect($payload)->firstWhere('name', 'content_audit');

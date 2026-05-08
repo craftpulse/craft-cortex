@@ -2,6 +2,8 @@
 
 namespace craftpulse\cortex\services;
 
+use Craft;
+use craftpulse\cortex\events\RegisterToolsEvent;
 use craftpulse\cortex\tools\content\Assets;
 use craftpulse\cortex\tools\content\Categories;
 use craftpulse\cortex\tools\content\Entries;
@@ -22,6 +24,7 @@ use craftpulse\cortex\tools\schema\Sections;
 use craftpulse\cortex\tools\schema\Sites;
 use craftpulse\cortex\tools\schema\TagGroups;
 use craftpulse\cortex\tools\schema\VolumesAndFilesystems;
+use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\system\Config;
 use craftpulse\cortex\tools\system\DatabaseSchema;
 use craftpulse\cortex\tools\system\Diagnostics;
@@ -31,13 +34,10 @@ use craftpulse\cortex\tools\system\Plugins;
 use craftpulse\cortex\tools\system\Routes;
 use craftpulse\cortex\tools\system\SearchSkills;
 use craftpulse\cortex\tools\system\SystemInfo;
+use craftpulse\cortex\tools\ToolInterface;
 use craftpulse\cortex\tools\workflow\Audit;
 use craftpulse\cortex\tools\workflow\DraftsAndRevisions;
 use craftpulse\cortex\tools\workflow\ImportExport;
-use Craft;
-use craftpulse\cortex\events\RegisterToolsEvent;
-use craftpulse\cortex\tools\support\AttributeReader;
-use craftpulse\cortex\tools\ToolInterface;
 use yii\base\Component;
 
 /**
@@ -180,7 +180,7 @@ class Tools extends Component
     public function asListPayload(): array
     {
         return array_map(
-            static function (ToolInterface $t): array {
+            static function(ToolInterface $t): array {
                 $entry = [
                     'name' => $t::getName(),
                     'description' => $t::getDescription(),

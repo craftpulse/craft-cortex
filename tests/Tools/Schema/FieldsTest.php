@@ -9,11 +9,11 @@ use Craft;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('fields');
 });
 
-it('lists fields with type, handle, instructions', function () {
+it('lists fields with type, handle, instructions', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKey('fields');
@@ -28,7 +28,7 @@ it('lists fields with type, handle, instructions', function () {
     }
 });
 
-it('returns full field detail (with settings) when handle is passed', function () {
+it('returns full field detail (with settings) when handle is passed', function() {
     $all = Craft::$app->getFields()->getAllFields();
     if ($all === []) {
         $this->markTestSkipped('No fields in playground.');
@@ -42,14 +42,14 @@ it('returns full field detail (with settings) when handle is passed', function (
     expect($result['field'])->toHaveKey('settings');
 });
 
-it('returns count when count: true is passed', function () {
+it('returns count when count: true is passed', function() {
     $result = $this->tool->execute(['count' => true]);
 
     expect($result)->toHaveKey('count');
     expect($result['count'])->toBe(count(Craft::$app->getFields()->getAllFields()));
 });
 
-it('returns a usage map for a field via mode: usage', function () {
+it('returns a usage map for a field via mode: usage', function() {
     $all = Craft::$app->getFields()->getAllFields();
     if ($all === []) {
         $this->markTestSkipped('No fields in playground.');
@@ -67,10 +67,10 @@ it('returns a usage map for a field via mode: usage', function () {
     expect($result['usage']['entryTypeCount'])->toBe(count($result['usage']['entryTypes']));
 });
 
-it('throws ToolException when mode: usage is requested without a handle', function () {
+it('throws ToolException when mode: usage is requested without a handle', function() {
     $this->tool->execute(['mode' => 'usage']);
 })->throws(ToolException::class, 'mode "usage" requires a `handle`.');
 
-it('throws ToolException for an unknown field handle', function () {
+it('throws ToolException for an unknown field handle', function() {
     $this->tool->execute(['handle' => '__cortex_no_such_field__']);
 })->throws(ToolException::class);

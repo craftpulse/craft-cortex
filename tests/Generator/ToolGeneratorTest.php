@@ -21,19 +21,19 @@ use craft\generator\Command;
 use craftpulse\cortex\generator\Tool as ToolGenerator;
 use yii\base\Event;
 
-it('extends BaseGenerator', function () {
+it('extends BaseGenerator', function() {
     expect(is_subclass_of(ToolGenerator::class, BaseGenerator::class))->toBeTrue();
 });
 
-it('exposes the cortex-tool CLI name', function () {
+it('exposes the cortex-tool CLI name', function() {
     expect(ToolGenerator::name())->toBe('cortex-tool');
 });
 
-it('exposes a non-empty description', function () {
+it('exposes a non-empty description', function() {
     expect(ToolGenerator::description())->toBeString()->not->toBeEmpty();
 });
 
-it('is registered on the make command via EVENT_REGISTER_GENERATORS', function () {
+it('is registered on the make command via EVENT_REGISTER_GENERATORS', function() {
     // Plugin::init() fires the registration on boot. The Yii Event class
     // tracks listeners on the class itself so we can verify by
     // simulating the event and checking that ToolGenerator appears in

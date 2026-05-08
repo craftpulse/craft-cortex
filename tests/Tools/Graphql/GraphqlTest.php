@@ -8,19 +8,19 @@
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('graphql');
 });
 
-it('throws when mode is missing', function () {
+it('throws when mode is missing', function() {
     $this->tool->execute([]);
 })->throws(ToolException::class, '`mode` is required');
 
-it('throws on unknown mode', function () {
+it('throws on unknown mode', function() {
     $this->tool->execute(['mode' => 'oops']);
 })->throws(ToolException::class, 'Unknown mode');
 
-it('lists schemas with id / name / uid / isPublic / scope summary', function () {
+it('lists schemas with id / name / uid / isPublic / scope summary', function() {
     $result = $this->tool->execute(['mode' => 'list_schemas']);
 
     expect($result)->toHaveKey('mode', 'list_schemas');
@@ -38,7 +38,7 @@ it('lists schemas with id / name / uid / isPublic / scope summary', function () 
     }
 });
 
-it('returns SDL for the public schema by default', function () {
+it('returns SDL for the public schema by default', function() {
     $public = Craft::$app->getGql()->getPublicSchema();
     if ($public === null) {
         $this->markTestSkipped('No public schema configured in this environment.');
@@ -55,11 +55,11 @@ it('returns SDL for the public schema by default', function () {
     expect($result['length'])->toBe(strlen($result['sdl']));
 });
 
-it('throws on get_sdl when schema name is unknown', function () {
+it('throws on get_sdl when schema name is unknown', function() {
     $this->tool->execute(['mode' => 'get_sdl', 'name' => '__definitely_not_a_schema__']);
 })->throws(ToolException::class, "No GraphQL schema found with name '__definitely_not_a_schema__'");
 
-it('lists tokens with metadata only — never the access-token value', function () {
+it('lists tokens with metadata only — never the access-token value', function() {
     $result = $this->tool->execute(['mode' => 'list_tokens']);
 
     expect($result)->toHaveKey('mode', 'list_tokens');

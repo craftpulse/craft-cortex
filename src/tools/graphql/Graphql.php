@@ -122,7 +122,7 @@ class Graphql extends AbstractTool
         $public = $gql->getPublicSchema();
 
         $rows = array_map(
-            fn (GqlSchema $s): array => $this->_schemaRow($s),
+            fn(GqlSchema $s): array => $this->_schemaRow($s),
             $schemas,
         );
 
@@ -201,7 +201,7 @@ class Graphql extends AbstractTool
         $tokens = Craft::$app->getGql()->getTokens();
 
         $rows = array_map(
-            fn (GqlToken $t): array => [
+            fn(GqlToken $t): array => [
                 'id' => $t->id,
                 'name' => $t->name,
                 'uid' => $t->uid,

@@ -9,11 +9,11 @@ use Craft;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('entry_types');
 });
 
-it('lists entry types with field-layout summary', function () {
+it('lists entry types with field-layout summary', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKey('entryTypes');
@@ -32,7 +32,7 @@ it('lists entry types with field-layout summary', function () {
     }
 });
 
-it('returns the full field layout (with tabs) when handle is passed', function () {
+it('returns the full field layout (with tabs) when handle is passed', function() {
     $all = Craft::$app->getEntries()->getAllEntryTypes();
     if ($all === []) {
         $this->markTestSkipped('No entry types in playground.');
@@ -50,13 +50,13 @@ it('returns the full field layout (with tabs) when handle is passed', function (
     }
 });
 
-it('returns count when count: true is passed', function () {
+it('returns count when count: true is passed', function() {
     $result = $this->tool->execute(['count' => true]);
 
     expect($result)->toHaveKey('count');
     expect($result['count'])->toBe(count(Craft::$app->getEntries()->getAllEntryTypes()));
 });
 
-it('throws ToolException for an unknown entry type handle', function () {
+it('throws ToolException for an unknown entry type handle', function() {
     $this->tool->execute(['handle' => '__cortex_no_such_entry_type__']);
 })->throws(ToolException::class);

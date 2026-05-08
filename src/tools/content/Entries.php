@@ -168,7 +168,7 @@ class Entries extends AbstractTool
 
         return [
             'entries' => array_map(
-                static fn (Entry $e): array => $serializer->serializeElement($e, $eagerHandles),
+                static fn(Entry $e): array => $serializer->serializeElement($e, $eagerHandles),
                 $entries,
             ),
             'count' => count($entries),
@@ -234,7 +234,7 @@ class Entries extends AbstractTool
 
         return array_values(array_filter(
             $with,
-            static fn (mixed $h): bool => is_string($h) && $h !== '',
+            static fn(mixed $h): bool => is_string($h) && $h !== '',
         ));
     }
 

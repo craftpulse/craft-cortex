@@ -18,21 +18,21 @@
 use craft\web\Controller;
 use craftpulse\cortex\controllers\SettingsController;
 
-it('extends craft\\web\\Controller', function () {
+it('extends craft\\web\\Controller', function() {
     expect(is_subclass_of(SettingsController::class, Controller::class))->toBeTrue();
 });
 
-it('declares the add-override action', function () {
+it('declares the add-override action', function() {
     $rc = new ReflectionClass(SettingsController::class);
     expect($rc->hasMethod('actionAddOverride'))->toBeTrue();
 });
 
-it('declares the remove-override action', function () {
+it('declares the remove-override action', function() {
     $rc = new ReflectionClass(SettingsController::class);
     expect($rc->hasMethod('actionRemoveOverride'))->toBeTrue();
 });
 
-it('ships a settings template file', function () {
+it('ships a settings template file', function() {
     // Full-render smoke happens manually in the CP — this test runs in
     // a console context where csrfInput() / actionInput() macros
     // dispatch to a console Response that doesn't implement

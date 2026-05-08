@@ -9,18 +9,18 @@ use craft\elements\Category;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('categories');
 });
 
-it('returns categories list with pagination metadata', function () {
+it('returns categories list with pagination metadata', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys(['categories', 'count', 'totalCount', 'limit', 'offset']);
     expect($result['categories'])->toBeArray();
 });
 
-it('returns count as a real integer', function () {
+it('returns count as a real integer', function() {
     $result = $this->tool->execute(['count' => true]);
 
     expect($result)->toHaveKey('count');
@@ -28,7 +28,7 @@ it('returns count as a real integer', function () {
     expect($result['count'])->toBe((int) Category::find()->count());
 });
 
-it('returns a single category when id is passed', function () {
+it('returns a single category when id is passed', function() {
     $category = Category::find()->one();
     if ($category === null) {
         $this->markTestSkipped('No categories in playground.');
@@ -40,11 +40,11 @@ it('returns a single category when id is passed', function () {
     expect($result['category']['id'])->toBe($category->id);
 });
 
-it('throws ToolException for unknown category id', function () {
+it('throws ToolException for unknown category id', function() {
     $this->tool->execute(['id' => 99999999]);
 })->throws(ToolException::class);
 
-it('accepts structure params without erroring (level, hasDescendants, leaves)', function () {
+it('accepts structure params without erroring (level, hasDescendants, leaves)', function() {
     $result = $this->tool->execute([
         'level' => 1,
         'hasDescendants' => false,

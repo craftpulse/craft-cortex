@@ -9,11 +9,11 @@ use Craft;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('image_transforms');
 });
 
-it('lists image transforms (possibly empty)', function () {
+it('lists image transforms (possibly empty)', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKey('imageTransforms');
@@ -24,13 +24,13 @@ it('lists image transforms (possibly empty)', function () {
     }
 });
 
-it('returns count when count: true is passed', function () {
+it('returns count when count: true is passed', function() {
     $result = $this->tool->execute(['count' => true]);
 
     expect($result)->toHaveKey('count');
     expect($result['count'])->toBe(count(Craft::$app->getImageTransforms()->getAllTransforms()));
 });
 
-it('throws ToolException for an unknown transform handle', function () {
+it('throws ToolException for an unknown transform handle', function() {
     $this->tool->execute(['handle' => '__cortex_no_such_transform__']);
 })->throws(ToolException::class);

@@ -8,29 +8,29 @@
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('resave');
 });
 
-it('throws when type is missing', function () {
+it('throws when type is missing', function() {
     $this->tool->execute([]);
 })->throws(ToolException::class, '`type` is required');
 
-it('throws on unknown type', function () {
+it('throws on unknown type', function() {
     $this->tool->execute(['type' => 'sandwiches']);
 })->throws(ToolException::class, "Unknown type 'sandwiches'");
 
-it('rejects options that do not apply to the chosen type', function () {
+it('rejects options that do not apply to the chosen type', function() {
     // `volume` is for assets — passing it with `type: tags` must fail before
     // reaching the controller, so the AI sees a clear validation error.
     $this->tool->execute(['type' => 'tags', 'volume' => 'images']);
 })->throws(ToolException::class, "Option(s) not supported for type 'tags'");
 
-it('requires set and to to be provided together', function () {
+it('requires set and to to be provided together', function() {
     $this->tool->execute(['type' => 'entries', 'set' => 'titleField']);
 })->throws(ToolException::class, '`set` and `to` must be provided together.');
 
-it('dispatches resave/entries with mapped options and captures output', function () {
+it('dispatches resave/entries with mapped options and captures output', function() {
     $result = $this->tool->execute([
         'type' => 'entries',
         'section' => '*',
@@ -53,7 +53,7 @@ it('dispatches resave/entries with mapped options and captures output', function
     expect($result['output'])->toBeString();
 });
 
-it('renames entryType to the controller property `type`', function () {
+it('renames entryType to the controller property `type`', function() {
     // ResaveController binds `--type` to `$type` for entry-type filtering.
     // We accept `entryType` from the AI (since `type` is already taken at
     // the tool level) and translate it.
@@ -67,7 +67,7 @@ it('renames entryType to the controller property `type`', function () {
     expect($result['options'])->not->toHaveKey('entryType');
 });
 
-it('exposes destructiveHint and idempotentHint annotations', function () {
+it('exposes destructiveHint and idempotentHint annotations', function() {
     $annotations = \craftpulse\cortex\tools\support\AttributeReader::annotationsFor($this->tool);
     expect($annotations)->toHaveKey('destructiveHint', true);
     expect($annotations)->toHaveKey('idempotentHint', true);

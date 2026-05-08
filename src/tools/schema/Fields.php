@@ -126,7 +126,7 @@ class Fields extends AbstractTool
 
         return [
             'fields' => array_map(
-                fn (FieldInterface $f): array => $this->_serializeField($f, full: false),
+                fn(FieldInterface $f): array => $this->_serializeField($f, full: false),
                 $all,
             ),
         ];

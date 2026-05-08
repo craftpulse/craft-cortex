@@ -20,7 +20,7 @@ use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\support\InvocationLogger;
 use craftpulse\cortex\tools\ToolException;
 
-it('emits a success line with redacted args and zero error fields', function () {
+it('emits a success line with redacted args and zero error fields', function() {
     $entry = InvocationLogger::formatEntry(
         toolName: 'sections',
         arguments: ['handle' => 'news'],
@@ -36,7 +36,7 @@ it('emits a success line with redacted args and zero error fields', function () 
         ->and($entry)->not->toContain('error_class=');
 });
 
-it('classifies a ToolException as kind=tool_error', function () {
+it('classifies a ToolException as kind=tool_error', function() {
     $entry = InvocationLogger::formatEntry(
         toolName: 'craft_command',
         arguments: ['command' => 'mailer/test'],
@@ -50,7 +50,7 @@ it('classifies a ToolException as kind=tool_error', function () {
         ->toContain('error_message="Command \\"mailer/test\\" is not in the allowlist"');
 });
 
-it('classifies any other Throwable as kind=internal_error', function () {
+it('classifies any other Throwable as kind=internal_error', function() {
     $entry = InvocationLogger::formatEntry(
         toolName: 'craft_exec',
         arguments: ['expression' => '1 + 1'],
@@ -64,7 +64,7 @@ it('classifies any other Throwable as kind=internal_error', function () {
         ->toContain('error_message="database is gone"');
 });
 
-it('redacts secret-keyed values in arguments before emitting the line', function () {
+it('redacts secret-keyed values in arguments before emitting the line', function() {
     $entry = InvocationLogger::formatEntry(
         toolName: 'craft_exec',
         arguments: [
@@ -83,7 +83,7 @@ it('redacts secret-keyed values in arguments before emitting the line', function
         ->and($entry)->not->toContain('should-be-redacted');
 });
 
-it('strips control characters from error messages so log lines stay grep-safe', function () {
+it('strips control characters from error messages so log lines stay grep-safe', function() {
     $entry = InvocationLogger::formatEntry(
         toolName: 'sections',
         arguments: [],
@@ -101,7 +101,7 @@ it('strips control characters from error messages so log lines stay grep-safe', 
 // Locked Phase 1 / Phase 2 context shape
 // -----------------------------------------------------------------------------
 
-it('emits transport / request_id / user / client fields on every line', function () {
+it('emits transport / request_id / user / client fields on every line', function() {
     $entry = InvocationLogger::formatEntry(
         toolName: 'sections',
         arguments: [],
@@ -122,7 +122,7 @@ it('emits transport / request_id / user / client fields on every line', function
         ->toContain('client=claude-code');
 });
 
-it('emits a `-` placeholder for any null context field', function () {
+it('emits a `-` placeholder for any null context field', function() {
     $entry = InvocationLogger::formatEntry(
         toolName: 'sections',
         arguments: [],
@@ -138,7 +138,7 @@ it('emits a `-` placeholder for any null context field', function () {
         ->toContain('client=-');
 });
 
-it('honours a Phase 2 user id when one is provided', function () {
+it('honours a Phase 2 user id when one is provided', function() {
     $entry = InvocationLogger::formatEntry(
         toolName: 'sections',
         arguments: [],
@@ -159,7 +159,7 @@ it('honours a Phase 2 user id when one is provided', function () {
         ->toContain('client=cursor');
 });
 
-it('falls back to transport=unknown when no context is supplied', function () {
+it('falls back to transport=unknown when no context is supplied', function() {
     // Backward-compat for in-process callers that haven't been migrated
     // to context. Should still produce a parseable line.
     $entry = InvocationLogger::formatEntry(
@@ -176,7 +176,7 @@ it('falls back to transport=unknown when no context is supplied', function () {
         ->toContain('client=-');
 });
 
-it('emits the locked field order: transport / request_id / user / client / args', function () {
+it('emits the locked field order: transport / request_id / user / client / args', function() {
     // Field order is part of the locked surface — log parsers that
     // don't split on `=` (positional regex) will rely on it. Assert.
     $entry = InvocationLogger::formatEntry(

@@ -14,7 +14,7 @@
 use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\Plugin;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->server = new Server();
 });
 
@@ -22,7 +22,7 @@ beforeEach(function () {
 // initialize
 // -----------------------------------------------------------------------------
 
-it('responds to initialize with the pinned protocol version + serverInfo', function () {
+it('responds to initialize with the pinned protocol version + serverInfo', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 1,
@@ -44,7 +44,7 @@ it('responds to initialize with the pinned protocol version + serverInfo', funct
         ->and($response['result']['capabilities'])->toHaveKeys(['tools', 'resources', 'prompts']);
 });
 
-it('captures clientInfo.name from initialize so the audit log can stamp it', function () {
+it('captures clientInfo.name from initialize so the audit log can stamp it', function() {
     $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 1,
@@ -68,7 +68,7 @@ it('captures clientInfo.name from initialize so the audit log can stamp it', fun
     expect($prop->getValue($this->server))->toBe('claude-code');
 });
 
-it('leaves the captured client name null when initialize omits clientInfo', function () {
+it('leaves the captured client name null when initialize omits clientInfo', function() {
     $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 1,
@@ -86,7 +86,7 @@ it('leaves the captured client name null when initialize omits clientInfo', func
     expect($prop->getValue($this->server))->toBeNull();
 });
 
-it('clears a previously-captured client name when a re-handshake omits clientInfo', function () {
+it('clears a previously-captured client name when a re-handshake omits clientInfo', function() {
     // First handshake — captures the name.
     $this->server->dispatch([
         'jsonrpc' => '2.0',
@@ -123,7 +123,7 @@ it('clears a previously-captured client name when a re-handshake omits clientInf
 // notifications
 // -----------------------------------------------------------------------------
 
-it('returns null for any notification (no id field)', function () {
+it('returns null for any notification (no id field)', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'method' => 'notifications/initialized',
@@ -136,7 +136,7 @@ it('returns null for any notification (no id field)', function () {
 // tools/list
 // -----------------------------------------------------------------------------
 
-it('returns the registry as tools/list', function () {
+it('returns the registry as tools/list', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 2,
@@ -155,7 +155,7 @@ it('returns the registry as tools/list', function () {
 // tools/call
 // -----------------------------------------------------------------------------
 
-it('wraps tool output in an MCP success envelope on tools/call', function () {
+it('wraps tool output in an MCP success envelope on tools/call', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 3,
@@ -173,7 +173,7 @@ it('wraps tool output in an MCP success envelope on tools/call', function () {
     expect($unwrapped)->toHaveKey('count');
 });
 
-it('returns an isError envelope when a tool throws ToolException', function () {
+it('returns an isError envelope when a tool throws ToolException', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 4,
@@ -194,7 +194,7 @@ it('returns an isError envelope when a tool throws ToolException', function () {
 // Protocol-level errors
 // -----------------------------------------------------------------------------
 
-it('returns JSON-RPC -32602 for an unknown tool name', function () {
+it('returns JSON-RPC -32602 for an unknown tool name', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 5,
@@ -207,7 +207,7 @@ it('returns JSON-RPC -32602 for an unknown tool name', function () {
     expect($response['error']['message'])->toContain('Unknown tool');
 });
 
-it('returns JSON-RPC -32602 when tools/call is missing the name param', function () {
+it('returns JSON-RPC -32602 when tools/call is missing the name param', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 6,
@@ -218,7 +218,7 @@ it('returns JSON-RPC -32602 when tools/call is missing the name param', function
     expect($response['error']['code'])->toBe(-32602);
 });
 
-it('returns JSON-RPC -32602 when tools/call arguments is not an object', function () {
+it('returns JSON-RPC -32602 when tools/call arguments is not an object', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 7,
@@ -232,7 +232,7 @@ it('returns JSON-RPC -32602 when tools/call arguments is not an object', functio
     expect($response['error']['code'])->toBe(-32602);
 });
 
-it('returns JSON-RPC -32601 for an unknown method', function () {
+it('returns JSON-RPC -32601 for an unknown method', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 8,
@@ -247,7 +247,7 @@ it('returns JSON-RPC -32601 for an unknown method', function () {
 // stdio-only enforcement (Gate 5 of craft_exec)
 // -----------------------------------------------------------------------------
 
-it('rejects a stdio-only tool when dispatched on the HTTP transport', function () {
+it('rejects a stdio-only tool when dispatched on the HTTP transport', function() {
     $httpServer = new Server(Server::TRANSPORT_HTTP);
 
     $response = $httpServer->dispatch([
@@ -266,7 +266,7 @@ it('rejects a stdio-only tool when dispatched on the HTTP transport', function (
     expect($response['error']['message'])->toContain('craft_exec');
 });
 
-it('does not reject stdio-only tools on the stdio transport', function () {
+it('does not reject stdio-only tools on the stdio transport', function() {
     // Same call as above, but on the stdio server. The tool's dry-run
     // default will short-circuit before evaluating, so the response is
     // a successful tools/call envelope (not the stdio-rejection error).
@@ -284,7 +284,7 @@ it('does not reject stdio-only tools on the stdio transport', function () {
     expect($response['result'])->toHaveKey('isError', false);
 });
 
-it('returns JSON-RPC -32600 when jsonrpc version is wrong', function () {
+it('returns JSON-RPC -32600 when jsonrpc version is wrong', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '1.0',
         'id' => 9,
@@ -299,7 +299,7 @@ it('returns JSON-RPC -32600 when jsonrpc version is wrong', function () {
 // prompts/list & prompts/get
 // -----------------------------------------------------------------------------
 
-it('returns the prompt registry as prompts/list', function () {
+it('returns the prompt registry as prompts/list', function() {
     $response = $this->server->dispatch(['jsonrpc' => '2.0', 'id' => 20, 'method' => 'prompts/list']);
 
     expect($response['result'])->toHaveKey('prompts');
@@ -314,7 +314,7 @@ it('returns the prompt registry as prompts/list', function () {
     }
 });
 
-it('returns a spec-shaped envelope for prompts/get on a known prompt', function () {
+it('returns a spec-shaped envelope for prompts/get on a known prompt', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 21,
@@ -335,7 +335,7 @@ it('returns a spec-shaped envelope for prompts/get on a known prompt', function 
         ->and($message['content']['text'])->toBeString()->not->toBeEmpty();
 });
 
-it('returns JSON-RPC -32602 for an unknown prompt name', function () {
+it('returns JSON-RPC -32602 for an unknown prompt name', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 22,
@@ -348,7 +348,7 @@ it('returns JSON-RPC -32602 for an unknown prompt name', function () {
     expect($response['error']['message'])->toContain('Unknown prompt');
 });
 
-it('returns JSON-RPC -32602 when prompts/get is missing the name param', function () {
+it('returns JSON-RPC -32602 when prompts/get is missing the name param', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 23,
@@ -363,7 +363,7 @@ it('returns JSON-RPC -32602 when prompts/get is missing the name param', functio
 // resources/list & resources/read
 // -----------------------------------------------------------------------------
 
-it('returns the resource registry as resources/list', function () {
+it('returns the resource registry as resources/list', function() {
     $response = $this->server->dispatch(['jsonrpc' => '2.0', 'id' => 30, 'method' => 'resources/list']);
 
     expect($response['result'])->toHaveKey('resources');
@@ -377,7 +377,7 @@ it('returns the resource registry as resources/list', function () {
     }
 });
 
-it('returns a spec-shaped envelope for resources/read on a known URI', function () {
+it('returns a spec-shaped envelope for resources/read on a known URI', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 31,
@@ -397,7 +397,7 @@ it('returns a spec-shaped envelope for resources/read on a known URI', function 
         ->and($block['text'])->toBeString()->not->toBeEmpty();
 });
 
-it('reads a reference URI through resources/read', function () {
+it('reads a reference URI through resources/read', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 32,
@@ -410,7 +410,7 @@ it('reads a reference URI through resources/read', function () {
     expect($block['text'])->toBeString()->not->toBeEmpty();
 });
 
-it('returns JSON-RPC -32602 for an unknown resource URI', function () {
+it('returns JSON-RPC -32602 for an unknown resource URI', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 33,
@@ -423,7 +423,7 @@ it('returns JSON-RPC -32602 for an unknown resource URI', function () {
     expect($response['error']['message'])->toContain('Unknown resource');
 });
 
-it('returns JSON-RPC -32602 when resources/read is missing the uri param', function () {
+it('returns JSON-RPC -32602 when resources/read is missing the uri param', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 34,
@@ -438,7 +438,7 @@ it('returns JSON-RPC -32602 when resources/read is missing the uri param', funct
 // ping
 // -----------------------------------------------------------------------------
 
-it('responds to ping with an empty result', function () {
+it('responds to ping with an empty result', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 12,
@@ -453,9 +453,9 @@ it('responds to ping with an empty result', function () {
 // Generator return type — eager consume (Phase 1; Phase 2 streams notifications)
 // -----------------------------------------------------------------------------
 
-it('eagerly consumes a Generator-returning tool and surfaces the return value', function () {
-    $listener = function (\craftpulse\cortex\events\RegisterToolsEvent $event): void {
-        $event->tools[] = new class extends \craftpulse\cortex\tools\AbstractTool {
+it('eagerly consumes a Generator-returning tool and surfaces the return value', function() {
+    $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event): void {
+        $event->tools[] = new class() extends \craftpulse\cortex\tools\AbstractTool {
             public static function getName(): string
             {
                 return '_fake_streaming_tool';
@@ -514,9 +514,9 @@ it('eagerly consumes a Generator-returning tool and surfaces the return value', 
 // Resource templates — dynamic URI fallback (Phase 1 plumbing for Pro)
 // -----------------------------------------------------------------------------
 
-it('reads a templated resource when no concrete URI matches', function () {
-    $listener = function (\craftpulse\cortex\events\RegisterResourcesEvent $event): void {
-        $event->resources[] = new class implements \craftpulse\cortex\resources\ResourceTemplateInterface {
+it('reads a templated resource when no concrete URI matches', function() {
+    $listener = function(\craftpulse\cortex\events\RegisterResourcesEvent $event): void {
+        $event->resources[] = new class() implements \craftpulse\cortex\resources\ResourceTemplateInterface {
             public function getUriTemplate(): string
             {
                 return '_fake://entries/{id}';
@@ -581,14 +581,14 @@ it('reads a templated resource when no concrete URI matches', function () {
     }
 });
 
-it('matchTemplate returns null when no template matches', function () {
+it('matchTemplate returns null when no template matches', function() {
     $service = new \craftpulse\cortex\services\Resources();
     $service->init();
     expect($service->matchTemplate('_unknown://nothing'))->toBeNull();
 });
 
-it('falls back to the last yielded value when a Generator has no explicit return', function () {
-    $gen = (function () {
+it('falls back to the last yielded value when a Generator has no explicit return', function() {
+    $gen = (function() {
         yield ['progress' => 0.5];
         yield ['done' => true];
     })();

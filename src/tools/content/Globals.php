@@ -105,7 +105,7 @@ class Globals extends AbstractTool
 
         return [
             'globalSets' => array_map(
-                function (GlobalSet $g) use ($siteId, $eagerHandles, $serializer): array {
+                function(GlobalSet $g) use ($siteId, $eagerHandles, $serializer): array {
                     // Re-fetch each set with eager loading applied so field
                     // values respect the caller's `with: [...]` request.
                     if ($eagerHandles === [] || !is_string($g->handle)) {
@@ -203,7 +203,7 @@ class Globals extends AbstractTool
 
         return array_values(array_filter(
             $with,
-            static fn (mixed $h): bool => is_string($h) && $h !== '',
+            static fn(mixed $h): bool => is_string($h) && $h !== '',
         ));
     }
 }

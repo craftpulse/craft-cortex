@@ -13,7 +13,7 @@
 use craftpulse\cortex\Plugin;
 use Michtio\CraftCmsClaudeSkills\Skills;
 
-it('renders the SKILL.md content verbatim in a single user message', function () {
+it('renders the SKILL.md content verbatim in a single user message', function() {
     $prompt = Plugin::getInstance()->prompts->getByName('craftcms_extending');
     expect($prompt)->not->toBeNull();
 
@@ -42,7 +42,7 @@ it('renders the SKILL.md content verbatim in a single user message', function ()
     expect($message['content']['text'])->toBe(Skills::content('craftcms'));
 });
 
-it('renders every registered prompt without raising', function () {
+it('renders every registered prompt without raising', function() {
     foreach (Plugin::getInstance()->prompts->getAll() as $prompt) {
         $envelope = $prompt->render([]);
 
@@ -55,7 +55,7 @@ it('renders every registered prompt without raising', function () {
     }
 });
 
-it('renders craftcms_ddev with the ddev SKILL.md content', function () {
+it('renders craftcms_ddev with the ddev SKILL.md content', function() {
     // Pick a different skill than the first test to defend against a
     // stuck-mapping bug where every prompt happens to point at `craftcms`.
     $prompt = Plugin::getInstance()->prompts->getByName('craftcms_ddev');

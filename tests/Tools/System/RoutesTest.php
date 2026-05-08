@@ -7,11 +7,11 @@
 
 use craftpulse\cortex\Plugin;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('routes');
 });
 
-it('returns the four route categories plus site count', function () {
+it('returns the four route categories plus site count', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys([
@@ -24,7 +24,7 @@ it('returns the four route categories plus site count', function () {
     expect($result['categoryGroupRoutes'])->toBeArray();
 });
 
-it('section routes are normalised with sectionHandle, siteHandle, uriFormat, template', function () {
+it('section routes are normalised with sectionHandle, siteHandle, uriFormat, template', function() {
     $result = $this->tool->execute([]);
 
     foreach ($result['sectionRoutes'] as $route) {

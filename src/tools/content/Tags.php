@@ -129,7 +129,7 @@ class Tags extends AbstractTool
 
         return [
             'tags' => array_map(
-                static fn (Tag $t): array => $serializer->serializeElement($t, $eagerHandles),
+                static fn(Tag $t): array => $serializer->serializeElement($t, $eagerHandles),
                 $tags,
             ),
             'count' => count($tags),
@@ -188,7 +188,7 @@ class Tags extends AbstractTool
 
         return array_values(array_filter(
             $with,
-            static fn (mixed $h): bool => is_string($h) && $h !== '',
+            static fn(mixed $h): bool => is_string($h) && $h !== '',
         ));
     }
 

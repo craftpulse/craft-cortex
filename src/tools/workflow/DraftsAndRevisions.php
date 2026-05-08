@@ -165,7 +165,7 @@ class DraftsAndRevisions extends AbstractTool
 
         return [
             'drafts' => array_map(
-                fn (Entry $e): array => $this->_serializeDraft($e),
+                fn(Entry $e): array => $this->_serializeDraft($e),
                 $entries,
             ),
             'count' => count($entries),
@@ -241,7 +241,7 @@ class DraftsAndRevisions extends AbstractTool
         return [
             'canonicalId' => $canonicalId,
             'revisions' => array_map(
-                fn (Entry $e): array => $this->_serializeRevision($e),
+                fn(Entry $e): array => $this->_serializeRevision($e),
                 $entries,
             ),
             'count' => count($entries),

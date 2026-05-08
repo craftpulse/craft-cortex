@@ -113,7 +113,7 @@ class EntryTypes extends AbstractTool
 
         return [
             'entryTypes' => array_map(
-                fn (EntryType $t): array => $this->_serializeEntryType($t, full: false),
+                fn(EntryType $t): array => $this->_serializeEntryType($t, full: false),
                 $types,
             ),
         ];
@@ -187,7 +187,7 @@ class EntryTypes extends AbstractTool
             'id' => $layout->id,
             'uid' => $layout->uid,
             'tabs' => array_map(
-                fn (FieldLayoutTab $tab): array => $this->_serializeTab($tab),
+                fn(FieldLayoutTab $tab): array => $this->_serializeTab($tab),
                 $layout->getTabs(),
             ),
         ];
@@ -205,7 +205,7 @@ class EntryTypes extends AbstractTool
             'name' => $tab->name,
             'uid' => $tab->uid,
             'elements' => array_map(
-                static function ($element): array {
+                static function($element): array {
                     $base = [
                         'type' => $element::class,
                         'uid' => $element->uid,

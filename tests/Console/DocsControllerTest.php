@@ -15,12 +15,12 @@
 
 use craftpulse\cortex\Plugin;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tmp = sys_get_temp_dir() . '/cortex-docs-' . uniqid();
     mkdir($this->tmp, 0755, true);
 });
 
-afterEach(function () {
+afterEach(function() {
     if (is_dir($this->tmp)) {
         foreach (glob($this->tmp . '/*') as $file) {
             unlink($file);
@@ -29,7 +29,7 @@ afterEach(function () {
     }
 });
 
-it('generates TOOLS.md with the right tool count and entries', function () {
+it('generates TOOLS.md with the right tool count and entries', function() {
     Craft::$app->runAction('cortex/docs/tools', ['out' => $this->tmp]);
 
     $path = $this->tmp . '/TOOLS.md';
@@ -43,7 +43,7 @@ it('generates TOOLS.md with the right tool count and entries', function () {
     expect($contents)->toContain('"type": "object"');
 });
 
-it('generates PROMPTS.md with prompt headings', function () {
+it('generates PROMPTS.md with prompt headings', function() {
     Craft::$app->runAction('cortex/docs/prompts', ['out' => $this->tmp]);
 
     $path = $this->tmp . '/PROMPTS.md';
@@ -55,7 +55,7 @@ it('generates PROMPTS.md with prompt headings', function () {
     expect($contents)->toContain('## `craftcms_extending`');
 });
 
-it('generates RESOURCES.md with a Markdown table', function () {
+it('generates RESOURCES.md with a Markdown table', function() {
     Craft::$app->runAction('cortex/docs/resources', ['out' => $this->tmp]);
 
     $path = $this->tmp . '/RESOURCES.md';
@@ -67,7 +67,7 @@ it('generates RESOURCES.md with a Markdown table', function () {
     expect($contents)->toContain('| URI | Name | MIME | Description |');
 });
 
-it('all action runs the three generators', function () {
+it('all action runs the three generators', function() {
     Craft::$app->runAction('cortex/docs/all', ['out' => $this->tmp]);
 
     expect(file_exists($this->tmp . '/TOOLS.md'))->toBeTrue();

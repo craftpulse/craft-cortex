@@ -215,7 +215,7 @@ class Audit extends AbstractTool
         return [
             'mode' => 'unused_assets',
             'assets' => array_map(
-                fn (Asset $a): array => $this->_serializeAsset($a),
+                fn(Asset $a): array => $this->_serializeAsset($a),
                 $assets,
             ),
             'count' => count($assets),
@@ -276,7 +276,7 @@ class Audit extends AbstractTool
 
         $multiSiteSections = array_filter(
             $sections,
-            static function (Section $s) use ($sectionFilter): bool {
+            static function(Section $s) use ($sectionFilter): bool {
                 if ($sectionFilter !== null && $s->handle !== $sectionFilter) {
                     return false;
                 }
@@ -287,7 +287,7 @@ class Audit extends AbstractTool
         $gaps = [];
         foreach ($multiSiteSections as $section) {
             $expectedSiteIds = array_values(array_map(
-                static fn ($s): int => (int) $s->siteId,
+                static fn($s): int => (int) $s->siteId,
                 $section->getSiteSettings(),
             ));
 

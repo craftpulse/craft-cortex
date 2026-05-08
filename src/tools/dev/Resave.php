@@ -186,7 +186,7 @@ class Resave extends AbstractTool
         };
 
         $rejected = array_diff(
-            array_keys(array_filter($arguments, fn ($k) => !in_array($k, ['type'], true), ARRAY_FILTER_USE_KEY)),
+            array_keys(array_filter($arguments, fn($k) => !in_array($k, ['type'], true), ARRAY_FILTER_USE_KEY)),
             array_merge($allowed, ['set', 'to', 'ifEmpty', 'ifInvalid', 'touch', 'updateSearchIndex', 'queue', 'batchSize']),
         );
         if ($rejected !== []) {

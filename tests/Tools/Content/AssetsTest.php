@@ -10,18 +10,18 @@ use craft\elements\Asset;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('assets');
 });
 
-it('returns assets list with pagination metadata', function () {
+it('returns assets list with pagination metadata', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys(['assets', 'count', 'totalCount', 'limit', 'offset']);
     expect($result['assets'])->toBeArray();
 });
 
-it('returns count as a real integer', function () {
+it('returns count as a real integer', function() {
     $result = $this->tool->execute(['count' => true]);
 
     expect($result)->toHaveKey('count');
@@ -29,7 +29,7 @@ it('returns count as a real integer', function () {
     expect($result['count'])->toBe((int) Asset::find()->count());
 });
 
-it('returns folders as an indexed array (not a keyed dict)', function () {
+it('returns folders as an indexed array (not a keyed dict)', function() {
     $volume = Craft::$app->getVolumes()->getAllVolumes()[0] ?? null;
     if ($volume === null) {
         $this->markTestSkipped('No volumes in playground.');
@@ -44,7 +44,7 @@ it('returns folders as an indexed array (not a keyed dict)', function () {
     }
 });
 
-it('returns a single asset when id is passed', function () {
+it('returns a single asset when id is passed', function() {
     $asset = Asset::find()->one();
     if ($asset === null) {
         $this->markTestSkipped('No assets in playground.');
@@ -60,11 +60,11 @@ it('returns a single asset when id is passed', function () {
     ]);
 });
 
-it('throws ToolException for unknown asset id', function () {
+it('throws ToolException for unknown asset id', function() {
     $this->tool->execute(['id' => 99999999]);
 })->throws(ToolException::class);
 
-it('returns a folder tree when mode: folders is requested with a volume', function () {
+it('returns a folder tree when mode: folders is requested with a volume', function() {
     $volume = Craft::$app->getVolumes()->getAllVolumes()[0] ?? null;
     if ($volume === null) {
         $this->markTestSkipped('No volumes in playground.');
@@ -81,10 +81,10 @@ it('returns a folder tree when mode: folders is requested with a volume', functi
     }
 });
 
-it('throws ToolException when mode: folders is requested without volume', function () {
+it('throws ToolException when mode: folders is requested without volume', function() {
     $this->tool->execute(['mode' => 'folders']);
 })->throws(ToolException::class);
 
-it('throws ToolException when mode: folders gets an unknown volume', function () {
+it('throws ToolException when mode: folders gets an unknown volume', function() {
     $this->tool->execute(['mode' => 'folders', 'volume' => '__cortex_no_such_volume__']);
 })->throws(ToolException::class);

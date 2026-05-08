@@ -222,7 +222,7 @@ class ImportExport extends AbstractTool
             'limit' => $limit,
             'offset' => $offset,
             'entries' => array_map(
-                fn (Entry $e): array => $this->_serializeEntry($e),
+                fn(Entry $e): array => $this->_serializeEntry($e),
                 $entries,
             ),
         ];
@@ -281,7 +281,7 @@ class ImportExport extends AbstractTool
             return [];
         }
         return array_values(array_filter(array_map(
-            static fn ($author): ?string => is_object($author) && property_exists($author, 'uid') ? (string) $author->uid : null,
+            static fn($author): ?string => is_object($author) && property_exists($author, 'uid') ? (string) $author->uid : null,
             $authors,
         )));
     }

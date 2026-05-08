@@ -27,7 +27,7 @@ uses(TestCase::class)->in(__DIR__);
 /**
  * Assert the value looks like an MCP tools/list item.
  */
-expect()->extend('toBeMcpToolListItem', function () {
+expect()->extend('toBeMcpToolListItem', function() {
     return $this
         ->toBeArray()
         ->toHaveKeys(['name', 'description', 'inputSchema'])
@@ -39,7 +39,7 @@ expect()->extend('toBeMcpToolListItem', function () {
 /**
  * Assert the value looks like an MCP tool result envelope (success).
  */
-expect()->extend('toBeMcpSuccessEnvelope', function () {
+expect()->extend('toBeMcpSuccessEnvelope', function() {
     return $this
         ->toBeArray()
         ->toHaveKey('content')
@@ -51,7 +51,7 @@ expect()->extend('toBeMcpSuccessEnvelope', function () {
 /**
  * Assert the value looks like an MCP tool error envelope.
  */
-expect()->extend('toBeMcpErrorEnvelope', function () {
+expect()->extend('toBeMcpErrorEnvelope', function() {
     return $this
         ->toBeArray()
         ->toHaveKey('isError', true)

@@ -8,15 +8,15 @@
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('config');
 });
 
-it('throws when mode is missing', function () {
+it('throws when mode is missing', function() {
     $this->tool->execute([]);
 })->throws(ToolException::class);
 
-it('returns the curated general config', function () {
+it('returns the curated general config', function() {
     $result = $this->tool->execute(['mode' => 'general']);
 
     expect($result)->toHaveKey('mode', 'general');
@@ -26,7 +26,7 @@ it('returns the curated general config', function () {
     expect($result)->not->toHaveKey('cookieValidationKey');
 });
 
-it('returns the db config without user/password/dsn', function () {
+it('returns the db config without user/password/dsn', function() {
     $result = $this->tool->execute(['mode' => 'db']);
 
     expect($result)->toHaveKey('mode', 'db');
@@ -36,13 +36,13 @@ it('returns the db config without user/password/dsn', function () {
     expect($result)->not->toHaveKey('dsn');
 });
 
-it('redacts any custom-config key whose name contains a secret needle', function () {
+it('redacts any custom-config key whose name contains a secret needle', function() {
     $result = $this->tool->execute(['mode' => 'custom']);
 
     expect($result)->toHaveKey('mode', 'custom');
     expect($result)->toHaveKey('values');
 
-    $walk = function ($node) use (&$walk): void {
+    $walk = function($node) use (&$walk): void {
         if (!is_array($node)) {
             return;
         }
@@ -65,20 +65,20 @@ it('redacts any custom-config key whose name contains a secret needle', function
     $walk($result['values']);
 });
 
-it('returns email config', function () {
+it('returns email config', function() {
     $result = $this->tool->execute(['mode' => 'email']);
 
     expect($result)->toHaveKey('mode', 'email');
     expect($result)->toHaveKey('config');
 });
 
-it('returns system_messages list', function () {
+it('returns system_messages list', function() {
     $result = $this->tool->execute(['mode' => 'system_messages']);
 
     expect($result)->toHaveKey('mode', 'system_messages');
     expect($result)->toHaveKeys(['messages', 'count']);
 });
 
-it('throws on unknown mode', function () {
+it('throws on unknown mode', function() {
     $this->tool->execute(['mode' => 'oops']);
 })->throws(ToolException::class, 'Unknown mode');

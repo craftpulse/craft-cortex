@@ -17,24 +17,24 @@
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('search_skills');
 });
 
-it('is registered on the tool registry', function () {
+it('is registered on the tool registry', function() {
     expect($this->tool)->not->toBeNull();
     expect($this->tool::getName())->toBe('search_skills');
 });
 
-it('throws when query is missing in search mode', function () {
+it('throws when query is missing in search mode', function() {
     $this->tool->execute(['mode' => 'search']);
 })->throws(ToolException::class, 'query');
 
-it('throws when query has no alphanumeric tokens', function () {
+it('throws when query has no alphanumeric tokens', function() {
     $this->tool->execute(['mode' => 'search', 'query' => '!!!']);
 })->throws(ToolException::class, 'alphanumeric');
 
-it('returns ranked results for a real query', function () {
+it('returns ranked results for a real query', function() {
     $result = $this->tool->execute(['mode' => 'search', 'query' => 'element']);
 
     expect($result)->toHaveKeys([
@@ -52,7 +52,7 @@ it('returns ranked results for a real query', function () {
     expect($scores)->toBe($sorted);
 });
 
-it('snippet includes the matched run', function () {
+it('snippet includes the matched run', function() {
     $result = $this->tool->execute(['mode' => 'search', 'query' => 'element', 'limit' => 1]);
 
     expect($result['results'])->toHaveCount(1);
@@ -64,7 +64,7 @@ it('snippet includes the matched run', function () {
     expect(stripos($top['snippet'], 'element'))->not->toBeFalse();
 });
 
-it('respects the kind filter — agent-only search returns only agents', function () {
+it('respects the kind filter — agent-only search returns only agents', function() {
     $result = $this->tool->execute([
         'mode' => 'search',
         'query' => 'craft',
@@ -79,7 +79,7 @@ it('respects the kind filter — agent-only search returns only agents', functio
     }
 });
 
-it('respects the kind filter — skill-only search returns only routers', function () {
+it('respects the kind filter — skill-only search returns only routers', function() {
     $result = $this->tool->execute([
         'mode' => 'search',
         'query' => 'craft',
@@ -94,7 +94,7 @@ it('respects the kind filter — skill-only search returns only routers', functi
     }
 });
 
-it('topics mode enumerates the corpus without scoring', function () {
+it('topics mode enumerates the corpus without scoring', function() {
     $result = $this->tool->execute(['mode' => 'topics']);
 
     expect($result)->toHaveKeys(['mode', 'kind', 'count', 'topics']);
@@ -106,7 +106,7 @@ it('topics mode enumerates the corpus without scoring', function () {
     }
 });
 
-it('topics mode kind=agent enumerates only agents', function () {
+it('topics mode kind=agent enumerates only agents', function() {
     $result = $this->tool->execute(['mode' => 'topics', 'kind' => 'agent']);
 
     foreach ($result['topics'] as $row) {
@@ -115,23 +115,23 @@ it('topics mode kind=agent enumerates only agents', function () {
     }
 });
 
-it('limit caps the results list', function () {
+it('limit caps the results list', function() {
     $result = $this->tool->execute(['mode' => 'search', 'query' => 'craft', 'limit' => 3]);
 
     expect(count($result['results']))->toBeLessThanOrEqual(3);
     expect($result['limit'])->toBe(3);
 });
 
-it('clamps limit to MAX_LIMIT', function () {
+it('clamps limit to MAX_LIMIT', function() {
     $result = $this->tool->execute(['mode' => 'search', 'query' => 'craft', 'limit' => 9999]);
     expect($result['limit'])->toBeLessThanOrEqual(50);
 });
 
-it('throws on unknown mode', function () {
+it('throws on unknown mode', function() {
     $this->tool->execute(['mode' => 'unknown']);
 })->throws(ToolException::class, 'Unknown mode');
 
-it('appears in the registry tools/list payload with annotations', function () {
+it('appears in the registry tools/list payload with annotations', function() {
     $payload = Plugin::getInstance()->tools->asListPayload();
     $entry = collect($payload)->firstWhere('name', 'search_skills');
 

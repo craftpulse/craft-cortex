@@ -18,11 +18,11 @@ use Carbon\Carbon;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\records\RuntimeOverride;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->service = Plugin::getInstance()->allowlist;
 });
 
-afterEach(function () {
+afterEach(function() {
     // Hard-delete every override touched by tests. Production never
     // runs against a tests/ namespace, so this is safe.
     RuntimeOverride::deleteAll([
@@ -32,7 +32,7 @@ afterEach(function () {
     ]);
 });
 
-it('getEffective returns the bundled defaults at minimum', function () {
+it('getEffective returns the bundled defaults at minimum', function() {
     $effective = $this->service->getEffective();
 
     // Defaults declared in Settings.
@@ -41,14 +41,14 @@ it('getEffective returns the bundled defaults at minimum', function () {
     expect($effective)->toContain('migrate/*');
 });
 
-it('add() persists a runtime override and getEffective reflects it', function () {
+it('add() persists a runtime override and getEffective reflects it', function() {
     $this->service->add('_test_/special-command', userId: null, note: 'unit-test');
 
     $effective = $this->service->getEffective();
     expect($effective)->toContain('_test_/special-command');
 });
 
-it('expired overrides do not appear in getEffective', function () {
+it('expired overrides do not appear in getEffective', function() {
     $override = $this->service->add('_test_/expired-command');
     // Force expiry into the past.
     $override->expiresAt = Carbon::now()->subSecond()->toDateTimeString();
@@ -58,7 +58,7 @@ it('expired overrides do not appear in getEffective', function () {
     expect($effective)->not->toContain('_test_/expired-command');
 });
 
-it('soft-deleted overrides do not appear in getEffective', function () {
+it('soft-deleted overrides do not appear in getEffective', function() {
     $override = $this->service->add('_test_/soft-deleted-command');
     $this->service->remove($override->id);
 
@@ -66,7 +66,7 @@ it('soft-deleted overrides do not appear in getEffective', function () {
     expect($effective)->not->toContain('_test_/soft-deleted-command');
 });
 
-it('getActiveOverrides excludes expired and soft-deleted rows', function () {
+it('getActiveOverrides excludes expired and soft-deleted rows', function() {
     $live = $this->service->add('_test_/active');
     $expired = $this->service->add('_test_/expired');
     $expired->expiresAt = Carbon::now()->subSecond()->toDateTimeString();
@@ -79,7 +79,7 @@ it('getActiveOverrides excludes expired and soft-deleted rows', function () {
     expect($patterns)->not->toContain('_test_/expired');
 });
 
-it('getAllOverrides returns expired rows when includeExpired = true', function () {
+it('getAllOverrides returns expired rows when includeExpired = true', function() {
     $expired = $this->service->add('_test_/all-expired');
     $expired->expiresAt = Carbon::now()->subSecond()->toDateTimeString();
     $expired->save(false);
@@ -90,7 +90,7 @@ it('getAllOverrides returns expired rows when includeExpired = true', function (
     expect($patterns)->toContain('_test_/all-expired');
 });
 
-it('pruneExpired hard-deletes expired non-deleted rows', function () {
+it('pruneExpired hard-deletes expired non-deleted rows', function() {
     $expired = $this->service->add('_test_/prune-me');
     $expired->expiresAt = Carbon::now()->subSecond()->toDateTimeString();
     $expired->save(false);
@@ -110,7 +110,7 @@ it('pruneExpired hard-deletes expired non-deleted rows', function () {
     expect($patterns)->toContain('_test_/keep-me');
 });
 
-it('craft_command tool resolves allowlist through the service', function () {
+it('craft_command tool resolves allowlist through the service', function() {
     $this->service->add('_test_/special-route');
 
     $tool = Plugin::getInstance()->tools->getByName('craft_command');

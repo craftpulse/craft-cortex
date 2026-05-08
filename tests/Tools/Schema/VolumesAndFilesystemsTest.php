@@ -8,11 +8,11 @@
 use Craft;
 use craftpulse\cortex\Plugin;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('volumes_and_filesystems');
 });
 
-it('returns volumes annotated with filesystems plus orphans plus the type registry', function () {
+it('returns volumes annotated with filesystems plus orphans plus the type registry', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys([
@@ -34,7 +34,7 @@ it('returns volumes annotated with filesystems plus orphans plus the type regist
     }
 });
 
-it('exposes the registered filesystem-type classes (Local + plugin-provided)', function () {
+it('exposes the registered filesystem-type classes (Local + plugin-provided)', function() {
     $result = $this->tool->execute([]);
 
     expect($result['filesystemTypes'])->toBeArray()->not->toBeEmpty();
@@ -57,7 +57,7 @@ it('exposes the registered filesystem-type classes (Local + plugin-provided)', f
     }
 });
 
-it('lists volumes that are accounted for as referenced (not in orphan list)', function () {
+it('lists volumes that are accounted for as referenced (not in orphan list)', function() {
     $result = $this->tool->execute([]);
 
     $referencedHandles = [];

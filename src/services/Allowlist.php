@@ -49,7 +49,7 @@ class Allowlist extends Component
     {
         $defaults = Plugin::getInstance()->getSettings()->allowedCommands;
         $overridePatterns = array_map(
-            static fn (array $row): string => (string) $row['pattern'],
+            static fn(array $row): string => (string) $row['pattern'],
             $this->getActiveOverrides(),
         );
         return array_values(array_unique(array_merge($defaults, $overridePatterns)));

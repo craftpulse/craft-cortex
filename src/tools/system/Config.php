@@ -268,7 +268,7 @@ class Config extends AbstractTool
         return [
             'mode' => 'system_messages',
             'messages' => array_map(
-                static fn ($m): array => [
+                static fn($m): array => [
                     'key' => $m->key ?? null,
                     'heading' => $m->heading ?? null,
                     'subject' => $m->subject ?? null,

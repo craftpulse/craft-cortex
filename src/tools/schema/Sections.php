@@ -112,7 +112,7 @@ class Sections extends AbstractTool
         }
 
         return [
-            'sections' => array_map(fn (Section $s): array => $this->_serializeSection($s), $sections),
+            'sections' => array_map(fn(Section $s): array => $this->_serializeSection($s), $sections),
         ];
     }
 
@@ -143,11 +143,11 @@ class Sections extends AbstractTool
             'previewTargets' => $section->previewTargets,
             'entryTypeCount' => count($section->getEntryTypes()),
             'entryTypeHandles' => array_map(
-                static fn ($entryType): string => (string) $entryType->handle,
+                static fn($entryType): string => (string) $entryType->handle,
                 $section->getEntryTypes(),
             ),
             'siteSettings' => array_map(
-                fn (Section_SiteSettings $settings): array => $this->_serializeSiteSettings($settings),
+                fn(Section_SiteSettings $settings): array => $this->_serializeSiteSettings($settings),
                 array_values($section->getSiteSettings()),
             ),
         ];

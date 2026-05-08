@@ -212,7 +212,7 @@ class Diagnostics extends AbstractTool
         return [
             'type' => 'deprecations',
             'entries' => array_map(
-                static fn ($d): array => [
+                static fn($d): array => [
                     'key' => $d->key,
                     'message' => $d->message,
                     'fingerprint' => $d->fingerprint,
@@ -313,7 +313,7 @@ class Diagnostics extends AbstractTool
                 }
             }
 
-            $lines = array_filter($lines, static fn (string $l): bool => trim($l) !== '');
+            $lines = array_filter($lines, static fn(string $l): bool => trim($l) !== '');
             return array_slice(array_values($lines), -$n);
         } finally {
             fclose($handle);

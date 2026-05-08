@@ -69,7 +69,7 @@ class ElementTypes extends AbstractTool
 
         return [
             'elementTypes' => array_map(
-                static function (string $class): array {
+                static function(string $class): array {
                     /** @var class-string<ElementInterface> $class */
                     // hasContent() was removed in Craft 5 — content is part of
                     // the elements_sites content column on every element now,

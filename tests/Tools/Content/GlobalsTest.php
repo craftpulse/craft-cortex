@@ -9,11 +9,11 @@ use Craft;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('globals');
 });
 
-it('returns every global set with field values when no handle is passed', function () {
+it('returns every global set with field values when no handle is passed', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys(['globalSets', 'count', 'siteId']);
@@ -25,7 +25,7 @@ it('returns every global set with field values when no handle is passed', functi
     }
 });
 
-it('returns a single global set when handle is passed', function () {
+it('returns a single global set when handle is passed', function() {
     $sets = Craft::$app->getGlobals()->getAllSets();
     if ($sets === []) {
         $this->markTestSkipped('No global sets in playground.');
@@ -38,11 +38,11 @@ it('returns a single global set when handle is passed', function () {
     expect($result['globalSet']['handle'])->toBe($handle);
 });
 
-it('throws ToolException for unknown global set handle', function () {
+it('throws ToolException for unknown global set handle', function() {
     $this->tool->execute(['handle' => '__cortex_no_such_global__']);
 })->throws(ToolException::class);
 
-it('respects the site filter (handle and id forms)', function () {
+it('respects the site filter (handle and id forms)', function() {
     $primary = Craft::$app->getSites()->getPrimarySite();
 
     $byHandle = $this->tool->execute(['site' => $primary->handle]);

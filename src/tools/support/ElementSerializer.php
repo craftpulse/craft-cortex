@@ -156,7 +156,7 @@ class ElementSerializer
         }
 
         if ($value instanceof ElementCollection) {
-            return $value->map(fn (ElementInterface $el): array => $this->summarizeElement($el))->all();
+            return $value->map(fn(ElementInterface $el): array => $this->summarizeElement($el))->all();
         }
 
         if ($value instanceof ElementQuery) {
@@ -171,13 +171,13 @@ class ElementSerializer
             }
 
             return array_map(
-                fn (ElementInterface $el): array => $this->summarizeElement($el),
+                fn(ElementInterface $el): array => $this->summarizeElement($el),
                 $value->all(),
             );
         }
 
         if (is_array($value)) {
-            return array_map(fn (mixed $v): mixed => $this->_serializeFieldValue($v, $isEager), $value);
+            return array_map(fn(mixed $v): mixed => $this->_serializeFieldValue($v, $isEager), $value);
         }
 
         // Last resort — let the value stringify itself if it can.

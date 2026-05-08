@@ -8,11 +8,11 @@
 use Craft;
 use craftpulse\cortex\Plugin;
 
-beforeEach(function () {
+beforeEach(function() {
     $this->tool = Plugin::getInstance()->tools->getByName('permissions_and_groups');
 });
 
-it('returns the permissions tree, flat name list, and groups', function () {
+it('returns the permissions tree, flat name list, and groups', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys([
@@ -24,7 +24,7 @@ it('returns the permissions tree, flat name list, and groups', function () {
     expect($result['groupCount'])->toBe(count(Craft::$app->getUserGroups()->getAllGroups()));
 });
 
-it('groups carry no user data — only handle / name / description / permissions', function () {
+it('groups carry no user data — only handle / name / description / permissions', function() {
     $result = $this->tool->execute([]);
 
     foreach ($result['groups'] as $group) {

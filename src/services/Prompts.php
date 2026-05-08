@@ -187,7 +187,7 @@ class Prompts extends Component
     public function asListPayload(): array
     {
         return array_map(
-            static function (PromptInterface $p): array {
+            static function(PromptInterface $p): array {
                 $entry = [
                     'name' => $p->getName(),
                     'description' => $p->getDescription(),

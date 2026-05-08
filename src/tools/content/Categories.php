@@ -136,7 +136,7 @@ class Categories extends AbstractTool
 
         return [
             'categories' => array_map(
-                static fn (Category $c): array => $serializer->serializeElement($c, $eagerHandles),
+                static fn(Category $c): array => $serializer->serializeElement($c, $eagerHandles),
                 $categories,
             ),
             'count' => count($categories),
@@ -197,7 +197,7 @@ class Categories extends AbstractTool
 
         return array_values(array_filter(
             $with,
-            static fn (mixed $h): bool => is_string($h) && $h !== '',
+            static fn(mixed $h): bool => is_string($h) && $h !== '',
         ));
     }
 

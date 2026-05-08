@@ -20,27 +20,27 @@ use craftpulse\cortex\tools\support\Schema;
 // Type entry points
 // -----------------------------------------------------------------------------
 
-it('builds string', function () {
+it('builds string', function() {
     expect(Schema::string()->toArray())->toBe(['type' => 'string']);
 });
 
-it('builds integer', function () {
+it('builds integer', function() {
     expect(Schema::integer()->toArray())->toBe(['type' => 'integer']);
 });
 
-it('builds number', function () {
+it('builds number', function() {
     expect(Schema::number()->toArray())->toBe(['type' => 'number']);
 });
 
-it('builds boolean', function () {
+it('builds boolean', function() {
     expect(Schema::boolean()->toArray())->toBe(['type' => 'boolean']);
 });
 
-it('builds null', function () {
+it('builds null', function() {
     expect(Schema::null()->toArray())->toBe(['type' => 'null']);
 });
 
-it('builds an untyped any() schema', function () {
+it('builds an untyped any() schema', function() {
     expect(Schema::any()->toArray())->toBe([]);
     expect(Schema::any()->description('foo')->toArray())->toBe(['description' => 'foo']);
 });
@@ -49,7 +49,7 @@ it('builds an untyped any() schema', function () {
 // String modifiers
 // -----------------------------------------------------------------------------
 
-it('attaches description, enum, format, pattern, length bounds, default', function () {
+it('attaches description, enum, format, pattern, length bounds, default', function() {
     $schema = Schema::string()
         ->description('hello')
         ->enum(['a', 'b', 'c'])
@@ -71,7 +71,7 @@ it('attaches description, enum, format, pattern, length bounds, default', functi
     ]);
 });
 
-it('rejects empty enums', function () {
+it('rejects empty enums', function() {
     Schema::string()->enum([]);
 })->throws(InvalidArgumentException::class);
 
@@ -79,7 +79,7 @@ it('rejects empty enums', function () {
 // Numeric bounds
 // -----------------------------------------------------------------------------
 
-it('applies numeric minimum and maximum', function () {
+it('applies numeric minimum and maximum', function() {
     expect(Schema::integer()->minimum(1)->maximum(1000)->toArray())->toBe([
         'type' => 'integer',
         'minimum' => 1,
@@ -97,7 +97,7 @@ it('applies numeric minimum and maximum', function () {
 // Arrays
 // -----------------------------------------------------------------------------
 
-it('builds an array of strings via items', function () {
+it('builds an array of strings via items', function() {
     expect(Schema::array(Schema::string())->toArray())->toBe([
         'type' => 'array',
         'items' => ['type' => 'string'],
@@ -109,7 +109,7 @@ it('builds an array of strings via items', function () {
     ]);
 });
 
-it('applies array length bounds and uniqueItems', function () {
+it('applies array length bounds and uniqueItems', function() {
     $schema = Schema::array(Schema::string())
         ->minItems(1)
         ->maxItems(10)
@@ -128,7 +128,7 @@ it('applies array length bounds and uniqueItems', function () {
 // Objects + property-level required
 // -----------------------------------------------------------------------------
 
-it('builds an empty object with additionalProperties false default', function () {
+it('builds an empty object with additionalProperties false default', function() {
     expect(Schema::object()->toArray())->toEqual([
         'type' => 'object',
         'properties' => (object) [],
@@ -136,7 +136,7 @@ it('builds an empty object with additionalProperties false default', function ()
     ]);
 });
 
-it('renders properties and bubbles required children up to the parent', function () {
+it('renders properties and bubbles required children up to the parent', function() {
     $schema = Schema::object([
         'expression' => Schema::string()->required()->description('Required.'),
         'confirm' => Schema::boolean()->description('Optional.'),
@@ -153,7 +153,7 @@ it('renders properties and bubbles required children up to the parent', function
     ]);
 });
 
-it('does not emit `required` when no children request it', function () {
+it('does not emit `required` when no children request it', function() {
     $schema = Schema::object([
         'handle' => Schema::string(),
         'count' => Schema::boolean(),
@@ -162,7 +162,7 @@ it('does not emit `required` when no children request it', function () {
     expect($schema->toArray())->not->toHaveKey('required');
 });
 
-it('honours additionalProperties true and explicit Schema', function () {
+it('honours additionalProperties true and explicit Schema', function() {
     $allowAny = Schema::object()->additionalProperties(true);
     expect($allowAny->toArray())->toEqual([
         'type' => 'object',
@@ -178,15 +178,15 @@ it('honours additionalProperties true and explicit Schema', function () {
     ]);
 });
 
-it('rejects non-string property keys and non-Schema property values', function () {
-    expect(fn () => Schema::object(['' => Schema::string()]))->toThrow(InvalidArgumentException::class);
+it('rejects non-string property keys and non-Schema property values', function() {
+    expect(fn() => Schema::object(['' => Schema::string()]))->toThrow(InvalidArgumentException::class);
 });
 
 // -----------------------------------------------------------------------------
 // Compositions
 // -----------------------------------------------------------------------------
 
-it('builds anyOf, oneOf, allOf', function () {
+it('builds anyOf, oneOf, allOf', function() {
     $any = Schema::anyOf(Schema::string(), Schema::integer());
     expect($any->toArray())->toBe([
         'anyOf' => [['type' => 'string'], ['type' => 'integer']],
@@ -214,23 +214,23 @@ it('builds anyOf, oneOf, allOf', function () {
     ]);
 });
 
-it('builds not', function () {
+it('builds not', function() {
     expect(Schema::not(Schema::string())->toArray())->toBe([
         'not' => ['type' => 'string'],
     ]);
 });
 
-it('rejects empty composition arguments', function () {
-    expect(fn () => Schema::anyOf())->toThrow(InvalidArgumentException::class);
-    expect(fn () => Schema::oneOf())->toThrow(InvalidArgumentException::class);
-    expect(fn () => Schema::allOf())->toThrow(InvalidArgumentException::class);
+it('rejects empty composition arguments', function() {
+    expect(fn() => Schema::anyOf())->toThrow(InvalidArgumentException::class);
+    expect(fn() => Schema::oneOf())->toThrow(InvalidArgumentException::class);
+    expect(fn() => Schema::allOf())->toThrow(InvalidArgumentException::class);
 });
 
 // -----------------------------------------------------------------------------
 // const
 // -----------------------------------------------------------------------------
 
-it('emits const literals including null', function () {
+it('emits const literals including null', function() {
     expect(Schema::constant('fixed')->toArray())->toBe(['const' => 'fixed']);
     expect(Schema::constant(null)->toArray())->toBe(['const' => null]);
     expect(Schema::constant(42)->toArray())->toBe(['const' => 42]);
@@ -240,7 +240,7 @@ it('emits const literals including null', function () {
 // Round-trip equivalence with existing tools' hand-rolled shapes
 // -----------------------------------------------------------------------------
 
-it('round-trips the Sites tool input schema', function () {
+it('round-trips the Sites tool input schema', function() {
     $schema = Schema::object([
         'handle' => Schema::string(),
         'count' => Schema::boolean(),
@@ -256,7 +256,7 @@ it('round-trips the Sites tool input schema', function () {
     ]);
 });
 
-it('round-trips the Diagnostics tool input schema', function () {
+it('round-trips the Diagnostics tool input schema', function() {
     $schema = Schema::object([
         'type' => Schema::string()
             ->enum(['logs', 'last_error', 'deprecations', 'queue', 'project_config_diff'])
@@ -298,7 +298,7 @@ it('round-trips the Diagnostics tool input schema', function () {
     ]);
 });
 
-it('round-trips the CraftExec tool input schema with required at object level', function () {
+it('round-trips the CraftExec tool input schema with required at object level', function() {
     $schema = Schema::object([
         'expression' => Schema::string()
             ->required()
@@ -330,7 +330,7 @@ it('round-trips the CraftExec tool input schema with required at object level', 
     ]);
 });
 
-it('round-trips the Entries tool input schema with polymorphic any() properties', function () {
+it('round-trips the Entries tool input schema with polymorphic any() properties', function() {
     $schema = Schema::object([
         'id' => Schema::any()->description('Single entry id, or array of ids.'),
         'with' => Schema::array(Schema::string())
@@ -357,7 +357,7 @@ it('round-trips the Entries tool input schema with polymorphic any() properties'
 // Nested objects
 // -----------------------------------------------------------------------------
 
-it('handles nested objects with their own required arrays', function () {
+it('handles nested objects with their own required arrays', function() {
     $schema = Schema::object([
         'outer' => Schema::object([
             'inner' => Schema::string()->required(),
@@ -386,7 +386,7 @@ it('handles nested objects with their own required arrays', function () {
 // examples (Phase 1 addition for Pro tools)
 // -----------------------------------------------------------------------------
 
-it('emits examples in toArray output', function () {
+it('emits examples in toArray output', function() {
     $schema = Schema::string()->examples(['small', 'medium', 'large']);
 
     expect($schema->toArray())->toBe([
@@ -395,7 +395,6 @@ it('emits examples in toArray output', function () {
     ]);
 });
 
-it('rejects an empty examples list', function () {
+it('rejects an empty examples list', function() {
     Schema::string()->examples([]);
 })->throws(InvalidArgumentException::class, 'at least one value');
-
