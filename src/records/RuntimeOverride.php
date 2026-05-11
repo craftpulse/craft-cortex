@@ -12,8 +12,8 @@ use craftpulse\cortex\db\Table;
  * Each row is an admin-issued allowlist pattern that layers on top of
  * the project-config / `config/cortex.php` defaults. Patterns auto-
  * expire (default 7 days, configurable via `Settings::$runtimeOverrideTtl`)
- * so transient grants don't accumulate. Cleanup runs through the
- * `PruneExpiredOverrides` queue job, scheduled via Craft's gc.
+ * so transient grants don't accumulate. Cleanup runs inline during
+ * Craft's gc sweep via `Allowlist::pruneExpired()`.
  * =========================================================================
  *
  * @property int $id

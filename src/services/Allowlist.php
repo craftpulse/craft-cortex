@@ -22,8 +22,8 @@ use yii\base\Exception;
  *
  * The CP allowlist UI drives the runtime-override surface — admins
  * add a pattern with an optional note and TTL; cortex grants the
- * pattern until expiry; the queue cleanup job (`PruneExpiredOverrides`)
- * sweeps expired rows nightly via Craft gc.
+ * pattern until expiry; `pruneExpired()` sweeps expired rows during
+ * Craft's gc.
  *
  * Carbon over `DateTimeHelper` here because services rule says:
  * services use Carbon, elements/queries use DateTimeHelper. Mixing in
@@ -159,8 +159,9 @@ class Allowlist extends Component
     }
 
     /**
-     * Hard-delete every expired override. Used by `PruneExpiredOverrides`.
-     * Returns the number of rows pruned.
+     * Hard-delete every expired override. Invoked during Craft's gc
+     * sweep via the listener registered in `Plugin::init()`. Returns
+     * the number of rows pruned.
      *
      * @author Craftpulse
      * @since  0.1.0
