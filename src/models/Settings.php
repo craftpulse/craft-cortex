@@ -94,10 +94,10 @@ class Settings extends Model
      */
     protected function defineRules(): array
     {
-        return array_merge(parent::defineRules(), [
-            [['runtimeOverrideTtl'], 'integer', 'min' => 1],
-            [['execEnabled', 'execDryRunDefault'], 'boolean'],
-            [['allowedCommands'], 'each', 'rule' => ['string', 'min' => 1]],
-        ]);
+        $rules = parent::defineRules();
+        $rules[] = [['runtimeOverrideTtl'], 'integer', 'min' => 1];
+        $rules[] = [['execEnabled', 'execDryRunDefault'], 'boolean'];
+        $rules[] = [['allowedCommands'], 'each', 'rule' => ['string', 'min' => 1]];
+        return $rules;
     }
 }
