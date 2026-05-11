@@ -10,7 +10,7 @@ use craftpulse\cortex\db\Table;
  * =========================================================================
  * Cortex install migration — creates the runtime-overrides table.
  *
- * Phase 1 ships with one table: `{{%cortex_runtime_overrides}}` for
+ * Ships with one table: `{{%cortex_runtime_overrides}}` for
  * admin-editable allowlist patterns that layer on top of the
  * project-config defaults and `config/cortex.php` overrides. Each
  * override has an explicit `expiresAt` (default 7 days, configurable

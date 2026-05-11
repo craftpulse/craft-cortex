@@ -20,9 +20,9 @@ use yii\base\Exception;
  *   2. Active runtime overrides — DB rows that haven't been
  *      soft-deleted and whose `expiresAt` is null or in the future.
  *
- * The CP allowlist UI (Gate 6.5) drives the runtime-override surface
- * — admins add a pattern with an optional note and TTL; cortex grants
- * the pattern until expiry; the queue cleanup job (`PruneExpiredOverrides`)
+ * The CP allowlist UI drives the runtime-override surface — admins
+ * add a pattern with an optional note and TTL; cortex grants the
+ * pattern until expiry; the queue cleanup job (`PruneExpiredOverrides`)
  * sweeps expired rows nightly via Craft gc.
  *
  * Carbon over `DateTimeHelper` here because services rule says:

@@ -26,9 +26,9 @@ use DateTimeInterface;
  *     map keyed by field handle plus identity summaries of both
  *     sides.
  *
- * Pro adds `apply` / `discard` modes for drafts (PLANNING.md 4.7) —
- * those mutate state, gated behind `viewEntries:{section}` plus save
- * permissions on apply. Free is read-only.
+ * Pro adds `apply` / `discard` modes for drafts — those mutate state,
+ * gated behind `viewEntries:{section}` plus save permissions on apply.
+ * Free is read-only.
  *
  * Compare mode emits scalar/array field values directly; relational and
  * other complex field types are stubbed as

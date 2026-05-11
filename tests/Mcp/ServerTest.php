@@ -245,7 +245,7 @@ it('returns JSON-RPC -32601 for an unknown method', function() {
 });
 
 // -----------------------------------------------------------------------------
-// stdio-only enforcement (Gate 5 of craft_exec)
+// stdio-only enforcement
 // -----------------------------------------------------------------------------
 
 it('rejects a stdio-only tool when dispatched on the HTTP transport', function() {
@@ -508,7 +508,7 @@ it('responds to ping with an empty result', function() {
 });
 
 // -----------------------------------------------------------------------------
-// Generator return type — eager consume (Phase 1; Phase 2 streams notifications)
+// Generator return type — eager consume (HTTP transport will stream notifications)
 // -----------------------------------------------------------------------------
 
 it('eagerly consumes a Generator-returning tool and surfaces the return value', function() {
@@ -550,8 +550,9 @@ it('eagerly consumes a Generator-returning tool and surfaces the return value', 
         // tool directly via a Server instance after temporarily swapping
         // the plugin's registry. Simpler: assert via the dispatcher by
         // re-registering on the global service for the duration.
-        // For Phase 1 the stronger contract is "no exception, final
-        // return is surfaced" — assert that against the inner consumer.
+        // For the stdio dispatcher the stronger contract is "no
+        // exception, final return is surfaced" — assert that against
+        // the inner consumer.
 
         $reflection = new ReflectionClass($this->server);
         $method = $reflection->getMethod('_consumeGenerator');
@@ -569,7 +570,7 @@ it('eagerly consumes a Generator-returning tool and surfaces the return value', 
 });
 
 // -----------------------------------------------------------------------------
-// Resource templates — dynamic URI fallback (Phase 1 plumbing for Pro)
+// Resource templates — dynamic URI fallback
 // -----------------------------------------------------------------------------
 
 it('reads a templated resource when no concrete URI matches', function() {

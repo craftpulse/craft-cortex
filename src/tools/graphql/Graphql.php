@@ -18,7 +18,7 @@ use Throwable;
  * =========================================================================
  * `graphql` tool — read-only introspection over Craft's GraphQL surface.
  *
- * Three modes (PLANNING.md 4.5):
+ * Three modes:
  *
  *   - `list_schemas`  — every schema with id / name / uid / isPublic / scope summary.
  *   - `get_sdl`       — printed SDL for a schema (by name) or the public schema.

@@ -12,9 +12,9 @@
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolInterface;
 
-it('registers all Phase-1 tools by name', function() {
+it('registers every bundled tool by name', function() {
     $expected = [
-        // Schema (Gate 2)
+        // Schema & structure
         'sections',
         'entry_types',
         'fields',
@@ -26,14 +26,14 @@ it('registers all Phase-1 tools by name', function() {
         'image_transforms',
         'element_types',
 
-        // Content reading (Gate 3)
+        // Content reading
         'entries',
         'assets',
         'categories',
         'tags',
         'globals',
 
-        // System & diagnostics (Gate 4 + Phase 1 ship-prep)
+        // System & diagnostics
         'system_info',
         'config',
         'plugins',
@@ -44,14 +44,14 @@ it('registers all Phase-1 tools by name', function() {
         'permissions_and_groups',
         'search_skills',
 
-        // GraphQL & Dev Actions (Gate 5)
+        // GraphQL & dev actions
         'graphql',
         'clear_caches',
         'resave',
         'craft_command',
         'craft_exec',
 
-        // Workflow & Audit — read modes (Gate 6.5)
+        // Workflow & audit (read modes)
         'drafts_and_revisions',
         'content_audit',
         'import_export',

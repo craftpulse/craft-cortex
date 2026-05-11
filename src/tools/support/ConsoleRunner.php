@@ -17,7 +17,7 @@ use Throwable;
  * detached so JSON-RPC output flows normally.
  *
  * No `proc_open`, `shell_exec`, `exec`, `passthru`, `popen`, or
- * backticks per PLANNING.md 4.9 — this is the only way commands run.
+ * backticks — this is the only way commands run.
  * =========================================================================
  *
  * @author Craftpulse

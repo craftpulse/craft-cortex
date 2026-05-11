@@ -17,8 +17,8 @@ use Throwable;
  * =========================================================================
  * `import_export` tool — structured-JSON export of entries (Free).
  *
- * Phase 1 ships export only. Pro adds an `import` mode (PLANNING.md
- * 4.7) for cross-environment content sync, gated behind
+ * The Free tier ships export only. The Pro tier adds an `import` mode
+ * for cross-environment content sync, gated behind
  * `saveEntries:{section}` permissions and dry-run-by-default.
  *
  * Output shape (format 2 — see `FORMAT_VERSION` const for version
@@ -74,10 +74,10 @@ use Throwable;
  *   - `site` — site handle (defaults to primary)
  *
  * The envelope includes Craft fingerprints (`craftVersion`,
- * `craftEdition`, `schemaVersion`) so a Pro importer can refuse a
+ * `craftEdition`, `schemaVersion`) so the importer can refuse a
  * cross-major or cross-edition payload before walking the entries.
  * Future schema bumps stay backwards-compatible via the `format`
- * version field; format 1 existed only briefly during Gate 6.5 and is
+ * version field; format 1 existed only briefly pre-release and is
  * not expected in the wild.
  * =========================================================================
  *
@@ -92,13 +92,12 @@ class ImportExport extends AbstractTool
     // =========================================================================
 
     /**
-     * Envelope format version. Bumped to 2 in Phase 1 ship-prep so Pro
-     * `import` consumes the full round-trip surface (authorIds for
-     * multi-author entries, parentUid + level for Structure hierarchies,
-     * enabledForSite for the per-site enabled bit, plus craftVersion /
-     * schemaVersion / edition fingerprints on the envelope). Format 1
-     * existed only briefly in Gate 6.5 — no published consumers, no
-     * back-compat layer needed.
+     * Envelope format version. Format 2 carries the full round-trip
+     * surface (authorIds for multi-author entries, parentUid + level
+     * for Structure hierarchies, enabledForSite for the per-site
+     * enabled bit, plus craftVersion / schemaVersion / edition
+     * fingerprints on the envelope). Format 1 existed only briefly
+     * pre-release — no published consumers, no back-compat layer.
      */
     public const FORMAT_VERSION = 2;
     public const DEFAULT_LIMIT = 100;

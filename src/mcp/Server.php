@@ -65,8 +65,9 @@ class Server
     /**
      * @param string $transport `Server::TRANSPORT_STDIO` (default) or
      *                          `Server::TRANSPORT_HTTP`. Set per
-     *                          transport adapter. Phase 2 adds the HTTP
-     *                          adapter; Phase 1 only constructs stdio.
+     *                          transport adapter — only the stdio
+     *                          adapter ships today; the HTTP adapter
+     *                          will land in a future release.
      *
      * @author Craftpulse
      * @since  0.1.0
@@ -298,8 +299,8 @@ class Server
             return $this->_successResponse($id, ['contents' => [$block]]);
         }
 
-        // Fall back to URI templates — Pro Gate 8.5 (custom skills) and
-        // any future per-element resource use these. Concrete URIs are
+        // Fall back to URI templates — Pro custom skills and any
+        // future per-element resource use these. Concrete URIs are
         // tried first so a templated resource never shadows a bundled
         // entry.
         $match = Plugin::getInstance()->resources->matchTemplate($uri);
@@ -347,9 +348,9 @@ class Server
         }
 
         if (AttributeReader::isStdioOnly($tool) && $this->_transport !== self::TRANSPORT_STDIO) {
-            // Hard reject. PLANNING.md 4.9: stdio-only is enforced at the
-            // transport boundary regardless of caller permissions or token
-            // scope, never config-driven.
+            // Hard reject. stdio-only enforcement happens at the
+            // transport boundary regardless of caller permissions or
+            // token scope, never config-driven.
             return $this->_errorResponse(
                 $id,
                 -32601,
@@ -393,10 +394,10 @@ class Server
     }
 
     /**
-     * Build an `InvocationContext` for the current dispatch. Phase 1
-     * stdio populates transport, request id, and client name (when
-     * captured from initialize); user is always null. Phase 2's HTTP
-     * transport will subclass / extend the dispatcher to populate the
+     * Build an `InvocationContext` for the current dispatch. The
+     * stdio transport populates transport, request id, and client
+     * name (when captured from initialize); user is always null. The
+     * HTTP transport will subclass / extend the dispatcher to populate
      * authenticated user before constructing the context.
      *
      * @author Craftpulse
@@ -432,9 +433,9 @@ class Server
 
     /**
      * Eagerly drain a tool's `Generator` and return the final result.
-     * Phase 1 dispatchers do NOT forward intermediate yields as MCP
-     * progress notifications — that's Phase 2 transport work, gated on
-     * the HTTP / SSE adapter. The interface change is forward-compatible:
+     * The stdio dispatcher does NOT forward intermediate yields as MCP
+     * progress notifications — that's transport-layer work for the
+     * HTTP / SSE adapter. The interface change is forward-compatible:
      * tools can already return `Generator`, but only the final value is
      * surfaced to the client.
      *
@@ -467,7 +468,7 @@ class Server
 
         return [
             'mode' => 'streamed',
-            'note' => 'Tool returned a Generator with no terminal array value. Phase 2 streaming will surface yields.',
+            'note' => 'Tool returned a Generator with no terminal array value. HTTP-transport streaming will surface yields.',
         ];
     }
 

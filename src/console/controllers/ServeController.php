@@ -16,7 +16,7 @@ use yii\console\ExitCode;
  * the transport-agnostic `Server` for dispatch, writes responses to
  * STDOUT, exits cleanly when STDIN closes.
  *
- * Memory hygiene per PLANNING.md section 4.3: logger flush interval set
+ * Memory hygiene: logger flush interval set
  * to 1 so log records don't accumulate in memory during long-running
  * sessions; logger levels reduced to error+warning to avoid noisy
  * Craft / Yii output corrupting the JSON-RPC stream on stdout.

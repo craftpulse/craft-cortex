@@ -2,7 +2,7 @@
 
 /**
  * =========================================================================
- * Six security gates from PLANNING.md 4.9, one test per gate.
+ * Tests for the six layered security gates on `craft_exec`:
  *
  *   1. Dry-run default
  *   2. Structured output / typed errors
@@ -30,10 +30,10 @@ it('throws when expression is missing', function() {
 })->throws(ToolException::class, '`expression` is required');
 
 // -----------------------------------------------------------------------------
-// Gate 1 — Dry-run default
+// Dry-run default
 // -----------------------------------------------------------------------------
 
-it('Gate 1: returns dry-run analysis without confirm — does NOT evaluate', function() {
+it('returns dry-run analysis without confirm — does NOT evaluate', function() {
     $result = $this->tool->execute([
         'expression' => '1 + 1',
     ]);
@@ -47,7 +47,7 @@ it('Gate 1: returns dry-run analysis without confirm — does NOT evaluate', fun
     expect($result)->not->toHaveKey('result');
 });
 
-it('Gate 1: evaluates only when confirm=true', function() {
+it('evaluates only when confirm=true', function() {
     $result = $this->tool->execute([
         'expression' => '1 + 1',
         'confirm' => true,
@@ -60,10 +60,10 @@ it('Gate 1: evaluates only when confirm=true', function() {
 });
 
 // -----------------------------------------------------------------------------
-// Gate 2 — Structured output / typed errors
+// Structured output / typed errors
 // -----------------------------------------------------------------------------
 
-it('Gate 2: structured success envelope with hasResult + result fields', function() {
+it('structured success envelope with hasResult + result fields', function() {
     $result = $this->tool->execute([
         'expression' => '["a" => 1, "b" => 2]',
         'confirm' => true,
@@ -74,7 +74,7 @@ it('Gate 2: structured success envelope with hasResult + result fields', functio
     expect($result['result'])->toBe(['a' => 1, 'b' => 2]);
 });
 
-it('Gate 2: parse errors are typed', function() {
+it('parse errors are typed', function() {
     $result = $this->tool->execute([
         'expression' => '$$$invalid$$$',
         'confirm' => true,
@@ -87,7 +87,7 @@ it('Gate 2: parse errors are typed', function() {
     expect($result['error'])->toHaveKey('trace');
 });
 
-it('Gate 2: runtime errors include class + file + line', function() {
+it('runtime errors include class + file + line', function() {
     $result = $this->tool->execute([
         'expression' => 'throw new \\RuntimeException("boom")',
         'confirm' => true,
@@ -103,10 +103,10 @@ it('Gate 2: runtime errors include class + file + line', function() {
 });
 
 // -----------------------------------------------------------------------------
-// Gate 3 — Secret redaction
+// Secret redaction
 // -----------------------------------------------------------------------------
 
-it('Gate 3: redacts secret-keyed values in array results', function() {
+it('redacts secret-keyed values in array results', function() {
     $result = $this->tool->execute([
         'expression' => '["password" => "hunter2", "name" => "alice"]',
         'confirm' => true,
@@ -116,7 +116,7 @@ it('Gate 3: redacts secret-keyed values in array results', function() {
     expect($result['result'])->toHaveKey('name', 'alice');
 });
 
-it('Gate 3: redacts API_KEY=value patterns in string results', function() {
+it('redacts API_KEY=value patterns in string results', function() {
     $result = $this->tool->execute([
         'expression' => '"API_KEY=abc123 trailing"',
         'confirm' => true,
@@ -127,7 +127,7 @@ it('Gate 3: redacts API_KEY=value patterns in string results', function() {
     expect($result['result'])->not->toContain('abc123');
 });
 
-it('Gate 3: redacts secrets surfaced via stdout (echo) too', function() {
+it('redacts secrets surfaced via stdout (echo) too', function() {
     $result = $this->tool->execute([
         'expression' => 'echo "SECURITY_KEY=topsecret"',
         'confirm' => true,
@@ -139,10 +139,10 @@ it('Gate 3: redacts secrets surfaced via stdout (echo) too', function() {
 });
 
 // -----------------------------------------------------------------------------
-// Gate 4 — Destructive-op guard
+// Destructive-op guard
 // -----------------------------------------------------------------------------
 
-it('Gate 4: detects destructive patterns and refuses with confirm alone', function() {
+it('detects destructive patterns and refuses with confirm alone', function() {
     $result = $this->tool->execute([
         'expression' => 'Craft::$app->elements->deleteElementById(1)',
         'confirm' => true,
@@ -156,7 +156,7 @@ it('Gate 4: detects destructive patterns and refuses with confirm alone', functi
     expect($result)->toHaveKey('isDestructive', true);
 });
 
-it('Gate 4: dangerous alone (without confirm) still treats as dry-run', function() {
+it('dangerous alone (without confirm) still treats as dry-run', function() {
     $result = $this->tool->execute([
         'expression' => 'Craft::$app->elements->deleteElementById(1)',
         'dangerous' => true,
@@ -165,7 +165,7 @@ it('Gate 4: dangerous alone (without confirm) still treats as dry-run', function
     expect($result)->toHaveKey('evaluated', false);
 });
 
-it('Gate 4: matches drop / truncate / migrate-down patterns', function() {
+it('matches drop / truncate / migrate-down patterns', function() {
     foreach ([
         'Craft::$app->db->createCommand()->dropTable("foo")',
         'Craft::$app->db->createCommand()->truncateTable("foo")',
@@ -178,7 +178,7 @@ it('Gate 4: matches drop / truncate / migrate-down patterns', function() {
     }
 });
 
-it('Gate 4: non-destructive expressions report isDestructive=false', function() {
+it('non-destructive expressions report isDestructive=false', function() {
     $result = $this->tool->execute([
         'expression' => 'count(Craft::$app->getEntries()->getAllSections())',
     ]);
@@ -187,18 +187,18 @@ it('Gate 4: non-destructive expressions report isDestructive=false', function() 
 });
 
 // -----------------------------------------------------------------------------
-// Gate 5 — stdio-only (asserted at the dispatcher level too — see Mcp/ServerTest)
+// stdio-only (asserted at the dispatcher level too — see Mcp/ServerTest)
 // -----------------------------------------------------------------------------
 
-it('Gate 5: declares isStdioOnly = true via attribute', function() {
+it('declares isStdioOnly = true via attribute', function() {
     expect(\craftpulse\cortex\tools\support\AttributeReader::isStdioOnly($this->tool))->toBeTrue();
 });
 
 // -----------------------------------------------------------------------------
-// Gate 6 — Annotation
+// Tool annotation
 // -----------------------------------------------------------------------------
 
-it('Gate 6: exposes destructiveHint:true via attribute reader', function() {
+it('exposes destructiveHint:true via attribute reader', function() {
     $annotations = \craftpulse\cortex\tools\support\AttributeReader::annotationsFor($this->tool);
     expect($annotations)->toHaveKey('destructiveHint', true);
     expect($annotations)->toHaveKey('idempotentHint', false);

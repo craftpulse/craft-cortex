@@ -8,10 +8,10 @@ use php_user_filter;
  * =========================================================================
  * Stream filter that captures (and suppresses) writes to STDOUT/STDERR.
  *
- * Phase 1 stdio MCP runs as a single console process where `STDOUT` IS
- * the JSON-RPC channel — so any console controller dispatched in-process
- * via `Craft::$app->runAction(...)` would corrupt that channel by
- * writing progress to the same descriptor.
+ * The stdio MCP server runs as a single console process where `STDOUT`
+ * IS the JSON-RPC channel — so any console controller dispatched
+ * in-process via `Craft::$app->runAction(...)` would corrupt that
+ * channel by writing progress to the same descriptor.
  *
  * The filter intercepts writes on the stream it's attached to, appends
  * them to a per-session buffer, and short-circuits the underlying write.
@@ -20,10 +20,9 @@ use php_user_filter;
  * outside of tool dispatch.
  *
  * Registered with `stream_filter_register('cortex.capture', ...)` lazily
- * by `ConsoleRunner::run()`.
- *
- * Phase 2 HTTP transport runs in PHP-FPM where this isn't an issue —
- * but we'll keep using the same helper for consistency and isolation.
+ * by `ConsoleRunner::run()`. The HTTP transport runs in PHP-FPM where
+ * STDOUT capture is irrelevant, but the same helper is used there for
+ * consistency and isolation.
  * =========================================================================
  *
  * @author Craftpulse

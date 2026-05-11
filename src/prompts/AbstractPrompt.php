@@ -6,8 +6,8 @@ namespace craftpulse\cortex\prompts;
  * =========================================================================
  * Base class for MCP prompts.
  *
- * Provides a sensible default for `getArguments()` — most Phase 1
- * prompts take none — and leaves everything else to concrete classes.
+ * Provides a sensible default for `getArguments()` — bundled prompts
+ * take none — and leaves everything else to concrete classes.
  * =========================================================================
  *
  * @author Craftpulse
