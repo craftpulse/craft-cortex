@@ -134,6 +134,11 @@ it('remove() throws when the soft-delete save fails', function() {
     $override->pattern = '';
     $override->save(false);
 
+    // Confirm the DB accepted the empty pattern — this is the
+    // precondition that lets the next save() fail at validation.
+    $override->refresh();
+    expect($override->pattern)->toBe('');
+
     expect(fn() => $this->service->remove($override->id))
         ->toThrow(Exception::class, 'Failed to soft-delete');
 });
