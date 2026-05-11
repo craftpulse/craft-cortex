@@ -62,7 +62,7 @@ Flipping this to `false` makes evaluation the default. This is **not** a securit
 
 The default TTL applied to a new runtime override when no expiry is supplied at creation time. Shorter values produce a tighter security posture (overrides expire faster, fewer surprise grants in the system); longer values reduce friction for teams that often need short-term command grants.
 
-Runtime overrides are admin-issued through the CP and stored in the `cortex_runtime_overrides` DB table. Expired overrides remain in the table (soft-delete) but no longer count toward the effective allowlist. A queue job (`PruneExpiredOverrides`) hard-deletes expired non-deleted overrides during regular Craft garbage collection.
+Runtime overrides are admin-issued through the CP and stored in the `cortex_runtime_overrides` DB table. Expired overrides remain in the table (soft-delete) but no longer count toward the effective allowlist. Expired non-deleted overrides are hard-deleted inline during Craft's regular garbage-collection sweep.
 
 ## The CP settings page
 

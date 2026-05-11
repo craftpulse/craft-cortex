@@ -45,7 +45,7 @@ Per-client install instructions, troubleshooting, and the manual snippet flow ar
 
 - Plugin settings model — `allowedCommands`, `execEnabled`, `execDryRunDefault`, `runtimeOverrideTtl`. All four exposed in the **Settings → Cortex** CP page; `allowedCommands` syncs across environments via project config.
 - `config/cortex.php` reference template (heavily commented) for environment-specific overrides — `*` wildcard plus named-environment blocks (`production`, `staging`).
-- Runtime allowlist overrides — admin-issued, auto-expiring DB-backed entries that layer on top of the project-config defaults. Useful for short-term command grants without a deploy. Cleanup queue job (`PruneExpiredOverrides`) prunes during regular Craft GC.
+- Runtime allowlist overrides — admin-issued, auto-expiring DB-backed entries that layer on top of the project-config defaults. Useful for short-term command grants without a deploy. Expired rows are pruned inline during Craft's regular GC sweep.
 - Settings reference: [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
 
 #### Security model
