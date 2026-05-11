@@ -367,7 +367,8 @@ class Audit extends AbstractTool
             $payload['truncatedSections'] = $truncatedSections;
             $payload['truncationCap'] = self::PROPAGATION_SECTION_ROW_CAP;
             $payload['hint'] = 'One or more sections exceeded the per-section row cap. ' .
-                '`totalCount` reflects gaps within the scanned subset only, not the absolute total. ' .
+                '`totalCount` counts gaps found within the scanned subset only — ' .
+                'sections that hit the cap may have additional un-scanned gaps. ' .
                 'Narrow with the `section` filter for an exhaustive scan of a single section.';
         }
 
