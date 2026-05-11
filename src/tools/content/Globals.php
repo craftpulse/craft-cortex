@@ -27,7 +27,7 @@ use craftpulse\cortex\tools\ToolException;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[IsReadOnly]
 #[IsIdempotent]
@@ -40,7 +40,7 @@ class Globals extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string
     {
@@ -51,7 +51,7 @@ class Globals extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string
     {
@@ -64,7 +64,7 @@ class Globals extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -81,7 +81,7 @@ class Globals extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array
     {
@@ -128,7 +128,7 @@ class Globals extends AbstractTool
      * @param string[] $eagerHandles
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _loadSet(string $handle, int $siteId, array $eagerHandles): ?GlobalSet
     {
@@ -149,7 +149,7 @@ class Globals extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _serializeSet(GlobalSet $set, array $eagerHandles, ElementSerializer $serializer): array
     {
@@ -167,7 +167,7 @@ class Globals extends AbstractTool
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _resolveSiteId(array $arguments): int
     {
@@ -192,7 +192,7 @@ class Globals extends AbstractTool
      * @return string[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _eagerHandles(array $arguments): array
     {

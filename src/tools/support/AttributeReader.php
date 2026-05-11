@@ -31,7 +31,7 @@ use ReflectionClass;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 final class AttributeReader
 {
@@ -47,7 +47,7 @@ final class AttributeReader
      * @return array<string,bool|string>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function annotationsFor(ToolInterface|string $toolOrClass): array
     {
@@ -90,7 +90,7 @@ final class AttributeReader
      * @param ToolInterface|class-string<ToolInterface> $toolOrClass
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function isStdioOnly(ToolInterface|string $toolOrClass): bool
     {

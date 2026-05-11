@@ -51,7 +51,7 @@ use Throwable;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[Title('Evaluate Craft Expression')]
 #[IsDestructive]
@@ -92,7 +92,7 @@ class CraftExec extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string
     {
@@ -103,7 +103,7 @@ class CraftExec extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string
     {
@@ -119,7 +119,7 @@ class CraftExec extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -140,7 +140,7 @@ class CraftExec extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array
     {
@@ -203,7 +203,7 @@ class CraftExec extends AbstractTool
      * Whether the expression matches any destructive pattern.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _isDestructive(string $expression): bool
     {
@@ -225,7 +225,7 @@ class CraftExec extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _dryRun(string $expression, bool $isDestructive, bool $blocked): array
     {
@@ -254,7 +254,7 @@ class CraftExec extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _evaluate(string $expression, bool $isDestructive): array
     {
@@ -323,7 +323,7 @@ class CraftExec extends AbstractTool
      * through `SecretRedactor::redactArray`.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _normaliseResult(mixed $value): mixed
     {
@@ -373,7 +373,7 @@ class CraftExec extends AbstractTool
      * @return array<int|string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _recursiveNormalise(array $value): array
     {

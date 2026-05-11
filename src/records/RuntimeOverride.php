@@ -27,7 +27,7 @@ use craftpulse\cortex\db\Table;
  * @property string $uid
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class RuntimeOverride extends ActiveRecord
 {
@@ -38,7 +38,7 @@ class RuntimeOverride extends ActiveRecord
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function tableName(): string
     {
@@ -54,7 +54,7 @@ class RuntimeOverride extends ActiveRecord
      * or oversized pattern.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function rules(): array
     {

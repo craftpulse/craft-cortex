@@ -43,7 +43,7 @@ use Michtio\CraftCmsClaudeSkills\Skills;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[Title('Search Bundled Skills')]
 #[IsReadOnly]
@@ -74,7 +74,7 @@ class SearchSkills extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string
     {
@@ -85,7 +85,7 @@ class SearchSkills extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string
     {
@@ -100,7 +100,7 @@ class SearchSkills extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -124,7 +124,7 @@ class SearchSkills extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array
     {
@@ -145,7 +145,7 @@ class SearchSkills extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _search(array $arguments): array
     {
@@ -198,7 +198,7 @@ class SearchSkills extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _topics(array $arguments): array
     {
@@ -237,7 +237,7 @@ class SearchSkills extends AbstractTool
      * @return list<array{kind:string,uri:string,skill:string,name:string|null,content:string}>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _buildIndex(?string $kindFilter): array
     {
@@ -293,7 +293,7 @@ class SearchSkills extends AbstractTool
      * @return array{total:float,hits:array<string,int>,firstPos:int}
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _score(array $tokens, string $content): array
     {
@@ -334,7 +334,7 @@ class SearchSkills extends AbstractTool
      * scoring-haystack copy) so renderers preserve markdown formatting.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _snippet(string $content, int $position): string
     {
@@ -374,7 +374,7 @@ class SearchSkills extends AbstractTool
      * @return list<string>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _tokenise(string $query): array
     {
@@ -388,7 +388,7 @@ class SearchSkills extends AbstractTool
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _limit(array $arguments): int
     {
@@ -398,7 +398,7 @@ class SearchSkills extends AbstractTool
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _kindFilter(array $arguments): ?string
     {

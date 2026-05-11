@@ -22,7 +22,7 @@ use craftpulse\cortex\db\Table;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class Install extends Migration
 {
@@ -33,7 +33,7 @@ class Install extends Migration
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function safeUp(): bool
     {
@@ -74,7 +74,7 @@ class Install extends Migration
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function safeDown(): bool
     {

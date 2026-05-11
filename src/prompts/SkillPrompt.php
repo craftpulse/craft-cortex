@@ -20,7 +20,7 @@ use Michtio\CraftCmsClaudeSkills\Skills;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class SkillPrompt extends AbstractPrompt
 {
@@ -51,7 +51,7 @@ class SkillPrompt extends AbstractPrompt
      * @param string $description Description shown in `prompts/list`.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function __construct(string $name, string $skill, string $description)
     {
@@ -64,7 +64,7 @@ class SkillPrompt extends AbstractPrompt
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getName(): string
     {
@@ -75,7 +75,7 @@ class SkillPrompt extends AbstractPrompt
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getDescription(): string
     {
@@ -86,7 +86,7 @@ class SkillPrompt extends AbstractPrompt
      * The on-disk skill directory name backing this prompt.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getSkill(): string
     {
@@ -103,7 +103,7 @@ class SkillPrompt extends AbstractPrompt
      * @throws \InvalidArgumentException If the backing skill cannot be read.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function render(array $arguments): array
     {

@@ -22,7 +22,7 @@ namespace craftpulse\cortex\tools;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 interface ToolInterface
 {
@@ -32,7 +32,7 @@ interface ToolInterface
      * `tools/call`.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string;
 
@@ -42,7 +42,7 @@ interface ToolInterface
      * implementation detail; describe the user-visible effect.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string;
 
@@ -53,7 +53,7 @@ interface ToolInterface
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array;
 
@@ -67,7 +67,7 @@ interface ToolInterface
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function outputSchema(): array;
 
@@ -81,7 +81,7 @@ interface ToolInterface
      * build.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function shouldRegister(): bool;
 
@@ -102,7 +102,7 @@ interface ToolInterface
      * @throws ToolException For tool-level errors (returned to client as `isError: true`).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array|\Generator;
 }

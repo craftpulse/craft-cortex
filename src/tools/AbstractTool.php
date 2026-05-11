@@ -13,7 +13,7 @@ namespace craftpulse\cortex\tools;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 abstract class AbstractTool implements ToolInterface
 {
@@ -27,7 +27,7 @@ abstract class AbstractTool implements ToolInterface
      * tool to expose `handle`, `count`, `mode`, etc.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -46,7 +46,7 @@ abstract class AbstractTool implements ToolInterface
      * with strictly-shaped output the LLM can validate against).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function outputSchema(): array
     {
@@ -60,7 +60,7 @@ abstract class AbstractTool implements ToolInterface
      * visibility on Craft permissions for the current user.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function shouldRegister(): bool
     {
@@ -78,7 +78,7 @@ abstract class AbstractTool implements ToolInterface
      * @param array<string,mixed> $arguments
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     protected function _handle(array $arguments): ?string
     {
@@ -92,7 +92,7 @@ abstract class AbstractTool implements ToolInterface
      * @param array<string,mixed> $arguments
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     protected function _isCount(array $arguments): bool
     {
@@ -107,7 +107,7 @@ abstract class AbstractTool implements ToolInterface
      * @param array<string,mixed> $arguments
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     protected function _mode(array $arguments): ?string
     {

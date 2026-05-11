@@ -17,7 +17,7 @@
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 
 // __DIR__ resolves through the symlink to the cortex source repo, which has

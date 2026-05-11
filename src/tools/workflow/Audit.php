@@ -18,7 +18,7 @@ use craftpulse\cortex\tools\ToolException;
  * =========================================================================
  * `audit` tool — read-only content health reports.
  *
- * Three Phase-1 modes, each producing a report the LLM can act on:
+ * Three modes, each producing a report the LLM can act on:
  *
  *   - `relations` — rows in `{{%relations}}` whose target element is
  *     missing or soft-deleted. Catches broken category / asset / entry
@@ -42,7 +42,7 @@ use craftpulse\cortex\tools\ToolException;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[IsReadOnly]
 #[IsIdempotent]
@@ -60,7 +60,7 @@ class Audit extends AbstractTool
      * an explicit hint to narrow with the `section` filter. Bounded to
      * keep the worst-case memory cost predictable.
      *
-     * @since 0.1.0
+     * @since 5.0.0
      */
     public const PROPAGATION_SECTION_ROW_CAP = 50000;
 
@@ -71,7 +71,7 @@ class Audit extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string
     {
@@ -82,7 +82,7 @@ class Audit extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string
     {
@@ -97,7 +97,7 @@ class Audit extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -119,7 +119,7 @@ class Audit extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array
     {
@@ -148,7 +148,7 @@ class Audit extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _relations(array $arguments): array
     {
@@ -194,7 +194,7 @@ class Audit extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _unusedAssets(array $arguments): array
     {
@@ -239,7 +239,7 @@ class Audit extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _serializeAsset(Asset $asset): array
     {
@@ -270,7 +270,7 @@ class Audit extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _propagation(array $arguments): array
     {
@@ -377,7 +377,7 @@ class Audit extends AbstractTool
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _limit(array $arguments): int
     {

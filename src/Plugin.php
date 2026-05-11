@@ -30,7 +30,7 @@ use yii\base\Event;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  *
  * @method static Plugin getInstance()
  * @method Settings getSettings()
@@ -47,7 +47,7 @@ class Plugin extends BasePlugin
     /**
      * @inheritdoc
      */
-    public string $schemaVersion = '0.1.0';
+    public string $schemaVersion = '1.0.0';
 
     /**
      * @inheritdoc
@@ -66,7 +66,7 @@ class Plugin extends BasePlugin
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function config(): array
     {
@@ -93,7 +93,7 @@ class Plugin extends BasePlugin
      * on installs that strip dev dependencies.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function init(): void
     {
@@ -129,7 +129,7 @@ class Plugin extends BasePlugin
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     protected function createSettingsModel(): ?Model
     {
@@ -140,7 +140,7 @@ class Plugin extends BasePlugin
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     protected function settingsHtml(): ?string
     {

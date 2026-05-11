@@ -205,7 +205,7 @@ In the Inspector UI, point at:
 - **Command:** `docker`
 - **Arguments:** `exec -i ddev-<project>-web php /var/www/html/craft cortex/serve`
 
-A successful `initialize` handshake reports `cortex 0.1.0` and protocol `2025-06-18`. `tools/list` returns 32 entries; `prompts/list` returns 8; `resources/list` returns 77.
+A successful `initialize` handshake reports `cortex 5.0.0` and protocol `2025-06-18`. `tools/list` returns 32 entries; `prompts/list` returns 8; `resources/list` returns 77.
 
 ## Troubleshooting
 

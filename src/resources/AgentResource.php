@@ -22,7 +22,7 @@ use Michtio\CraftCmsClaudeSkills\Skills;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class AgentResource extends AbstractResource
 {
@@ -52,7 +52,7 @@ class AgentResource extends AbstractResource
      * @param string $agent Bundled agent file basename without `.md`.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function __construct(string $agent)
     {
@@ -64,7 +64,7 @@ class AgentResource extends AbstractResource
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getUri(): string
     {
@@ -78,7 +78,7 @@ class AgentResource extends AbstractResource
      * agents visually under the skills surface.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getName(): string
     {
@@ -89,7 +89,7 @@ class AgentResource extends AbstractResource
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getDescription(): string
     {
@@ -105,7 +105,7 @@ class AgentResource extends AbstractResource
      * @throws \InvalidArgumentException If the backing agent cannot be read.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function read(): array
     {

@@ -30,7 +30,7 @@ use yii\helpers\Console;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class DocsController extends Controller
 {
@@ -50,7 +50,7 @@ class DocsController extends Controller
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function options($actionID): array
     {
@@ -61,7 +61,7 @@ class DocsController extends Controller
      * Generate `TOOLS.md`, `PROMPTS.md`, and `RESOURCES.md`.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function actionAll(): int
     {
@@ -75,7 +75,7 @@ class DocsController extends Controller
      * Generate `TOOLS.md`.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function actionTools(): int
     {
@@ -88,7 +88,7 @@ class DocsController extends Controller
      * Generate `PROMPTS.md`.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function actionPrompts(): int
     {
@@ -101,7 +101,7 @@ class DocsController extends Controller
      * Generate `RESOURCES.md`.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function actionResources(): int
     {
@@ -115,7 +115,7 @@ class DocsController extends Controller
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _outDir(): string
     {
@@ -128,7 +128,7 @@ class DocsController extends Controller
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _writeDoc(string $filename, string $contents): int
     {
@@ -153,7 +153,7 @@ class DocsController extends Controller
      * @param \craftpulse\cortex\tools\ToolInterface[] $tools
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _renderToolsMarkdown(array $tools): string
     {
@@ -206,7 +206,7 @@ class DocsController extends Controller
      * @param \craftpulse\cortex\prompts\PromptInterface[] $prompts
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _renderPromptsMarkdown(array $prompts): string
     {
@@ -247,7 +247,7 @@ class DocsController extends Controller
      * @param \craftpulse\cortex\resources\ResourceInterface[] $resources
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _renderResourcesMarkdown(array $resources): string
     {

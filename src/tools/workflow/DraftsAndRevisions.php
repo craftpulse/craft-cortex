@@ -37,7 +37,7 @@ use DateTimeInterface;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[IsReadOnly]
 #[IsIdempotent]
@@ -56,7 +56,7 @@ class DraftsAndRevisions extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string
     {
@@ -67,7 +67,7 @@ class DraftsAndRevisions extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string
     {
@@ -82,7 +82,7 @@ class DraftsAndRevisions extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -108,7 +108,7 @@ class DraftsAndRevisions extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array
     {
@@ -133,7 +133,7 @@ class DraftsAndRevisions extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _listDrafts(array $arguments): array
     {
@@ -179,7 +179,7 @@ class DraftsAndRevisions extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _serializeDraft(Entry $entry): array
     {
@@ -211,7 +211,7 @@ class DraftsAndRevisions extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _listRevisions(array $arguments): array
     {
@@ -255,7 +255,7 @@ class DraftsAndRevisions extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _serializeRevision(Entry $entry): array
     {
@@ -277,7 +277,7 @@ class DraftsAndRevisions extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _compare(array $arguments): array
     {
@@ -313,7 +313,7 @@ class DraftsAndRevisions extends AbstractTool
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _loadAnyEntry(int $id): Entry
     {
@@ -334,7 +334,7 @@ class DraftsAndRevisions extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _compareSummary(Entry $entry): array
     {
@@ -358,7 +358,7 @@ class DraftsAndRevisions extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _extractFieldValues(Entry $entry): array
     {
@@ -397,7 +397,7 @@ class DraftsAndRevisions extends AbstractTool
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _limit(array $arguments): int
     {

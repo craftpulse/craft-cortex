@@ -24,7 +24,7 @@ use Throwable;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class Server
 {
@@ -35,7 +35,7 @@ class Server
 
     public const SERVER_NAME = 'cortex';
 
-    public const SERVER_VERSION = '0.1.0';
+    public const SERVER_VERSION = '5.0.0';
 
     public const TRANSPORT_STDIO = 'stdio';
 
@@ -70,7 +70,7 @@ class Server
      *                          will land in a future release.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function __construct(string $transport = self::TRANSPORT_STDIO)
     {
@@ -85,7 +85,7 @@ class Server
      * @return array<string,mixed>|null
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function dispatch(array $request): ?array
     {
@@ -146,7 +146,7 @@ class Server
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _initializeResult(array $params): array
     {
@@ -183,7 +183,7 @@ class Server
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _toolsList(): array
     {
@@ -196,7 +196,7 @@ class Server
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _promptsList(): array
     {
@@ -209,7 +209,7 @@ class Server
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _resourcesList(): array
     {
@@ -230,7 +230,7 @@ class Server
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _handlePromptsGet(int|string|null $id, array $params): array
     {
@@ -269,7 +269,7 @@ class Server
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _handleResourcesRead(int|string|null $id, array $params): array
     {
@@ -318,7 +318,7 @@ class Server
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _handleToolsCall(int|string|null $id, array $params): array
     {
@@ -377,7 +377,7 @@ class Server
      * authenticated user before constructing the context.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _invocationContext(string|int|null $requestId): InvocationContext
     {
@@ -396,7 +396,7 @@ class Server
      * invocation-log granularity.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _elapsedMs(int $startNs): int
     {
@@ -424,7 +424,7 @@ class Server
      * @return array<int|string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _consumeGenerator(Generator $gen): array
     {
@@ -457,7 +457,7 @@ class Server
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _toolResultEnvelope(array $result): array
     {
@@ -479,7 +479,7 @@ class Server
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _toolErrorEnvelope(string $message): array
     {
@@ -497,7 +497,7 @@ class Server
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _successResponse(int|string|null $id, array|object $result): array
     {
@@ -513,7 +513,7 @@ class Server
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _errorResponse(int|string|null $id, int $code, string $message): array
     {
@@ -535,7 +535,7 @@ class Server
      * or SQL fragments.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _internalError(int|string|null $id, Throwable $e, string $message): array
     {

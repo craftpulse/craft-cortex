@@ -26,7 +26,7 @@ namespace craftpulse\cortex\resources;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 interface ResourceTemplateInterface
 {
@@ -37,7 +37,7 @@ interface ResourceTemplateInterface
      * `craft-element://entries/{id}`.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getUriTemplate(): string;
 
@@ -46,7 +46,7 @@ interface ResourceTemplateInterface
      * see the template, not the matched form.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getName(): string;
 
@@ -54,7 +54,7 @@ interface ResourceTemplateInterface
      * Human-readable description shown in `resources/list`.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getDescription(): string;
 
@@ -64,7 +64,7 @@ interface ResourceTemplateInterface
      * with variable MIME types should override at the protocol layer.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getMimeType(): string;
 
@@ -77,7 +77,7 @@ interface ResourceTemplateInterface
      * @return array<string,string>|null
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function matches(string $uri): ?array;
 
@@ -92,7 +92,7 @@ interface ResourceTemplateInterface
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function read(string $uri, array $captures): array;
 }

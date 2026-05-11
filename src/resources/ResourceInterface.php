@@ -18,7 +18,7 @@ namespace craftpulse\cortex\resources;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 interface ResourceInterface
 {
@@ -28,7 +28,7 @@ interface ResourceInterface
      * `resources/list` payload.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getUri(): string;
 
@@ -37,7 +37,7 @@ interface ResourceInterface
      * humans browsing a resource picker.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getName(): string;
 
@@ -46,7 +46,7 @@ interface ResourceInterface
      * answer "what would I find inside?" in one or two sentences.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getDescription(): string;
 
@@ -55,7 +55,7 @@ interface ResourceInterface
      * so this is `text/markdown` for every bundled resource.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getMimeType(): string;
 
@@ -67,7 +67,7 @@ interface ResourceInterface
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function read(): array;
 }

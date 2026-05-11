@@ -37,7 +37,7 @@ use yii\base\Event;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[IsReadOnly]
 #[IsIdempotent]
@@ -50,7 +50,7 @@ class Extensibility extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string
     {
@@ -61,7 +61,7 @@ class Extensibility extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string
     {
@@ -75,7 +75,7 @@ class Extensibility extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -92,7 +92,7 @@ class Extensibility extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array
     {
@@ -127,7 +127,7 @@ class Extensibility extends AbstractTool
      * @return array<int,array<string,mixed>>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _events(): array
     {
@@ -169,7 +169,7 @@ class Extensibility extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _twig(): array
     {
@@ -224,7 +224,7 @@ class Extensibility extends AbstractTool
      * @return array<int,array<string,mixed>>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _utilities(): array
     {
@@ -248,7 +248,7 @@ class Extensibility extends AbstractTool
      * @return array<int,array<string,mixed>>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _commands(): array
     {
@@ -295,7 +295,7 @@ class Extensibility extends AbstractTool
      * Render an event-handler callable into a stable string for output.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _describeHandler(mixed $handler): string
     {

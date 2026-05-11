@@ -32,7 +32,7 @@ use Nette\PhpGenerator\PhpNamespace;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class Tool extends BaseGenerator
 {
@@ -41,19 +41,19 @@ class Tool extends BaseGenerator
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private string $_className;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private string $_namespace;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private string $_toolName;
 
@@ -64,7 +64,7 @@ class Tool extends BaseGenerator
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function name(): string
     {
@@ -75,7 +75,7 @@ class Tool extends BaseGenerator
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function description(): string
     {
@@ -86,7 +86,7 @@ class Tool extends BaseGenerator
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function run(): bool
     {
@@ -130,7 +130,7 @@ implementation detail; describe the user-visible effect.
 =========================================================================
 
 @author Craftpulse
-@since  0.1.0
+@since  5.0.0
 COMMENT);
 
         // Default attributes — most tools are read-only and idempotent.
@@ -141,19 +141,19 @@ COMMENT);
         $class->addMethod('getName')
             ->setStatic()
             ->setReturnType('string')
-            ->setComment("@author Craftpulse\n@since  0.1.0")
+            ->setComment("@author Craftpulse\n@since  5.0.0")
             ->setBody("return '{$this->_toolName}';");
 
         $class->addMethod('getDescription')
             ->setStatic()
             ->setReturnType('string')
-            ->setComment("@author Craftpulse\n@since  0.1.0")
+            ->setComment("@author Craftpulse\n@since  5.0.0")
             ->setBody("return 'TODO: describe this tool for the LLM.';");
 
         $class->addMethod('getInputSchema')
             ->setStatic()
             ->setReturnType('array')
-            ->setComment("@inheritdoc\n\n@author Craftpulse\n@since  0.1.0")
+            ->setComment("@inheritdoc\n\n@author Craftpulse\n@since  5.0.0")
             ->setBody(<<<'BODY'
 return Schema::object([
     // TODO: declare your tool's input schema here.
@@ -161,7 +161,7 @@ return Schema::object([
 BODY);
 
         $class->getMethod('execute')
-            ->setComment("@inheritdoc\n\n@author Craftpulse\n@since  0.1.0")
+            ->setComment("@inheritdoc\n\n@author Craftpulse\n@since  5.0.0")
             ->setBody(<<<'BODY'
 // TODO: implement.
 return [];
@@ -204,7 +204,7 @@ MD;
      * to derive a default MCP tool name from the user's class name.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _toSnakeCase(string $value): string
     {

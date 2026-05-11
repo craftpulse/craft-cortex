@@ -16,14 +16,14 @@ use Attribute;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[Attribute(Attribute::TARGET_CLASS)]
 final class IsIdempotent
 {
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function __construct(
         public readonly bool $value = true,

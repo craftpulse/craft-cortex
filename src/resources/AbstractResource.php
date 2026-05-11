@@ -13,7 +13,7 @@ namespace craftpulse\cortex\resources;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 abstract class AbstractResource implements ResourceInterface
 {
@@ -26,7 +26,7 @@ abstract class AbstractResource implements ResourceInterface
      * Default: every cortex's bundled resource is a Markdown document.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getMimeType(): string
     {

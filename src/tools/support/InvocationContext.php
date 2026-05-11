@@ -35,7 +35,7 @@ namespace craftpulse\cortex\tools\support;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 final class InvocationContext
 {
@@ -59,7 +59,7 @@ final class InvocationContext
      *                                     Null before initialize.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function __construct(
         public readonly string $transport = 'stdio',
@@ -75,7 +75,7 @@ final class InvocationContext
      * in-process tool invocation outside the JSON-RPC dispatcher).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function transportOnly(string $transport = 'stdio'): self
     {
