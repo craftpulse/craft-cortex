@@ -122,13 +122,7 @@ class Allowlist extends Component
         $override->note = $note;
         $override->createdByUserId = $userId;
         $override->expiresAt = Carbon::now()->addSeconds($ttl)->toDateTimeString();
-        if (!$override->save()) {
-            throw new Exception(sprintf(
-                'Failed to save runtime override "%s": %s',
-                $pattern,
-                implode(', ', $override->getErrorSummary(true)),
-            ));
-        }
+        $this->_saveOrThrow($override, 'save', $pattern);
 
         return $override;
     }
@@ -148,13 +142,7 @@ class Allowlist extends Component
             return false;
         }
         $override->dateDeleted = Carbon::now()->toDateTimeString();
-        if (!$override->save()) {
-            throw new Exception(sprintf(
-                'Failed to soft-delete runtime override #%d: %s',
-                $id,
-                implode(', ', $override->getErrorSummary(true)),
-            ));
-        }
+        $this->_saveOrThrow($override, 'soft-delete', "#{$id}");
         return true;
     }
 
@@ -174,5 +162,31 @@ class Allowlist extends Component
             ['dateDeleted' => null],
             ['<', 'expiresAt', $now],
         ]);
+    }
+
+    // Private Methods
+    // =========================================================================
+
+    /**
+     * Persist the override or throw on validation/save failure. Used by
+     * `add()` and `remove()` to surface the underlying error summary
+     * with consistent wording.
+     *
+     * @throws Exception
+     *
+     * @author Craftpulse
+     * @since  0.1.0
+     */
+    private function _saveOrThrow(RuntimeOverride $override, string $action, string $context): void
+    {
+        if ($override->save()) {
+            return;
+        }
+        throw new Exception(sprintf(
+            'Failed to %s runtime override %s: %s',
+            $action,
+            $context,
+            implode(', ', $override->getFirstErrors()),
+        ));
     }
 }
