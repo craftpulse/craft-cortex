@@ -37,7 +37,7 @@ use yii\base\Event;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class RegisterToolsEvent extends Event
 {
@@ -45,7 +45,7 @@ class RegisterToolsEvent extends Event
      * @var ToolInterface[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public array $tools = [];
 }

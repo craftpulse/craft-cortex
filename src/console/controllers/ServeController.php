@@ -23,7 +23,7 @@ use yii\console\ExitCode;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class ServeController extends Controller
 {
@@ -36,7 +36,7 @@ class ServeController extends Controller
      * @return int Exit code per yii\console\ExitCode
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function actionIndex(): int
     {
@@ -97,7 +97,7 @@ class ServeController extends Controller
      * @param array<string,mixed> $response
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _writeResponse($stdout, array $response): void
     {
@@ -116,7 +116,7 @@ class ServeController extends Controller
      * log levels to error+warning and flush eagerly.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _silenceLogs(): void
     {

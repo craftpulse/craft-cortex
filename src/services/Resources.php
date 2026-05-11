@@ -25,7 +25,7 @@ use yii\base\Component;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class Resources extends Component
 {
@@ -72,7 +72,7 @@ class Resources extends Component
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function init(): void
     {
@@ -137,7 +137,7 @@ class Resources extends Component
      * @return array{0: ResourceTemplateInterface, 1: array<string,string>}|null
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function matchTemplate(string $uri): ?array
     {
@@ -158,7 +158,7 @@ class Resources extends Component
      * @return ResourceTemplateInterface[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getTemplates(): array
     {
@@ -171,7 +171,7 @@ class Resources extends Component
      * @return ResourceInterface[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getAll(): array
     {
@@ -184,7 +184,7 @@ class Resources extends Component
      * error -32602 (Invalid params).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getByUri(string $uri): ?ResourceInterface
     {
@@ -195,7 +195,7 @@ class Resources extends Component
      * Number of registered resources.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getCount(): int
     {
@@ -209,7 +209,7 @@ class Resources extends Component
      * @return array<int,array<string,mixed>>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function asListPayload(): array
     {
@@ -236,7 +236,7 @@ class Resources extends Component
      * @return ResourceInterface[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _buildRegistry(): array
     {

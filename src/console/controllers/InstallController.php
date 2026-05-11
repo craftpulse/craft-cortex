@@ -35,7 +35,7 @@ use yii\helpers\Console;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class InstallController extends Controller
 {
@@ -95,7 +95,7 @@ class InstallController extends Controller
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function options($actionID): array
     {
@@ -113,7 +113,7 @@ class InstallController extends Controller
      * @return array<string,string>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function optionAliases(): array
     {
@@ -128,7 +128,7 @@ class InstallController extends Controller
      * Print MCP client config snippets for cortex.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function actionIndex(): int
     {
@@ -187,7 +187,7 @@ class InstallController extends Controller
      *     auto-rejects (safe default for CI).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function actionApply(): int
     {
@@ -352,7 +352,7 @@ class InstallController extends Controller
      *   - windsurf: ~/.codeium/windsurf/mcp_config.json across platforms.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function resolveConfigPath(string $client): ?string
     {
@@ -404,7 +404,7 @@ class InstallController extends Controller
      * @throws \RuntimeException When the existing file is malformed.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function buildMergedConfig(string $client, ?string $existing, string $command): ?array
     {
@@ -419,7 +419,7 @@ class InstallController extends Controller
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _detectDdev(): bool
     {
@@ -432,7 +432,7 @@ class InstallController extends Controller
      * direct call against the project's `craft` script.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _buildCommand(bool $isDdev, string $project): string
     {
@@ -448,7 +448,7 @@ class InstallController extends Controller
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _printClientBlock(string $handle, string $label, string $command): void
     {
@@ -467,7 +467,7 @@ class InstallController extends Controller
      * unknown clients.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function buildSnippet(string $handle, string $command): string
     {
@@ -485,7 +485,7 @@ class InstallController extends Controller
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _claudeDesktop(string $command): string
     {
@@ -510,7 +510,7 @@ TXT;
      * its own. Verified against https://code.claude.com/docs/en/mcp.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _claudeCode(string $command): string
     {
@@ -529,7 +529,7 @@ TXT;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _cursor(string $command): string
     {
@@ -551,7 +551,7 @@ TXT;
      * against https://docs.continue.dev/customize/deep-dives/mcp.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _continue(string $command): string
     {
@@ -570,7 +570,7 @@ TXT;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _cline(string $command): string
     {
@@ -594,7 +594,7 @@ TXT;
      * Verified against https://zed.dev/docs/ai/mcp.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _zed(string $command): string
     {
@@ -611,7 +611,7 @@ TXT;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _windsurf(string $command): string
     {
@@ -631,7 +631,7 @@ TXT;
      * by most clients. Clients that diverge get a custom rendering above.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _jsonSnippet(string $command): string
     {
@@ -653,7 +653,7 @@ JSON;
      * conventions Continue's config follows.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _yamlSnippet(string $command): string
     {
@@ -681,7 +681,7 @@ JSON;
      * the snippet copy-paste safe without overquoting plain identifiers.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _yamlScalar(string $value): string
     {
@@ -698,7 +698,7 @@ JSON;
      * @return string[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _splitCommand(string $command): array
     {
@@ -712,7 +712,7 @@ JSON;
      * back to `%USERPROFILE%` on Windows.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _homeDir(): string
     {
@@ -737,7 +737,7 @@ JSON;
      * or when the env var is missing.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _appData(): ?string
     {
@@ -757,7 +757,7 @@ JSON;
      * @throws \RuntimeException When the existing file is not valid JSON.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _mergeJsonMcpServers(?string $existing, string $command): ?array
     {
@@ -773,7 +773,7 @@ JSON;
      * @throws \RuntimeException When the existing file is not valid JSON.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _mergeJsonContextServers(?string $existing, string $command): ?array
     {
@@ -795,7 +795,7 @@ JSON;
      * @throws \RuntimeException When the existing file is not valid JSON.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _mergeJsonObjectKey(?string $existing, string $command, string $serversKey): ?array
     {
@@ -849,7 +849,7 @@ JSON;
      * @return array{0: string, 1: string}|null
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _buildContinueStandalone(?string $existing, string $command): ?array
     {
@@ -881,7 +881,7 @@ JSON;
      * `schema` + `mcpServers:` list with one entry.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _renderContinueYaml(string $command): string
     {
@@ -914,7 +914,7 @@ JSON;
      * @throws \RuntimeException On any I/O failure during the write path.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _writeAtomic(string $path, string $contents, ?string $existing): void
     {

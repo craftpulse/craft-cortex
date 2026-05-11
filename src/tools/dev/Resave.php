@@ -32,7 +32,7 @@ use craftpulse\cortex\tools\ToolException;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[Title('Resave Elements')]
 #[IsDestructive]
@@ -59,7 +59,7 @@ class Resave extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string
     {
@@ -70,7 +70,7 @@ class Resave extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string
     {
@@ -88,7 +88,7 @@ class Resave extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -121,7 +121,7 @@ class Resave extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array
     {
@@ -165,7 +165,7 @@ class Resave extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _buildParams(string $type, array $arguments): array
     {

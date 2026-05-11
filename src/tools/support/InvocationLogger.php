@@ -47,7 +47,7 @@ use Throwable;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 final class InvocationLogger
 {
@@ -81,7 +81,7 @@ final class InvocationLogger
      * @param array<string,mixed> $arguments
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function logCall(
         string $toolName,
@@ -114,7 +114,7 @@ final class InvocationLogger
      * @param array<string,mixed> $arguments
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function formatEntry(
         string $toolName,
@@ -158,7 +158,7 @@ final class InvocationLogger
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private static function _resolveKind(?Throwable $error): string
     {
@@ -178,7 +178,7 @@ final class InvocationLogger
      * stays stable across transports.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private static function _orDash(string|int|null $value): string
     {
@@ -194,7 +194,7 @@ final class InvocationLogger
      * are stripped — the line is meant to grep cleanly.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private static function _quoteForLog(string $value): string
     {

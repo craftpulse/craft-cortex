@@ -37,7 +37,7 @@ use yii\base\Event;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class RegisterPromptsEvent extends Event
 {
@@ -45,7 +45,7 @@ class RegisterPromptsEvent extends Event
      * @var PromptInterface[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public array $prompts = [];
 }

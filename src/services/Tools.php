@@ -52,7 +52,7 @@ use yii\base\Component;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class Tools extends Component
 {
@@ -87,7 +87,7 @@ class Tools extends Component
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function init(): void
     {
@@ -135,7 +135,7 @@ class Tools extends Component
      * @return ToolInterface[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getAll(): array
     {
@@ -148,7 +148,7 @@ class Tools extends Component
      * error -32602 (Invalid params).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getByName(string $name): ?ToolInterface
     {
@@ -159,7 +159,7 @@ class Tools extends Component
      * Number of registered tools. Cheap helper for diagnostics / tests.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getCount(): int
     {
@@ -175,7 +175,7 @@ class Tools extends Component
      * @return array<int,array<string,mixed>>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function asListPayload(): array
     {
@@ -214,7 +214,7 @@ class Tools extends Component
      * @return ToolInterface[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _buildRegistry(): array
     {

@@ -26,7 +26,7 @@ namespace craftpulse\cortex\tools\support;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class SecretRedactor
 {
@@ -52,7 +52,7 @@ class SecretRedactor
      * secret needle. Match is substring on the normalised form.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function isSecretKey(string $key): bool
     {
@@ -74,7 +74,7 @@ class SecretRedactor
      * @return array<int|string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function redactArray(array $data): array
     {
@@ -99,7 +99,7 @@ class SecretRedactor
      * happens to mention "password".
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function redactString(string $output): string
     {

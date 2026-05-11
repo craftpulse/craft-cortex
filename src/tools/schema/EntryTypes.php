@@ -30,7 +30,7 @@ use craftpulse\cortex\tools\ToolException;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[IsReadOnly]
 #[IsIdempotent]
@@ -43,7 +43,7 @@ class EntryTypes extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string
     {
@@ -54,7 +54,7 @@ class EntryTypes extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string
     {
@@ -68,7 +68,7 @@ class EntryTypes extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -84,7 +84,7 @@ class EntryTypes extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array
     {
@@ -126,7 +126,7 @@ class EntryTypes extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _serializeEntryType(EntryType $type, bool $full): array
     {
@@ -155,7 +155,7 @@ class EntryTypes extends AbstractTool
      * @return array<string,mixed>|null
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _serializeFieldLayoutSummary(?FieldLayout $layout): ?array
     {
@@ -175,7 +175,7 @@ class EntryTypes extends AbstractTool
      * @return array<string,mixed>|null
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _serializeFieldLayoutFull(?FieldLayout $layout): ?array
     {
@@ -197,7 +197,7 @@ class EntryTypes extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _serializeTab(FieldLayoutTab $tab): array
     {

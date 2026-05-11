@@ -31,7 +31,7 @@ use InvalidArgumentException;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 final class Schema
 {
@@ -51,13 +51,13 @@ final class Schema
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?string $_type = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?string $_description = null;
 
@@ -65,97 +65,97 @@ final class Schema
      * @var list<mixed>|null
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?array $_enum = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private bool $_required = false;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private mixed $_default = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private bool $_hasDefault = false;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private mixed $_const = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private bool $_hasConst = false;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?string $_format = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?string $_pattern = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?int $_minLength = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?int $_maxLength = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private int|float|null $_minimum = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private int|float|null $_maximum = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?int $_minItems = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?int $_maxItems = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?bool $_uniqueItems = null;
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?self $_items = null;
 
@@ -163,13 +163,13 @@ final class Schema
      * @var array<string,self>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private array $_properties = [];
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private bool|self $_additionalProperties = false;
 
@@ -180,7 +180,7 @@ final class Schema
      * if explicitly set.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private bool $_additionalPropertiesExplicit = false;
 
@@ -188,7 +188,7 @@ final class Schema
      * @var list<mixed>|null
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?array $_examples = null;
 
@@ -196,7 +196,7 @@ final class Schema
      * @var list<self>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private array $_anyOf = [];
 
@@ -204,7 +204,7 @@ final class Schema
      * @var list<self>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private array $_oneOf = [];
 
@@ -212,13 +212,13 @@ final class Schema
      * @var list<self>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private array $_allOf = [];
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private ?self $_not = null;
 
@@ -229,7 +229,7 @@ final class Schema
      * Build a `string` schema.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function string(): self
     {
@@ -240,7 +240,7 @@ final class Schema
      * Build an `integer` schema.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function integer(): self
     {
@@ -251,7 +251,7 @@ final class Schema
      * Build a `number` schema (float / int).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function number(): self
     {
@@ -262,7 +262,7 @@ final class Schema
      * Build a `boolean` schema.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function boolean(): self
     {
@@ -273,7 +273,7 @@ final class Schema
      * Build a `null` schema.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function null(): self
     {
@@ -284,7 +284,7 @@ final class Schema
      * Build an `array` schema, optionally with an item schema.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function array(?self $items = null): self
     {
@@ -303,7 +303,7 @@ final class Schema
      * @param array<string,self> $properties
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function object(array $properties = []): self
     {
@@ -326,7 +326,7 @@ final class Schema
      * accepts mixed shapes (single id, array of ids, hash, …).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function any(): self
     {
@@ -337,7 +337,7 @@ final class Schema
      * Build a `const` schema — value must equal the given literal.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function constant(mixed $value): self
     {
@@ -352,7 +352,7 @@ final class Schema
      * the given schemas.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function anyOf(self ...$schemas): self
     {
@@ -369,7 +369,7 @@ final class Schema
      * the given schemas.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function oneOf(self ...$schemas): self
     {
@@ -386,7 +386,7 @@ final class Schema
      * schemas.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function allOf(self ...$schemas): self
     {
@@ -402,7 +402,7 @@ final class Schema
      * Build a `not` composition — value must NOT match the given schema.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function not(self $schema): self
     {
@@ -418,7 +418,7 @@ final class Schema
      * Attach a human-readable description shown in `tools/list`.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function description(string $value): self
     {
@@ -431,7 +431,7 @@ final class Schema
      * object. Standalone, this flag is silently ignored on output.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function required(): self
     {
@@ -443,7 +443,7 @@ final class Schema
      * Set a default value advertised to clients.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function default(mixed $value): self
     {
@@ -458,7 +458,7 @@ final class Schema
      * @param list<mixed> $values
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function enum(array $values): self
     {
@@ -474,7 +474,7 @@ final class Schema
      * `date-time`).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function format(string $value): self
     {
@@ -486,7 +486,7 @@ final class Schema
      * Set a regex `pattern` constraint (string types).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function pattern(string $value): self
     {
@@ -498,7 +498,7 @@ final class Schema
      * Constrain string length to a minimum.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function minLength(int $value): self
     {
@@ -510,7 +510,7 @@ final class Schema
      * Constrain string length to a maximum.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function maxLength(int $value): self
     {
@@ -522,7 +522,7 @@ final class Schema
      * Constrain numeric value to a minimum (inclusive).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function minimum(int|float $value): self
     {
@@ -534,7 +534,7 @@ final class Schema
      * Constrain numeric value to a maximum (inclusive).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function maximum(int|float $value): self
     {
@@ -546,7 +546,7 @@ final class Schema
      * Constrain array length to a minimum.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function minItems(int $value): self
     {
@@ -558,7 +558,7 @@ final class Schema
      * Constrain array length to a maximum.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function maxItems(int $value): self
     {
@@ -570,7 +570,7 @@ final class Schema
      * Require array entries to be unique.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function uniqueItems(bool $value = true): self
     {
@@ -582,7 +582,7 @@ final class Schema
      * Set the schema for array items (array types).
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function items(self $items): self
     {
@@ -596,7 +596,7 @@ final class Schema
      * @param array<string,self> $properties
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function properties(array $properties): self
     {
@@ -618,7 +618,7 @@ final class Schema
      * = validate against the given schema.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function additionalProperties(bool|self $value): self
     {
@@ -636,7 +636,7 @@ final class Schema
      * @param list<mixed> $values
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function examples(array $values): self
     {
@@ -655,7 +655,7 @@ final class Schema
      * Used by parent objects to populate their `required` array.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function isRequired(): bool
     {
@@ -673,7 +673,7 @@ final class Schema
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function toArray(): array
     {
@@ -792,7 +792,7 @@ final class Schema
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _setType(string $type): self
     {

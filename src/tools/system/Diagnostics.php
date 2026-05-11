@@ -34,7 +34,7 @@ use DateTimeInterface;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[IsReadOnly]
 #[IsIdempotent]
@@ -54,7 +54,7 @@ class Diagnostics extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string
     {
@@ -65,7 +65,7 @@ class Diagnostics extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string
     {
@@ -78,7 +78,7 @@ class Diagnostics extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -102,7 +102,7 @@ class Diagnostics extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array
     {
@@ -132,7 +132,7 @@ class Diagnostics extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _logs(array $arguments, int $limit): array
     {
@@ -168,7 +168,7 @@ class Diagnostics extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _lastError(array $arguments): array
     {
@@ -201,7 +201,7 @@ class Diagnostics extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _deprecations(int $limit): array
     {
@@ -231,7 +231,7 @@ class Diagnostics extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _queue(int $limit): array
     {
@@ -267,7 +267,7 @@ class Diagnostics extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _projectConfigDiff(): array
     {
@@ -287,7 +287,7 @@ class Diagnostics extends AbstractTool
      * @return string[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _tail(string $path, int $n): array
     {
@@ -329,7 +329,7 @@ class Diagnostics extends AbstractTool
      * @return array<int,array<string,mixed>>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _parseLogLines(array $lines, string $minLevel): array
     {
@@ -370,7 +370,7 @@ class Diagnostics extends AbstractTool
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _channel(array $arguments): string
     {
@@ -380,7 +380,7 @@ class Diagnostics extends AbstractTool
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _minLevel(array $arguments): string
     {
@@ -394,7 +394,7 @@ class Diagnostics extends AbstractTool
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _logPath(string $channel): string
     {
@@ -414,7 +414,7 @@ class Diagnostics extends AbstractTool
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _limit(array $arguments): int
     {

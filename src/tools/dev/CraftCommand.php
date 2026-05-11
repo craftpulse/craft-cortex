@@ -32,7 +32,7 @@ use craftpulse\cortex\tools\ToolException;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[Title('Run Craft Command')]
 #[IsDestructive]
@@ -47,7 +47,7 @@ class CraftCommand extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string
     {
@@ -58,7 +58,7 @@ class CraftCommand extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string
     {
@@ -75,7 +75,7 @@ class CraftCommand extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -97,7 +97,7 @@ class CraftCommand extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array
     {
@@ -161,7 +161,7 @@ class CraftCommand extends AbstractTool
      * @return string[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _allowlist(): array
     {
@@ -180,7 +180,7 @@ class CraftCommand extends AbstractTool
      * @param string[] $patterns
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _matchPattern(string $command, array $patterns): ?string
     {
@@ -202,7 +202,7 @@ class CraftCommand extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _options(array $arguments): array
     {

@@ -31,7 +31,7 @@ use yii\base\Exception;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class Allowlist extends Component
 {
@@ -44,7 +44,7 @@ class Allowlist extends Component
      * @return string[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getEffective(): array
     {
@@ -62,7 +62,7 @@ class Allowlist extends Component
      * @return array<int,array<string,mixed>>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getActiveOverrides(): array
     {
@@ -83,7 +83,7 @@ class Allowlist extends Component
      * @return array<int,array<string,mixed>>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getAllOverrides(bool $includeExpired = true): array
     {
@@ -107,7 +107,7 @@ class Allowlist extends Component
      * @throws Exception when the underlying record fails validation or save.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function add(
         string $pattern,
@@ -133,7 +133,7 @@ class Allowlist extends Component
      * @throws Exception when the underlying record fails to save.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function remove(int $id): bool
     {
@@ -152,7 +152,7 @@ class Allowlist extends Component
      * the number of rows pruned.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function pruneExpired(): int
     {
@@ -175,7 +175,7 @@ class Allowlist extends Component
      * @throws Exception
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _saveOrThrow(RuntimeOverride $override, string $action, string $context): void
     {

@@ -31,7 +31,7 @@ use Throwable;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[IsReadOnly]
 #[IsIdempotent]
@@ -44,7 +44,7 @@ class Graphql extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string
     {
@@ -55,7 +55,7 @@ class Graphql extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string
     {
@@ -69,7 +69,7 @@ class Graphql extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -89,7 +89,7 @@ class Graphql extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array
     {
@@ -113,7 +113,7 @@ class Graphql extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _listSchemas(): array
     {
@@ -148,7 +148,7 @@ class Graphql extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _getSdl(array $arguments): array
     {
@@ -194,7 +194,7 @@ class Graphql extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _listTokens(): array
     {
@@ -232,7 +232,7 @@ class Graphql extends AbstractTool
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _schemaRow(GqlSchema $schema): array
     {
@@ -253,7 +253,7 @@ class Graphql extends AbstractTool
      * @param GqlSchema[] $schemas
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _schemaInList(GqlSchema $needle, array $schemas): bool
     {
@@ -268,7 +268,7 @@ class Graphql extends AbstractTool
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _findSchemaByName(string $name): ?GqlSchema
     {
@@ -288,7 +288,7 @@ class Graphql extends AbstractTool
      * the LLM doesn't try to use the placeholder as a real token.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _fingerprint(string $token): ?string
     {

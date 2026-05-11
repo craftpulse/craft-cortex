@@ -20,7 +20,7 @@ use craft\base\Model;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class Settings extends Model
 {
@@ -90,7 +90,7 @@ class Settings extends Model
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     protected function defineRules(): array
     {

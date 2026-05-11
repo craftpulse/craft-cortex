@@ -26,7 +26,7 @@ use yii\web\Response;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class SettingsController extends Controller
 {
@@ -38,7 +38,7 @@ class SettingsController extends Controller
      * page on success with a flash, or back with errors on failure.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function actionAddOverride(): Response
     {
@@ -79,7 +79,7 @@ class SettingsController extends Controller
      * cortex settings page.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function actionRemoveOverride(): Response
     {

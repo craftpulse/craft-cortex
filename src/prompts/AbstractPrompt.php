@@ -11,7 +11,7 @@ namespace craftpulse\cortex\prompts;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 abstract class AbstractPrompt implements PromptInterface
 {
@@ -25,7 +25,7 @@ abstract class AbstractPrompt implements PromptInterface
      * `PromptArgument` entries when a future prompt needs them.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getArguments(): array
     {

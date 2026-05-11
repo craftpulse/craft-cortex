@@ -20,7 +20,7 @@ use craftpulse\cortex\tools\ToolException;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 #[IsReadOnly]
 #[IsIdempotent]
@@ -40,7 +40,7 @@ class Tags extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getName(): string
     {
@@ -51,7 +51,7 @@ class Tags extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getDescription(): string
     {
@@ -64,7 +64,7 @@ class Tags extends AbstractTool
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
@@ -93,7 +93,7 @@ class Tags extends AbstractTool
      * @throws ToolException
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function execute(array $arguments): array
     {
@@ -146,7 +146,7 @@ class Tags extends AbstractTool
      * @param string[] $eagerHandles
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _buildQuery(array $arguments, array $eagerHandles): TagQuery
     {
@@ -177,7 +177,7 @@ class Tags extends AbstractTool
      * @return string[]
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _eagerHandles(array $arguments): array
     {
@@ -194,7 +194,7 @@ class Tags extends AbstractTool
 
     /**
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private function _limit(array $arguments): int
     {

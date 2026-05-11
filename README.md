@@ -158,7 +158,7 @@ In the Inspector UI, point at:
 - **Command:** `docker`
 - **Arguments:** `exec -i ddev-<project>-web php /var/www/html/craft cortex/serve`
 
-The `initialize` handshake should succeed (`cortex 0.1.0`, protocol `2025-06-18`), and every tool / prompt / resource shows up in the lists.
+The `initialize` handshake should succeed (`cortex 5.0.0`, protocol `2025-06-18`), and every tool / prompt / resource shows up in the lists.
 
 ## Roadmap
 

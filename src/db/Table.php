@@ -12,7 +12,7 @@ namespace craftpulse\cortex\db;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 final class Table
 {
@@ -23,7 +23,7 @@ final class Table
      * table layers temporary additions on top.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public const RUNTIME_OVERRIDES = '{{%cortex_runtime_overrides}}';
 }

@@ -17,7 +17,7 @@ use Exception;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class ToolException extends Exception
 {

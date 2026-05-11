@@ -18,7 +18,7 @@ namespace craftpulse\cortex\prompts;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 interface PromptInterface
 {
@@ -28,7 +28,7 @@ interface PromptInterface
      * `prompts/get`.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getName(): string;
 
@@ -37,7 +37,7 @@ interface PromptInterface
      * One to three sentences answering "when would I invoke this?".
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getDescription(): string;
 
@@ -49,7 +49,7 @@ interface PromptInterface
      * @return array<int,array<string,mixed>>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getArguments(): array;
 
@@ -62,7 +62,7 @@ interface PromptInterface
      * @return array<string,mixed>
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function render(array $arguments): array;
 }

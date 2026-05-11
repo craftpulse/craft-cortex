@@ -21,7 +21,7 @@ use Throwable;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class ConsoleRunner
 {
@@ -48,7 +48,7 @@ class ConsoleRunner
      * @return array{route: string, exitCode: int|null, output: string, error: ?string}
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public static function run(string $route, array $params = []): array
     {
@@ -96,7 +96,7 @@ class ConsoleRunner
      * Register the user-stream filter once per process. Idempotent.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private static function _register(): void
     {
@@ -114,7 +114,7 @@ class ConsoleRunner
      * we drop the escape codes for cleaner rendering.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     private static function _stripAnsi(string $output): string
     {

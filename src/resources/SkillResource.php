@@ -19,7 +19,7 @@ use Michtio\CraftCmsClaudeSkills\Skills;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class SkillResource extends AbstractResource
 {
@@ -56,7 +56,7 @@ class SkillResource extends AbstractResource
      *                               null for the skill's SKILL.md.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function __construct(string $skill, ?string $reference = null)
     {
@@ -71,7 +71,7 @@ class SkillResource extends AbstractResource
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getUri(): string
     {
@@ -86,7 +86,7 @@ class SkillResource extends AbstractResource
      * UIs in MCP clients.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getName(): string
     {
@@ -99,7 +99,7 @@ class SkillResource extends AbstractResource
      * @inheritdoc
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function getDescription(): string
     {
@@ -115,7 +115,7 @@ class SkillResource extends AbstractResource
      *                                   reference cannot be read.
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function read(): array
     {

@@ -26,7 +26,7 @@ use php_user_filter;
  * =========================================================================
  *
  * @author Craftpulse
- * @since  0.1.0
+ * @since  5.0.0
  */
 class StdoutCaptureFilter extends php_user_filter
 {
@@ -60,7 +60,7 @@ class StdoutCaptureFilter extends php_user_filter
      * @param int $consumed
      *
      * @author Craftpulse
-     * @since  0.1.0
+     * @since  5.0.0
      */
     public function filter($in, $out, &$consumed, $closing): int
     {
