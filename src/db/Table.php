@@ -18,7 +18,7 @@ final class Table
 {
     /**
      * Runtime allowlist override entries — admin-editable allowlist
-     * patterns that auto-expire (Gate 6.5). Project-config defaults +
+     * patterns that auto-expire. Project-config defaults +
      * `config/cortex.php` overrides remain the canonical source; this
      * table layers temporary additions on top.
      *

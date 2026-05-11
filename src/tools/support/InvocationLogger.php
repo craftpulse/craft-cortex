@@ -11,10 +11,10 @@ use Throwable;
  * Per-invocation logger for cortex tool calls.
  *
  * Writes a single structured line per tool call to Craft's logger under
- * the `cortex` category. The line shape is locked across Phase 1 and
- * Phase 2 so log consumers (operators tailing `storage/logs/web.log`,
- * the Pro audit dashboard, external SIEM forwarders) don't break on
- * the transport upgrade. Format:
+ * the `cortex` category. The line shape is locked across transports so
+ * log consumers (operators tailing `storage/logs/web.log`, the Pro
+ * audit dashboard, external SIEM forwarders) don't break when HTTP
+ * lands. Format:
  *
  *   tool=<name> kind=<success|tool_error|internal_error>
  *   duration_ms=<int> transport=<stdio|http> request_id=<id|->
@@ -27,16 +27,16 @@ use Throwable;
  *
  * Field lifecycle is documented on `InvocationContext`. The summary:
  *   - `transport` — always populated by the dispatcher.
- *   - `request_id` — JSON-RPC id, present from Phase 1.
- *   - `user` — null until Phase 2's HTTP transport authenticates a
- *     Craft user (stdio is single-process, runs as local OS user, no
+ *   - `request_id` — JSON-RPC id from the calling envelope.
+ *   - `user` — null until the HTTP transport authenticates a Craft
+ *     user (stdio is single-process, runs as local OS user, no
  *     per-request Craft identity).
  *   - `client` — from MCP `initialize`'s `clientInfo.name`; populates
  *     once per session, after handshake.
  *
- * Phase 1 ships logger-backed only — operators tail Craft logs to
- * retroactively investigate "what did the LLM do." Phase 2 adds a
- * DB-backed `cortex_invocations` audit table; it consumes the same
+ * Logger-backed today — operators tail Craft logs to retroactively
+ * investigate "what did the LLM do." A DB-backed `cortex_invocations`
+ * audit table will land alongside the Pro tier; it consumes the same
  * call shape, so this class stays the dispatcher's hook point and the
  * Pro layer subscribes to the same data.
  *
@@ -107,7 +107,7 @@ final class InvocationLogger
     /**
      * Build the log line as a string. Pure — no side effects — so the
      * test suite asserts shape without driving Craft's logger. Consumers
-     * outside the dispatcher (Phase 2 audit-log writer, future debugging
+     * outside the dispatcher (the future audit-log writer, debugging
      * helpers) can call this directly to share the same redaction +
      * formatting policy.
      *
@@ -175,7 +175,7 @@ final class InvocationLogger
      * Render a context field for inclusion in the log line. Null becomes
      * the literal `-` (Apache-style "not applicable / not yet known"
      * placeholder) so the field is always present and the line shape
-     * stays stable across Phase 1 / Phase 2.
+     * stays stable across transports.
      *
      * @author Craftpulse
      * @since  0.1.0

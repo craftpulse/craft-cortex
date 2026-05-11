@@ -18,7 +18,7 @@ use craftpulse\cortex\tools\ToolException;
  * system_messages — that are otherwise scattered across `getConfig()`,
  * `getProjectConfig()`, and `getSystemMessages()`.
  *
- * Hard rules (PLANNING.md 4.9):
+ * Hard rules:
  *   - No secrets in any output. Key-based redaction is delegated to
  *     `SecretRedactor` (the single source of truth across cortex tools);
  *     any matching key gets replaced with the literal string

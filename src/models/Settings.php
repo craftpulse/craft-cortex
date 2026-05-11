@@ -16,8 +16,7 @@ use craft\base\Model;
  *
  * Runtime overrides (admin-editable, auto-expiring) live in the
  * `cortex_runtime_overrides` DB table and are layered on top at lookup
- * time. That layer ships in Gate 6 alongside the CP settings UI;
- * Gate 5 only honours project-config + file overrides.
+ * time, driven by the CP settings UI.
  * =========================================================================
  *
  * @author Craftpulse
@@ -30,9 +29,8 @@ class Settings extends Model
 
     /**
      * @var string[] Default allowlist of command-route glob patterns the
-     *               `craft_command` tool may dispatch. Source of truth
-     *               per PLANNING.md 4.9. Override via project config or
-     *               `config/cortex.php`.
+     *               `craft_command` tool may dispatch. Override via
+     *               project config or `config/cortex.php`.
      */
     public array $allowedCommands = [
         'resave/*',
@@ -59,10 +57,10 @@ class Settings extends Model
     /**
      * @var bool Whether the `craft_exec` tool is enabled. Defaults to
      *           true; flip to false to remove `craft_exec` from
-     *           `tools/list` entirely (the registry honours it). The
-     *           planning docs treat exec as a stdio-only opt-in
-     *           fallback — operators that want a stricter posture can
-     *           disable it without losing the rest of the dev surface.
+     *           `tools/list` entirely (the registry honours it). Exec
+     *           is treated as a stdio-only opt-in fallback — operators
+     *           that want a stricter posture can disable it without
+     *           losing the rest of the dev surface.
      */
     public bool $execEnabled = true;
 

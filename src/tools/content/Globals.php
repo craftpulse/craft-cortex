@@ -22,8 +22,8 @@ use craftpulse\cortex\tools\ToolException;
  * Site filter via `site` (handle / id) — global sets are localised
  * across the requested site.
  *
- * Read-only. Writes (and Pro-only `update_global_set` per PLANNING.md
- * 4.7) land in the Pro tier.
+ * Read-only. Writes (and the Pro-only `update_global_set`) land in
+ * the Pro tier.
  * =========================================================================
  *
  * @author Craftpulse

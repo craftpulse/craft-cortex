@@ -45,10 +45,10 @@ use yii\base\Component;
  * MCP tool registry.
  *
  * Single source of truth for which tools the server exposes. Built once
- * at service init from a static list — no runtime registration yet
- * (third-party plugin tools land in Pro per PLANNING.md 4.14). Lookups
- * are O(n) over a small array; if the registry ever grows past ~50
- * tools we'll switch to a name-keyed map.
+ * at service init from a static list — third-party plugin tool
+ * registration lands in the Pro tier. Lookups are O(n) over a small
+ * array; if the registry ever grows past ~50 tools we'll switch to a
+ * name-keyed map.
  * =========================================================================
  *
  * @author Craftpulse
@@ -209,7 +209,7 @@ class Tools extends Component
     /**
      * Build the tool registry. Order here is the order tools appear in
      * `tools/list` — schema first, content reading next, then system,
-     * GraphQL, dev actions, per the Phase 1 sequence in PLANNING.md.
+     * GraphQL, dev actions, workflow.
      *
      * @return ToolInterface[]
      *
@@ -219,7 +219,7 @@ class Tools extends Component
     private function _buildRegistry(): array
     {
         return [
-            // Gate 2 — Schema & Structure (10 tools).
+            // Schema & structure.
             new Sections(),
             new EntryTypes(),
             new Fields(),
@@ -231,14 +231,14 @@ class Tools extends Component
             new ImageTransforms(),
             new ElementTypes(),
 
-            // Gate 3 — Content Reading (5 tools).
+            // Content reading.
             new Entries(),
             new Assets(),
             new Categories(),
             new Tags(),
             new Globals(),
 
-            // Gate 4 — System & Diagnostics (8 tools).
+            // System & diagnostics.
             new SystemInfo(),
             new Config(),
             new Plugins(),
@@ -249,14 +249,14 @@ class Tools extends Component
             new PermissionsAndGroups(),
             new SearchSkills(),
 
-            // Gate 5 — GraphQL & Dev Actions (5 tools).
+            // GraphQL & dev actions.
             new Graphql(),
             new ClearCaches(),
             new Resave(),
             new CraftCommand(),
             new CraftExec(),
 
-            // Gate 6.5 — Workflow & Audit (read modes).
+            // Workflow & audit (read modes).
             new DraftsAndRevisions(),
             new Audit(),
             new ImportExport(),

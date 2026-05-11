@@ -12,9 +12,9 @@ namespace craftpulse\cortex\resources;
  * the resource's content as one or more `{uri, mimeType, text|blob}`
  * blocks.
  *
- * Phase 1 ships skill-backed resources only — both the SKILL.md
- * router (`craft-skills://<skill>`) and each per-skill reference
- * (`craft-skills://<skill>/<reference>`).
+ * The bundled registry surfaces skill-backed resources only — both
+ * the SKILL.md router (`craft-skills://<skill>`) and each per-skill
+ * reference (`craft-skills://<skill>/<reference>`).
  * =========================================================================
  *
  * @author Craftpulse
@@ -52,7 +52,7 @@ interface ResourceInterface
 
     /**
      * MIME type of the resource content. Skills are always Markdown
-     * so this is `text/markdown` for every Phase 1 resource.
+     * so this is `text/markdown` for every bundled resource.
      *
      * @author Craftpulse
      * @since  0.1.0

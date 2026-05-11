@@ -18,7 +18,7 @@ use Throwable;
 /**
  * =========================================================================
  * `craft_exec` tool — wraps Craft's `ExecController` eval pattern under
- * six security gates (PLANNING.md 4.9).
+ * six layered security gates.
  *
  * Threat model: an LLM choosing destructive operations because it
  * misread context, NOT sandbox escape. "Trusted local user" doesn't
@@ -182,13 +182,13 @@ class CraftExec extends AbstractTool
         $dangerous = ($arguments['dangerous'] ?? false) === true;
         $isDestructive = $this->_isDestructive($expression);
 
-        // Gate 4: destructive guard. Even with confirm, a destructive
+        // Destructive-op guard. Even with confirm, a destructive
         // expression needs explicit `dangerous: true`.
         if ($isDestructive && (!$confirm || !$dangerous)) {
             return $this->_dryRun($expression, $isDestructive, blocked: true);
         }
 
-        // Gate 1: dry-run default. Without confirm, never evaluate.
+        // Dry-run default. Without confirm, never evaluate.
         if (!$confirm) {
             return $this->_dryRun($expression, $isDestructive, blocked: false);
         }

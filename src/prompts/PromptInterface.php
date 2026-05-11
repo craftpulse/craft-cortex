@@ -11,10 +11,10 @@ namespace craftpulse\cortex\prompts;
  * prompt's `{name, description, arguments?}`, and `prompts/get` returns
  * `{description?, messages: [{role, content}]}` for a named prompt.
  *
- * Cortex Phase 1 ships eight skill-backed prompts (one per bundled
- * skill) — none of them take arguments. The interface still surfaces
- * `getArguments()` so future prompts (e.g. parametrised playbooks) can
- * declare them without an ABI change.
+ * The bundled registry ships eight skill-backed prompts (one per
+ * bundled skill) — none of them take arguments. The interface still
+ * surfaces `getArguments()` so future prompts (e.g. parametrised
+ * playbooks) can declare them without an ABI change.
  * =========================================================================
  *
  * @author Craftpulse

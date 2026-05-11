@@ -16,7 +16,7 @@ use craftpulse\cortex\tools\ToolException;
  * =========================================================================
  * `entries` tool — list / get / count Craft entries with full query surface.
  *
- * Designed per PLANNING.md 4.13: a single thick tool with parameters
+ * Designed as a single thick tool with parameters
  * instead of separate `list_entries`, `get_entry`, `count_entries`.
  * Modes:
  *   - default: list matching entries.

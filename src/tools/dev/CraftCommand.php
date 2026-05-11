@@ -17,17 +17,15 @@ use craftpulse\cortex\tools\ToolException;
  * `craft_command` tool — allowlisted Craft / Yii console-command runner.
  *
  * Dispatches a console route through Craft's internal runner — never
- * `proc_open`, `shell_exec`, `exec`, `passthru`, `popen`, or backticks
- * (PLANNING.md 4.9). The allowlist is enforced at the tool layer
- * before dispatch: a non-allowlisted command never reaches the
- * `runAction()` call.
+ * `proc_open`, `shell_exec`, `exec`, `passthru`, `popen`, or backticks.
+ * The allowlist is enforced at the tool layer before dispatch: a
+ * non-allowlisted command never reaches the `runAction()` call.
  *
  * Allowlist precedence (highest → lowest):
  *   1. `config/cortex.php` overrides (standard Craft pattern; auto-merged).
  *   2. Project config under `plugins.cortex.settings.allowedCommands`.
  *   3. Defaults baked into `Settings::$allowedCommands`.
- *
- * Runtime DB overrides (admin-editable, auto-expiring) ship in Gate 6.
+ *   4. Runtime DB overrides (admin-editable, auto-expiring) layered on top.
  *
  * Patterns use `fnmatch()` semantics — `resave/*` matches any
  * `resave/<x>` route, `up` matches only the literal `up` command.

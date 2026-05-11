@@ -8,8 +8,8 @@
  * every tool invocation; the actual log delivery is Craft's logger and
  * is exercised at the system level. These tests assert the formatted
  * line that operators grep — secret redaction, kind classification,
- * duration emission, error class capture, and the locked Phase 1 /
- * Phase 2 context shape (transport, request id, user, client).
+ * duration emission, error class capture, and the locked context
+ * shape (transport, request id, user, client).
  * =========================================================================
  *
  * @author Craftpulse
@@ -98,7 +98,7 @@ it('strips control characters from error messages so log lines stay grep-safe', 
 });
 
 // -----------------------------------------------------------------------------
-// Locked Phase 1 / Phase 2 context shape
+// Locked context shape
 // -----------------------------------------------------------------------------
 
 it('emits transport / request_id / user / client fields on every line', function() {
@@ -138,7 +138,7 @@ it('emits a `-` placeholder for any null context field', function() {
         ->toContain('client=-');
 });
 
-it('honours a Phase 2 user id when one is provided', function() {
+it('honours an HTTP-transport user id when one is provided', function() {
     $entry = InvocationLogger::formatEntry(
         toolName: 'sections',
         arguments: [],

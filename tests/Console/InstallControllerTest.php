@@ -5,8 +5,8 @@
  * InstallController snippet shape tests.
  *
  * Locks the per-client snippet shape against regression — bad snippets
- * are a Phase 1 ship blocker because they're the user's first encounter
- * with cortex. Each test asserts the strings that have to appear (and,
+ * are a ship blocker because they're the user's first encounter with
+ * cortex. Each test asserts the strings that have to appear (and,
  * for the high-risk ones, the strings that MUST NOT appear).
  *
  * The controller is exercised through its `buildSnippet()` helper, which

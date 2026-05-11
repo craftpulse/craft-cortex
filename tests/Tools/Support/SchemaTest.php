@@ -383,7 +383,7 @@ it('handles nested objects with their own required arrays', function() {
 
 
 // -----------------------------------------------------------------------------
-// examples (Phase 1 addition for Pro tools)
+// examples
 // -----------------------------------------------------------------------------
 
 it('emits examples in toArray output', function() {

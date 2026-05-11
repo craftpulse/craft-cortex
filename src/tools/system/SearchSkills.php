@@ -28,9 +28,9 @@ use Michtio\CraftCmsClaudeSkills\Skills;
  * up with `resources/read` to load the full content. Scoring is a
  * simple word-occurrence sum normalised by document length — useful
  * for "find me the section on element authorisation" queries, not for
- * vector-similarity-style semantic search. Phase 3 may layer
- * vectorised search on top; this tool stays as the cheap-and-fast
- * keyword path.
+ * vector-similarity-style semantic search. Vectorised search may
+ * layer on top in a future release; this tool stays as the
+ * cheap-and-fast keyword path.
  *
  * Modes:
  *   - `search` (default): rank documents against the query.

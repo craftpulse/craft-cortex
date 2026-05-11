@@ -55,8 +55,9 @@ it('builds a spec-shaped prompts/list payload', function() {
 
 it('omits the arguments key from list entries when a prompt has none', function() {
     foreach (Plugin::getInstance()->prompts->asListPayload() as $item) {
-        // Phase 1 ships only argumentless prompts — assert the spec-
-        // optional `arguments` key is absent rather than present-but-empty.
+        // The bundled registry ships only argumentless prompts —
+        // assert the spec-optional `arguments` key is absent rather
+        // than present-but-empty.
         expect($item)->not->toHaveKey('arguments');
     }
 });

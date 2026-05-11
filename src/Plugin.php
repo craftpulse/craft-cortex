@@ -26,8 +26,8 @@ use yii\base\Event;
  *   - `Plugin::getInstance()->resources` -> skill-backed resources
  *
  * Console controllers are auto-discovered by Craft from
- * src/console/controllers/. Web controllers will land alongside HTTP
- * transport in Phase 2 per PLANNING.md section 4.7.
+ * src/console/controllers/. Web controllers will land alongside the
+ * HTTP transport in a future release.
  * =========================================================================
  *
  * @author Craftpulse

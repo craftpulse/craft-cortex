@@ -32,7 +32,7 @@ use craftpulse\cortex\tools\ToolException;
  *     in every site the section is enabled for. Catches translation
  *     gaps and incomplete propagation. Filterable to a single section.
  *
- * Pro will add fix modes (PLANNING.md 4.7): delete broken relations,
+ * Pro adds fix modes: delete broken relations,
  * delete unused assets, force-propagate missing entries. All three
  * mutate state, so they're gated behind the relevant Craft permissions.
  *

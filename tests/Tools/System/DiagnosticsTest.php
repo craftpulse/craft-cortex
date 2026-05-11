@@ -53,8 +53,9 @@ it('returns logs payload (gracefully handles missing file)', function() {
 it('strips path traversal segments from the channel argument', function() {
     // `..` segments in `channel` would otherwise let a caller read
     // arbitrary files via FileHelper::normalizePath(). The tool is
-    // stdio-only and trusted-local in Phase 1, but the basename guard
-    // is a Phase-2 prebreak hardening — verify it stays in place.
+    // stdio is trusted-local today, but the basename guard hardens
+    // the surface for the future HTTP transport — verify it stays
+    // in place.
     $result = $this->tool->execute([
         'type' => 'logs',
         'channel' => '../../config/db',

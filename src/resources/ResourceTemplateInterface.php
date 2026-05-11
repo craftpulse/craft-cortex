@@ -9,15 +9,15 @@ namespace craftpulse\cortex\resources;
  * Where `ResourceInterface` exposes ONE concrete URI (the registry
  * builds an instance per address — see `SkillResource`),
  * `ResourceTemplateInterface` exposes a URI TEMPLATE that matches a
- * family of URIs at read time. Examples (Phase 2):
+ * family of URIs at read time. Examples:
  *
  *   - `craft-element://entries/{id}` — read any entry by id
  *   - `custom-skills://{handle}` — read a Pro custom-skills element
  *   - `craft-asset://{volume}/{path}` — read an asset by volume + path
  *
- * Phase 1 ships the interface and the dispatcher fallback; no Phase 1
- * resource implements it. Pro Gate 8.5 (custom skills) is the first
- * concrete consumer.
+ * The Free tier ships the interface and the dispatcher fallback; no
+ * Free-tier resource implements it. The Pro custom-skills element is
+ * the first concrete consumer.
  *
  * Templates use the RFC 6570 Level-1 simple-substitution form: literal
  * path segments plus `{name}` placeholders (no operators, no nested

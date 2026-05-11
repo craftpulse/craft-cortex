@@ -6,7 +6,7 @@ namespace craftpulse\cortex\resources;
  * =========================================================================
  * Base class for MCP resources.
  *
- * Provides defaults for content types that apply across all Phase 1
+ * Provides defaults for content types that apply across all cortex's bundled
  * resources. Skills are exclusively Markdown, so `text/markdown` is
  * the default MIME type — concrete classes override only when they
  * surface non-Markdown content.
@@ -23,7 +23,7 @@ abstract class AbstractResource implements ResourceInterface
     /**
      * @inheritdoc
      *
-     * Default: every Phase 1 resource is a Markdown document.
+     * Default: every cortex's bundled resource is a Markdown document.
      *
      * @author Craftpulse
      * @since  0.1.0

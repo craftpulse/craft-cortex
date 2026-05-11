@@ -13,12 +13,12 @@ namespace craftpulse\cortex\tools;
  * (the dispatcher converts them to JSON-RPC internal errors).
  *
  * The `execute()` return type is `array|\Generator` to leave room for
- * Phase 2 progress streaming — long-running Pro tools (resave, audit fix
- * modes, bulk_entries, import_export import) will yield progress
- * notifications interleaved with the final result. Phase 1 dispatchers
- * eagerly consume any Generator (final yield = result) without
- * surfacing intermediate notifications. Phase 2's HTTP transport adds
- * notification forwarding.
+ * progress streaming — long-running Pro tools (resave, audit fix modes,
+ * bulk_entries, import_export import) yield progress notifications
+ * interleaved with the final result. The stdio dispatcher eagerly
+ * consumes any Generator (final yield = result) without surfacing
+ * intermediate notifications; the HTTP transport will forward yields
+ * as `notifications/progress` messages.
  * =========================================================================
  *
  * @author Craftpulse
@@ -73,11 +73,12 @@ interface ToolInterface
 
     /**
      * Whether this tool should appear in the registry for the current
-     * request. Phase 1 always returns `true` from `AbstractTool`. Phase 2
-     * Pro tools override to gate visibility on Craft permissions — a user
-     * without `saveEntries:{section}` doesn't see the corresponding mode
-     * surfaces in `tools/list`. Returning `false` removes the tool
-     * entirely from the registry for that build.
+     * request. `AbstractTool` returns `true` by default; concrete tools
+     * override to gate visibility — for example, a Pro tool checking
+     * `saveEntries:{section}` so a user without the permission doesn't
+     * see the corresponding mode surfaces in `tools/list`. Returning
+     * `false` removes the tool entirely from the registry for that
+     * build.
      *
      * @author Craftpulse
      * @since  0.1.0
@@ -90,10 +91,11 @@ interface ToolInterface
      *
      * Long-running tools may return a `\Generator` that yields progress
      * notifications and finishes with the result via `Generator::return`
-     * (or as the final yield, whichever pattern the tool prefers). Phase 1
-     * eagerly consumes the generator — the final value becomes the wire
-     * response. Phase 2's HTTP transport forwards intermediate yields as
-     * `notifications/progress` messages per MCP spec 2025-06-18.
+     * (or as the final yield, whichever pattern the tool prefers). The
+     * stdio dispatcher eagerly consumes the generator — the final value
+     * becomes the wire response. The HTTP transport will forward
+     * intermediate yields as `notifications/progress` messages per MCP
+     * spec 2025-06-18.
      *
      * @param array<string,mixed> $arguments Validated against `getInputSchema()` upstream.
      * @return array<int|string,mixed>|\Generator<int,mixed,mixed,array<int|string,mixed>>

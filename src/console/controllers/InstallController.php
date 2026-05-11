@@ -20,7 +20,7 @@ use yii\helpers\Console;
  * apply can't proceed (config absent, parent dir missing, cortex entry
  * already present without `--force`).
  *
- * Supported clients (Phase 1):
+ * Supported clients:
  *   - Claude Desktop (Anthropic, macOS / Windows / Linux)
  *   - Claude Code (Anthropic CLI; project-scoped `.mcp.json`)
  *   - Cursor (global `~/.cursor/mcp.json`)

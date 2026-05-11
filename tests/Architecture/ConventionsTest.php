@@ -342,11 +342,11 @@ it('every private method and property under src/ uses the underscore-prefix conv
 // -----------------------------------------------------------------------------
 
 it('no tool declares `mixed` as the execute() return type', function() {
-    // PLANNING.md 4.10 calls this out: tools should return concrete
-    // shapes, not mixed. Allowed: array, \Generator, array|\Generator, or
-    // covariant overrides of those. `mixed` defeats the contract — the
-    // dispatcher relies on iterating a Generator vs returning an array,
-    // and `mixed` lets a tool drift to returning anything at all.
+    // Tools should return concrete shapes, not mixed. Allowed: array,
+    // \Generator, array|\Generator, or covariant overrides of those.
+    // `mixed` defeats the contract — the dispatcher relies on
+    // iterating a Generator vs returning an array, and `mixed` lets a
+    // tool drift to returning anything at all.
 
     $violations = [];
 
