@@ -39,7 +39,7 @@ Catalogue lives in [`docs/PROMPTS.md`](docs/PROMPTS.md) and [`docs/RESOURCES.md`
 - `ddev craft cortex/install --client=<name>` prints copy-paste config snippets for the seven supported MCP clients. DDEV-aware — auto-emits the `docker exec` invocation form when running inside a DDEV project.
 - `ddev craft cortex/install/apply --client=<name>` writes the entry directly into the client's per-platform config file. Atomic write (temp file + rename), `.bak.<unix-timestamp>` backup of the existing file, idempotent re-runs, `--dry-run` for previewing the diff, `--force` to overwrite an existing Cortex entry.
 - `php craft cortex/install/detect` scans the host filesystem for installed MCP clients (`/Applications`, `PATH`, `%LOCALAPPDATA%`) and prints a status table. Read-only — never writes.
-- `php craft cortex/install/auto` runs detection plus per-client confirm-and-apply in one pass — the "I installed Cortex, now wire it up everywhere" flow. Honours `--dry-run` and `--force`. Both `detect` and `auto` refuse to run from inside DDEV because the container can't see the host filesystem; the manual snippet form (`ddev craft cortex/install`) is the documented fallback inside DDEV.
+- `php craft cortex/install/auto` runs detection plus per-client confirm-and-apply in one pass — the "I installed Cortex, now wire it up everywhere" flow. Honours `--dry-run` and `--force`. Both `detect` and `auto` refuse to run from inside any container (DDEV, plain Docker, Lando, Sail, Podman, LXC, Kubernetes) because the container can't see the host filesystem; the manual snippet form (`ddev craft cortex/install`) is the documented fallback inside DDEV.
 
 Per-client install instructions, troubleshooting, and the manual snippet flow are in [`docs/INSTALL.md`](docs/INSTALL.md).
 

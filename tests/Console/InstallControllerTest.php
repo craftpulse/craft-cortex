@@ -346,3 +346,27 @@ it('actionAuto refuses to run from inside DDEV', function() {
 
     expect($exit)->toBe(\yii\console\ExitCode::CONFIG);
 });
+
+it('actionDetect refuses to run when the container env var is set (Podman, systemd-nspawn)', function() {
+    // The `container` env var is set by Podman (native mode) and systemd-nspawn.
+    // Exit code is the testable contract; message content lives in _refuseInContainer().
+    putenv('container=podman');
+    try {
+        $exit = @$this->controller->actionDetect();
+    } finally {
+        putenv('container');
+    }
+
+    expect($exit)->toBe(\yii\console\ExitCode::CONFIG);
+});
+
+it('actionAuto refuses to run when the container env var is set (Podman, systemd-nspawn)', function() {
+    putenv('container=podman');
+    try {
+        $exit = @$this->controller->actionAuto();
+    } finally {
+        putenv('container');
+    }
+
+    expect($exit)->toBe(\yii\console\ExitCode::CONFIG);
+});

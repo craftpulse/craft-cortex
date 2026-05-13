@@ -78,12 +78,12 @@ Once Cortex is installed, your MCP client needs to know how to talk to it. Corte
 
 | Action | What it does | Where it runs |
 |--------|--------------|---------------|
-| `cortex/install/auto` | Scans the host for installed MCP clients, then for each one prompts to apply Cortex config. The "I installed Cortex, now wire it up everywhere" flow. | **Host only.** Refuses to run from inside DDEV. |
-| `cortex/install/detect` | Scans the host and prints a status table of which clients are installed and configured. Read-only — never writes. | **Host only.** |
+| `cortex/install/auto` | Scans the host for installed MCP clients, then for each one prompts to apply Cortex config. The "I installed Cortex, now wire it up everywhere" flow. | **Host only.** Refuses to run from inside a container (DDEV, Docker, Lando, Sail, Podman, LXC, Kubernetes). |
+| `cortex/install/detect` | Scans the host and prints a status table of which clients are installed and configured. Read-only — never writes. | **Host only.** Refuses to run from inside a container. |
 | `cortex/install/apply --client=<name>` | Writes Cortex config to one specific client's config file. Atomic write + timestamped backup. | Anywhere — host or DDEV — but the config path it targets must exist on the running filesystem. |
 | `cortex/install` | Prints copy-paste snippets for every supported client (or just one with `--client=<name>`). Read-only. | Anywhere. |
 
-**If you're running Cortex inside DDEV**, your container can't see your host's `/Applications`, `~/.cursor`, etc. — so `detect` and `auto` refuse to run there to avoid false negatives. Run them from your host's PHP:
+**If you're running Cortex inside a container** (DDEV, plain Docker, Lando, Sail, Podman, LXC, Kubernetes), your container can't see your host's `/Applications`, `~/.cursor`, etc. — so `detect` and `auto` refuse to run there to avoid false negatives. Run them from your host's PHP:
 
 ```bash
 php /path/to/project/craft cortex/install/auto
@@ -93,7 +93,7 @@ Or stick with the manual snippet form (`ddev craft cortex/install`), which works
 
 ### Auto-detect and apply (fastest)
 
-If you're running Cortex from the host (not inside DDEV), this is one command:
+If you're running Cortex from the host (not inside a container), this is one command:
 
 ```bash
 php craft cortex/install/auto
@@ -250,9 +250,9 @@ A successful `initialize` handshake reports `cortex 5.0.0` and protocol `2025-06
 
 Cortex won't ghost-create config directories — their absence is the canonical "client not installed" signal. Either install the client first, or use the manual snippet form (`cortex/install --client=<name>`) and paste into a config file you create yourself.
 
-### `apply` refuses inside DDEV but my client IS installed (on the host)
+### `apply` refuses inside a container but my client IS installed (on the host)
 
-If you're running `ddev craft cortex/install/apply` from inside a DDEV container, the auto-config writer can only see the container's filesystem — not your host's. Your MCP client lives on the host, so its config directory looks "missing" from the container's perspective.
+If you're running `ddev craft cortex/install/apply` (or any containerised equivalent) from inside a container, the auto-config writer can only see the container's filesystem — not your host's. Your MCP client lives on the host, so its config directory looks "missing" from the container's perspective.
 
 Two ways to handle it:
 
