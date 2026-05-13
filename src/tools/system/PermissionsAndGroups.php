@@ -7,6 +7,7 @@ use craft\models\UserGroup;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 
 /**
  * =========================================================================
@@ -58,6 +59,39 @@ class PermissionsAndGroups extends AbstractTool
             'user-group structure with each group\'s assigned permissions. Use to discover ' .
             'what permission identifiers exist and how groups carve up access. Returns no ' .
             'user data — membership is Pro-tier with PII gating.';
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Stable single-shape return. The permissions tree itself is a
+     * heterogeneous recursive map keyed by section name with arbitrary
+     * nested permissions, so the schema declares it as a generic object
+     * with `additionalProperties: true` — the LLM still gets the flat
+     * `permissionNames` list and `permissionCount` for ergonomic lookup.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public static function outputSchema(): array
+    {
+        $groupEntry = Schema::object([
+            'id' => Schema::integer()->required(),
+            'uid' => Schema::string()->required(),
+            'name' => Schema::string()->required(),
+            'handle' => Schema::string()->required(),
+            'description' => Schema::string(),
+            'permissions' => Schema::array(Schema::string())->required(),
+        ]);
+
+        return Schema::object([
+            'permissions' => Schema::object()->additionalProperties(true)->required()
+                ->description('Recursive permissions tree keyed by category name.'),
+            'permissionCount' => Schema::integer()->required(),
+            'permissionNames' => Schema::array(Schema::string())->required(),
+            'groups' => Schema::array($groupEntry)->required(),
+            'groupCount' => Schema::integer()->required(),
+        ])->toArray();
     }
 
     /**

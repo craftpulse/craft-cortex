@@ -7,6 +7,7 @@ use craft\base\PluginInterface;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 
 /**
  * =========================================================================
@@ -53,6 +54,44 @@ class Plugins extends AbstractTool
         return 'List every installed plugin (enabled or not). Returns handle, name, version, ' .
             'edition, developer, schemaVersion, enabled flag, and license status. Use to ' .
             'discover what extension surface the project has before recommending an approach.';
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Stable single-shape return — no list/single/count polymorphism — so
+     * the schema can describe every key precisely. Plugin metadata keys
+     * Craft cannot resolve come back as `null`, hence the optional
+     * (non-required) annotation on most fields.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public static function outputSchema(): array
+    {
+        $pluginEntry = Schema::object([
+            'handle' => Schema::string()->required(),
+            'name' => Schema::string(),
+            'version' => Schema::string(),
+            'schemaVersion' => Schema::string(),
+            'edition' => Schema::string(),
+            'hasMultipleEditions' => Schema::boolean()->required(),
+            'developer' => Schema::string(),
+            'developerUrl' => Schema::string(),
+            'documentationUrl' => Schema::string(),
+            'description' => Schema::string(),
+            'isInstalled' => Schema::boolean()->required(),
+            'isEnabled' => Schema::boolean()->required(),
+            'moduleId' => Schema::string(),
+            'licenseKeyStatus' => Schema::string(),
+            'licenseIssues' => Schema::array(Schema::any())->required(),
+        ]);
+
+        return Schema::object([
+            'plugins' => Schema::array($pluginEntry)->required(),
+            'count' => Schema::integer()->required(),
+            'enabledCount' => Schema::integer()->required(),
+        ])->toArray();
     }
 
     /**

@@ -8,6 +8,7 @@ use craft\models\Section_SiteSettings;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 
 /**
  * =========================================================================
@@ -56,6 +57,50 @@ class Routes extends AbstractTool
             'routes (admin-edited), section URI formats per site, and category-group URIs ' .
             'per site. Tells you what URL patterns exist on the install and where to add ' .
             'a new one.';
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Stable single-shape return — no list/single/count polymorphism — so
+     * the schema can describe every key precisely. Spec-aware clients
+     * read `structuredContent`; older clients still see the same JSON in
+     * the text block.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public static function outputSchema(): array
+    {
+        $routeEntry = Schema::object([
+            'pattern' => Schema::string()->required(),
+            'target' => Schema::any()->required(),
+        ]);
+
+        $sectionRoute = Schema::object([
+            'sectionHandle' => Schema::string()->required(),
+            'sectionType' => Schema::string()->required(),
+            'siteId' => Schema::integer()->required(),
+            'siteHandle' => Schema::string(),
+            'uriFormat' => Schema::string(),
+            'template' => Schema::string(),
+        ]);
+
+        $categoryRoute = Schema::object([
+            'groupHandle' => Schema::string()->required(),
+            'siteId' => Schema::integer()->required(),
+            'siteHandle' => Schema::string(),
+            'uriFormat' => Schema::string(),
+            'template' => Schema::string(),
+        ]);
+
+        return Schema::object([
+            'configFileRoutes' => Schema::array($routeEntry)->required(),
+            'projectConfigRoutes' => Schema::array($routeEntry)->required(),
+            'sectionRoutes' => Schema::array($sectionRoute)->required(),
+            'categoryGroupRoutes' => Schema::array($categoryRoute)->required(),
+            'siteCount' => Schema::integer()->required(),
+        ])->toArray();
     }
 
     /**
