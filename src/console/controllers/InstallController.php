@@ -9,8 +9,9 @@ use yii\helpers\Console;
 /**
  * =========================================================================
  * Cortex install commands — print copy-paste MCP client config snippets
- * (`cortex/install`) and write them directly to the client's config file
- * (`cortex/install/apply`).
+ * (`cortex/install`), write them directly to the client's config file
+ * (`cortex/install/apply`), and auto-detect installed clients on the
+ * host filesystem (`cortex/install/detect` and `cortex/install/auto`).
  *
  * The default action prints snippets for the user to copy into their MCP
  * client's config manually (read-only — never writes). The `apply`
@@ -19,6 +20,15 @@ use yii\helpers\Console;
  * backup. The snippet form is the documented manual fallback whenever
  * apply can't proceed (config absent, parent dir missing, cortex entry
  * already present without `--force`).
+ *
+ * The `detect` action scans the host for installed MCP clients and prints
+ * a status table. The `auto` action runs detection plus per-client
+ * confirm-and-apply in one pass — the Boost-style "I installed cortex,
+ * now wire it up everywhere" flow. **Both refuse to run from inside DDEV**
+ * because the container can't see the host's `/Applications`, `~/.cursor`,
+ * etc. — false negatives are worse than no detection. The manual
+ * `cortex/install` snippet flow works from inside DDEV and stays the
+ * documented fallback.
  *
  * Supported clients:
  *   - Claude Desktop (Anthropic, macOS / Windows / Linux)
@@ -29,9 +39,16 @@ use yii\helpers\Console;
  *   - Zed (`settings.json`, `context_servers` key)
  *   - Windsurf (Codeium fork of VS Code; `mcp_config.json`)
  *
- * Run `cortex/install` to print snippets. Run `cortex/install/apply
- * --client=<name>` to write the entry. Use `--ddev` to emit the docker-
- * exec invocation form (cortex running inside DDEV, MCP client on host).
+ * Usage:
+ *   cortex/install                                  # print all snippets
+ *   cortex/install --client=<name>                  # print one snippet
+ *   cortex/install/apply --client=<name>            # write one config file
+ *   cortex/install/detect                           # status table (host-only)
+ *   cortex/install/auto                             # detect + confirm + apply per client (host-only)
+ *
+ * Use `--ddev` to emit the docker-exec invocation form (cortex running
+ * inside DDEV, MCP client on host). Auto-detected from `DDEV_PROJECT` /
+ * `IS_DDEV_PROJECT` when present.
  * =========================================================================
  *
  * @author Craftpulse
@@ -50,6 +67,50 @@ class InstallController extends Controller
         'cline' => 'Cline (VS Code)',
         'zed' => 'Zed',
         'windsurf' => 'Windsurf',
+    ];
+
+    /**
+     * Per-client detection signals consumed by `detect()`. Three optional
+     * keys:
+     *
+     *   - `macAppBundle`: `.app` folder name under `/Applications` on macOS.
+     *   - `binary`: executable name searched against `getenv('PATH')`. We
+     *     walk PATH manually rather than calling `which`/`where` so the
+     *     no-shell-exec architecture test stays green.
+     *   - `windowsPath`: relative path under `%LOCALAPPDATA%\Programs` on
+     *     Windows. (Programs install path; `%APPDATA%` is for config.)
+     *
+     * Clients without an `app` signal (Continue.dev, Cline — both VS Code
+     * extensions) rely on the `configured` signal alone.
+     *
+     * @var array<string,array<string,string>>
+     */
+    private const DETECTION = [
+        'claude-desktop' => [
+            'macAppBundle' => 'Claude.app',
+            'windowsPath' => 'Programs\\Claude',
+        ],
+        'claude-code' => [
+            'binary' => 'claude',
+        ],
+        'cursor' => [
+            'macAppBundle' => 'Cursor.app',
+            'binary' => 'cursor',
+            'windowsPath' => 'Programs\\cursor',
+        ],
+        // Continue.dev and Cline are VS Code extensions. The extension
+        // itself isn't installed as a standalone binary or .app bundle —
+        // we lean on the `configured` signal (config directory exists).
+        'continue' => [],
+        'cline' => [],
+        'zed' => [
+            'macAppBundle' => 'Zed.app',
+            'binary' => 'zed',
+        ],
+        'windsurf' => [
+            'macAppBundle' => 'Windsurf.app',
+            'binary' => 'windsurf',
+        ],
     ];
 
     // Public Properties
@@ -206,121 +267,182 @@ class InstallController extends Controller
             return ExitCode::USAGE;
         }
 
-        $label = self::CLIENTS[$this->client];
-        $path = $this->resolveConfigPath($this->client);
-        if ($path === null) {
-            $this->stderr("Could not resolve config path for {$label} on this platform.\n", Console::FG_RED);
+        return $this->_applyOne($this->client, skipConfirm: false);
+    }
+
+    /**
+     * Scan the host filesystem for installed MCP clients and print a
+     * status table. **Refuses to run from inside DDEV** — the container
+     * can't see the host's `/Applications`, `~/.cursor`, etc. and any
+     * detection result would be a false negative.
+     *
+     * Read-only — never writes. Pair with `cortex/install/auto` to detect
+     * and apply in one pass.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionDetect(): int
+    {
+        if ($this->_refuseInDdev('detect')) {
             return ExitCode::CONFIG;
         }
 
-        $isDdev = $this->ddev || $this->_detectDdev();
-        $project = $this->ddevProject ?? getenv('DDEV_PROJECT') ?: 'PROJECT';
-        $command = $this->_buildCommand($isDdev, $project);
+        $this->stdout("\n");
+        $this->stdout("MCP client detection (host filesystem)\n", Console::FG_PURPLE);
+        $this->stdout(str_repeat('=', 70) . "\n\n");
 
-        $existing = is_file($path) ? @file_get_contents($path) : null;
-        if ($existing === false) {
-            $this->stderr("Could not read existing config at {$path}.\n", Console::FG_RED);
-            return ExitCode::IOERR;
-        }
-
-        // Precondition for real writes: the parent directory must exist.
-        // We don't ghost-create config dirs — their absence is the
-        // canonical "client not installed" signal, and silently
-        // scaffolding them would mask typos and produce non-functional
-        // config alongside an actual install elsewhere on the system.
-        // For dry-run, we surface the missing-parent state as a warning
-        // and still print the would-be diff — the user is asking what
-        // *would* happen, not what *can* happen, and dry-run from inside
-        // a container that doesn't see the host config dir is the
-        // canonical "preview from a different filesystem" case.
-        $parent = dirname($path);
-        $parentMissing = !is_dir($parent);
-        if ($parentMissing && !$this->dryRun) {
-            $this->stderr(sprintf(
-                "%s config directory not found at %s.\n",
-                $label,
-                $parent,
-            ), Console::FG_RED);
-            $this->stderr(sprintf(
-                "Install %s first, or use the manual snippet:\n  ddev craft cortex/install --client=%s\n",
-                $label,
-                $this->client,
-            ), Console::FG_GREY);
-            $this->stderr(sprintf(
-                "If you're running this inside a container (e.g. DDEV) and your MCP\n" .
-                "client lives on the host, the manual snippet form is the right path —\n" .
-                "the auto-config writer can only see the container's filesystem.\n",
-            ), Console::FG_GREY);
-            return ExitCode::CONFIG;
-        }
-
-        try {
-            $result = $this->buildMergedConfig($this->client, $existing, $command);
-        } catch (\RuntimeException $e) {
-            $this->stderr("Failed to parse existing config at {$path}: {$e->getMessage()}\n", Console::FG_RED);
-            return ExitCode::DATAERR;
-        }
-
-        if ($result === null) {
-            $this->stderr(sprintf(
-                "Cortex entry already present at %s. Re-run with --force to overwrite.\n",
-                $path,
-            ), Console::FG_YELLOW);
-            return ExitCode::OK;
-        }
-        [$newContents, $action] = $result;
-
-        if ($this->dryRun) {
-            $this->stdout("Dry run — no changes written.\n\n", Console::FG_PURPLE);
-            $this->stdout("Target: ", Console::FG_GREY);
-            $this->stdout("{$path}\n");
-            $this->stdout("Action: ", Console::FG_GREY);
-            $this->stdout("{$action}\n\n");
-
-            if ($parentMissing) {
-                $this->stdout("Note: parent directory ", Console::FG_YELLOW);
-                $this->stdout("{$parent}", Console::FG_YELLOW);
-                $this->stdout(" does not exist on this filesystem.\n", Console::FG_YELLOW);
-                $this->stdout("A real write would refuse — this dry-run is a preview only.\n", Console::FG_YELLOW);
-                if ($this->_detectDdev()) {
-                    $this->stdout("(You're running inside DDEV. The container's filesystem isn't your host's; copy the\n", Console::FG_GREY);
-                    $this->stdout("AFTER block below into your host MCP client config manually.)\n\n", Console::FG_GREY);
-                } else {
-                    $this->stdout("\n");
-                }
+        $any = false;
+        foreach (self::CLIENTS as $client => $label) {
+            $result = $this->detect($client);
+            $anySignal = $result['app'] || $result['configured'];
+            if ($anySignal) {
+                $any = true;
             }
 
-            $this->stdout("--- BEFORE ---\n", Console::FG_GREY);
-            $this->stdout($existing !== null ? rtrim($existing) . "\n" : "(file does not exist)\n");
-            $this->stdout("\n--- AFTER ---\n", Console::FG_GREY);
-            $this->stdout(rtrim($newContents) . "\n");
-            return ExitCode::OK;
+            $this->stdout(sprintf("  %-20s ", $label));
+            $this->_renderSignal('app', $result['app']);
+            $this->stdout('  ');
+            $this->_renderSignal('configured', $result['configured']);
+            $this->stdout("\n");
+            if ($result['configPath'] !== null) {
+                $this->stdout(sprintf("  %-20s   path: %s\n", '', $result['configPath']), Console::FG_GREY);
+            }
+            $this->stdout("\n");
         }
 
-        $this->stdout("Target: ", Console::FG_GREY);
-        $this->stdout("{$path}\n");
-        $this->stdout("Action: ", Console::FG_GREY);
-        $this->stdout("{$action}\n");
-        if ($existing !== null) {
-            $this->stdout("Backup: ", Console::FG_GREY);
-            $this->stdout("<file>.bak.<unix-timestamp>\n");
+        if ($any) {
+            $this->stdout("Run `cortex/install/auto` to apply cortex config to detected clients.\n", Console::FG_GREEN);
+        } else {
+            $this->stdout("No clients detected on this host.\n", Console::FG_YELLOW);
+            $this->stdout("If you have a client installed, run `cortex/install` for the manual snippet form.\n", Console::FG_GREY);
         }
+        $this->stdout("\n");
 
-        if (!$this->confirm("\nWrite cortex MCP config to {$path}?")) {
-            $this->stderr("Aborted.\n", Console::FG_YELLOW);
-            return ExitCode::OK;
-        }
-
-        try {
-            $this->_writeAtomic($path, $newContents, $existing);
-        } catch (\RuntimeException $e) {
-            $this->stderr("Write failed: {$e->getMessage()}\n", Console::FG_RED);
-            return ExitCode::IOERR;
-        }
-
-        $this->stdout(sprintf("\nWrote cortex config to %s.\n", $path), Console::FG_GREEN);
-        $this->stdout("Reload {$label} to pick up the new server.\n", Console::FG_GREEN);
         return ExitCode::OK;
+    }
+
+    /**
+     * Detect installed clients and walk them interactively — for each
+     * detected client, prompt to apply cortex config and run the same
+     * write pipeline `actionApply()` uses. **Refuses to run from inside
+     * DDEV** for the same reason `actionDetect()` does.
+     *
+     * Honours `--dry-run` (no writes, prints before/after for each) and
+     * `--force` (overwrites an existing cortex entry instead of
+     * refusing). Per-client confirm prompt is the only prompt; the
+     * underlying apply path skips its own confirm since auto already
+     * gathered the decision.
+     *
+     * Exit code: OK when at least one client was applied or skipped
+     * cleanly; CONFIG when running inside DDEV.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionAuto(): int
+    {
+        if ($this->_refuseInDdev('auto')) {
+            return ExitCode::CONFIG;
+        }
+
+        $detected = [];
+        foreach (self::CLIENTS as $client => $label) {
+            $result = $this->detect($client);
+            if ($result['app'] || $result['configured']) {
+                $detected[$client] = $label;
+            }
+        }
+
+        if ($detected === []) {
+            $this->stdout("\nNo MCP clients detected on this host.\n", Console::FG_YELLOW);
+            $this->stdout("Run `cortex/install` for the manual snippet form if you have a client installed.\n\n", Console::FG_GREY);
+            return ExitCode::OK;
+        }
+
+        $this->stdout("\n");
+        $this->stdout("Detected MCP clients:\n", Console::FG_PURPLE);
+        foreach ($detected as $client => $label) {
+            $this->stdout("  - {$label}\n");
+        }
+        $this->stdout("\n");
+
+        foreach ($detected as $client => $label) {
+            $this->stdout(str_repeat('-', 70) . "\n");
+            $this->stdout("{$label}\n", Console::FG_YELLOW);
+            $this->stdout(str_repeat('-', 70) . "\n");
+
+            if (!$this->confirm("Apply cortex config for {$label}?")) {
+                $this->stdout("Skipped.\n\n", Console::FG_GREY);
+                continue;
+            }
+
+            $exit = $this->_applyOne($client, skipConfirm: true);
+            if ($exit !== ExitCode::OK) {
+                $this->stderr("Apply failed for {$label} (exit code {$exit}); continuing.\n\n", Console::FG_YELLOW);
+            } else {
+                $this->stdout("\n");
+            }
+        }
+
+        return ExitCode::OK;
+    }
+
+    /**
+     * Detect whether a given MCP client is installed on this host.
+     * Returns three signals in a fixed shape:
+     *
+     *   - `app` (bool): a strong "the client itself is present" signal.
+     *     Looks for the macOS `.app` bundle, the executable on `PATH`,
+     *     or the Windows install path under `%LOCALAPPDATA%\Programs`,
+     *     in that order. Clients with no `app` signal in `DETECTION`
+     *     (Continue.dev, Cline — both VS Code extensions) always
+     *     return `false` here.
+     *
+     *   - `configured` (bool): a weaker "the user has used this client
+     *     at some point" signal — the parent of the per-client config
+     *     path exists. Useful for VS Code-extension clients where the
+     *     extension itself has no detectable presence outside VS Code.
+     *
+     *   - `configPath` (string|null): the resolved per-platform config
+     *     path (or `null` when no path is defined for this platform).
+     *     Pulled straight from `resolveConfigPath()` so detection and
+     *     apply agree on the target.
+     *
+     * @internal Public for test access only.
+     * @return array{app: bool, configured: bool, configPath: ?string}
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function detect(string $client): array
+    {
+        $signal = self::DETECTION[$client] ?? [];
+        $appDetected = false;
+
+        if (isset($signal['macAppBundle']) && PHP_OS_FAMILY === 'Darwin') {
+            $appDetected = is_dir('/Applications/' . $signal['macAppBundle']);
+        }
+
+        if (!$appDetected && isset($signal['binary'])) {
+            $appDetected = $this->_binaryInPath($signal['binary']);
+        }
+
+        if (!$appDetected && isset($signal['windowsPath']) && PHP_OS_FAMILY === 'Windows') {
+            $localAppData = getenv('LOCALAPPDATA');
+            if (is_string($localAppData) && $localAppData !== '') {
+                $appDetected = is_dir(rtrim($localAppData, '\\/') . '\\' . $signal['windowsPath']);
+            }
+        }
+
+        $configPath = $this->resolveConfigPath($client);
+        $configured = $configPath !== null && is_dir(dirname($configPath));
+
+        return [
+            'app' => $appDetected,
+            'configured' => $configured,
+            'configPath' => $configPath,
+        ];
     }
 
     /**
@@ -424,6 +546,235 @@ class InstallController extends Controller
     private function _detectDdev(): bool
     {
         return getenv('IS_DDEV_PROJECT') === 'true' || getenv('DDEV_HOSTNAME') !== false;
+    }
+
+    /**
+     * Apply cortex config for a single client. Shared pipeline behind
+     * `actionApply()` (interactive single-client) and `actionAuto()`
+     * (per-detected-client loop). When `$skipConfirm` is true, the
+     * write confirmation prompt is omitted — the caller has already
+     * gathered the decision.
+     *
+     * Pre-conditions enforced by callers (not re-checked here):
+     *   - `$client` is a known handle in `self::CLIENTS`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _applyOne(string $client, bool $skipConfirm): int
+    {
+        $label = self::CLIENTS[$client];
+        $path = $this->resolveConfigPath($client);
+        if ($path === null) {
+            $this->stderr("Could not resolve config path for {$label} on this platform.\n", Console::FG_RED);
+            return ExitCode::CONFIG;
+        }
+
+        $isDdev = $this->ddev || $this->_detectDdev();
+        $project = $this->ddevProject ?? getenv('DDEV_PROJECT') ?: 'PROJECT';
+        $command = $this->_buildCommand($isDdev, $project);
+
+        $existing = is_file($path) ? @file_get_contents($path) : null;
+        if ($existing === false) {
+            $this->stderr("Could not read existing config at {$path}.\n", Console::FG_RED);
+            return ExitCode::IOERR;
+        }
+
+        // Precondition for real writes: the parent directory must exist.
+        // We don't ghost-create config dirs — their absence is the
+        // canonical "client not installed" signal, and silently
+        // scaffolding them would mask typos and produce non-functional
+        // config alongside an actual install elsewhere on the system.
+        // For dry-run, we surface the missing-parent state as a warning
+        // and still print the would-be diff — the user is asking what
+        // *would* happen, not what *can* happen, and dry-run from inside
+        // a container that doesn't see the host config dir is the
+        // canonical "preview from a different filesystem" case.
+        $parent = dirname($path);
+        $parentMissing = !is_dir($parent);
+        if ($parentMissing && !$this->dryRun) {
+            $this->stderr(sprintf(
+                "%s config directory not found at %s.\n",
+                $label,
+                $parent,
+            ), Console::FG_RED);
+            $this->stderr(sprintf(
+                "Install %s first, or use the manual snippet:\n  ddev craft cortex/install --client=%s\n",
+                $label,
+                $client,
+            ), Console::FG_GREY);
+            $this->stderr(sprintf(
+                "If you're running this inside a container (e.g. DDEV) and your MCP\n" .
+                "client lives on the host, the manual snippet form is the right path —\n" .
+                "the auto-config writer can only see the container's filesystem.\n",
+            ), Console::FG_GREY);
+            return ExitCode::CONFIG;
+        }
+
+        try {
+            $result = $this->buildMergedConfig($client, $existing, $command);
+        } catch (\RuntimeException $e) {
+            $this->stderr("Failed to parse existing config at {$path}: {$e->getMessage()}\n", Console::FG_RED);
+            return ExitCode::DATAERR;
+        }
+
+        if ($result === null) {
+            $this->stderr(sprintf(
+                "Cortex entry already present at %s. Re-run with --force to overwrite.\n",
+                $path,
+            ), Console::FG_YELLOW);
+            return ExitCode::OK;
+        }
+        [$newContents, $action] = $result;
+
+        if ($this->dryRun) {
+            $this->stdout("Dry run — no changes written.\n\n", Console::FG_PURPLE);
+            $this->stdout("Target: ", Console::FG_GREY);
+            $this->stdout("{$path}\n");
+            $this->stdout("Action: ", Console::FG_GREY);
+            $this->stdout("{$action}\n\n");
+
+            if ($parentMissing) {
+                $this->stdout("Note: parent directory ", Console::FG_YELLOW);
+                $this->stdout("{$parent}", Console::FG_YELLOW);
+                $this->stdout(" does not exist on this filesystem.\n", Console::FG_YELLOW);
+                $this->stdout("A real write would refuse — this dry-run is a preview only.\n", Console::FG_YELLOW);
+                if ($this->_detectDdev()) {
+                    $this->stdout("(You're running inside DDEV. The container's filesystem isn't your host's; copy the\n", Console::FG_GREY);
+                    $this->stdout("AFTER block below into your host MCP client config manually.)\n\n", Console::FG_GREY);
+                } else {
+                    $this->stdout("\n");
+                }
+            }
+
+            $this->stdout("--- BEFORE ---\n", Console::FG_GREY);
+            $this->stdout($existing !== null ? rtrim($existing) . "\n" : "(file does not exist)\n");
+            $this->stdout("\n--- AFTER ---\n", Console::FG_GREY);
+            $this->stdout(rtrim($newContents) . "\n");
+            return ExitCode::OK;
+        }
+
+        $this->stdout("Target: ", Console::FG_GREY);
+        $this->stdout("{$path}\n");
+        $this->stdout("Action: ", Console::FG_GREY);
+        $this->stdout("{$action}\n");
+        if ($existing !== null) {
+            $this->stdout("Backup: ", Console::FG_GREY);
+            $this->stdout("<file>.bak.<unix-timestamp>\n");
+        }
+
+        if (!$skipConfirm && !$this->confirm("\nWrite cortex MCP config to {$path}?")) {
+            $this->stderr("Aborted.\n", Console::FG_YELLOW);
+            return ExitCode::OK;
+        }
+
+        try {
+            $this->_writeAtomic($path, $newContents, $existing);
+        } catch (\RuntimeException $e) {
+            $this->stderr("Write failed: {$e->getMessage()}\n", Console::FG_RED);
+            return ExitCode::IOERR;
+        }
+
+        $this->stdout(sprintf("\nWrote cortex config to %s.\n", $path), Console::FG_GREEN);
+        $this->stdout("Reload {$label} to pick up the new server.\n", Console::FG_GREEN);
+        return ExitCode::OK;
+    }
+
+    /**
+     * Refuse to run the detect-or-auto pipeline when cortex is invoked
+     * from inside a DDEV container. Detection inside DDEV walks the
+     * container's filesystem, not the host's — `/Applications`,
+     * `~/.cursor`, etc. don't exist there, so every signal would be a
+     * false negative. Returns true (and emits the message) when the
+     * action should bail; false (silent) when it should proceed.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _refuseInDdev(string $action): bool
+    {
+        if (!$this->_detectDdev()) {
+            return false;
+        }
+
+        $this->stderr("\n");
+        $this->stderr("cortex/install/{$action} cannot run from inside DDEV.\n", Console::FG_RED);
+        $this->stderr("\n");
+        $this->stderr("The cortex process can only see the container's filesystem —\n", Console::FG_GREY);
+        $this->stderr("not your host's /Applications, ~/.cursor, etc. Detection from\n", Console::FG_GREY);
+        $this->stderr("inside the container would produce false negatives.\n", Console::FG_GREY);
+        $this->stderr("\n");
+        $this->stderr("Run from your host's PHP instead:\n", Console::FG_GREY);
+        $this->stderr("  php /path/to/project/craft cortex/install/{$action}\n", Console::FG_CYAN);
+        $this->stderr("\n");
+        $this->stderr("Or use the manual snippet form (works from inside DDEV):\n", Console::FG_GREY);
+        $this->stderr("  ddev craft cortex/install [--client=<name>]\n\n", Console::FG_CYAN);
+        return true;
+    }
+
+    /**
+     * Render one detection signal (`app installed` / `configured`) with
+     * a green ✓ or grey ✗ glyph plus a short label. Used by
+     * `actionDetect()` to keep the table compact while staying readable
+     * in monochrome terminals.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _renderSignal(string $kind, bool $detected): void
+    {
+        $glyph = $detected ? '✓' : '✗';
+        $label = $kind === 'app' ? 'installed' : 'configured';
+        $colour = $detected ? Console::FG_GREEN : Console::FG_GREY;
+        $this->stdout("{$glyph} {$label}", $colour);
+    }
+
+    /**
+     * Walk `PATH` manually looking for an executable file. We don't
+     * shell out to `which` / `where` because the architecture test
+     * forbids shell-exec functions — and we'd rather keep that ban
+     * absolute than carve out an exception for "but only this one
+     * convenient case". Honours `PATHEXT` on Windows for extension-less
+     * lookups (`cursor` → `cursor.exe`).
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _binaryInPath(string $name): bool
+    {
+        $path = getenv('PATH');
+        if (!is_string($path) || $path === '') {
+            return false;
+        }
+
+        $separator = PHP_OS_FAMILY === 'Windows' ? ';' : ':';
+        $extensions = [''];
+        if (PHP_OS_FAMILY === 'Windows') {
+            $pathExt = getenv('PATHEXT');
+            if (is_string($pathExt) && $pathExt !== '') {
+                $extensions = array_map(
+                    static fn(string $e): string => strtolower(trim($e)),
+                    explode(';', $pathExt),
+                );
+            } else {
+                $extensions = ['.exe', '.bat', '.cmd'];
+            }
+        }
+
+        foreach (explode($separator, $path) as $dir) {
+            $dir = trim($dir);
+            if ($dir === '' || !is_dir($dir)) {
+                continue;
+            }
+            foreach ($extensions as $ext) {
+                $candidate = rtrim($dir, '/\\') . DIRECTORY_SEPARATOR . $name . $ext;
+                if (is_file($candidate) && is_executable($candidate)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
