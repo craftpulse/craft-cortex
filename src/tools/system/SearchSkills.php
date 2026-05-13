@@ -154,7 +154,7 @@ class SearchSkills extends AbstractTool
             throw new ToolException('`query` is required for mode=search and must be a non-empty string.');
         }
 
-        $limit = $this->_limit($arguments);
+        $limit = $this->_limit($arguments, self::DEFAULT_LIMIT, self::MAX_LIMIT);
         $kindFilter = $this->_kindFilter($arguments);
         $tokens = $this->_tokenise($query);
         if ($tokens === []) {
@@ -384,16 +384,6 @@ class SearchSkills extends AbstractTool
             return [];
         }
         return array_values(array_unique($matches[0]));
-    }
-
-    /**
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _limit(array $arguments): int
-    {
-        $limit = (int) ($arguments['limit'] ?? self::DEFAULT_LIMIT);
-        return max(1, min(self::MAX_LIMIT, $limit));
     }
 
     /**

@@ -2,12 +2,12 @@
 
 namespace craftpulse\cortex\services;
 
-use Craft;
 use craftpulse\cortex\events\RegisterResourcesEvent;
 use craftpulse\cortex\resources\AgentResource;
 use craftpulse\cortex\resources\ResourceInterface;
 use craftpulse\cortex\resources\ResourceTemplateInterface;
 use craftpulse\cortex\resources\SkillResource;
+use craftpulse\cortex\tools\support\RegistryLog;
 use Michtio\CraftCmsClaudeSkills\Skills;
 use yii\base\Component;
 
@@ -89,15 +89,7 @@ class Resources extends Component
                     // First registration wins. See `services/Tools::init`
                     // for the rationale; same shape on the Resources
                     // surface, keyed by URI rather than name.
-                    Craft::warning(
-                        sprintf(
-                            'Resource URI collision on "%s" — first registration (%s) wins; ignoring %s.',
-                            $uri,
-                            $this->_byUri[$uri]::class,
-                            $resource::class,
-                        ),
-                        'cortex',
-                    );
+                    RegistryLog::collision('Resource', 'URI', $uri, $this->_byUri[$uri], $resource);
                     continue;
                 }
                 $this->_resources[] = $resource;
@@ -111,15 +103,7 @@ class Resources extends Component
                     // and the Tools registry — warn loudly so collisions
                     // surface during boot rather than as silent
                     // misroutes at request time.
-                    Craft::warning(
-                        sprintf(
-                            'Resource template collision on "%s" — first registration (%s) wins; ignoring %s.',
-                            $template,
-                            $this->_byTemplate[$template]::class,
-                            $resource::class,
-                        ),
-                        'cortex',
-                    );
+                    RegistryLog::collision('Resource template', 'URI', $template, $this->_byTemplate[$template], $resource);
                     continue;
                 }
                 $this->_templates[] = $resource;

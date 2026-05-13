@@ -47,8 +47,6 @@ class Settings extends Model
         'fields/*',
         'users/create',
         'entrify/*',
-        'db/backup',
-        'db/restore',
         'utils/*',
         'clear-deprecations',
         'mailer/test',
@@ -78,8 +76,9 @@ class Settings extends Model
      *          allowlist override when none is supplied at creation
      *          time. Default: 7 days. Expired overrides are still
      *          stored but no longer count toward the effective
-     *          allowlist; the cleanup queue job prunes them in the
-     *          background.
+     *          allowlist; expired rows are pruned during Craft's gc
+     *          cycle (see `Allowlist::pruneExpired()` wired to
+     *          `Gc::EVENT_RUN` in `Plugin::init()`).
      */
     public int $runtimeOverrideTtl = 604800;
 

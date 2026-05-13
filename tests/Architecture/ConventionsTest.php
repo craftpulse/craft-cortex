@@ -64,7 +64,12 @@ it('does not use eval, shell-exec family, or backticks anywhere in src/', functi
     // Each pattern is a function call at top-level scope (not a method
     // access or property name). Tokenise rather than regex to avoid
     // false positives on identical strings inside docblocks / comments.
-    $banned = ['eval', 'shell_exec', 'proc_open', 'passthru', 'popen'];
+    //
+    // NOTE: `eval` is a PHP language construct, not a function call — it
+    // tokenises as `T_EVAL`, not `T_STRING`. It is matched in its own scan
+    // loop below. The shell-exec family (shell_exec, proc_open, passthru,
+    // popen) are real functions, so they fall under the T_STRING scan.
+    $banned = ['shell_exec', 'proc_open', 'passthru', 'popen'];
 
     $violations = [];
     foreach (cortex_src_files() as $file) {
@@ -127,6 +132,20 @@ it('does not use eval, shell-exec family, or backticks anywhere in src/', functi
             }
             if ($isCall) {
                 $violations[] = sprintf('%s calls exec()', $file);
+            }
+        }
+
+        // `eval` is a language construct (T_EVAL), not a function call.
+        // The only legitimate eval site is `tools/dev/CraftExec.php`, which
+        // is the entry point for `craft_exec`. Skip that file; every other
+        // src/ file containing T_EVAL is a violation.
+        if (str_ends_with($file, '/CraftExec.php')) {
+            continue;
+        }
+        foreach ($tokens as $token) {
+            if (is_array($token) && $token[0] === T_EVAL) {
+                $violations[] = sprintf('%s uses eval', $file);
+                break;
             }
         }
     }

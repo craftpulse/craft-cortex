@@ -4,13 +4,13 @@ namespace craftpulse\cortex\tools\workflow;
 
 use Craft;
 use craft\elements\Entry;
+use craft\helpers\DateTimeHelper;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 use DateTimeImmutable;
-use DateTimeInterface;
 use Throwable;
 
 /**
@@ -185,8 +185,8 @@ class ImportExport extends AbstractTool
      */
     private function _export(array $arguments): array
     {
-        $limit = $this->_limit($arguments);
-        $offset = max(0, (int) ($arguments['offset'] ?? 0));
+        $limit = $this->_limit($arguments, self::DEFAULT_LIMIT, self::MAX_LIMIT);
+        $offset = $this->_offset($arguments);
 
         $query = Entry::find()->status(null);
 
@@ -212,7 +212,7 @@ class ImportExport extends AbstractTool
         return [
             'format' => self::FORMAT_VERSION,
             'mode' => 'export',
-            'exportedAt' => (new DateTimeImmutable())->format(DateTimeInterface::ATOM),
+            'exportedAt' => DateTimeHelper::toIso8601(new DateTimeImmutable()),
             'craftVersion' => $info->version,
             'craftEdition' => Craft::$app->getEditionName(),
             'schemaVersion' => $info->schemaVersion,
@@ -253,10 +253,10 @@ class ImportExport extends AbstractTool
             'authorIds' => $this->_authorIds($entry),
             'parentUid' => $parentUid,
             'level' => $entry->level,
-            'postDate' => $entry->postDate?->format(DateTimeInterface::ATOM),
-            'expiryDate' => $entry->expiryDate?->format(DateTimeInterface::ATOM),
-            'dateCreated' => $entry->dateCreated?->format(DateTimeInterface::ATOM),
-            'dateUpdated' => $entry->dateUpdated?->format(DateTimeInterface::ATOM),
+            'postDate' => $entry->postDate !== null ? DateTimeHelper::toIso8601($entry->postDate) : null,
+            'expiryDate' => $entry->expiryDate !== null ? DateTimeHelper::toIso8601($entry->expiryDate) : null,
+            'dateCreated' => $entry->dateCreated !== null ? DateTimeHelper::toIso8601($entry->dateCreated) : null,
+            'dateUpdated' => $entry->dateUpdated !== null ? DateTimeHelper::toIso8601($entry->dateUpdated) : null,
             'fields' => $entry->getSerializedFieldValues(),
         ];
     }
@@ -303,15 +303,5 @@ class ImportExport extends AbstractTool
             return null;
         }
         return $parent?->uid;
-    }
-
-    /**
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _limit(array $arguments): int
-    {
-        $limit = (int) ($arguments['limit'] ?? self::DEFAULT_LIMIT);
-        return max(1, min(self::MAX_LIMIT, $limit));
     }
 }

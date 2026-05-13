@@ -20,8 +20,9 @@ use php_user_filter;
  * outside of tool dispatch.
  *
  * Registered with `stream_filter_register('cortex.capture', ...)` lazily
- * by `ConsoleRunner::run()`. The HTTP transport runs in PHP-FPM where
- * STDOUT capture is irrelevant, but the same helper is used there for
+ * inside `ConsoleRunner::run()` on first use; subsequent runs reuse the
+ * same registration. The HTTP transport runs in PHP-FPM where STDOUT
+ * capture is irrelevant, but the same helper is used there for
  * consistency and isolation.
  * =========================================================================
  *
@@ -35,17 +36,19 @@ class StdoutCaptureFilter extends php_user_filter
 
     /**
      * @var string Accumulated captured output for the current dispatch.
-     *             Cleared by `ConsoleRunner::start()`, drained by
-     *             `ConsoleRunner::end()`. A single static buffer is fine
-     *             because stdio MCP serves one request at a time.
+     *             Reset at the start of `ConsoleRunner::run()` and
+     *             drained back to the caller after `runAction()` returns
+     *             (in the `finally` block). A single static buffer is
+     *             fine because stdio MCP serves one request at a time.
      */
     public static string $buffer = '';
 
     /**
      * @var bool Whether captures should suppress the underlying write.
      *           When `false`, the filter is a no-op pass-through (writes
-     *           land on the underlying fd as normal). Toggled by
-     *           `ConsoleRunner` around the dispatch boundary.
+     *           land on the underlying fd as normal). Flipped on at the
+     *           start of `ConsoleRunner::run()` and back off in the
+     *           `finally` after the captured dispatch completes.
      */
     public static bool $capturing = false;
 

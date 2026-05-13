@@ -5,6 +5,7 @@ namespace craftpulse\cortex\controllers;
 use Craft;
 use craft\web\Controller;
 use craftpulse\cortex\Plugin;
+use yii\base\Exception;
 use yii\web\Response;
 
 /**
@@ -61,12 +62,20 @@ class SettingsController extends Controller
         }
 
         $userId = Craft::$app->getUser()->getId();
-        Plugin::getInstance()->allowlist->add(
-            pattern: $pattern,
-            userId: is_int($userId) ? $userId : null,
-            note: $note,
-            ttlSeconds: $ttlSeconds,
-        );
+        try {
+            Plugin::getInstance()->allowlist->add(
+                pattern: $pattern,
+                userId: is_int($userId) ? $userId : null,
+                note: $note,
+                ttlSeconds: $ttlSeconds,
+            );
+        } catch (Exception $e) {
+            Craft::error($e->getMessage(), 'cortex');
+            Craft::$app->getSession()->setError(
+                Craft::t('cortex', 'Could not add override.'),
+            );
+            return $this->redirectToPostedUrl();
+        }
 
         Craft::$app->getSession()->setNotice(
             Craft::t('cortex', 'Override added.'),
@@ -88,7 +97,15 @@ class SettingsController extends Controller
 
         $id = (int) $this->request->getRequiredBodyParam('id');
 
-        $removed = Plugin::getInstance()->allowlist->remove($id);
+        try {
+            $removed = Plugin::getInstance()->allowlist->remove($id);
+        } catch (Exception $e) {
+            Craft::error($e->getMessage(), 'cortex');
+            Craft::$app->getSession()->setError(
+                Craft::t('cortex', 'Could not remove override.'),
+            );
+            return $this->redirectToPostedUrl();
+        }
 
         if ($removed) {
             Craft::$app->getSession()->setNotice(

@@ -187,23 +187,4 @@ class Globals extends AbstractTool
 
         return $resolved !== null ? (int) $resolved->id : $primaryId;
     }
-
-    /**
-     * @return string[]
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _eagerHandles(array $arguments): array
-    {
-        $with = $arguments['with'] ?? [];
-        if (!is_array($with)) {
-            return [];
-        }
-
-        return array_values(array_filter(
-            $with,
-            static fn(mixed $h): bool => is_string($h) && $h !== '',
-        ));
-    }
 }

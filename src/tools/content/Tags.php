@@ -117,8 +117,8 @@ class Tags extends AbstractTool
             return ['tag' => $serializer->serializeElement($tag, $eagerHandles)];
         }
 
-        $limit = $this->_limit($arguments);
-        $offset = max(0, (int) ($arguments['offset'] ?? 0));
+        $limit = $this->_limit($arguments, self::DEFAULT_LIMIT, self::MAX_LIMIT);
+        $offset = $this->_offset($arguments);
 
         $totalQuery = clone $query;
         $totalCount = (int) $totalQuery->count();
@@ -171,34 +171,5 @@ class Tags extends AbstractTool
         }
 
         return $query;
-    }
-
-    /**
-     * @return string[]
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _eagerHandles(array $arguments): array
-    {
-        $with = $arguments['with'] ?? [];
-        if (!is_array($with)) {
-            return [];
-        }
-
-        return array_values(array_filter(
-            $with,
-            static fn(mixed $h): bool => is_string($h) && $h !== '',
-        ));
-    }
-
-    /**
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _limit(array $arguments): int
-    {
-        $limit = (int) ($arguments['limit'] ?? self::DEFAULT_LIMIT);
-        return max(1, min(self::MAX_LIMIT, $limit));
     }
 }

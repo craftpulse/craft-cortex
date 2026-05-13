@@ -117,11 +117,7 @@ class PermissionsAndGroups extends AbstractTool
 
         $walk = function($node) use (&$walk, &$names): void {
             if (is_array($node)) {
-                foreach ($node as $key => $value) {
-                    if (is_string($key) && str_contains($key, ':')) {
-                        // The Craft tree uses `prefix:Label` keys at top
-                        // level — strip the label.
-                    }
+                foreach ($node as $value) {
                     if (is_array($value)) {
                         // Each entry can be a permission def `[ 'name', 'label', 'nested' ]`
                         // or a category bucket. Walk both.
