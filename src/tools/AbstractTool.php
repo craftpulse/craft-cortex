@@ -41,9 +41,18 @@ abstract class AbstractTool implements ToolInterface
     /**
      * @inheritdoc
      *
-     * Default: no output schema declared. Override per tool when the
-     * caller benefits from advertising response shape (Pro tools, tools
-     * with strictly-shaped output the LLM can validate against).
+     * Default: no output schema declared.
+     *
+     * **Override only when the response shape is stable across every
+     * possible input.** Polymorphic tools (list-or-single-or-count,
+     * mode-dispatched payloads) are intentionally left without an
+     * output schema in v5.0 — hand-written `oneOf` schemas for those
+     * drift from runtime and are a maintenance liability greater than
+     * the spec-aware-client validation benefit. When a tool with a
+     * non-empty `outputSchema()` runs, the MCP dispatcher dual-emits
+     * the response under `structuredContent` alongside the legacy
+     * text block (`Server::_toolResultEnvelope`); when it's empty the
+     * envelope carries the text block only.
      *
      * @author Craftpulse
      * @since  5.0.0

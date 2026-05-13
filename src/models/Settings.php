@@ -88,6 +88,8 @@ class Settings extends Model
     /**
      * @inheritdoc
      *
+     * @return array<int,mixed>
+     *
      * @author Craftpulse
      * @since  5.0.0
      */
