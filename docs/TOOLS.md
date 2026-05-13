@@ -4,7 +4,7 @@ Auto-generated reference for the cortex MCP tool surface. Run
 `ddev craft cortex/docs/tools` to refresh.
 
 - **Total tools:** 33
-- **Generated:** 2026-05-13T14:20:14-07:00
+- **Generated:** 2026-05-13T14:32:33-07:00
 
 ## `get_initial_context`
 
@@ -1731,7 +1731,7 @@ Run an allowlisted Craft / Yii console command in-process. Required `command` is
 
 ## `craft_exec`
 
-Evaluate a single PHP expression in the running Craft context — wraps Craft's ExecController. **stdio only.** Defaults to dry-run: pass `confirm: true` to actually evaluate. Destructive patterns (delete*, drop*, truncate*, Elements::deleteElement, migrate/down) additionally require `dangerous: true`. Result is JSON-serialised and secrets are redacted before return. Errors come back typed (parse_error / runtime_error) with a stack trace.
+Evaluate a single PHP expression in the running Craft context using PHP `eval` behind six layered security gates (same approach as Craft's ExecController, not a wrapper around it). **stdio only.** Defaults to dry-run: pass `confirm: true` to actually evaluate. Destructive patterns (delete*, drop*, truncate*, Elements::deleteElement, migrate/down) additionally require `dangerous: true`. Result is JSON-serialised and secrets are redacted before return. Errors come back typed (parse_error / runtime_error) with a stack trace.
 
 **Annotations:**
 

@@ -107,9 +107,10 @@ class CraftExec extends AbstractTool
      */
     public static function getDescription(): string
     {
-        return 'Evaluate a single PHP expression in the running Craft context — wraps ' .
-            'Craft\'s ExecController. **stdio only.** Defaults to dry-run: pass ' .
-            '`confirm: true` to actually evaluate. Destructive patterns (delete*, drop*, ' .
+        return 'Evaluate a single PHP expression in the running Craft context using PHP ' .
+            '`eval` behind six layered security gates (same approach as Craft\'s ' .
+            'ExecController, not a wrapper around it). **stdio only.** Defaults to dry-run: ' .
+            'pass `confirm: true` to actually evaluate. Destructive patterns (delete*, drop*, ' .
             'truncate*, Elements::deleteElement, migrate/down) additionally require ' .
             '`dangerous: true`. Result is JSON-serialised and secrets are redacted before ' .
             'return. Errors come back typed (parse_error / runtime_error) with a stack trace.';
