@@ -1,4 +1,4 @@
-<!-- craftcms-claude-skills v1.3.0 -->
+<!-- craftcms-claude-skills v1.4.2 -->
 # Cortex — Craft CMS 5 MCP Server Plugin
 
 @.claude/rules/coding-style.md
@@ -15,7 +15,7 @@
 - **Handle:** `cortex`
 - **Namespace:** `craftpulse\cortex`
 - **Author:** Craftpulse
-- **Status:** Pre-scaffold — repo currently contains only this config and `.git`. Plugin source has not been generated yet.
+- **Status:** Phase 1 (Free tier) feature-complete on `develop-v5`. Shipping: 33 tools, 8 prompts, 77 resources, stdio transport, project-config + DB allowlist, six `craft_exec` security gates, install command, full Pest + PHPStan + ECS green. Pre-Plugin-Store-submission; Phase 2 (Pro tier — HTTP transport, write tools, custom skills, CP UI) is on the roadmap.
 
 Cortex is a Model Context Protocol server for Craft CMS. It exposes Craft internals to AI agents over dual transport (stdio for dev, Streamable HTTP for content ops). Editions: Free / Pro / Commerce. Locked architecture decisions live in this repo's auto-memory and the planning doc (see Paths below).
 
@@ -48,24 +48,37 @@ ddev composer install                # Install deps (auto-runs craft up)
 
 These commands run against the test environment in `~/dev/craft-plugin-playground/cms_v5`, where this plugin is symlinked during development.
 
-## Plugin Structure (planned)
+## Plugin Structure
 
 ```
 src/
-├── Plugin.php                   # Entry point
-├── controllers/                 # CP web controllers
+├── Plugin.php                   # Entry point — wires services, registers generator, hooks Gc
+├── attributes/                  # PHP 8 tool-annotation attributes (IsReadOnly, IsDestructive, IsIdempotent, IsOpenWorld, IsStdioOnly, Title)
+├── config/                      # config/cortex.php reference template
+├── console/controllers/         # cortex/serve (stdio MCP), cortex/install, cortex/docs
+├── controllers/                 # CP web controllers (Settings — runtime allowlist overrides)
 ├── db/                          # Table constants
-├── elements/                    # Custom element types (if any)
-├── enums/                       # PHP backed enums
-├── events/                      # Event classes
-├── jobs/                        # Queue jobs
-├── migrations/                  # Database migrations + Install.php
-├── models/                      # Settings, data models
-├── records/                     # ActiveRecord classes
-├── services/                    # Business logic services (Mcp, Tools, Transport, etc.)
-├── templates/                   # CP Twig templates
-└── translations/                # Translation files
+├── events/                      # RegisterToolsEvent, RegisterPromptsEvent, RegisterResourcesEvent
+├── generator/                   # ddev craft make cortex-tool scaffolder
+├── mcp/                         # JSON-RPC dispatcher (Server.php) — transport-agnostic
+├── migrations/                  # Install.php — cortex_runtime_overrides table
+├── models/                      # Settings (allowedCommands, execEnabled, execDryRunDefault, runtimeOverrideTtl)
+├── prompts/                     # PromptInterface, AbstractPrompt, SkillPrompt
+├── records/                     # RuntimeOverride ActiveRecord
+├── resources/                   # ResourceInterface, AbstractResource, SkillResource, AgentResource, ResourceTemplateInterface
+├── services/                    # Allowlist, Tools, Prompts, Resources (yii\base\Component)
+├── templates/                   # CP Twig templates (Settings page)
+└── tools/                       # ToolInterface + AbstractTool + ToolException
+    ├── content/                 # entries, assets, categories, tags, globals
+    ├── dev/                     # craft_command, craft_exec, clear_caches, resave
+    ├── graphql/                 # graphql
+    ├── schema/                  # sections, entry_types, fields, field_types, category_groups, tag_groups, volumes_and_filesystems, sites, image_transforms, element_types
+    ├── support/                 # AttributeReader, ConsoleRunner, ElementSerializer, InvocationContext, InvocationLogger, RegistryLog, Schema (JSON Schema DSL), SecretRedactor, StdoutCaptureFilter
+    ├── system/                  # get_initial_context, system_info, config, plugins, routes, system_diagnostics, database_schema, extensibility, permissions_and_groups, search_skills
+    └── workflow/                # drafts_and_revisions, content_audit, import_export
 ```
+
+Not built (deferred or never planned): `elements/`, `enums/`, `jobs/` — gc cleanup runs inline via `Gc::EVENT_RUN` rather than a queue job. Custom skills element type lands in Phase 2 Gate 8.5.
 
 ## Paths
 
