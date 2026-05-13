@@ -74,7 +74,44 @@ Cortex is DDEV-aware. When you run `ddev craft cortex/install` it auto-detects t
 
 ## Connect your MCP client
 
-Once Cortex is installed, your MCP client needs to know how to talk to it. Cortex provides two console actions for this — a snippet printer for manual copy-paste, and an auto-config writer that drops the entry directly into your client's config file.
+Once Cortex is installed, your MCP client needs to know how to talk to it. Cortex provides four console actions for this — listed below in order of decreasing magic:
+
+| Action | What it does | Where it runs |
+|--------|--------------|---------------|
+| `cortex/install/auto` | Scans the host for installed MCP clients, then for each one prompts to apply Cortex config. The "I installed Cortex, now wire it up everywhere" flow. | **Host only.** Refuses to run from inside DDEV. |
+| `cortex/install/detect` | Scans the host and prints a status table of which clients are installed and configured. Read-only — never writes. | **Host only.** |
+| `cortex/install/apply --client=<name>` | Writes Cortex config to one specific client's config file. Atomic write + timestamped backup. | Anywhere — host or DDEV — but the config path it targets must exist on the running filesystem. |
+| `cortex/install` | Prints copy-paste snippets for every supported client (or just one with `--client=<name>`). Read-only. | Anywhere. |
+
+**If you're running Cortex inside DDEV**, your container can't see your host's `/Applications`, `~/.cursor`, etc. — so `detect` and `auto` refuse to run there to avoid false negatives. Run them from your host's PHP:
+
+```bash
+php /path/to/project/craft cortex/install/auto
+```
+
+Or stick with the manual snippet form (`ddev craft cortex/install`), which works fine inside DDEV.
+
+### Auto-detect and apply (fastest)
+
+If you're running Cortex from the host (not inside DDEV), this is one command:
+
+```bash
+php craft cortex/install/auto
+```
+
+Cortex scans your host for installed MCP clients (`/Applications`, `PATH`, `%LOCALAPPDATA%`) and the directories where they store config. For each detected client, you'll see a `[Y/n]` prompt — confirm and Cortex writes the config entry the same way `apply` does (atomic write, timestamped backup, idempotent re-runs). Skip with `n` and move to the next.
+
+To preview without writing anything, pair with `--dry-run`:
+
+```bash
+php craft cortex/install/auto --dry-run
+```
+
+To just see the detection table without applying:
+
+```bash
+php craft cortex/install/detect
+```
 
 ### Auto-config writer
 

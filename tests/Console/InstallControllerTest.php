@@ -263,3 +263,86 @@ it('returns null for an unknown client', function() {
 
     expect($path)->toBeNull();
 });
+
+// -----------------------------------------------------------------------------
+// Detection
+// -----------------------------------------------------------------------------
+
+it('detect() returns the expected shape for every known client', function() {
+    // Detection results vary by host (the test machine may or may not
+    // have a given client installed), so we only assert structure here.
+    // Real-machine accuracy is verified manually.
+    $clients = [
+        'claude-desktop', 'claude-code', 'cursor',
+        'continue', 'cline', 'zed', 'windsurf',
+    ];
+
+    foreach ($clients as $client) {
+        $result = $this->controller->detect($client);
+        expect($result)
+            ->toHaveKeys(['app', 'configured', 'configPath'])
+            ->and($result['app'])->toBeBool()
+            ->and($result['configured'])->toBeBool()
+            ->and($result['configPath'])->toBeString();
+    }
+});
+
+it('detect() always reports app=false for VS Code extension clients', function() {
+    // Continue.dev and Cline are extensions, not standalone apps — we
+    // never claim to detect them via /Applications, PATH, or %LOCALAPPDATA%.
+    // The `configured` signal carries them; `app` is structurally locked
+    // to false regardless of host state.
+    foreach (['continue', 'cline'] as $client) {
+        $result = $this->controller->detect($client);
+        expect($result['app'])->toBeFalse();
+    }
+});
+
+it('detect() returns app=false / configured=false for an unknown client', function() {
+    $result = $this->controller->detect('unknown-client');
+
+    expect($result['app'])->toBeFalse()
+        ->and($result['configured'])->toBeFalse()
+        ->and($result['configPath'])->toBeNull();
+});
+
+it('detect() returns configPath equal to resolveConfigPath() for the same client', function() {
+    // The two methods must agree on the target path — detection that
+    // doesn't share apply()'s path resolution would surface "configured"
+    // signals against a file the apply pipeline never touches.
+    foreach (['claude-desktop', 'cursor', 'continue', 'zed', 'windsurf'] as $client) {
+        $detect = $this->controller->detect($client);
+        $resolved = $this->controller->resolveConfigPath($client);
+        expect($detect['configPath'])->toBe($resolved);
+    }
+});
+
+// -----------------------------------------------------------------------------
+// DDEV refusal — detect / auto actions
+// -----------------------------------------------------------------------------
+
+it('actionDetect refuses to run from inside DDEV', function() {
+    // Yii's Controller::stderr() writes to the STDERR file descriptor,
+    // not via PHP's output buffer — message content isn't capturable
+    // here. Exit code is the testable contract; the hint copy lives in
+    // _refuseInDdev() and is reviewable in source.
+    putenv('IS_DDEV_PROJECT=true');
+    try {
+        $exit = @$this->controller->actionDetect();
+    } finally {
+        putenv('IS_DDEV_PROJECT');
+    }
+
+    expect($exit)->toBe(\yii\console\ExitCode::CONFIG);
+});
+
+it('actionAuto refuses to run from inside DDEV', function() {
+    putenv('IS_DDEV_PROJECT=true');
+    try {
+        $exit = @$this->controller->actionAuto();
+    } finally {
+        putenv('IS_DDEV_PROJECT');
+    }
+
+    expect($exit)->toBe(\yii\console\ExitCode::CONFIG);
+});
