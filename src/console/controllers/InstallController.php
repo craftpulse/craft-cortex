@@ -24,7 +24,8 @@ use yii\helpers\Console;
  * The `detect` action scans the host for installed MCP clients and prints
  * a status table. The `auto` action runs detection plus per-client
  * confirm-and-apply in one pass — the Boost-style "I installed cortex,
- * now wire it up everywhere" flow. **Both refuse to run from inside DDEV**
+ * now wire it up everywhere" flow. **Both refuse to run from inside any
+ * container** (DDEV, plain Docker, Lando, Sail, Podman, LXC, Kubernetes)
  * because the container can't see the host's `/Applications`, `~/.cursor`,
  * etc. — false negatives are worse than no detection. The manual
  * `cortex/install` snippet flow works from inside DDEV and stays the
@@ -272,7 +273,8 @@ class InstallController extends Controller
 
     /**
      * Scan the host filesystem for installed MCP clients and print a
-     * status table. **Refuses to run from inside DDEV** — the container
+     * status table. **Refuses to run from inside any container** (DDEV,
+     * plain Docker, Lando, Sail, Podman, LXC, Kubernetes) — the container
      * can't see the host's `/Applications`, `~/.cursor`, etc. and any
      * detection result would be a false negative.
      *
@@ -284,7 +286,7 @@ class InstallController extends Controller
      */
     public function actionDetect(): int
     {
-        if ($this->_refuseInDdev('detect')) {
+        if ($this->_refuseInContainer('detect')) {
             return ExitCode::CONFIG;
         }
 
@@ -326,7 +328,8 @@ class InstallController extends Controller
      * Detect installed clients and walk them interactively — for each
      * detected client, prompt to apply cortex config and run the same
      * write pipeline `actionApply()` uses. **Refuses to run from inside
-     * DDEV** for the same reason `actionDetect()` does.
+     * any container** (DDEV, plain Docker, Lando, Sail, Podman, LXC,
+     * Kubernetes) for the same reason `actionDetect()` does.
      *
      * Honours `--dry-run` (no writes, prints before/after for each) and
      * `--force` (overwrites an existing cortex entry instead of
@@ -335,14 +338,14 @@ class InstallController extends Controller
      * gathered the decision.
      *
      * Exit code: OK when at least one client was applied or skipped
-     * cleanly; CONFIG when running inside DDEV.
+     * cleanly; CONFIG when running inside a container.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
     public function actionAuto(): int
     {
-        if ($this->_refuseInDdev('auto')) {
+        if ($this->_refuseInContainer('auto')) {
             return ExitCode::CONFIG;
         }
 
@@ -549,6 +552,106 @@ class InstallController extends Controller
     }
 
     /**
+     * Return true when the current process is running inside any container
+     * runtime — DDEV, plain Docker / Docker Compose, Podman (with or without
+     * Docker compatibility mode), LXC, systemd-nspawn, Kubernetes, or any
+     * containerd-based runtime. Four independent signals are ORed together:
+     *
+     *   1. **DDEV env vars** (`_detectDdev()`) — `IS_DDEV_PROJECT=true` or
+     *      `DDEV_HOSTNAME` is set. Covers DDEV and DDEV-managed containers
+     *      regardless of the underlying runtime.
+     *
+     *   2. **`/.dockerenv` sentinel file** — Docker, Docker Compose, Podman
+     *      in Docker-compatibility mode, and most Docker-based wrappers
+     *      (Lando, Laravel Sail, Docksal) all bind-mount this empty file at
+     *      the filesystem root. Podman also creates it in compat mode.
+     *
+     *   3. **`container` env var** — Set to a non-empty string by Podman in
+     *      native (non-Docker-compat) mode and by systemd-nspawn containers.
+     *      `getenv()` returns `false` when the var is unset, so we check for
+     *      a truthy non-empty string only.
+     *
+     *   4. **`/proc/self/cgroup` content** — Readable on Linux hosts; not
+     *      present on macOS/Windows hosts. The file contains one line per
+     *      cgroup entry; when any line contains the tokens `docker`,
+     *      `kubepods`, `lxc`, or `containerd` the process is containerised.
+     *      We use `file_get_contents` — no shell exec. On runtimes that don't
+     *      expose `/proc` (e.g. macOS) the file_get_contents call returns
+     *      false, which we treat as "not detected via this signal".
+     *
+     * `_detectDdev()` is kept as a separate predicate because `_buildCommand()`
+     * uses it to decide whether to emit the DDEV-specific `docker exec` form.
+     * That path is DDEV-specific; we know the `ddev-<project>-web` naming
+     * convention. For plain Docker or other runtimes we don't, so `_buildCommand()`
+     * is intentionally left untouched.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _detectContainer(): bool
+    {
+        if ($this->_detectDdev()) {
+            return true;
+        }
+
+        if (is_file('/.dockerenv')) {
+            return true;
+        }
+
+        $containerEnv = getenv('container');
+        if (is_string($containerEnv) && $containerEnv !== '') {
+            return true;
+        }
+
+        $cgroup = @file_get_contents('/proc/self/cgroup');
+        if (is_string($cgroup) && preg_match('/docker|kubepods|lxc|containerd/', $cgroup)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Refuse to run the detect-or-auto pipeline when cortex is invoked
+     * from inside any container (DDEV, plain Docker, Lando, Sail, Podman,
+     * LXC, Kubernetes). Detection inside a container walks the container's
+     * filesystem, not the host's — `/Applications`, `~/.cursor`, etc. don't
+     * exist there, so every signal would be a false negative. Returns true
+     * (and emits the message) when the action should bail; false (silent)
+     * when it should proceed.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _refuseInContainer(string $action): bool
+    {
+        if (!$this->_detectContainer()) {
+            return false;
+        }
+
+        $this->stderr("\n");
+        $this->stderr("cortex/install/{$action} cannot run from inside a container.\n", Console::FG_RED);
+        $this->stderr("\n");
+        $this->stderr("The cortex process can only see the container's filesystem —\n", Console::FG_GREY);
+        $this->stderr("not your host's /Applications, ~/.cursor, etc. Detection from\n", Console::FG_GREY);
+        $this->stderr("inside the container would produce false negatives.\n", Console::FG_GREY);
+        $this->stderr("\n");
+        $this->stderr("Run from your host's PHP instead:\n", Console::FG_GREY);
+        $this->stderr("  php /path/to/project/craft cortex/install/{$action}\n", Console::FG_CYAN);
+        $this->stderr("\n");
+
+        if ($this->_detectDdev()) {
+            $this->stderr("Or use the manual snippet form (works from inside DDEV):\n", Console::FG_GREY);
+            $this->stderr("  ddev craft cortex/install [--client=<name>]\n\n", Console::FG_CYAN);
+        } else {
+            $this->stderr("Or use the manual snippet form:\n", Console::FG_GREY);
+            $this->stderr("  php craft cortex/install [--client=<name>]\n\n", Console::FG_CYAN);
+        }
+
+        return true;
+    }
+
+    /**
      * Apply cortex config for a single client. Shared pipeline behind
      * `actionApply()` (interactive single-client) and `actionAuto()`
      * (per-detected-client loop). When `$skipConfirm` is true, the
@@ -639,8 +742,8 @@ class InstallController extends Controller
                 $this->stdout("{$parent}", Console::FG_YELLOW);
                 $this->stdout(" does not exist on this filesystem.\n", Console::FG_YELLOW);
                 $this->stdout("A real write would refuse — this dry-run is a preview only.\n", Console::FG_YELLOW);
-                if ($this->_detectDdev()) {
-                    $this->stdout("(You're running inside DDEV. The container's filesystem isn't your host's; copy the\n", Console::FG_GREY);
+                if ($this->_detectContainer()) {
+                    $this->stdout("(You're running inside a container. The container's filesystem isn't your host's; copy the\n", Console::FG_GREY);
                     $this->stdout("AFTER block below into your host MCP client config manually.)\n\n", Console::FG_GREY);
                 } else {
                     $this->stdout("\n");
@@ -678,38 +781,6 @@ class InstallController extends Controller
         $this->stdout(sprintf("\nWrote cortex config to %s.\n", $path), Console::FG_GREEN);
         $this->stdout("Reload {$label} to pick up the new server.\n", Console::FG_GREEN);
         return ExitCode::OK;
-    }
-
-    /**
-     * Refuse to run the detect-or-auto pipeline when cortex is invoked
-     * from inside a DDEV container. Detection inside DDEV walks the
-     * container's filesystem, not the host's — `/Applications`,
-     * `~/.cursor`, etc. don't exist there, so every signal would be a
-     * false negative. Returns true (and emits the message) when the
-     * action should bail; false (silent) when it should proceed.
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _refuseInDdev(string $action): bool
-    {
-        if (!$this->_detectDdev()) {
-            return false;
-        }
-
-        $this->stderr("\n");
-        $this->stderr("cortex/install/{$action} cannot run from inside DDEV.\n", Console::FG_RED);
-        $this->stderr("\n");
-        $this->stderr("The cortex process can only see the container's filesystem —\n", Console::FG_GREY);
-        $this->stderr("not your host's /Applications, ~/.cursor, etc. Detection from\n", Console::FG_GREY);
-        $this->stderr("inside the container would produce false negatives.\n", Console::FG_GREY);
-        $this->stderr("\n");
-        $this->stderr("Run from your host's PHP instead:\n", Console::FG_GREY);
-        $this->stderr("  php /path/to/project/craft cortex/install/{$action}\n", Console::FG_CYAN);
-        $this->stderr("\n");
-        $this->stderr("Or use the manual snippet form (works from inside DDEV):\n", Console::FG_GREY);
-        $this->stderr("  ddev craft cortex/install [--client=<name>]\n\n", Console::FG_CYAN);
-        return true;
     }
 
     /**
