@@ -7,6 +7,7 @@ use craft\enums\CmsEdition;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\support\Schema;
 
 /**
  * =========================================================================
@@ -52,6 +53,56 @@ class SystemInfo extends AbstractTool
         return 'Snapshot of the running Craft install: version, edition, schema version, ' .
             'environment, devMode, PHP version, database driver/version, site count, ' .
             'maintenance flag, and license state. No parameters.';
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Output is a stable nested object — every key is always emitted with
+     * the same type, so we advertise an outputSchema so spec-aware clients
+     * read the response from `structuredContent` and validate it. Older
+     * clients still read the JSON-serialised text block.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public static function outputSchema(): array
+    {
+        return Schema::object([
+            'craft' => Schema::object([
+                'version' => Schema::string()->required(),
+                'edition' => Schema::string()->required()->description('Solo / Team / Pro / Enterprise.'),
+                'editionId' => Schema::integer()->required(),
+                'schemaVersion' => Schema::string()->required(),
+                'fieldVersion' => Schema::string()->required(),
+                'maintenance' => Schema::boolean()->required(),
+                'devMode' => Schema::boolean()->required(),
+                'environment' => Schema::string()->required(),
+                'isInstalled' => Schema::boolean()->required(),
+                'systemName' => Schema::string()->required(),
+                'systemUid' => Schema::string()->required(),
+            ])->required(),
+            'php' => Schema::object([
+                'version' => Schema::string()->required(),
+                'sapi' => Schema::string()->required(),
+                'memoryLimit' => Schema::string()->required(),
+                'maxExecutionTime' => Schema::string()->required(),
+                'timezone' => Schema::string()->required(),
+            ])->required(),
+            'db' => Schema::object([
+                'driver' => Schema::string()->required(),
+                'serverVersion' => Schema::string()->required(),
+                'isMysql' => Schema::boolean()->required(),
+                'isPgsql' => Schema::boolean()->required(),
+            ])->required(),
+            'sites' => Schema::object([
+                'count' => Schema::integer()->required(),
+                'primarySiteHandle' => Schema::string()->required(),
+            ])->required(),
+            'license' => Schema::object([
+                'status' => Schema::string()->required(),
+            ])->required(),
+        ])->toArray();
     }
 
     /**

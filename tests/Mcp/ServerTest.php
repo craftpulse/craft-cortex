@@ -205,6 +205,47 @@ it('wraps tool output in an MCP success envelope on tools/call', function() {
     expect($unwrapped)->toHaveKey('count');
 });
 
+it('omits structuredContent when the tool declares no outputSchema', function() {
+    // `sections` (in count mode) returns a stable `{count: int}` shape but
+    // does not declare an outputSchema, so the envelope only carries the
+    // text block. Spec lets clients infer "no schema" by absence.
+    $response = $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 3,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'sections',
+            'arguments' => ['count' => true],
+        ],
+    ]);
+
+    expect($response['result'])->toBeMcpSuccessEnvelope();
+    expect($response['result'])->not->toHaveKey('structuredContent');
+});
+
+it('dual-emits structuredContent when the tool declares an outputSchema', function() {
+    // `system_info` declares outputSchema, so the envelope carries both
+    // the legacy text block AND a structuredContent field with the same
+    // parsed payload. Spec-aware clients read structuredContent and can
+    // validate against tools/list outputSchema; older clients fall back
+    // to the text block.
+    $response = $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 3,
+        'method' => 'tools/call',
+        'params' => ['name' => 'system_info'],
+    ]);
+
+    expect($response['result'])->toBeMcpSuccessEnvelope();
+    expect($response['result'])->toHaveKey('structuredContent');
+
+    $structured = $response['result']['structuredContent'];
+    $text = cortex_unwrap($response['result']);
+
+    expect($structured)->toBe($text);
+    expect($structured)->toHaveKeys(['craft', 'php', 'db', 'sites', 'license']);
+});
+
 it('returns an isError envelope when a tool throws ToolException', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',

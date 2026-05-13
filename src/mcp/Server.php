@@ -8,6 +8,7 @@ use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\support\InvocationLogger;
 use craftpulse\cortex\tools\ToolException;
+use craftpulse\cortex\tools\ToolInterface;
 use Generator;
 use Throwable;
 
@@ -382,7 +383,7 @@ class Server
 
         InvocationLogger::logCall($name, $arguments, null, $this->_elapsedMs($startNs), $context);
 
-        return $this->_successResponse($id, $this->_toolResultEnvelope($result));
+        return $this->_successResponse($id, $this->_toolResultEnvelope($tool, $result));
     }
 
     /**
@@ -469,15 +470,21 @@ class Server
      * serialised as JSON and returned in a single text-content block
      * — that's the convention every shipping MCP server uses.
      *
+     * When the tool declares a non-empty `outputSchema()`, the envelope
+     * additionally carries the parsed object under `structuredContent`
+     * per MCP 2025-06-18 §6.2 — clients with schema-validation support
+     * read that, older clients fall back to the text block. Tools with
+     * no output schema declared emit the text block only.
+     *
      * @param array<int|string,mixed> $result
      * @return array<string,mixed>
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _toolResultEnvelope(array $result): array
+    private function _toolResultEnvelope(ToolInterface $tool, array $result): array
     {
-        return [
+        $envelope = [
             'content' => [
                 [
                     'type' => 'text',
@@ -489,6 +496,12 @@ class Server
             ],
             'isError' => false,
         ];
+
+        if ($tool::outputSchema() !== []) {
+            $envelope['structuredContent'] = $result;
+        }
+
+        return $envelope;
     }
 
     /**
@@ -549,6 +562,8 @@ class Server
      * logger under the `cortex` category; the wire response stays
      * generic so untrusted-client transports don't leak internal paths
      * or SQL fragments.
+     *
+     * @return array<string,mixed>
      *
      * @author Craftpulse
      * @since  5.0.0

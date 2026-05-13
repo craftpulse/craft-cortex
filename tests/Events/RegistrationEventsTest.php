@@ -242,11 +242,31 @@ it('emits outputSchema in tools/list when a tool advertises one', function() {
 });
 
 it('omits outputSchema in tools/list when a tool returns []', function() {
-    // Bundled tools (none of which advertise outputSchema) — payload
-    // should never carry the key for them.
-    $payload = \craftpulse\cortex\Plugin::getInstance()->tools->asListPayload();
+    // Tools/list entries should carry `outputSchema` if and only if the
+    // tool's static `outputSchema()` returns a non-empty array. Iterate
+    // every bundled tool and verify the presence/absence matches.
+    $tools = \craftpulse\cortex\Plugin::getInstance()->tools;
+    $payload = $tools->asListPayload();
+    $byName = [];
     foreach ($payload as $entry) {
-        expect($entry)->not->toHaveKey('outputSchema');
+        $byName[$entry['name']] = $entry;
+    }
+
+    foreach ($tools->getAll() as $tool) {
+        $entry = $byName[$tool::getName()] ?? null;
+        expect($entry)->not->toBeNull();
+
+        $schema = $tool::outputSchema();
+        if ($schema === []) {
+            expect($entry)->not->toHaveKey('outputSchema');
+        } else {
+            expect($entry)->toHaveKey('outputSchema');
+            // toEqual (structural) rather than toBe (identity) — empty
+            // property maps render as stdClass instances and two
+            // invocations of the same outputSchema() produce
+            // identity-distinct but structurally-equal trees.
+            expect($entry['outputSchema'])->toEqual($schema);
+        }
     }
 });
 
