@@ -3,8 +3,211 @@
 Auto-generated reference for the cortex MCP tool surface. Run
 `ddev craft cortex/docs/tools` to refresh.
 
-- **Total tools:** 32
-- **Generated:** 2026-05-07T10:46:39-07:00
+- **Total tools:** 33
+- **Generated:** 2026-05-13T14:20:14-07:00
+
+## `get_initial_context`
+
+Bootstrap snapshot for an AI agent picking up a fresh conversation against this Craft install. Returns Craft version + edition + environment, the primary site handle, a thin sites/sections/element-types index, the bundled cortex skill prompts (the moat content the LLM should consult when authoring against Craft), the `craft_exec` posture, and the effective command allowlist. Call this first — it replaces three or four orientation tool calls with one.
+
+**Annotations:**
+
+- `readOnlyHint`: true
+- `idempotentHint`: true
+- `title`: Get Initial Context
+
+**Input schema:**
+
+```json
+{
+    "type": "object",
+    "properties": {},
+    "additionalProperties": false
+}
+```
+
+**Output schema:**
+
+```json
+{
+    "type": "object",
+    "properties": {
+        "craft": {
+            "type": "object",
+            "properties": {
+                "version": {
+                    "type": "string"
+                },
+                "edition": {
+                    "type": "string"
+                },
+                "schemaVersion": {
+                    "type": "string"
+                },
+                "environment": {
+                    "type": "string"
+                },
+                "devMode": {
+                    "type": "boolean"
+                },
+                "primarySiteHandle": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "version",
+                "edition",
+                "schemaVersion",
+                "environment",
+                "devMode",
+                "primarySiteHandle"
+            ],
+            "additionalProperties": false
+        },
+        "sites": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "handle": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "language": {
+                        "type": "string"
+                    },
+                    "primary": {
+                        "type": "boolean"
+                    }
+                },
+                "required": [
+                    "handle",
+                    "name",
+                    "language",
+                    "primary"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "sections": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "handle": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "type": {
+                        "type": "string"
+                    },
+                    "entryTypeCount": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "handle",
+                    "name",
+                    "type",
+                    "entryTypeCount"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "elementTypes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "handle": {
+                        "type": "string"
+                    },
+                    "refHandle": {
+                        "type": "string"
+                    },
+                    "displayName": {
+                        "type": "string"
+                    },
+                    "class": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "handle",
+                    "displayName",
+                    "class"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "skillPrompts": {
+            "type": "array",
+            "description": "Bundled cortex prompts that return authored Craft expertise. Invoke `prompts/get` with one of these names when authoring against Craft.",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "name",
+                    "description"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "exec": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "dryRunDefault": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "enabled",
+                "dryRunDefault"
+            ],
+            "additionalProperties": false
+        },
+        "allowlist": {
+            "type": "array",
+            "description": "Effective allowlist of command-route glob patterns the `craft_command` tool may dispatch. Union of project-config defaults plus active runtime overrides.",
+            "items": {
+                "type": "string"
+            }
+        },
+        "hints": {
+            "type": "array",
+            "description": "Operating notes for the agent \u2014 when to invoke which prompts, which tools are stdio-only, etc.",
+            "items": {
+                "type": "string"
+            }
+        }
+    },
+    "required": [
+        "craft",
+        "sites",
+        "sections",
+        "elementTypes",
+        "skillPrompts",
+        "exec",
+        "allowlist",
+        "hints"
+    ],
+    "additionalProperties": false
+}
+```
 
 ## `sections`
 
@@ -651,6 +854,157 @@ Snapshot of the running Craft install: version, edition, schema version, environ
 }
 ```
 
+**Output schema:**
+
+```json
+{
+    "type": "object",
+    "properties": {
+        "craft": {
+            "type": "object",
+            "properties": {
+                "version": {
+                    "type": "string"
+                },
+                "edition": {
+                    "type": "string",
+                    "description": "Solo / Team / Pro / Enterprise."
+                },
+                "editionId": {
+                    "type": "integer"
+                },
+                "schemaVersion": {
+                    "type": "string"
+                },
+                "fieldVersion": {
+                    "type": "string"
+                },
+                "maintenance": {
+                    "type": "boolean"
+                },
+                "devMode": {
+                    "type": "boolean"
+                },
+                "environment": {
+                    "type": "string"
+                },
+                "isInstalled": {
+                    "type": "boolean"
+                },
+                "systemName": {
+                    "type": "string"
+                },
+                "systemUid": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "version",
+                "edition",
+                "editionId",
+                "schemaVersion",
+                "fieldVersion",
+                "maintenance",
+                "devMode",
+                "environment",
+                "isInstalled",
+                "systemName",
+                "systemUid"
+            ],
+            "additionalProperties": false
+        },
+        "php": {
+            "type": "object",
+            "properties": {
+                "version": {
+                    "type": "string"
+                },
+                "sapi": {
+                    "type": "string"
+                },
+                "memoryLimit": {
+                    "type": "string"
+                },
+                "maxExecutionTime": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "version",
+                "sapi",
+                "memoryLimit",
+                "maxExecutionTime",
+                "timezone"
+            ],
+            "additionalProperties": false
+        },
+        "db": {
+            "type": "object",
+            "properties": {
+                "driver": {
+                    "type": "string"
+                },
+                "serverVersion": {
+                    "type": "string"
+                },
+                "isMysql": {
+                    "type": "boolean"
+                },
+                "isPgsql": {
+                    "type": "boolean"
+                }
+            },
+            "required": [
+                "driver",
+                "serverVersion",
+                "isMysql",
+                "isPgsql"
+            ],
+            "additionalProperties": false
+        },
+        "sites": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "primarySiteHandle": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "count",
+                "primarySiteHandle"
+            ],
+            "additionalProperties": false
+        },
+        "license": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "status"
+            ],
+            "additionalProperties": false
+        }
+    },
+    "required": [
+        "craft",
+        "php",
+        "db",
+        "sites",
+        "license"
+    ],
+    "additionalProperties": false
+}
+```
+
 ## `config`
 
 Read curated Craft configuration. Modes: `general` (whitelisted GeneralConfig fields), `custom` (config/custom.php), `db` (host/name/driver/port — never user/password), `email` (transport adapter from project config), `system_messages` (system email message keys). All output is secrets-redacted.
@@ -704,6 +1058,90 @@ List every installed plugin (enabled or not). Returns handle, name, version, edi
 }
 ```
 
+**Output schema:**
+
+```json
+{
+    "type": "object",
+    "properties": {
+        "plugins": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "handle": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "version": {
+                        "type": "string"
+                    },
+                    "schemaVersion": {
+                        "type": "string"
+                    },
+                    "edition": {
+                        "type": "string"
+                    },
+                    "hasMultipleEditions": {
+                        "type": "boolean"
+                    },
+                    "developer": {
+                        "type": "string"
+                    },
+                    "developerUrl": {
+                        "type": "string"
+                    },
+                    "documentationUrl": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "isInstalled": {
+                        "type": "boolean"
+                    },
+                    "isEnabled": {
+                        "type": "boolean"
+                    },
+                    "moduleId": {
+                        "type": "string"
+                    },
+                    "licenseKeyStatus": {
+                        "type": "string"
+                    },
+                    "licenseIssues": {
+                        "type": "array",
+                        "items": []
+                    }
+                },
+                "required": [
+                    "handle",
+                    "hasMultipleEditions",
+                    "isInstalled",
+                    "isEnabled",
+                    "licenseIssues"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "count": {
+            "type": "integer"
+        },
+        "enabledCount": {
+            "type": "integer"
+        }
+    },
+    "required": [
+        "plugins",
+        "count",
+        "enabledCount"
+    ],
+    "additionalProperties": false
+}
+```
+
 ## `routes`
 
 Combined route map: config-file routes (config/routes.php), project-config routes (admin-edited), section URI formats per site, and category-group URIs per site. Tells you what URL patterns exist on the install and where to add a new one.
@@ -719,6 +1157,121 @@ Combined route map: config-file routes (config/routes.php), project-config route
 {
     "type": "object",
     "properties": {},
+    "additionalProperties": false
+}
+```
+
+**Output schema:**
+
+```json
+{
+    "type": "object",
+    "properties": {
+        "configFileRoutes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string"
+                    },
+                    "target": []
+                },
+                "required": [
+                    "pattern",
+                    "target"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "projectConfigRoutes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "pattern": {
+                        "type": "string"
+                    },
+                    "target": []
+                },
+                "required": [
+                    "pattern",
+                    "target"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "sectionRoutes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "sectionHandle": {
+                        "type": "string"
+                    },
+                    "sectionType": {
+                        "type": "string"
+                    },
+                    "siteId": {
+                        "type": "integer"
+                    },
+                    "siteHandle": {
+                        "type": "string"
+                    },
+                    "uriFormat": {
+                        "type": "string"
+                    },
+                    "template": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "sectionHandle",
+                    "sectionType",
+                    "siteId"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "categoryGroupRoutes": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "groupHandle": {
+                        "type": "string"
+                    },
+                    "siteId": {
+                        "type": "integer"
+                    },
+                    "siteHandle": {
+                        "type": "string"
+                    },
+                    "uriFormat": {
+                        "type": "string"
+                    },
+                    "template": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "groupHandle",
+                    "siteId"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "siteCount": {
+            "type": "integer"
+        }
+    },
+    "required": [
+        "configFileRoutes",
+        "projectConfigRoutes",
+        "sectionRoutes",
+        "categoryGroupRoutes",
+        "siteCount"
+    ],
     "additionalProperties": false
 }
 ```
@@ -855,6 +1408,79 @@ The full Craft permissions tree (built-in + plugin-registered) and the user-grou
 {
     "type": "object",
     "properties": {},
+    "additionalProperties": false
+}
+```
+
+**Output schema:**
+
+```json
+{
+    "type": "object",
+    "properties": {
+        "permissions": {
+            "type": "object",
+            "description": "Recursive permissions tree keyed by category name.",
+            "properties": {},
+            "additionalProperties": true
+        },
+        "permissionCount": {
+            "type": "integer"
+        },
+        "permissionNames": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            }
+        },
+        "groups": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "uid": {
+                        "type": "string"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "handle": {
+                        "type": "string"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "permissions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "uid",
+                    "name",
+                    "handle",
+                    "permissions"
+                ],
+                "additionalProperties": false
+            }
+        },
+        "groupCount": {
+            "type": "integer"
+        }
+    },
+    "required": [
+        "permissions",
+        "permissionCount",
+        "permissionNames",
+        "groups",
+        "groupCount"
+    ],
     "additionalProperties": false
 }
 ```

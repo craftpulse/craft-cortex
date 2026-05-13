@@ -14,6 +14,9 @@ use craftpulse\cortex\tools\ToolInterface;
 
 it('registers every bundled tool by name', function() {
     $expected = [
+        // Orientation
+        'get_initial_context',
+
         // Schema & structure
         'sections',
         'entry_types',

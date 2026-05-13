@@ -197,6 +197,13 @@ class DocsController extends Controller
             $md .= "**Input schema:**\n\n";
             $json = json_encode($schema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
             $md .= "```json\n{$json}\n```\n\n";
+
+            $outputSchema = $tool::outputSchema();
+            if ($outputSchema !== []) {
+                $md .= "**Output schema:**\n\n";
+                $json = json_encode($outputSchema, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                $md .= "```json\n{$json}\n```\n\n";
+            }
         }
 
         return $md;

@@ -29,6 +29,7 @@ use craftpulse\cortex\tools\system\Config;
 use craftpulse\cortex\tools\system\DatabaseSchema;
 use craftpulse\cortex\tools\system\Diagnostics;
 use craftpulse\cortex\tools\system\Extensibility;
+use craftpulse\cortex\tools\system\InitialContext;
 use craftpulse\cortex\tools\system\PermissionsAndGroups;
 use craftpulse\cortex\tools\system\Plugins;
 use craftpulse\cortex\tools\system\Routes;
@@ -211,6 +212,9 @@ class Tools extends Component
     private function _buildRegistry(): array
     {
         return [
+            // Orientation — first in the list so fresh agents see it first.
+            new InitialContext(),
+
             // Schema & structure.
             new Sections(),
             new EntryTypes(),
