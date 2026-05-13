@@ -7,6 +7,7 @@ use craft\db\Query;
 use craft\db\Table;
 use craft\elements\Asset;
 use craft\elements\Entry;
+use craft\helpers\DateTimeHelper;
 use craft\models\Section;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
@@ -63,6 +64,22 @@ class Audit extends AbstractTool
      * @since 5.0.0
      */
     public const PROPAGATION_SECTION_ROW_CAP = 50000;
+
+    /**
+     * Global cap on accumulated propagation gaps across all sections.
+     * Once the gap array reaches this size the outer section loop short-
+     * circuits and the payload sets `globalCapReached = true`. Picked
+     * at 5000 because that's roughly an order of magnitude above what
+     * an operator is willing to read in a single tool response, while
+     * still leaving headroom for partial-site rollouts where every
+     * canonical row shows up as a gap (one section can produce
+     * thousands). The per-section cap (above) handles single-section
+     * runaway; this one bounds the cumulative cost when many sections
+     * each contribute a moderate number of gaps.
+     *
+     * @since 5.0.0
+     */
+    public const PROPAGATION_GLOBAL_GAP_CAP = 5000;
 
     // Public Methods
     // =========================================================================
@@ -152,8 +169,8 @@ class Audit extends AbstractTool
      */
     private function _relations(array $arguments): array
     {
-        $limit = $this->_limit($arguments);
-        $offset = max(0, (int) ($arguments['offset'] ?? 0));
+        $limit = $this->_limit($arguments, self::DEFAULT_LIMIT, self::MAX_LIMIT);
+        $offset = $this->_offset($arguments);
 
         $base = (new Query())
             ->from(['relations' => Table::RELATIONS])
@@ -198,18 +215,25 @@ class Audit extends AbstractTool
      */
     private function _unusedAssets(array $arguments): array
     {
-        $limit = $this->_limit($arguments);
-        $offset = max(0, (int) ($arguments['offset'] ?? 0));
+        $limit = $this->_limit($arguments, self::DEFAULT_LIMIT, self::MAX_LIMIT);
+        $offset = $this->_offset($arguments);
 
-        $referencedIds = (new Query())
-            ->select('targetId')
-            ->from(Table::RELATIONS)
-            ->distinct();
-
+        // LEFT JOIN against `relations` and filter for rows where no
+        // matching `targetId` exists. This replaces the older
+        // `NOT IN (SELECT targetId FROM relations)` subquery, which
+        // forces MySQL to materialise the full set of referenced ids
+        // before running the outer scan — slow on large installs and
+        // notoriously hard for the planner to flatten. The LEFT JOIN
+        // variant lets the planner use the `relations.targetId` index
+        // directly and short-circuits per row.
         $query = Asset::find()
             ->status(null)
             ->site('*')
-            ->andWhere(['not', ['elements.id' => $referencedIds]]);
+            ->leftJoin(
+                ['cortex_relations' => Table::RELATIONS],
+                '[[cortex_relations.targetId]] = [[elements.id]]',
+            )
+            ->andWhere(['cortex_relations.id' => null]);
 
         if (isset($arguments['volume']) && is_string($arguments['volume']) && $arguments['volume'] !== '') {
             $query->volume($arguments['volume']);
@@ -253,7 +277,7 @@ class Audit extends AbstractTool
             'volumeHandle' => $asset->getVolume()->handle,
             'folderPath' => $asset->folderPath,
             'siteHandle' => $asset->getSite()->handle,
-            'dateCreated' => $asset->dateCreated?->format(\DateTimeInterface::ATOM),
+            'dateCreated' => $asset->dateCreated !== null ? DateTimeHelper::toIso8601($asset->dateCreated) : null,
         ];
     }
 
@@ -274,8 +298,8 @@ class Audit extends AbstractTool
      */
     private function _propagation(array $arguments): array
     {
-        $limit = $this->_limit($arguments);
-        $offset = max(0, (int) ($arguments['offset'] ?? 0));
+        $limit = $this->_limit($arguments, self::DEFAULT_LIMIT, self::MAX_LIMIT);
+        $offset = $this->_offset($arguments);
 
         $sections = Craft::$app->getEntries()->getAllSections();
 
@@ -295,6 +319,7 @@ class Audit extends AbstractTool
 
         $gaps = [];
         $truncatedSections = [];
+        $globalCapReached = false;
         foreach ($multiSiteSections as $section) {
             $expectedSiteIds = array_values(array_map(
                 static fn($s): int => (int) $s->siteId,
@@ -348,6 +373,11 @@ class Audit extends AbstractTool
                     'missingSites' => $missing,
                 ];
             }
+
+            if (count($gaps) >= self::PROPAGATION_GLOBAL_GAP_CAP) {
+                $globalCapReached = true;
+                break;
+            }
         }
 
         $totalCount = count($gaps);
@@ -360,6 +390,7 @@ class Audit extends AbstractTool
             'totalCount' => $totalCount,
             'limit' => $limit,
             'offset' => $offset,
+            'globalCapReached' => $globalCapReached,
         ];
 
         if ($truncatedSections !== []) {
@@ -372,16 +403,17 @@ class Audit extends AbstractTool
                 'Narrow with the `section` filter for an exhaustive scan of a single section.';
         }
 
-        return $payload;
-    }
+        if ($globalCapReached) {
+            $payload['globalCapHit'] = self::PROPAGATION_GLOBAL_GAP_CAP;
+            $payload['hint'] = ($payload['hint'] ?? '') !== ''
+                ? $payload['hint'] . ' '
+                : '';
+            $payload['hint'] .= 'The global gap cap of '
+                . self::PROPAGATION_GLOBAL_GAP_CAP
+                . ' was reached — additional sections were not scanned. '
+                . 'Narrow with the `section` filter to inspect specific sections.';
+        }
 
-    /**
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _limit(array $arguments): int
-    {
-        $limit = (int) ($arguments['limit'] ?? self::DEFAULT_LIMIT);
-        return max(1, min(self::MAX_LIMIT, $limit));
+        return $payload;
     }
 }

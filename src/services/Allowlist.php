@@ -35,6 +35,33 @@ use yii\base\Exception;
  */
 class Allowlist extends Component
 {
+    // Constants
+    // =========================================================================
+
+    /**
+     * Cap on the number of expired overrides pruned per gc invocation.
+     * Re-armed on the next gc cycle, so eventual consistency is
+     * preserved without a single sweep blocking other DB work.
+     *
+     * @since 5.0.0
+     */
+    public const PRUNE_BATCH_LIMIT = 10000;
+
+    // Private Properties
+    // =========================================================================
+
+    /**
+     * Per-request memoization of `getActiveOverrides()`. The same
+     * request can resolve `getEffective()` multiple times (once for
+     * the registry lookup, once for the audit-log line, plus inside
+     * `craft_command` itself) — caching trims the DB round-trips
+     * without persisting across requests. Mutating methods
+     * (`add()` / `remove()` / `pruneExpired()`) reset the cache.
+     *
+     * @var array<int,array<string,mixed>>|null
+     */
+    private ?array $_activeOverridesCache = null;
+
     // Public Methods — Read
     // =========================================================================
 
@@ -58,6 +85,8 @@ class Allowlist extends Component
 
     /**
      * Currently-active overrides (unexpired and not soft-deleted).
+     * Memoized per-request — mutations invalidate the cache so a
+     * single request that adds + reads back gets the up-to-date row.
      *
      * @return array<int,array<string,mixed>>
      *
@@ -66,6 +95,10 @@ class Allowlist extends Component
      */
     public function getActiveOverrides(): array
     {
+        if ($this->_activeOverridesCache !== null) {
+            return $this->_activeOverridesCache;
+        }
+
         $now = Carbon::now()->toDateTimeString();
         /** @var array<int,array<string,mixed>> $rows */
         $rows = RuntimeOverride::find()
@@ -74,7 +107,7 @@ class Allowlist extends Component
             ->orderBy(['expiresAt' => SORT_ASC])
             ->asArray()
             ->all();
-        return $rows;
+        return $this->_activeOverridesCache = $rows;
     }
 
     /**
@@ -123,6 +156,7 @@ class Allowlist extends Component
         $override->createdByUserId = $userId;
         $override->expiresAt = Carbon::now()->addSeconds($ttl)->toDateTimeString();
         $this->_saveOrThrow($override, 'save', $pattern);
+        $this->_activeOverridesCache = null;
 
         return $override;
     }
@@ -143,13 +177,19 @@ class Allowlist extends Component
         }
         $override->dateDeleted = Carbon::now()->toDateTimeString();
         $this->_saveOrThrow($override, 'soft-delete', "#{$id}");
+        $this->_activeOverridesCache = null;
         return true;
     }
 
     /**
-     * Hard-delete every expired override. Invoked during Craft's gc
-     * sweep via the listener registered in `Plugin::init()`. Returns
-     * the number of rows pruned.
+     * Hard-delete expired overrides in capped batches. Invoked during
+     * Craft's gc sweep via the listener registered in `Plugin::init()`.
+     * Returns the number of rows pruned in this call.
+     *
+     * The cap (`PRUNE_BATCH_LIMIT`) bounds gc's worst-case runtime when
+     * an install has accumulated tens of thousands of expired rows —
+     * subsequent gc cycles pick up the rest. Without the cap a single
+     * gc pass could lock the table for seconds on large installs.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -157,11 +197,27 @@ class Allowlist extends Component
     public function pruneExpired(): int
     {
         $now = Carbon::now()->toDateTimeString();
-        return RuntimeOverride::deleteAll([
-            'and',
-            ['dateDeleted' => null],
-            ['<', 'expiresAt', $now],
-        ]);
+
+        // `deleteAll` has no built-in LIMIT, so we select the next batch
+        // of expired ids and delete by primary key. Indexed lookup +
+        // bounded round-trip cost.
+        $ids = RuntimeOverride::find()
+            ->select(['id'])
+            ->where([
+                'and',
+                ['dateDeleted' => null],
+                ['<', 'expiresAt', $now],
+            ])
+            ->limit(self::PRUNE_BATCH_LIMIT)
+            ->column();
+
+        if ($ids === []) {
+            return 0;
+        }
+
+        $deleted = RuntimeOverride::deleteAll(['id' => $ids]);
+        $this->_activeOverridesCache = null;
+        return $deleted;
     }
 
     // Private Methods

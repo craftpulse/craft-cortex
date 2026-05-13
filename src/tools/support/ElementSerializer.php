@@ -5,6 +5,7 @@ namespace craftpulse\cortex\tools\support;
 use craft\base\ElementInterface;
 use craft\elements\db\ElementQuery;
 use craft\elements\ElementCollection;
+use craft\helpers\DateTimeHelper;
 use DateTimeInterface;
 
 /**
@@ -100,8 +101,8 @@ class ElementSerializer
             'enabled' => $element->enabled,
             'archived' => $element->archived,
             'trashed' => $element->trashed,
-            'dateCreated' => $element->dateCreated?->format(DateTimeInterface::ATOM),
-            'dateUpdated' => $element->dateUpdated?->format(DateTimeInterface::ATOM),
+            'dateCreated' => $element->dateCreated !== null ? DateTimeHelper::toIso8601($element->dateCreated) : null,
+            'dateUpdated' => $element->dateUpdated !== null ? DateTimeHelper::toIso8601($element->dateUpdated) : null,
             'level' => $element->level,
             'lft' => $element->lft,
             'rgt' => $element->rgt,
@@ -152,7 +153,7 @@ class ElementSerializer
         }
 
         if ($value instanceof DateTimeInterface) {
-            return $value->format(DateTimeInterface::ATOM);
+            return DateTimeHelper::toIso8601($value);
         }
 
         if ($value instanceof ElementCollection) {

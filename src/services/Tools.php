@@ -2,7 +2,6 @@
 
 namespace craftpulse\cortex\services;
 
-use Craft;
 use craftpulse\cortex\events\RegisterToolsEvent;
 use craftpulse\cortex\tools\content\Assets;
 use craftpulse\cortex\tools\content\Categories;
@@ -25,6 +24,7 @@ use craftpulse\cortex\tools\schema\Sites;
 use craftpulse\cortex\tools\schema\TagGroups;
 use craftpulse\cortex\tools\schema\VolumesAndFilesystems;
 use craftpulse\cortex\tools\support\AttributeReader;
+use craftpulse\cortex\tools\support\RegistryLog;
 use craftpulse\cortex\tools\system\Config;
 use craftpulse\cortex\tools\system\DatabaseSchema;
 use craftpulse\cortex\tools\system\Diagnostics;
@@ -112,15 +112,7 @@ class Tools extends Component
                 // overwrite. Surface the collision in Craft's log so the
                 // third-party plugin author can see why their tool is
                 // missing from `tools/list`.
-                Craft::warning(
-                    sprintf(
-                        'Tool name collision on "%s" — first registration (%s) wins; ignoring %s.',
-                        $name,
-                        $this->_byName[$name]::class,
-                        $tool::class,
-                    ),
-                    'cortex',
-                );
+                RegistryLog::collision('Tool', 'name', $name, $this->_byName[$name], $tool);
                 continue;
             }
             $this->_tools[] = $tool;

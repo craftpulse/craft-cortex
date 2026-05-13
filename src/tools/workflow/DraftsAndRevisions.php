@@ -3,12 +3,12 @@
 namespace craftpulse\cortex\tools\workflow;
 
 use craft\elements\Entry;
+use craft\helpers\DateTimeHelper;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
-use DateTimeInterface;
 
 /**
  * =========================================================================
@@ -152,8 +152,8 @@ class DraftsAndRevisions extends AbstractTool
             $query->draftCreator($arguments['creatorId']);
         }
 
-        $limit = $this->_limit($arguments);
-        $offset = max(0, (int) ($arguments['offset'] ?? 0));
+        $limit = $this->_limit($arguments, self::DEFAULT_LIMIT, self::MAX_LIMIT);
+        $offset = $this->_offset($arguments);
 
         $totalQuery = clone $query;
         $totalCount = (int) $totalQuery->count();
@@ -201,8 +201,8 @@ class DraftsAndRevisions extends AbstractTool
             'draftNotes' => $entry->canGetProperty('draftNotes') ? $entry->draftNotes : null, // @phpstan-ignore-line
             'creatorId' => $entry->canGetProperty('draftCreatorId') ? $entry->draftCreatorId : null, // @phpstan-ignore-line
             'isProvisional' => $entry->canGetProperty('isProvisionalDraft') ? (bool) $entry->isProvisionalDraft : false,
-            'dateCreated' => $entry->dateCreated?->format(DateTimeInterface::ATOM),
-            'dateUpdated' => $entry->dateUpdated?->format(DateTimeInterface::ATOM),
+            'dateCreated' => $entry->dateCreated !== null ? DateTimeHelper::toIso8601($entry->dateCreated) : null,
+            'dateUpdated' => $entry->dateUpdated !== null ? DateTimeHelper::toIso8601($entry->dateUpdated) : null,
         ];
     }
 
@@ -227,8 +227,8 @@ class DraftsAndRevisions extends AbstractTool
             ->site('*')
             ->orderBy('num desc');
 
-        $limit = $this->_limit($arguments);
-        $offset = max(0, (int) ($arguments['offset'] ?? 0));
+        $limit = $this->_limit($arguments, self::DEFAULT_LIMIT, self::MAX_LIMIT);
+        $offset = $this->_offset($arguments);
 
         $totalQuery = clone $query;
         $totalCount = (int) $totalQuery->count();
@@ -268,7 +268,7 @@ class DraftsAndRevisions extends AbstractTool
             'creatorId' => $entry->revisionCreatorId ?? null,
             'title' => $entry->title,
             'siteHandle' => $entry->getSite()->handle,
-            'dateCreated' => $entry->dateCreated?->format(DateTimeInterface::ATOM),
+            'dateCreated' => $entry->dateCreated !== null ? DateTimeHelper::toIso8601($entry->dateCreated) : null,
         ];
     }
 
@@ -367,8 +367,8 @@ class DraftsAndRevisions extends AbstractTool
             'slug' => $entry->slug,
             'enabled' => $entry->enabled,
             'authorId' => $entry->authorId,
-            'postDate' => $entry->postDate?->format(DateTimeInterface::ATOM),
-            'expiryDate' => $entry->expiryDate?->format(DateTimeInterface::ATOM),
+            'postDate' => $entry->postDate !== null ? DateTimeHelper::toIso8601($entry->postDate) : null,
+            'expiryDate' => $entry->expiryDate !== null ? DateTimeHelper::toIso8601($entry->expiryDate) : null,
         ];
 
         $layout = $entry->getFieldLayout();
@@ -393,15 +393,5 @@ class DraftsAndRevisions extends AbstractTool
         }
 
         return $values;
-    }
-
-    /**
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _limit(array $arguments): int
-    {
-        $limit = (int) ($arguments['limit'] ?? self::DEFAULT_LIMIT);
-        return max(1, min(self::MAX_LIMIT, $limit));
     }
 }

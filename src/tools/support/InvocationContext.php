@@ -2,6 +2,8 @@
 
 namespace craftpulse\cortex\tools\support;
 
+use craftpulse\cortex\mcp\Server;
+
 /**
  * =========================================================================
  * Per-invocation context object for `InvocationLogger`.
@@ -62,23 +64,10 @@ final class InvocationContext
      * @since  5.0.0
      */
     public function __construct(
-        public readonly string $transport = 'stdio',
+        public readonly string $transport = Server::TRANSPORT_STDIO,
         public readonly string|int|null $requestId = null,
         public readonly ?int $userId = null,
         public readonly ?string $clientName = null,
     ) {
-    }
-
-    /**
-     * Convenience: a context with only the transport set. Used when the
-     * caller has no request id / user / client info to attach (e.g. an
-     * in-process tool invocation outside the JSON-RPC dispatcher).
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    public static function transportOnly(string $transport = 'stdio'): self
-    {
-        return new self(transport: $transport);
     }
 }

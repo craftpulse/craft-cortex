@@ -41,6 +41,22 @@ class Server
 
     public const TRANSPORT_HTTP = 'http';
 
+    public const TRANSPORT_UNKNOWN = 'unknown';
+
+    // JSON-RPC 2.0 standard error codes — locked by the spec, not by us.
+    // Wire values are stable across MCP revisions, so promoting to
+    // named constants is a pure readability win.
+
+    public const ERR_PARSE = -32700;
+
+    public const ERR_INVALID_REQUEST = -32600;
+
+    public const ERR_METHOD_NOT_FOUND = -32601;
+
+    public const ERR_INVALID_PARAMS = -32602;
+
+    public const ERR_INTERNAL = -32603;
+
     // Private Properties
     // =========================================================================
 
@@ -92,7 +108,7 @@ class Server
         if (!isset($request['jsonrpc']) || $request['jsonrpc'] !== '2.0') {
             return $this->_errorResponse(
                 $request['id'] ?? null,
-                -32600,
+                self::ERR_INVALID_REQUEST,
                 'Invalid Request: jsonrpc must be "2.0"',
             );
         }
@@ -104,7 +120,7 @@ class Server
         if (!is_string($method) || $method === '') {
             return $isNotification
                 ? null
-                : $this->_errorResponse($id, -32600, 'Invalid Request: missing method');
+                : $this->_errorResponse($id, self::ERR_INVALID_REQUEST, 'Invalid Request: missing method');
         }
 
         if ($isNotification) {
@@ -114,7 +130,7 @@ class Server
 
         $params = $request['params'] ?? [];
         if (!is_array($params)) {
-            return $this->_errorResponse($id, -32602, 'Invalid params: must be an array or object');
+            return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: must be an array or object');
         }
 
         return match ($method) {
@@ -126,7 +142,7 @@ class Server
             'resources/list' => $this->_successResponse($id, $this->_resourcesList()),
             'resources/read' => $this->_handleResourcesRead($id, $params),
             'ping' => $this->_successResponse($id, new \stdClass()),
-            default => $this->_errorResponse($id, -32601, "Method not found: {$method}"),
+            default => $this->_errorResponse($id, self::ERR_METHOD_NOT_FOUND, "Method not found: {$method}"),
         };
     }
 
@@ -236,17 +252,17 @@ class Server
     {
         $name = $params['name'] ?? null;
         if (!is_string($name) || $name === '') {
-            return $this->_errorResponse($id, -32602, 'Invalid params: prompts/get requires `name` (string)');
+            return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: prompts/get requires `name` (string)');
         }
 
         $prompt = Plugin::getInstance()->prompts->getByName($name);
         if ($prompt === null) {
-            return $this->_errorResponse($id, -32602, "Unknown prompt: {$name}");
+            return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, "Unknown prompt: {$name}");
         }
 
         $arguments = $params['arguments'] ?? [];
         if (!is_array($arguments)) {
-            return $this->_errorResponse($id, -32602, 'Invalid params: prompts/get `arguments` must be an object');
+            return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: prompts/get `arguments` must be an object');
         }
 
         try {
@@ -275,7 +291,7 @@ class Server
     {
         $uri = $params['uri'] ?? null;
         if (!is_string($uri) || $uri === '') {
-            return $this->_errorResponse($id, -32602, 'Invalid params: resources/read requires `uri` (string)');
+            return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: resources/read requires `uri` (string)');
         }
 
         $resource = Plugin::getInstance()->resources->getByUri($uri);
@@ -304,7 +320,7 @@ class Server
             return $this->_successResponse($id, ['contents' => [$block]]);
         }
 
-        return $this->_errorResponse($id, -32602, "Unknown resource: {$uri}");
+        return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, "Unknown resource: {$uri}");
     }
 
     /**
@@ -324,12 +340,12 @@ class Server
     {
         $name = $params['name'] ?? null;
         if (!is_string($name) || $name === '') {
-            return $this->_errorResponse($id, -32602, 'Invalid params: tools/call requires `name` (string)');
+            return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: tools/call requires `name` (string)');
         }
 
         $tool = Plugin::getInstance()->tools->getByName($name);
         if ($tool === null) {
-            return $this->_errorResponse($id, -32602, "Unknown tool: {$name}");
+            return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, "Unknown tool: {$name}");
         }
 
         if (AttributeReader::isStdioOnly($tool) && $this->_transport !== self::TRANSPORT_STDIO) {
@@ -338,14 +354,14 @@ class Server
             // token scope, never config-driven.
             return $this->_errorResponse(
                 $id,
-                -32601,
+                self::ERR_METHOD_NOT_FOUND,
                 "Tool '{$name}' is stdio-only and cannot be invoked over the HTTP transport.",
             );
         }
 
         $arguments = $params['arguments'] ?? [];
         if (!is_array($arguments)) {
-            return $this->_errorResponse($id, -32602, 'Invalid params: tools/call `arguments` must be an object');
+            return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: tools/call `arguments` must be an object');
         }
 
         $context = $this->_invocationContext($id);
@@ -540,6 +556,6 @@ class Server
     private function _internalError(int|string|null $id, Throwable $e, string $message): array
     {
         Craft::error($e->getMessage() . "\n" . $e->getTraceAsString(), 'cortex');
-        return $this->_errorResponse($id, -32603, $message);
+        return $this->_errorResponse($id, self::ERR_INTERNAL, $message);
     }
 }

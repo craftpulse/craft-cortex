@@ -45,9 +45,9 @@ return [
          * environment, or extend the defaults via the CP runtime
          * overrides UI for short-lived grants (auto-expiring).
          *
-         * Default ships ~17 patterns covering generators, migrations,
+         * Default ships ~15 patterns covering generators, migrations,
          * project config, caches, resaves, fixtures, and a few common
-         * one-shots (db/backup, mailer/test).
+         * one-shots.
          *
          * @var string[]
          */
@@ -66,8 +66,6 @@ return [
         //     'fields/*',
         //     'users/create',
         //     'entrify/*',
-        //     'db/backup',
-        //     'db/restore',
         //     'utils/*',
         //     'clear-deprecations',
         //     'mailer/test',
@@ -129,5 +127,26 @@ return [
     // 'staging' => [
     //     'execEnabled' => true,
     //     'runtimeOverrideTtl' => 86400, // 1 day on staging.
+    // ],
+
+    // ---------------------------------------------------------------------
+    // Opting in to destructive DB commands
+    // ---------------------------------------------------------------------
+    //
+    // `db/backup` and `db/restore` are NOT in the default allowlist. They
+    // are destructive — backup writes a file to the storage volume,
+    // restore replaces the entire database from a dump. Operators that
+    // want them available to the `craft_command` tool should add them
+    // explicitly per environment:
+    //
+    // 'dev' => [
+    //     'allowedCommands' => [
+    //         // Inherit the defaults by merging them in yourself, or list
+    //         // the full set the environment needs.
+    //         'resave/*', 'cache/*', 'migrate/*', 'up', 'gc',
+    //         // Plus the destructive opt-ins.
+    //         'db/backup',
+    //         'db/restore',
+    //     ],
     // ],
 ];

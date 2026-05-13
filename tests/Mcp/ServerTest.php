@@ -45,7 +45,31 @@ it('responds to initialize with the pinned protocol version + serverInfo', funct
         ->and($response['result']['capabilities'])->toHaveKeys(['tools', 'resources', 'prompts']);
 });
 
-it('captures clientInfo.name from initialize so the audit log can stamp it', function() {
+/**
+ * Pull the last `tools/call` audit-log line out of Craft's in-flight
+ * message buffer. The locked audit-line format is exactly the contract
+ * we want to assert against, so we drive the dispatcher and read the
+ * line back rather than inspecting private state.
+ *
+ * @return string|null the matched log line, or null if nothing was logged
+ */
+function _cortex_last_audit_line(): ?string
+{
+    $messages = Craft::getLogger()->messages;
+    for ($i = count($messages) - 1; $i >= 0; $i--) {
+        $entry = $messages[$i];
+        if (($entry[2] ?? null) !== \craftpulse\cortex\tools\support\InvocationLogger::CATEGORY) {
+            continue;
+        }
+        $text = (string) $entry[0];
+        if (str_starts_with($text, 'tool=')) {
+            return $text;
+        }
+    }
+    return null;
+}
+
+it('stamps the captured clientInfo.name into the audit-log line', function() {
     $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 1,
@@ -57,19 +81,20 @@ it('captures clientInfo.name from initialize so the audit log can stamp it', fun
         ],
     ]);
 
-    // The captured client name lives on a private property — accessed
-    // via reflection here rather than exposed publicly because it's an
-    // internal dispatcher detail, not part of the extension API. This
-    // test guards the wiring; the line format is locked in the
-    // InvocationLogger tests.
-    $rc = new ReflectionClass($this->server);
-    $prop = $rc->getProperty('_clientName');
-    $prop->setAccessible(true);
+    // Drive a real tools/call so the dispatcher emits one audit-log line.
+    // `sections` is a known no-arg read-only tool. The locked audit
+    // line format renders the captured client as `client=<name>`.
+    $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 2,
+        'method' => 'tools/call',
+        'params' => ['name' => 'sections'],
+    ]);
 
-    expect($prop->getValue($this->server))->toBe('claude-code');
+    expect(_cortex_last_audit_line())->toContain('client=claude-code');
 });
 
-it('leaves the captured client name null when initialize omits clientInfo', function() {
+it('renders client=- in the audit log when initialize omits clientInfo', function() {
     $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 1,
@@ -80,11 +105,14 @@ it('leaves the captured client name null when initialize omits clientInfo', func
         ],
     ]);
 
-    $rc = new ReflectionClass($this->server);
-    $prop = $rc->getProperty('_clientName');
-    $prop->setAccessible(true);
+    $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 2,
+        'method' => 'tools/call',
+        'params' => ['name' => 'sections'],
+    ]);
 
-    expect($prop->getValue($this->server))->toBeNull();
+    expect(_cortex_last_audit_line())->toContain('client=-');
 });
 
 it('clears a previously-captured client name when a re-handshake omits clientInfo', function() {
@@ -113,11 +141,14 @@ it('clears a previously-captured client name when a re-handshake omits clientInf
         ],
     ]);
 
-    $rc = new ReflectionClass($this->server);
-    $prop = $rc->getProperty('_clientName');
-    $prop->setAccessible(true);
+    $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 3,
+        'method' => 'tools/call',
+        'params' => ['name' => 'sections'],
+    ]);
 
-    expect($prop->getValue($this->server))->toBeNull();
+    expect(_cortex_last_audit_line())->toContain('client=-');
 });
 
 // -----------------------------------------------------------------------------
@@ -204,7 +235,7 @@ it('returns JSON-RPC -32602 for an unknown tool name', function() {
     ]);
 
     expect($response)->toHaveKey('error');
-    expect($response['error']['code'])->toBe(-32602);
+    expect($response['error']['code'])->toBe(Server::ERR_INVALID_PARAMS);
     expect($response['error']['message'])->toContain('Unknown tool');
 });
 
@@ -216,7 +247,7 @@ it('returns JSON-RPC -32602 when tools/call is missing the name param', function
         'params' => [],
     ]);
 
-    expect($response['error']['code'])->toBe(-32602);
+    expect($response['error']['code'])->toBe(Server::ERR_INVALID_PARAMS);
 });
 
 it('returns JSON-RPC -32602 when tools/call arguments is not an object', function() {
@@ -230,7 +261,7 @@ it('returns JSON-RPC -32602 when tools/call arguments is not an object', functio
         ],
     ]);
 
-    expect($response['error']['code'])->toBe(-32602);
+    expect($response['error']['code'])->toBe(Server::ERR_INVALID_PARAMS);
 });
 
 it('returns JSON-RPC -32601 for an unknown method', function() {
@@ -241,7 +272,7 @@ it('returns JSON-RPC -32601 for an unknown method', function() {
     ]);
 
     expect($response)->toHaveKey('error');
-    expect($response['error']['code'])->toBe(-32601);
+    expect($response['error']['code'])->toBe(Server::ERR_METHOD_NOT_FOUND);
 });
 
 // -----------------------------------------------------------------------------
@@ -262,7 +293,7 @@ it('rejects a stdio-only tool when dispatched on the HTTP transport', function()
     ]);
 
     expect($response)->toHaveKey('error');
-    expect($response['error']['code'])->toBe(-32601);
+    expect($response['error']['code'])->toBe(Server::ERR_METHOD_NOT_FOUND);
     expect($response['error']['message'])->toContain('stdio-only');
     expect($response['error']['message'])->toContain('craft_exec');
 });
@@ -286,39 +317,45 @@ it('does not reject stdio-only tools on the stdio transport', function() {
 });
 
 it('returns -32603 with a generic message when a tool throws an unexpected exception', function() {
-    // Inject a tool that raises a non-ToolException Throwable. The
-    // dispatcher should log the full message via Craft::error and
-    // return a generic wire envelope so the exception text never
-    // reaches the caller.
+    // Register a fixture tool that raises a non-ToolException Throwable
+    // via the public extension surface. The dispatcher should log the
+    // full message via Craft::error and return a generic wire envelope
+    // so the exception text never reaches the caller.
     $secret = '__SECRET_DB_CONNECTION_STRING__';
-    $throwingTool = new class($secret) extends AbstractTool {
-        public function __construct(private string $secret)
-        {
-        }
+    $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event) use ($secret): void {
+        $event->tools[] = new class($secret) extends AbstractTool {
+            public function __construct(private string $secret)
+            {
+            }
 
-        public static function getName(): string
-        {
-            return '_throwing_test_tool';
-        }
+            public static function getName(): string
+            {
+                return '_throwing_test_tool';
+            }
 
-        public static function getDescription(): string
-        {
-            return 'Test fixture that throws an unexpected exception.';
-        }
+            public static function getDescription(): string
+            {
+                return 'Test fixture that throws an unexpected exception.';
+            }
 
-        public function execute(array $arguments): array
-        {
-            throw new RuntimeException($this->secret);
-        }
+            public function execute(array $arguments): array
+            {
+                throw new RuntimeException($this->secret);
+            }
+        };
     };
+    \yii\base\Event::on(
+        \craftpulse\cortex\services\Tools::class,
+        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        $listener,
+    );
 
-    $tools = Plugin::getInstance()->tools;
-    $rc = new ReflectionClass($tools);
-    $byName = $rc->getProperty('_byName');
-    $byName->setAccessible(true);
-    $registry = $byName->getValue($tools);
-    $registry['_throwing_test_tool'] = $throwingTool;
-    $byName->setValue($tools, $registry);
+    // Swap the plugin's `tools` service for a freshly-built one so the
+    // listener fires and the dispatcher sees the fixture tool.
+    $originalTools = Plugin::getInstance()->tools;
+    $freshTools = new \craftpulse\cortex\services\Tools();
+    $freshTools->init();
+    Plugin::getInstance()->set('tools', $freshTools);
 
     try {
         $response = $this->server->dispatch([
@@ -332,13 +369,17 @@ it('returns -32603 with a generic message when a tool throws an unexpected excep
         ]);
 
         expect($response)->toHaveKey('error');
-        expect($response['error']['code'])->toBe(-32603);
+        expect($response['error']['code'])->toBe(Server::ERR_INTERNAL);
         expect($response['error']['message'])
             ->toContain('_throwing_test_tool')
             ->not->toContain($secret);
     } finally {
-        unset($registry['_throwing_test_tool']);
-        $byName->setValue($tools, $registry);
+        Plugin::getInstance()->set('tools', $originalTools);
+        \yii\base\Event::off(
+            \craftpulse\cortex\services\Tools::class,
+            \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+            $listener,
+        );
     }
 });
 
@@ -350,7 +391,7 @@ it('returns JSON-RPC -32600 when jsonrpc version is wrong', function() {
     ]);
 
     expect($response)->toHaveKey('error');
-    expect($response['error']['code'])->toBe(-32600);
+    expect($response['error']['code'])->toBe(Server::ERR_INVALID_REQUEST);
 });
 
 // -----------------------------------------------------------------------------
@@ -402,7 +443,7 @@ it('returns JSON-RPC -32602 for an unknown prompt name', function() {
     ]);
 
     expect($response)->toHaveKey('error');
-    expect($response['error']['code'])->toBe(-32602);
+    expect($response['error']['code'])->toBe(Server::ERR_INVALID_PARAMS);
     expect($response['error']['message'])->toContain('Unknown prompt');
 });
 
@@ -414,7 +455,7 @@ it('returns JSON-RPC -32602 when prompts/get is missing the name param', functio
         'params' => [],
     ]);
 
-    expect($response['error']['code'])->toBe(-32602);
+    expect($response['error']['code'])->toBe(Server::ERR_INVALID_PARAMS);
 });
 
 // -----------------------------------------------------------------------------
@@ -477,7 +518,7 @@ it('returns JSON-RPC -32602 for an unknown resource URI', function() {
     ]);
 
     expect($response)->toHaveKey('error');
-    expect($response['error']['code'])->toBe(-32602);
+    expect($response['error']['code'])->toBe(Server::ERR_INVALID_PARAMS);
     expect($response['error']['message'])->toContain('Unknown resource');
 });
 
@@ -489,7 +530,7 @@ it('returns JSON-RPC -32602 when resources/read is missing the uri param', funct
         'params' => [],
     ]);
 
-    expect($response['error']['code'])->toBe(-32602);
+    expect($response['error']['code'])->toBe(Server::ERR_INVALID_PARAMS);
 });
 
 // -----------------------------------------------------------------------------
@@ -538,29 +579,31 @@ it('eagerly consumes a Generator-returning tool and surfaces the return value', 
         $listener,
     );
 
+    $originalTools = Plugin::getInstance()->tools;
+    $freshTools = new \craftpulse\cortex\services\Tools();
+    $freshTools->init();
+    Plugin::getInstance()->set('tools', $freshTools);
+
     try {
-        // Build a fresh service so the fresh listener is in effect.
-        $service = new \craftpulse\cortex\services\Tools();
-        $service->init();
-        $tool = $service->getByName('_fake_streaming_tool');
-        expect($tool)->not->toBeNull();
+        // Drive the Generator path through the public dispatch() surface
+        // so the test exercises the actual code path the wire client
+        // hits — not a private helper. The dispatcher must consume the
+        // generator and surface the return value as the tools/call
+        // result.
+        $response = $this->server->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => ['name' => '_fake_streaming_tool', 'arguments' => []],
+        ]);
 
-        // The dispatcher operates on Plugin::getInstance()->tools, so to
-        // exercise the Generator path through the dispatcher we call the
-        // tool directly via a Server instance after temporarily swapping
-        // the plugin's registry. Simpler: assert via the dispatcher by
-        // re-registering on the global service for the duration.
-        // For the stdio dispatcher the stronger contract is "no
-        // exception, final return is surfaced" — assert that against
-        // the inner consumer.
-
-        $reflection = new ReflectionClass($this->server);
-        $method = $reflection->getMethod('_consumeGenerator');
-        $method->setAccessible(true);
-        $result = $method->invoke($this->server, $tool->execute([]));
-
-        expect($result)->toBe(['done' => true, 'count' => 2]);
+        expect($response)->toHaveKey('result');
+        expect($response['result'])->toHaveKey('isError', false);
+        expect($response['result']['content'][0]['text'])
+            ->toContain('"done": true')
+            ->toContain('"count": 2');
     } finally {
+        Plugin::getInstance()->set('tools', $originalTools);
         \yii\base\Event::off(
             \craftpulse\cortex\services\Tools::class,
             \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
@@ -647,15 +690,55 @@ it('matchTemplate returns null when no template matches', function() {
 });
 
 it('falls back to the last yielded value when a Generator has no explicit return', function() {
-    $gen = (function() {
-        yield ['progress' => 0.5];
-        yield ['done' => true];
-    })();
+    $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event): void {
+        $event->tools[] = new class() extends \craftpulse\cortex\tools\AbstractTool {
+            public static function getName(): string
+            {
+                return '_fake_streaming_no_return';
+            }
 
-    $reflection = new ReflectionClass($this->server);
-    $method = $reflection->getMethod('_consumeGenerator');
-    $method->setAccessible(true);
-    $result = $method->invoke($this->server, $gen);
+            public static function getDescription(): string
+            {
+                return 'Fixture that yields without an explicit return.';
+            }
 
-    expect($result)->toBe(['done' => true]);
+            public function execute(array $arguments): \Generator
+            {
+                yield ['progress' => 0.5];
+                yield ['done' => true];
+            }
+        };
+    };
+    \yii\base\Event::on(
+        \craftpulse\cortex\services\Tools::class,
+        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        $listener,
+    );
+
+    $originalTools = Plugin::getInstance()->tools;
+    $freshTools = new \craftpulse\cortex\services\Tools();
+    $freshTools->init();
+    Plugin::getInstance()->set('tools', $freshTools);
+
+    try {
+        $response = $this->server->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => ['name' => '_fake_streaming_no_return', 'arguments' => []],
+        ]);
+
+        // No explicit `return` from the Generator — the dispatcher
+        // surfaces the last yielded value as the tools/call result.
+        expect($response)->toHaveKey('result');
+        expect($response['result'])->toHaveKey('isError', false);
+        expect($response['result']['content'][0]['text'])->toContain('"done": true');
+    } finally {
+        Plugin::getInstance()->set('tools', $originalTools);
+        \yii\base\Event::off(
+            \craftpulse\cortex\services\Tools::class,
+            \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+            $listener,
+        );
+    }
 });

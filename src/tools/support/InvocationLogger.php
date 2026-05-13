@@ -3,6 +3,7 @@
 namespace craftpulse\cortex\tools\support;
 
 use Craft;
+use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\tools\ToolException;
 use Throwable;
 
@@ -128,7 +129,7 @@ final class InvocationLogger
         $redacted = SecretRedactor::redactArray($arguments);
         $argsJson = (string) json_encode($redacted, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        $ctx = $context ?? new InvocationContext(transport: 'unknown');
+        $ctx = $context ?? new InvocationContext(transport: Server::TRANSPORT_UNKNOWN);
 
         $line = sprintf(
             'tool=%s kind=%s duration_ms=%d transport=%s request_id=%s user=%s client=%s args=%s',

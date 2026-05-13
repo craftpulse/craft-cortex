@@ -2,10 +2,10 @@
 
 namespace craftpulse\cortex\services;
 
-use Craft;
 use craftpulse\cortex\events\RegisterPromptsEvent;
 use craftpulse\cortex\prompts\PromptInterface;
 use craftpulse\cortex\prompts\SkillPrompt;
+use craftpulse\cortex\tools\support\RegistryLog;
 use Michtio\CraftCmsClaudeSkills\Skills;
 use yii\base\Component;
 
@@ -121,15 +121,7 @@ class Prompts extends Component
             if (isset($this->_byName[$name])) {
                 // First registration wins. See `services/Tools::init` for
                 // the rationale; same shape on the Prompts surface.
-                Craft::warning(
-                    sprintf(
-                        'Prompt name collision on "%s" — first registration (%s) wins; ignoring %s.',
-                        $name,
-                        $this->_byName[$name]::class,
-                        $prompt::class,
-                    ),
-                    'cortex',
-                );
+                RegistryLog::collision('Prompt', 'name', $name, $this->_byName[$name], $prompt);
                 continue;
             }
             $this->_prompts[] = $prompt;

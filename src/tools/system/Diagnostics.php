@@ -3,6 +3,7 @@
 namespace craftpulse\cortex\tools\system;
 
 use Craft;
+use craft\helpers\DateTimeHelper;
 use craft\helpers\FileHelper;
 use craft\queue\Queue;
 use craftpulse\cortex\attributes\IsIdempotent;
@@ -10,7 +11,6 @@ use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
-use DateTimeInterface;
 
 /**
  * =========================================================================
@@ -111,7 +111,7 @@ class Diagnostics extends AbstractTool
             throw new ToolException('`type` is required (logs / last_error / deprecations / queue / project_config_diff).');
         }
 
-        $limit = $this->_limit($arguments);
+        $limit = $this->_limit($arguments, self::DEFAULT_LIMIT, self::MAX_LIMIT);
 
         return match ($type) {
             'logs' => $this->_logs($arguments, $limit),
@@ -218,7 +218,7 @@ class Diagnostics extends AbstractTool
                     'fingerprint' => $d->fingerprint,
                     'file' => $d->file,
                     'line' => $d->line,
-                    'lastOccurrence' => $d->lastOccurrence?->format(DateTimeInterface::ATOM),
+                    'lastOccurrence' => $d->lastOccurrence !== null ? DateTimeHelper::toIso8601($d->lastOccurrence) : null,
                 ],
                 $entries,
             ),
@@ -410,15 +410,5 @@ class Diagnostics extends AbstractTool
         $name = basename($name);
 
         return FileHelper::normalizePath("{$base}/{$name}");
-    }
-
-    /**
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _limit(array $arguments): int
-    {
-        $limit = (int) ($arguments['limit'] ?? self::DEFAULT_LIMIT);
-        return max(1, min(self::MAX_LIMIT, $limit));
     }
 }

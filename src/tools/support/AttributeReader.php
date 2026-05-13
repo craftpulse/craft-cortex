@@ -35,6 +35,21 @@ use ReflectionClass;
  */
 final class AttributeReader
 {
+    // Private Properties
+    // =========================================================================
+
+    /**
+     * Per-class memoization of `isStdioOnly()`. Tool classes are
+     * immutable per-process — once we read the attribute once the
+     * answer never changes — so a static cache trims the reflection
+     * cost on every tool dispatch. `Server::dispatch()` calls
+     * `isStdioOnly()` for every `tools/call` and uses the result to
+     * 403 HTTP requests for stdio-gated tools.
+     *
+     * @var array<class-string,bool>
+     */
+    private static array $_stdioOnlyCache = [];
+
     // Public Methods
     // =========================================================================
 
@@ -94,11 +109,14 @@ final class AttributeReader
      */
     public static function isStdioOnly(ToolInterface|string $toolOrClass): bool
     {
+        $class = is_string($toolOrClass) ? $toolOrClass : $toolOrClass::class;
+        if (array_key_exists($class, self::$_stdioOnlyCache)) {
+            return self::$_stdioOnlyCache[$class];
+        }
+
         $rc = new ReflectionClass($toolOrClass);
         $attrs = $rc->getAttributes(IsStdioOnly::class);
-        if ($attrs === []) {
-            return false;
-        }
-        return $attrs[0]->newInstance()->value;
+        $value = $attrs === [] ? false : (bool) $attrs[0]->newInstance()->value;
+        return self::$_stdioOnlyCache[$class] = $value;
     }
 }

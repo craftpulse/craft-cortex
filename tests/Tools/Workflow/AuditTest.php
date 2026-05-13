@@ -57,9 +57,12 @@ it('unused_assets mode returns a paginated envelope', function() {
 it('propagation mode returns a paginated envelope', function() {
     $result = $this->tool->execute(['mode' => 'propagation', 'limit' => 10]);
 
-    expect($result)->toHaveKeys(['mode', 'gaps', 'count', 'totalCount', 'limit', 'offset']);
+    expect($result)->toHaveKeys(['mode', 'gaps', 'count', 'totalCount', 'limit', 'offset', 'globalCapReached']);
     expect($result['mode'])->toBe('propagation');
     expect($result['gaps'])->toBeArray();
+    // The playground has far fewer than 5000 gaps; the global cap should
+    // never trip during normal CI runs.
+    expect($result['globalCapReached'])->toBeFalse();
 });
 
 it('clamps limit to MAX_LIMIT', function() {

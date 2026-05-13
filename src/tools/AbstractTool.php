@@ -114,4 +114,61 @@ abstract class AbstractTool implements ToolInterface
         $mode = $arguments['mode'] ?? null;
         return is_string($mode) && $mode !== '' ? $mode : null;
     }
+
+    /**
+     * Clamp the caller-supplied `limit` to the tool's `[1, $max]` band,
+     * falling back to `$default` when no value was supplied. Concrete
+     * tools pass their own `DEFAULT_LIMIT` / `MAX_LIMIT` constants so
+     * each tool keeps tool-specific bounds.
+     *
+     * @param array<string,mixed> $arguments
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _limit(array $arguments, int $default, int $max): int
+    {
+        $limit = (int) ($arguments['limit'] ?? $default);
+        return max(1, min($max, $limit));
+    }
+
+    /**
+     * Floor the caller-supplied `offset` to zero. Tools use this with a
+     * matching `_limit()` call for paginated envelopes.
+     *
+     * @param array<string,mixed> $arguments
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _offset(array $arguments): int
+    {
+        return max(0, (int) ($arguments['offset'] ?? 0));
+    }
+
+    /**
+     * Return the caller-supplied `with` argument as a list of eager-load
+     * handles. Strings are trimmed of empties; non-array `with` is
+     * normalised to `[]`. Content tools forward this list to the
+     * `ElementSerializer` so the LLM can opt in to related-field
+     * expansion per call.
+     *
+     * @param array<string,mixed> $arguments
+     * @return string[]
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _eagerHandles(array $arguments): array
+    {
+        $with = $arguments['with'] ?? [];
+        if (!is_array($with)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            $with,
+            static fn(mixed $h): bool => is_string($h) && $h !== '',
+        ));
+    }
 }

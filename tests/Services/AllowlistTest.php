@@ -151,3 +151,72 @@ it('craft_command tool resolves allowlist through the service', function() {
 
     expect($result['patterns'])->toContain('_test_/special-route');
 });
+
+it('add() invalidates the active-overrides cache', function() {
+    // Prime the cache with a baseline read.
+    $before = $this->service->getEffective();
+    expect($before)->not->toContain('_test_/cache-invalidation');
+
+    // Add a new override and read again — the new pattern must be
+    // visible without a service restart.
+    $this->service->add('_test_/cache-invalidation');
+    $after = $this->service->getEffective();
+
+    expect($after)->toContain('_test_/cache-invalidation');
+});
+
+it('remove() invalidates the active-overrides cache', function() {
+    $override = $this->service->add('_test_/cache-remove');
+
+    // Prime the cache.
+    expect($this->service->getEffective())->toContain('_test_/cache-remove');
+
+    // Soft-delete and confirm the pattern is gone on the next read.
+    $this->service->remove($override->id);
+    expect($this->service->getEffective())->not->toContain('_test_/cache-remove');
+});
+
+it('pruneExpired caps the per-call delete count at PRUNE_BATCH_LIMIT', function() {
+    // Insert one row beyond the cap directly so the test doesn't take
+    // 15000 round-trips through the validating ::save() path. The cap
+    // assertion is what matters — the rest get cleaned up by a
+    // subsequent gc sweep. Use the record class directly so we can
+    // bypass the rule that requires `pattern` to be non-empty for new
+    // rows when we're seeding through findOne()->save(false).
+    //
+    // Strategy: seed PRUNE_BATCH_LIMIT + 5 expired rows, call
+    // pruneExpired, assert the return is exactly PRUNE_BATCH_LIMIT
+    // (the LIMIT short-circuits), then call again and assert the
+    // remainder (5) is pruned.
+    $cap = \craftpulse\cortex\services\Allowlist::PRUNE_BATCH_LIMIT;
+    $surplus = 5;
+    $past = Carbon::now()->subSecond()->toDateTimeString();
+
+    // Bulk-insert via the query builder — fastest path to many rows.
+    $rows = [];
+    for ($i = 0; $i < $cap + $surplus; $i++) {
+        $rows[] = [
+            'pattern' => '_test/batch-' . $i,
+            'note' => null,
+            'createdByUserId' => null,
+            'expiresAt' => $past,
+            'dateDeleted' => null,
+            'dateCreated' => $past,
+            'dateUpdated' => $past,
+            'uid' => \craft\helpers\StringHelper::UUID(),
+        ];
+    }
+    Craft::$app->getDb()->createCommand()
+        ->batchInsert(
+            RuntimeOverride::tableName(),
+            ['pattern', 'note', 'createdByUserId', 'expiresAt', 'dateDeleted', 'dateCreated', 'dateUpdated', 'uid'],
+            $rows,
+        )
+        ->execute();
+
+    $firstPass = $this->service->pruneExpired();
+    expect($firstPass)->toBe($cap);
+
+    $secondPass = $this->service->pruneExpired();
+    expect($secondPass)->toBeGreaterThanOrEqual($surplus);
+});
