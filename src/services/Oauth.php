@@ -14,10 +14,13 @@ use craftpulse\cortex\Plugin;
 use craftpulse\cortex\records\OauthClient as OauthClientRecord;
 use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
 use DateInterval;
+use Lcobucci\Clock\SystemClock;
 use Lcobucci\JWT\Configuration;
 use Lcobucci\JWT\Signer\Key\InMemory;
 use Lcobucci\JWT\Signer\Rsa\Sha256;
 use Lcobucci\JWT\UnencryptedToken;
+use Lcobucci\JWT\Validation\Constraint\SignedWith;
+use Lcobucci\JWT\Validation\Constraint\StrictValidAt;
 use League\OAuth2\Server\AuthorizationServer;
 use League\OAuth2\Server\Grant\AuthCodeGrant;
 use League\OAuth2\Server\Grant\RefreshTokenGrant;
@@ -563,9 +566,15 @@ class Oauth extends Component
     }
 
     /**
-     * Parse + signature-verify a JWT against the install's public
-     * key. Returns the parsed token, or null if anything (signature,
-     * expiry, structure) fails.
+     * Parse + signature-verify a JWT against the install's public key.
+     * Returns the parsed token, or null if anything (signature, expiry,
+     * `nbf`, or structure) fails.
+     *
+     * Uses lcobucci's standard asymmetric-signer + Validator pipeline:
+     *
+     *   - `SignedWith` — verifies the RS256 signature against the public key.
+     *   - `StrictValidAt` — validates `iat`, `nbf`, and `exp` in a single
+     *     constraint, rejecting future-`nbf` tokens and already-expired tokens.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -576,14 +585,18 @@ class Oauth extends Component
             return null;
         }
 
-        $publicKey = file_get_contents($this->getPublicKeyPath());
-        if ($publicKey === false || $publicKey === '') {
+        $publicKeyContent = file_get_contents($this->getPublicKeyPath());
+        if ($publicKeyContent === false || $publicKeyContent === '') {
             return null;
         }
 
-        $config = Configuration::forSymmetricSigner(
-            new Sha256(),
-            InMemory::plainText('empty', 'empty'),
+        $signer = new Sha256();
+        $publicKey = InMemory::plainText($publicKeyContent);
+
+        $config = Configuration::forAsymmetricSigner(
+            $signer,
+            InMemory::plainText('not-used-for-verification'),
+            $publicKey,
         );
 
         try {
@@ -596,16 +609,12 @@ class Oauth extends Component
             return null;
         }
 
-        $signer = new Sha256();
-        $key = InMemory::plainText($publicKey);
-        if (!$signer->verify($token->signature()->hash(), $token->payload(), $key)) {
-            return null;
-        }
+        $constraints = [
+            new SignedWith($signer, $publicKey),
+            new StrictValidAt(SystemClock::fromUTC()),
+        ];
 
-        // Hand-check expiry rather than asking lcobucci's constraints
-        // — keeps the dependency surface narrow.
-        $expires = $token->claims()->get('exp');
-        if ($expires instanceof \DateTimeInterface && $expires->getTimestamp() < time()) {
+        if (!$config->validator()->validate($token, ...$constraints)) {
             return null;
         }
 
