@@ -246,6 +246,19 @@ it('lookupAccessToken() returns null on a syntactically broken JWT', function() 
     expect($this->service->lookupAccessToken('not-a-jwt'))->toBeNull();
 });
 
+it('lookupAccessToken() returns clientId as empty string when cid claim is absent', function() {
+    $client = _cortex_oauth_mint_client();
+    $jwt = _cortex_oauth_mint_jwt_without_cid(
+        clientId: $client->clientId,
+        audience: 'https://test-audience.invalid/no-cid',
+        userId: 1,
+    );
+
+    $result = $this->service->lookupAccessToken($jwt);
+    expect($result)->not->toBeNull();
+    expect($result['clientId'])->toBe('');
+});
+
 it('lookupAccessToken() returns null for a token whose nbf is in the future', function() {
     $client = _cortex_oauth_mint_client();
     $jwt = _cortex_oauth_mint_jwt(
@@ -371,6 +384,44 @@ function _cortex_oauth_mint_jwt(string $clientId, string $audience, int $userId,
     $record->save();
 
     return $jwtString;
+}
+
+/**
+ * Mint a JWT without the `cid` claim — simulates tokens issued by a
+ * system that doesn't stamp the client id as a custom claim.
+ */
+function _cortex_oauth_mint_jwt_without_cid(string $clientId, string $audience, int $userId, int $expiresIn = 3600): string
+{
+    $privateKeyContent = file_get_contents(Plugin::getInstance()->oauth->getPrivateKeyPath());
+    $signer = new \Lcobucci\JWT\Signer\Rsa\Sha256();
+    $config = \Lcobucci\JWT\Configuration::forAsymmetricSigner(
+        $signer,
+        \Lcobucci\JWT\Signer\Key\InMemory::plainText($privateKeyContent),
+        \Lcobucci\JWT\Signer\Key\InMemory::plainText('not-used'),
+    );
+    $jti = bin2hex(random_bytes(20));
+    $now = new \DateTimeImmutable();
+    $token = $config->builder()
+        ->permittedFor($audience)
+        ->identifiedBy($jti)
+        ->issuedAt($now)
+        ->canOnlyBeUsedAfter($now)
+        ->expiresAt($now->modify('+' . $expiresIn . ' seconds'))
+        ->relatedTo((string) $userId)
+        ->withClaim('scopes', [])
+        // intentionally omitting `cid`
+        ->getToken($signer, \Lcobucci\JWT\Signer\Key\InMemory::plainText($privateKeyContent));
+
+    $record = new OauthTokenRecord();
+    $record->tokenType = 'access';
+    $record->tokenHash = hash('sha256', $jti);
+    $record->userId = $userId;
+    $record->clientId = $clientId;
+    $record->audience = $audience;
+    $record->expiresAt = date('Y-m-d H:i:s', time() + $expiresIn);
+    $record->save();
+
+    return $token->toString();
 }
 
 /**

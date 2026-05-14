@@ -321,13 +321,23 @@ class Oauth extends Component
         }
 
         $userId = $claims->get('sub');
-        $clientId = $claims->get('cid') ?? $this->_audienceFallback($claims->get('aud'));
+        $rawClientId = $claims->get('cid');
+        if (!is_string($rawClientId) || $rawClientId === '') {
+            // `cid` is absent — token was mis-issued or predates the
+            // custom claim. Log for operator visibility; return empty
+            // string per the array contract.
+            Craft::warning(
+                'OAuth access token presented without a `cid` claim. Token jti=' . $jti,
+                'cortex.oauth',
+            );
+            $rawClientId = '';
+        }
         $audience = $this->_audienceFromClaims($claims->get('aud'));
         $scopes = $claims->get('scopes');
 
         return [
             'userId' => is_string($userId) || is_numeric($userId) ? (int) $userId : null,
-            'clientId' => is_string($clientId) ? $clientId : '',
+            'clientId' => $rawClientId,
             'scope' => $this->_renderScopes($scopes),
             'audience' => $audience,
         ];
@@ -666,25 +676,6 @@ class Oauth extends Component
             return $aud[0];
         }
         return null;
-    }
-
-    /**
-     * Fallback when `cid` is absent — for tokens issued before the
-     * `cid` claim landed, league's stock behaviour put the client id
-     * in `aud[0]`. This keeps lookup working across migrations.
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _audienceFallback(mixed $aud): string
-    {
-        if (is_string($aud)) {
-            return $aud;
-        }
-        if (is_array($aud) && isset($aud[0]) && is_string($aud[0])) {
-            return $aud[0];
-        }
-        return '';
     }
 
     /**
