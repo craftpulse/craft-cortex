@@ -317,6 +317,43 @@ it('returns JSON-RPC -32601 for an unknown method', function() {
 });
 
 // -----------------------------------------------------------------------------
+// setUserId() — request-scoped, no static state leak between instances
+// -----------------------------------------------------------------------------
+
+it('setUserId() is request-scoped — separate Server instances do not share user state', function() {
+    $a = new Server(Server::TRANSPORT_HTTP);
+    $a->setUserId(101);
+
+    $b = new Server(Server::TRANSPORT_HTTP);
+    $b->setUserId(202);
+
+    // Drive a tools/call through each so the audit-log line surfaces
+    // the bound userId. We re-use the existing `sections` tool which
+    // is a no-arg success path; the assertion target is the
+    // `user=` field on the locked audit line.
+    $a->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => ['name' => 'sections'],
+    ]);
+    $aLine = _cortex_last_audit_line();
+    expect($aLine)->toContain('user=101');
+
+    $b->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 2,
+        'method' => 'tools/call',
+        'params' => ['name' => 'sections'],
+    ]);
+    $bLine = _cortex_last_audit_line();
+    expect($bLine)->toContain('user=202');
+    // Confirm the second dispatch produced a different line — same
+    // text would mean we accidentally read the cached one from `$a`.
+    expect($bLine)->not->toBe($aLine);
+});
+
+// -----------------------------------------------------------------------------
 // stdio-only enforcement
 // -----------------------------------------------------------------------------
 
@@ -728,6 +765,157 @@ it('matchTemplate returns null when no template matches', function() {
     $service = new \craftpulse\cortex\services\Resources();
     $service->init();
     expect($service->matchTemplate('_unknown://nothing'))->toBeNull();
+});
+
+// -----------------------------------------------------------------------------
+// Per-user filtering — HTTP routes through asListPayloadFor / getByNameFor
+// -----------------------------------------------------------------------------
+
+it('tools/list over HTTP omits a tool whose filterFor returns false for the resolved user', function() {
+    // Register a stub tool that only the null-user (stdio) caller sees.
+    // The HTTP path resolves the bound userId to a real User and the
+    // stub returns false for it, so the tool drops out of tools/list.
+    $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event): void {
+        $event->tools[] = new class() extends AbstractTool {
+            public static function getName(): string
+            {
+                return '_test_/stdio-only-filter';
+            }
+
+            public static function getDescription(): string
+            {
+                return 'Fixture — filterFor only allows null (stdio).';
+            }
+
+            public function filterFor(?\craft\elements\User $user = null): bool
+            {
+                return $user === null;
+            }
+
+            public function execute(array $arguments): array
+            {
+                return ['ok' => true];
+            }
+        };
+    };
+    \yii\base\Event::on(
+        \craftpulse\cortex\services\Tools::class,
+        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        $listener,
+    );
+
+    $originalTools = Plugin::getInstance()->tools;
+    $freshTools = new \craftpulse\cortex\services\Tools();
+    $freshTools->init();
+    Plugin::getInstance()->set('tools', $freshTools);
+
+    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
+        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    expect($admin)->not->toBeNull();
+
+    try {
+        $http = new Server(Server::TRANSPORT_HTTP);
+        $http->setUserId((int) $admin->id);
+        $httpResponse = $http->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/list',
+        ]);
+
+        $httpNames = array_column($httpResponse['result']['tools'], 'name');
+        expect($httpNames)->not->toContain('_test_/stdio-only-filter');
+
+        // Default stdio dispatcher passes null and the stub allows null.
+        $stdioResponse = $this->server->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 2,
+            'method' => 'tools/list',
+        ]);
+        $stdioNames = array_column($stdioResponse['result']['tools'], 'name');
+        expect($stdioNames)->toContain('_test_/stdio-only-filter');
+    } finally {
+        Plugin::getInstance()->set('tools', $originalTools);
+        \yii\base\Event::off(
+            \craftpulse\cortex\services\Tools::class,
+            \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+            $listener,
+        );
+    }
+});
+
+it('tools/call over HTTP rejects a tool whose filterFor returns false as Unknown tool', function() {
+    // A non-admin user (null-user-only stub) tries to call the tool
+    // through the HTTP path. The dispatcher must fail closed —
+    // indistinguishable from "tool not registered" on the wire.
+    $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event): void {
+        $event->tools[] = new class() extends AbstractTool {
+            public static function getName(): string
+            {
+                return '_test_/http-rejected-filter';
+            }
+
+            public static function getDescription(): string
+            {
+                return 'Fixture — filterFor only allows null (stdio).';
+            }
+
+            public function filterFor(?\craft\elements\User $user = null): bool
+            {
+                return $user === null;
+            }
+
+            public function execute(array $arguments): array
+            {
+                return ['ok' => true];
+            }
+        };
+    };
+    \yii\base\Event::on(
+        \craftpulse\cortex\services\Tools::class,
+        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        $listener,
+    );
+
+    $originalTools = Plugin::getInstance()->tools;
+    $freshTools = new \craftpulse\cortex\services\Tools();
+    $freshTools->init();
+    Plugin::getInstance()->set('tools', $freshTools);
+
+    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
+        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    expect($admin)->not->toBeNull();
+
+    try {
+        $http = new Server(Server::TRANSPORT_HTTP);
+        $http->setUserId((int) $admin->id);
+        $response = $http->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => ['name' => '_test_/http-rejected-filter'],
+        ]);
+
+        expect($response)->toHaveKey('error');
+        expect($response['error']['code'])->toBe(Server::ERR_INVALID_PARAMS);
+        expect($response['error']['message'])->toContain('Unknown tool');
+
+        // stdio path (null user) succeeds — same tool, no user binding.
+        $stdioResponse = $this->server->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 2,
+            'method' => 'tools/call',
+            'params' => ['name' => '_test_/http-rejected-filter'],
+        ]);
+        expect($stdioResponse)->toHaveKey('result');
+        expect($stdioResponse['result'])->toHaveKey('isError', false);
+    } finally {
+        Plugin::getInstance()->set('tools', $originalTools);
+        \yii\base\Event::off(
+            \craftpulse\cortex\services\Tools::class,
+            \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+            $listener,
+        );
+    }
 });
 
 it('falls back to the last yielded value when a Generator has no explicit return', function() {

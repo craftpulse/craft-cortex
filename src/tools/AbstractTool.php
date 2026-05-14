@@ -2,6 +2,8 @@
 
 namespace craftpulse\cortex\tools;
 
+use craft\elements\User;
+
 /**
  * =========================================================================
  * Base class for MCP tools.
@@ -65,15 +67,50 @@ abstract class AbstractTool implements ToolInterface
     /**
      * @inheritdoc
      *
-     * Default: every tool registers. Pro write tools override to gate
-     * visibility on Craft permissions for the current user.
+     * Default: every tool registers. Tools with license / edition /
+     * settings gating override (e.g. `craft_exec` checks
+     * `Settings::$execEnabled`; future Pro tools check the edition).
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public function shouldRegister(): bool
+    public static function shouldRegister(): bool
     {
         return true;
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Default: the tool is visible to every user, including the stdio
+     * `null` caller. Pro tools override to consult Craft permissions
+     * for the resolved user. See `ToolInterface::filterFor()` for the
+     * locked contract.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function filterFor(?User $user = null): bool
+    {
+        return true;
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Default: delegate to the tool's static `getInputSchema()`.
+     * Concrete tools that need per-user schema rewrites (mode-enum
+     * filtering based on Craft permissions) override this method.
+     * Tools that override the static method alone still get correct
+     * behaviour: `inputSchemaFor(null)` returns the static schema
+     * verbatim, preserving the stdio path.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function inputSchemaFor(?User $user = null): array
+    {
+        return static::getInputSchema();
     }
 
     // Protected Methods
