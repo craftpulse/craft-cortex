@@ -3,10 +3,10 @@
 namespace craftpulse\cortex\controllers;
 
 use Craft;
+use craft\helpers\UrlHelper;
 use craft\web\Controller;
 use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\mcp\transport\Http;
-use craftpulse\cortex\models\Token;
 use craftpulse\cortex\Plugin;
 use yii\web\Response;
 
@@ -88,16 +88,16 @@ class McpController extends Controller
     // =========================================================================
 
     /**
-     * @var Token|null Bearer token resolved by `beforeAction()`. Set
-     *                 once auth succeeds; consumed by `_handlePost()`
-     *                 to bind the session's `userId` at initialize
-     *                 time and to validate the session on touch.
-     *                 Stashed (rather than re-looked-up downstream)
-     *                 so subsequent gates' audit-log writers
-     *                 correlate the invocation back to the issuing
-     *                 token row without a second DB probe.
+     * @var int|null Craft user id resolved by `beforeAction()`. The
+     *               OAuth path sets this from the JWT `sub` claim;
+     *               the bearer path sets this from the token's bound
+     *               user id. Single source of truth that
+     *               `_handlePost()` reads, independent of which auth
+     *               surface fired. Gate 7.5 audit log will additionally
+     *               correlate the invocation to the issuing bearer-
+     *               token row via a separate lookup at logging time.
      */
-    private ?Token $_authenticatedToken = null;
+    private ?int $_authenticatedUserId = null;
 
     // Public Methods
     // =========================================================================
@@ -197,28 +197,39 @@ class McpController extends Controller
         // Gate 5 — bearer-token authentication. 401 with
         // WWW-Authenticate: Bearer realm="cortex" on every reject
         // path per RFC 6750.
+        //
+        // Lookup precedence per locked decision 17:
+        //   1. OAuth access tokens (short-lived, audience-bound).
+        //   2. Long-lived bearer tokens (cortex_tokens).
+        //
+        // Disambiguation: JWTs contain dots, bearer tokens are 64-char
+        // hex without dots. Probe OAuth first when dots present;
+        // fall back to bearer when the OAuth lookup misses. Either
+        // path resolving wins; both missing → 401.
         $bearer = $this->_extractBearer();
         if ($bearer === null) {
             $this->_unauthorized('Missing or malformed Authorization header. Expected: Authorization: Bearer <token>.');
             return false;
         }
 
-        $token = Plugin::getInstance()->tokens->lookup($bearer);
-        if ($token === null) {
+        $resolved = $this->_resolveBearer($bearer);
+        if ($resolved === null) {
             $this->_unauthorized('Invalid or revoked bearer token.');
             return false;
         }
 
-        $this->_authenticatedToken = $token;
+        $this->_authenticatedUserId = $resolved['userId'];
 
         // Bind the resolved user onto Craft's auth surface so the
         // parent `_enforceAllowAnonymous` gate sees a non-guest, and
         // downstream permission checks (Gate 7.4 per-user filtering
         // and Pro tools that gate on Craft permissions) see the
         // bearer's identity.
-        $user = $token->getUser();
-        if ($user !== null) {
-            Craft::$app->getUser()->setIdentity($user);
+        if ($resolved['userId'] !== null) {
+            $user = Craft::$app->getUsers()->getUserById($resolved['userId']);
+            if ($user !== null) {
+                Craft::$app->getUser()->setIdentity($user);
+            }
         }
 
         // Gate 6 — Craft's own beforeAction pipeline. Runs CSRF
@@ -418,10 +429,10 @@ class McpController extends Controller
         $sessionIdHeader = $this->request->getHeaders()->get(Http::HEADER_SESSION_ID);
         $sessionId = is_string($sessionIdHeader) && $sessionIdHeader !== '' ? $sessionIdHeader : null;
 
-        // The authenticated token is guaranteed non-null here —
-        // `beforeAction()` short-circuits any path that doesn't resolve
-        // one before reaching the action body.
-        $authenticatedUserId = $this->_authenticatedToken?->userId;
+        // The authenticated user id is guaranteed set here —
+        // `beforeAction()` short-circuits any path that doesn't
+        // resolve one before reaching the action body.
+        $authenticatedUserId = $this->_authenticatedUserId;
 
         // The dispatcher uses the captured client name as the session's
         // `clientName`; capture it from the request before constructing
@@ -517,20 +528,82 @@ class McpController extends Controller
      * Write a 401 with the canonical `WWW-Authenticate: Bearer realm="cortex"`
      * challenge header and a JSON body. RFC 6750 §3 requires the
      * challenge header on every 401 from a bearer-protected resource;
-     * RFC 9728 (sub-gate 7.3) will extend this with `resource_metadata=`
-     * to advertise OAuth metadata.
-     *
-     * Returns the populated response so `beforeAction()` can surface
-     * the same object Yii would otherwise expect to short-circuit
-     * around.
+     * RFC 9728 §5.1 extends it with `resource_metadata=` so
+     * unauthenticated clients can discover the authorization server
+     * without prior configuration.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
     private function _unauthorized(string $message): Response
     {
-        $this->response->headers->set('WWW-Authenticate', 'Bearer realm="cortex"');
+        $resourceMetadata = UrlHelper::siteUrl('.well-known/oauth-protected-resource');
+        $this->response->headers->set(
+            'WWW-Authenticate',
+            sprintf('Bearer realm="cortex", resource_metadata="%s"', $resourceMetadata),
+        );
         return $this->_status(401, $message);
+    }
+
+    /**
+     * Resolve a presented bearer string to a Craft user id, or null
+     * on miss. OAuth-first lookup per locked decision 17 — short-
+     * lived audience-bound tokens win over long-lived bearers when
+     * both could theoretically match. In practice the shapes are
+     * disjoint (JWTs have dots; bearer tokens are 64-char hex), but
+     * the precedence order is what's locked.
+     *
+     * Audience verification: the OAuth path verifies the `aud` claim
+     * matches the canonical MCP endpoint URL. A token issued for
+     * resource A presented at resource B is rejected — RFC 8707
+     * confused-deputy defense.
+     *
+     * @return array{userId:?int}|null
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _resolveBearer(string $bearer): ?array
+    {
+        $hasDots = str_contains($bearer, '.');
+        $expectedAudience = UrlHelper::siteUrl('cortex/mcp');
+
+        if ($hasDots) {
+            $oauthHit = Plugin::getInstance()->oauth->lookupAccessToken($bearer);
+            if ($oauthHit === null) {
+                return null;
+            }
+
+            // Audience binding. A token's `aud` must match the URL
+            // the client is presenting it at. Mismatch → reject as
+            // if the token didn't exist.
+            $audience = $oauthHit['audience'] ?? null;
+            if (!is_string($audience) || $audience === '' || !$this->_audienceMatches($audience, $expectedAudience)) {
+                return null;
+            }
+
+            return ['userId' => $oauthHit['userId']];
+        }
+
+        $token = Plugin::getInstance()->tokens->lookup($bearer);
+        if ($token === null) {
+            return null;
+        }
+        return ['userId' => $token->userId];
+    }
+
+    /**
+     * Audience comparison that tolerates trailing slashes. Both
+     * candidate values may carry or omit the trailing `/` depending
+     * on how the client built them; we normalize both before
+     * comparing.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _audienceMatches(string $a, string $b): bool
+    {
+        return rtrim($a, '/') === rtrim($b, '/');
     }
 
     /**
