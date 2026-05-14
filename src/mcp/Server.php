@@ -4,14 +4,18 @@ namespace craftpulse\cortex\mcp;
 
 use Craft;
 use craft\elements\User;
+use craftpulse\cortex\events\LogCallEvent;
 use craftpulse\cortex\Plugin;
+use craftpulse\cortex\tools\StreamableToolInterface;
 use craftpulse\cortex\tools\support\AttributeReader;
+use craftpulse\cortex\tools\support\CancellationToken;
 use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\support\InvocationLogger;
 use craftpulse\cortex\tools\ToolException;
 use craftpulse\cortex\tools\ToolInterface;
 use Generator;
 use Throwable;
+use yii\base\Event;
 
 /**
  * =========================================================================
@@ -44,6 +48,38 @@ class Server
     public const TRANSPORT_HTTP = 'http';
 
     public const TRANSPORT_UNKNOWN = 'unknown';
+
+    /**
+     * Cache key prefix for in-flight cancellation signals. Each entry
+     * is keyed by `cortex:cancel:{sessionId}:{requestId}` and stores
+     * `true` for one hour after a `notifications/cancelled` arrives.
+     * The streaming dispatcher's `CancellationToken` reads through
+     * this slot between yields so the running tool can short-circuit.
+     *
+     * Sessions without an `Mcp-Session-Id` (which would be unusual on
+     * the streaming path — initialize never streams) write under the
+     * `cortex:cancel:-:{requestId}` key; the dash placeholder matches
+     * the `_orDash()` rendering used throughout the audit log.
+     *
+     * TTL of one hour is the proposal — long enough that a delayed
+     * cancellation arriving after a network blip still lands on a
+     * running call, short enough that abandoned slots don't linger.
+     * Cache eviction handles the rest.
+     *
+     * @since 5.0.0
+     */
+    public const CANCEL_CACHE_KEY_PREFIX = 'cortex:cancel:';
+
+    /**
+     * TTL in seconds for cancellation cache slots. Bounds how long a
+     * cancellation signal stays "armed" against the streaming
+     * dispatcher's polling token. Set high enough that a delayed
+     * `notifications/cancelled` POSTing seconds before the streaming
+     * call finishes still flips the flag.
+     *
+     * @since 5.0.0
+     */
+    public const CANCEL_CACHE_TTL = 3600;
 
     // JSON-RPC 2.0 standard error codes — locked by the spec, not by us.
     // Wire values are stable across MCP revisions, so promoting to
@@ -301,7 +337,13 @@ class Server
         }
 
         if ($isNotification) {
-            // Notifications get acknowledged silently.
+            // MCP notifications/cancelled — write a cache slot so any
+            // streaming generator on the same session+requestId observes
+            // the flip on its next `isCancelled()` check. Everything
+            // else is silently acknowledged per JSON-RPC 2.0 §6.
+            if ($method === 'notifications/cancelled') {
+                $this->_recordCancellation($request['params'] ?? []);
+            }
             return null;
         }
 
@@ -321,6 +363,112 @@ class Server
             'ping' => $this->_successResponse($id, new \stdClass()),
             default => $this->_errorResponse($id, self::ERR_METHOD_NOT_FOUND, "Method not found: {$method}"),
         };
+    }
+
+    /**
+     * Streaming counterpart to `dispatch()`. Yields one JSON-RPC
+     * envelope per SSE frame the transport should emit:
+     *
+     *   - For tools implementing `StreamableToolInterface` AND on the
+     *     HTTP transport: one `notifications/progress` envelope per
+     *     `stream()` yield, then one terminal `tools/call` response
+     *     envelope carrying the generator's return value.
+     *   - For non-streamable tools, or any non-`tools/call` method:
+     *     one envelope, identical in shape to what `dispatch()` would
+     *     have returned in JSON mode. The transport wraps it in a
+     *     single SSE frame — the MCP spec permits one-frame SSE for
+     *     any POST that the server chooses to upgrade.
+     *
+     * Cancellation: between every yield, the streaming dispatcher
+     * checks the `CancellationToken` on the running invocation
+     * context. The token's `isCancelled()` callback reads through the
+     * `cortex:cancel:{session}:{requestId}` cache slot the
+     * `notifications/cancelled` arrival populated; on flip, the
+     * dispatcher yields one final `notifications/cancelled` envelope
+     * and returns, leaving the generator drained but no terminal
+     * response written. The audit row carries `kind=cancelled`.
+     *
+     * Audit log: exactly one row per stream completion, written after
+     * the generator finishes (success, cancellation, or error) — never
+     * per progress frame. `durationMs` is wall-clock from stream start
+     * to stream end.
+     *
+     * @param array<string,mixed> $request
+     * @return Generator<int,array<string,mixed>,mixed,void>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function dispatchStreaming(array $request): Generator
+    {
+        if (!isset($request['jsonrpc']) || $request['jsonrpc'] !== '2.0') {
+            yield $this->_errorResponse(
+                $request['id'] ?? null,
+                self::ERR_INVALID_REQUEST,
+                'Invalid Request: jsonrpc must be "2.0"',
+            );
+            return;
+        }
+
+        $method = $request['method'] ?? null;
+        $id = $request['id'] ?? null;
+        $isNotification = !array_key_exists('id', $request);
+
+        if (!is_string($method) || $method === '') {
+            if (!$isNotification) {
+                yield $this->_errorResponse($id, self::ERR_INVALID_REQUEST, 'Invalid Request: missing method');
+            }
+            return;
+        }
+
+        if ($isNotification) {
+            // Streaming side observes the same cancellation surface as
+            // the JSON-mode dispatch path — write the cache slot, no
+            // wire response.
+            if ($method === 'notifications/cancelled') {
+                $this->_recordCancellation($request['params'] ?? []);
+            }
+            return;
+        }
+
+        // Methods other than `tools/call` collapse to single-frame SSE
+        // — same wire shape `dispatch()` would have returned in JSON
+        // mode, just framed as one SSE event. The MCP spec lets us
+        // upgrade any POST.
+        if ($method !== 'tools/call') {
+            $response = $this->dispatch($request);
+            if ($response !== null) {
+                yield $response;
+            }
+            return;
+        }
+
+        $params = $request['params'] ?? [];
+        if (!is_array($params)) {
+            yield $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: must be an array or object');
+            return;
+        }
+
+        $resolution = $this->_validateToolCall($id, $params);
+        if ($resolution['error'] !== null) {
+            yield $resolution['error'];
+            return;
+        }
+        $tool = $resolution['tool'];
+        $name = $resolution['name'];
+        $arguments = $resolution['arguments'];
+        assert($tool !== null);
+
+        // Non-streamable tools degrade to single-frame SSE — call the
+        // existing JSON-mode dispatch and yield its envelope as the
+        // lone frame. The wire is what the client asked for; one
+        // frame is correct per spec.
+        if (!$tool instanceof StreamableToolInterface) {
+            yield $this->_handleToolsCall($id, $params);
+            return;
+        }
+
+        yield from $this->_streamToolCall($id, $tool, $name, $arguments, $params);
     }
 
     // Private Methods
@@ -524,37 +672,17 @@ class Server
      */
     private function _handleToolsCall(int|string|null $id, array $params): array
     {
-        $name = $params['name'] ?? null;
-        if (!is_string($name) || $name === '') {
-            return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: tools/call requires `name` (string)');
+        $resolution = $this->_validateToolCall($id, $params);
+        if ($resolution['error'] !== null) {
+            return $resolution['error'];
         }
-
-        $tool = Plugin::getInstance()->tools->getByNameFor($name, $this->_resolveUser());
-        if ($tool === null) {
-            // Indistinguishable from "tool not registered" on the wire —
-            // a tool the user lacks permission for fails closed as
-            // "Unknown tool", same JSON-RPC error code, same message
-            // shape. Security boundary: `tools/list` filtering hides
-            // the existence of the tool; `tools/call` filtering refuses
-            // the call.
-            return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, "Unknown tool: {$name}");
-        }
-
-        if (AttributeReader::isStdioOnly($tool) && $this->_transport !== self::TRANSPORT_STDIO) {
-            // Hard reject. stdio-only enforcement happens at the
-            // transport boundary regardless of caller permissions or
-            // token scope, never config-driven.
-            return $this->_errorResponse(
-                $id,
-                self::ERR_METHOD_NOT_FOUND,
-                "Tool '{$name}' is stdio-only and cannot be invoked over the HTTP transport.",
-            );
-        }
-
-        $arguments = $params['arguments'] ?? [];
-        if (!is_array($arguments)) {
-            return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: tools/call `arguments` must be an object');
-        }
+        $tool = $resolution['tool'];
+        $name = $resolution['name'];
+        $arguments = $resolution['arguments'];
+        // `_validateToolCall()` guarantees `tool` is non-null on the
+        // happy path; PHPStan can't follow the through-array branch
+        // so the assertion narrows the type.
+        assert($tool !== null);
 
         $context = $this->_invocationContext($id);
 
@@ -580,6 +708,409 @@ class Server
         InvocationLogger::logCall($name, $arguments, null, $this->_elapsedMs($startNs), $context, $responsePayload);
 
         return $this->_successResponse($id, $this->_toolResultEnvelope($tool, $result));
+    }
+
+    /**
+     * Shared pre-dispatch validation for `tools/call`. Returns either
+     * an `['error' => <envelope>]` slot the caller should yield/return,
+     * or an `['tool' => ToolInterface, 'name' => string, 'arguments' =>
+     * array]` slot the caller can drive into either the JSON-mode or
+     * the streaming path.
+     *
+     * Centralises the four checks both dispatch paths need: name
+     * presence, registry lookup with per-user filtering, stdio-only
+     * enforcement, and argument-shape validation. Pulled out of
+     * `_handleToolsCall()` so the streaming dispatcher shares the
+     * exact same gate ordering.
+     *
+     * Returns a uniform shape with `error` always present (null when
+     * validation passed) so PHPStan can narrow without union gymnastics
+     * at the call sites.
+     *
+     * @param array<string,mixed> $params
+     * @return array{error: array<string,mixed>|null, tool: ToolInterface|null, name: string, arguments: array<string,mixed>}
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _validateToolCall(int|string|null $id, array $params): array
+    {
+        $miss = [
+            'error' => null,
+            'tool' => null,
+            'name' => '',
+            'arguments' => [],
+        ];
+
+        $name = $params['name'] ?? null;
+        if (!is_string($name) || $name === '') {
+            $miss['error'] = $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: tools/call requires `name` (string)');
+            return $miss;
+        }
+
+        $tool = Plugin::getInstance()->tools->getByNameFor($name, $this->_resolveUser());
+        if ($tool === null) {
+            // Indistinguishable from "tool not registered" on the wire —
+            // a tool the user lacks permission for fails closed as
+            // "Unknown tool", same JSON-RPC error code, same message
+            // shape. Security boundary: `tools/list` filtering hides
+            // the existence of the tool; `tools/call` filtering refuses
+            // the call.
+            $miss['error'] = $this->_errorResponse($id, self::ERR_INVALID_PARAMS, "Unknown tool: {$name}");
+            return $miss;
+        }
+
+        if (AttributeReader::isStdioOnly($tool) && $this->_transport !== self::TRANSPORT_STDIO) {
+            // Hard reject. stdio-only enforcement happens at the
+            // transport boundary regardless of caller permissions or
+            // token scope, never config-driven.
+            $miss['error'] = $this->_errorResponse(
+                $id,
+                self::ERR_METHOD_NOT_FOUND,
+                "Tool '{$name}' is stdio-only and cannot be invoked over the HTTP transport.",
+            );
+            return $miss;
+        }
+
+        $arguments = $params['arguments'] ?? [];
+        if (!is_array($arguments)) {
+            $miss['error'] = $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: tools/call `arguments` must be an object');
+            return $miss;
+        }
+
+        return [
+            'error' => null,
+            'tool' => $tool,
+            'name' => $name,
+            'arguments' => $arguments,
+        ];
+    }
+
+    /**
+     * Drive a `StreamableToolInterface` through its `stream()` entry
+     * point. Yields one `notifications/progress` JSON-RPC envelope per
+     * progress frame the tool produces, plus one terminal envelope
+     * carrying the generator's return value (or a `notifications/
+     * cancelled` envelope when the cooperative cancellation flag
+     * fires).
+     *
+     * The streaming pipeline owns its own audit-log line — one
+     * `InvocationLogger::logCall()` per stream completion, never per
+     * frame — so the durationMs reflects wall-clock from stream start
+     * to stream end. Cancellation surfaces as `kind=cancelled` on the
+     * audit row; ToolException as `kind=tool_error`; any other
+     * Throwable as `kind=internal_error`. The locked invariant from
+     * Gate 7.5 (KV ⊆ DB columns) stays satisfied.
+     *
+     * @param array<string,mixed> $arguments
+     * @param array<string,mixed> $callParams Original `tools/call` params (carries `_meta.progressToken`).
+     * @return Generator<int,array<string,mixed>,mixed,void>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _streamToolCall(
+        int|string|null $id,
+        StreamableToolInterface $tool,
+        string $name,
+        array $arguments,
+        array $callParams,
+    ): Generator {
+        $progressToken = $this->_progressToken($callParams);
+        $context = $this->_invocationContextWithCancellation($id);
+        $cancellationToken = $context->getCancellationToken();
+
+        $startNs = hrtime(true);
+        $gen = null;
+        $finalResult = null;
+        $cancelledMidStream = false;
+
+        try {
+            $gen = $tool->stream($arguments, $context);
+
+            while ($gen->valid()) {
+                if ($cancellationToken->isCancelled()) {
+                    $cancelledMidStream = true;
+                    break;
+                }
+
+                $frame = $gen->current();
+                if (is_array($frame)) {
+                    yield $this->_progressEnvelope($progressToken, $frame);
+                }
+                $gen->next();
+            }
+
+            // Generator may exit between yields by checking the
+            // cancellation flag itself and returning early. In that
+            // case the loop's mid-yield check never fires (no more
+            // yields to gate), but the token IS flipped — surface the
+            // cancellation regardless. The terminal envelope must
+            // reflect the wire-level outcome, not the generator's
+            // private exit shape.
+            if (!$cancelledMidStream && $cancellationToken->isCancelled()) {
+                $cancelledMidStream = true;
+            }
+
+            if (!$cancelledMidStream) {
+                $finalResult = $gen->getReturn();
+            }
+        } catch (ToolException $e) {
+            InvocationLogger::logCall($name, $arguments, $e, $this->_elapsedMs($startNs), $context);
+            yield $this->_successResponse($id, $this->_toolErrorEnvelope($e->getMessage()));
+            return;
+        } catch (Throwable $e) {
+            InvocationLogger::logCall($name, $arguments, $e, $this->_elapsedMs($startNs), $context);
+            yield $this->_internalError($id, $e, sprintf('Internal error executing tool "%s".', $name));
+            return;
+        }
+
+        if ($cancelledMidStream) {
+            // Audit-log with `kind=cancelled`. The KIND_CANCELLED
+            // sentinel rides on a synthetic ToolException carrier so
+            // the existing `logCall(..., $error, ...)` flow surfaces
+            // it as a tool-side outcome rather than an internal error.
+            // The KV line's `kind=cancelled` comes from the explicit
+            // `$kindOverride` parameter on `formatEntry()` /
+            // `buildEntry()`; we drive both directly here so the
+            // logger doesn't have to special-case cancellation.
+            $this->_logCancelled($name, $arguments, $context, $this->_elapsedMs($startNs));
+            yield $this->_cancelledEnvelope($id, $progressToken);
+            return;
+        }
+
+        // Final frame — the terminal `tools/call` response. The audit
+        // row writes the response excerpt the same way the JSON-mode
+        // dispatcher does so DB rows for streamed and non-streamed
+        // calls are indistinguishable in their forensic shape.
+        if (!is_array($finalResult)) {
+            // Fallback when the streamable tool's generator omits an
+            // explicit `return` — defensive only; tools SHOULD always
+            // return their terminal payload.
+            $finalResult = ['mode' => 'streamed', 'note' => 'Streamable tool generator finished without an explicit return.'];
+        }
+        $responsePayload = (string) json_encode($finalResult, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        InvocationLogger::logCall($name, $arguments, null, $this->_elapsedMs($startNs), $context, $responsePayload);
+
+        yield $this->_successResponse($id, $this->_toolResultEnvelope($tool, $finalResult));
+    }
+
+    /**
+     * Build an `InvocationContext` whose `CancellationToken` polls the
+     * cache slot the HTTP transport's `notifications/cancelled` arrival
+     * writes to. Only relevant on the streaming HTTP path — stdio
+     * never streams over the wire, so the JSON-mode
+     * `_invocationContext()` keeps the default-unfired token.
+     *
+     * The token's `isCancelled()` is overridden via a callback-backed
+     * subclass so the polling is lazy — we don't hit the cache on
+     * construction, only when the streaming loop checks the flag
+     * between yields.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _invocationContextWithCancellation(string|int|null $requestId): InvocationContext
+    {
+        $sessionId = $this->_sessionId ?? '-';
+        $requestIdStr = $requestId !== null ? (string) $requestId : '-';
+        $cacheKey = self::CANCEL_CACHE_KEY_PREFIX . $sessionId . ':' . $requestIdStr;
+
+        $token = new CancellationToken(static function() use ($cacheKey): bool {
+            $cache = Craft::$app->getCache();
+            return $cache !== null && $cache->get($cacheKey) === true;
+        });
+
+        return new InvocationContext(
+            transport: $this->_transport,
+            requestId: $requestId,
+            userId: $this->_userId,
+            clientName: $this->_clientName,
+            tokenId: $this->_tokenId,
+            sessionId: $this->_sessionId,
+            rateLimitRemaining: $this->_rateLimitRemaining,
+            cancellationToken: $token,
+        );
+    }
+
+    /**
+     * Persist a cancellation signal so the streaming dispatcher's
+     * `CancellationToken` observes the flip on its next
+     * `isCancelled()` check. Notifications without an `Mcp-Session-Id`
+     * (which would be unusual on the streaming path — initialize
+     * never streams) write under the dash-placeholder session slot.
+     *
+     * Per MCP cancellation spec, malformed / unknown requestId values
+     * are silently ignored — the notification is fire-and-forget.
+     *
+     * @param array<string,mixed>|mixed $params
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _recordCancellation(mixed $params): void
+    {
+        if (!is_array($params)) {
+            return;
+        }
+        $requestId = $params['requestId'] ?? null;
+        if (!is_string($requestId) && !is_int($requestId)) {
+            return;
+        }
+
+        $sessionId = $this->_sessionId ?? '-';
+        if ($sessionId === '-') {
+            // Per MCP spec: ignore-able. We still write the cache slot
+            // so an in-process streaming test that drives both the
+            // streaming dispatcher and the cancellation notification
+            // against the same Server instance observes the flip.
+            Craft::info(
+                sprintf('cortex: notifications/cancelled arrived without an Mcp-Session-Id (requestId=%s)', (string) $requestId),
+                'cortex',
+            );
+        }
+
+        $cache = Craft::$app->getCache();
+        if ($cache === null) {
+            return;
+        }
+        $cache->set(
+            self::CANCEL_CACHE_KEY_PREFIX . $sessionId . ':' . (string) $requestId,
+            true,
+            self::CANCEL_CACHE_TTL,
+        );
+    }
+
+    /**
+     * Build a `notifications/progress` JSON-RPC envelope from a tool's
+     * yielded frame. Per MCP 2025-06-18 §progress:
+     *
+     *   - `progressToken` MUST be the value the client supplied in the
+     *     original request's `_meta.progressToken`. When the client
+     *     omitted it the server still emits progress frames (the
+     *     client may ignore them), so the envelope falls back to the
+     *     request id — that's a sensible default that preserves a
+     *     1:1 mapping between request and progress stream.
+     *   - `progress` is required, monotonically non-decreasing. The
+     *     tool is responsible for the increment; we pass through what
+     *     it yielded.
+     *   - `total` and `message` are optional and pass through verbatim
+     *     when present in the frame.
+     *
+     * @param array<string,mixed> $frame
+     * @return array<string,mixed>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _progressEnvelope(string|int|null $progressToken, array $frame): array
+    {
+        $params = [];
+        if ($progressToken !== null) {
+            $params['progressToken'] = $progressToken;
+        }
+        if (array_key_exists('progress', $frame)) {
+            $params['progress'] = $frame['progress'];
+        }
+        if (array_key_exists('total', $frame)) {
+            $params['total'] = $frame['total'];
+        }
+        if (array_key_exists('message', $frame)) {
+            $params['message'] = $frame['message'];
+        }
+
+        return [
+            'jsonrpc' => '2.0',
+            'method' => 'notifications/progress',
+            'params' => $params,
+        ];
+    }
+
+    /**
+     * Build the terminal `notifications/cancelled` envelope for a
+     * mid-stream cancellation. References the cancelled request id so
+     * the client can correlate it back to the original `tools/call`.
+     *
+     * @return array<string,mixed>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _cancelledEnvelope(int|string|null $id, string|int|null $progressToken): array
+    {
+        $params = ['requestId' => $id];
+        if ($progressToken !== null) {
+            $params['progressToken'] = $progressToken;
+        }
+        return [
+            'jsonrpc' => '2.0',
+            'method' => 'notifications/cancelled',
+            'params' => $params,
+        ];
+    }
+
+    /**
+     * Pull `_meta.progressToken` out of a `tools/call` params blob.
+     * Per MCP §progress the token MUST be a string or integer; any
+     * other shape (or absence) returns null and the dispatcher emits
+     * progress envelopes without a `progressToken` field. Spec-aware
+     * clients ignore those; non-spec clients see no frames.
+     *
+     * @param array<string,mixed> $callParams
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _progressToken(array $callParams): string|int|null
+    {
+        $meta = $callParams['_meta'] ?? null;
+        if (!is_array($meta)) {
+            return null;
+        }
+        $token = $meta['progressToken'] ?? null;
+        if (is_string($token) || is_int($token)) {
+            return $token;
+        }
+        return null;
+    }
+
+    /**
+     * Emit a `kind=cancelled` audit row for a mid-stream cancellation.
+     * Uses `buildEntry()` + `formatEntry()` directly to override the
+     * kind without manufacturing a synthetic exception — keeps the
+     * `error_class` / `error_message` columns null for the cancelled
+     * row, which is the semantic shape we want (cancellation isn't
+     * an error).
+     *
+     * @param array<string,mixed> $arguments
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _logCancelled(string $name, array $arguments, InvocationContext $context, int $durationMs): void
+    {
+        $line = InvocationLogger::formatEntry(
+            toolName: $name,
+            arguments: $arguments,
+            error: null,
+            durationMs: $durationMs,
+            context: $context,
+            kindOverride: InvocationLogger::KIND_CANCELLED,
+        );
+        Craft::info($line, InvocationLogger::CATEGORY);
+
+        $entry = InvocationLogger::buildEntry(
+            toolName: $name,
+            arguments: $arguments,
+            error: null,
+            durationMs: $durationMs,
+            context: $context,
+            kindOverride: InvocationLogger::KIND_CANCELLED,
+        );
+        $event = new LogCallEvent();
+        $event->entry = $entry;
+        $event->line = $line;
+        Event::trigger(InvocationLogger::class, InvocationLogger::EVENT_LOG_CALL, $event);
     }
 
     /**

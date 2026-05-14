@@ -115,6 +115,13 @@ class _CortexMcpRequest
  */
 class _CortexMcpControllerHarness extends McpController
 {
+    /**
+     * Captured SSE wire bytes when the harness was driven through the
+     * streaming response path. Empty string until `runIndex()` returns
+     * on a streaming request.
+     */
+    public string $capturedSseBody = '';
+
     public function withRequest(_CortexMcpRequest $req): self
     {
         // Yii's `craft\web\Controller` exposes a `request` magic getter
@@ -129,6 +136,21 @@ class _CortexMcpControllerHarness extends McpController
     {
         $this->response = new Response();
         return $this;
+    }
+
+    /**
+     * Override the production SSE emitter with one that captures
+     * frames into `$capturedSseBody` instead of writing to the SAPI.
+     * Tests assert against the captured bytes after `runIndex()`
+     * returns.
+     */
+    protected function _buildSseEmitter(): \craftpulse\cortex\mcp\transport\SseEmitter
+    {
+        return new \craftpulse\cortex\mcp\transport\SseEmitter(
+            function(string $frame): void {
+                $this->capturedSseBody .= $frame;
+            },
+        );
     }
 
     /**
@@ -1359,4 +1381,195 @@ it('a throttled call does NOT dispatch — no tool-execution audit row, only the
         'kind' => 'rate_limited',
     ]);
     Plugin::getInstance()->sessions->terminate($sessionId);
+});
+
+// -----------------------------------------------------------------------------
+// Sub-gate 7.7 — Streamable HTTP / SSE response path
+// -----------------------------------------------------------------------------
+
+/**
+ * Register the streaming fixture tool for one test's lifetime. Returns
+ * the bookkeeping pair the caller must restore in `finally`.
+ */
+function _cortex_register_streaming_fixture(): array
+{
+    $listener = static function(\craftpulse\cortex\events\RegisterToolsEvent $event): void {
+        $event->tools[] = new \craftpulse\cortex\tests\Tools\Fixtures\StreamingFixtureTool();
+    };
+    \yii\base\Event::on(
+        \craftpulse\cortex\services\Tools::class,
+        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        $listener,
+    );
+
+    $original = Plugin::getInstance()->tools;
+    $fresh = new \craftpulse\cortex\services\Tools();
+    $fresh->init();
+    Plugin::getInstance()->set('tools', $fresh);
+
+    return [$original, $listener];
+}
+
+function _cortex_restore_streaming_fixture(array $context): void
+{
+    [$original, $listener] = $context;
+    Plugin::getInstance()->set('tools', $original);
+    \yii\base\Event::off(
+        \craftpulse\cortex\services\Tools::class,
+        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        $listener,
+    );
+}
+
+/**
+ * Parse a raw SSE response body into an array of frames. Each frame
+ * is `{id: <uuid>, event: <name>, data: <decoded-json>}`.
+ *
+ * @return array<int,array{id: string, event: string, data: mixed}>
+ */
+function _cortex_parse_sse(string $body): array
+{
+    $frames = [];
+    $blocks = preg_split('/\r?\n\r?\n/', trim($body)) ?: [];
+    foreach ($blocks as $block) {
+        if ($block === '') {
+            continue;
+        }
+        $frame = ['id' => '', 'event' => '', 'data' => null];
+        foreach (preg_split('/\r?\n/', $block) ?: [] as $line) {
+            if (str_starts_with($line, 'id: ')) {
+                $frame['id'] = substr($line, 4);
+            } elseif (str_starts_with($line, 'event: ')) {
+                $frame['event'] = substr($line, 7);
+            } elseif (str_starts_with($line, 'data: ')) {
+                $frame['data'] = json_decode(substr($line, 6), true, flags: JSON_THROW_ON_ERROR);
+            }
+        }
+        $frames[] = $frame;
+    }
+    return $frames;
+}
+
+it('a streaming tools/call with Accept: text/event-stream returns SSE frames', function() {
+    $ctx = _cortex_register_streaming_fixture();
+
+    try {
+        // Initialize so the controller mints a session for the streaming call.
+        $initBody = (string) json_encode([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'initialize',
+            'params' => [
+                'protocolVersion' => Server::PROTOCOL_VERSION,
+                'clientInfo' => ['name' => 'pest-sse', 'version' => '0'],
+            ],
+        ]);
+        $initController = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            'Authorization' => $this->bearerHeader,
+        ], $initBody);
+        $initResponse = $initController->runIndex();
+        expect($initResponse->statusCode)->toBe(200);
+        $sessionId = (string) $initResponse->headers->get(Http::HEADER_SESSION_ID);
+
+        // Drive the streaming call with Accept: text/event-stream.
+        // The SseEmitter writes directly to PHP's output buffer via
+        // `echo` + `flush()`; capturing via ob_start lets us assert on
+        // the wire bytes without standing up a real HTTP server.
+        $callBody = (string) json_encode([
+            'jsonrpc' => '2.0',
+            'id' => 2,
+            'method' => 'tools/call',
+            'params' => [
+                'name' => '_streaming_test',
+                'arguments' => [],
+                '_meta' => ['progressToken' => 'prog-controller'],
+            ],
+        ]);
+        $callController = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            Http::HEADER_SESSION_ID => $sessionId,
+            'Authorization' => $this->bearerHeader,
+            'Accept' => 'application/json, text/event-stream',
+        ], $callBody);
+
+        $callResponse = $callController->runIndex();
+
+        expect($callResponse->statusCode)->toBe(200);
+        // SSE response Content-Type is on the Yii response side too so
+        // any proxy layer in front sees the right content type.
+        expect($callResponse->headers->get('Content-Type'))->toContain('text/event-stream');
+
+        $frames = _cortex_parse_sse($callController->capturedSseBody);
+        // Three progress frames + one terminal response = 4 frames.
+        expect($frames)->toHaveCount(4);
+
+        // The first three frames are notifications/progress with the
+        // client's progressToken passed through verbatim.
+        for ($i = 0; $i < 3; $i++) {
+            expect($frames[$i]['event'])->toBe('message');
+            expect($frames[$i]['data'])->toBeArray();
+            expect($frames[$i]['data']['method'])->toBe('notifications/progress');
+            expect($frames[$i]['data']['params']['progressToken'])->toBe('prog-controller');
+            expect($frames[$i]['data']['params']['progress'])->toBe($i + 1);
+            expect($frames[$i]['data']['params']['total'])->toBe(3);
+        }
+
+        // The final frame is the terminal tools/call response.
+        $terminal = $frames[3]['data'];
+        expect($terminal)->toBeArray();
+        expect($terminal['id'])->toBe(2);
+        expect($terminal['result']['isError'])->toBeFalse();
+
+        Plugin::getInstance()->sessions->terminate($sessionId);
+    } finally {
+        _cortex_restore_streaming_fixture($ctx);
+    }
+});
+
+it('a tools/call without Accept: text/event-stream keeps the JSON response path', function() {
+    $ctx = _cortex_register_streaming_fixture();
+
+    try {
+        $initBody = (string) json_encode([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'initialize',
+            'params' => [
+                'protocolVersion' => Server::PROTOCOL_VERSION,
+                'clientInfo' => ['name' => 'pest-json', 'version' => '0'],
+            ],
+        ]);
+        $initController = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            'Authorization' => $this->bearerHeader,
+        ], $initBody);
+        $initResponse = $initController->runIndex();
+        $sessionId = (string) $initResponse->headers->get(Http::HEADER_SESSION_ID);
+
+        $callBody = (string) json_encode([
+            'jsonrpc' => '2.0',
+            'id' => 2,
+            'method' => 'tools/call',
+            'params' => ['name' => '_streaming_test', 'arguments' => []],
+        ]);
+        $callController = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            Http::HEADER_SESSION_ID => $sessionId,
+            'Authorization' => $this->bearerHeader,
+            'Accept' => 'application/json',
+        ], $callBody);
+        $callResponse = $callController->runIndex();
+
+        expect($callResponse->statusCode)->toBe(200);
+        expect($callResponse->headers->get('Content-Type'))->toContain('application/json');
+        // The body is the normal JSON-RPC envelope, not SSE frames.
+        $envelope = _cortex_decode_response($callResponse);
+        expect($envelope)->toHaveKey('result');
+        expect($envelope['result'])->toHaveKey('isError', false);
+
+        Plugin::getInstance()->sessions->terminate($sessionId);
+    } finally {
+        _cortex_restore_streaming_fixture($ctx);
+    }
 });

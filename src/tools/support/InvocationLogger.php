@@ -82,6 +82,7 @@ final class InvocationLogger
     public const KIND_TOOL_ERROR = 'tool_error';
     public const KIND_INTERNAL_ERROR = 'internal_error';
     public const KIND_RATE_LIMITED = 'rate_limited';
+    public const KIND_CANCELLED = 'cancelled';
 
     /**
      * Fired once per `logCall()` invocation, after the formatted KV

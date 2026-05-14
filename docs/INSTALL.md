@@ -213,6 +213,70 @@ curl -X POST https://your-site.test/oauth/revoke -d 'token=<access or refresh>'
 
 Per RFC 7009 §2.2 the endpoint returns 200 regardless of whether the token was known — no information leakage.
 
+### Streaming Tools (SSE over HTTP)
+
+Cortex's HTTP transport supports MCP's Streamable HTTP profile — long-running tools can emit progress frames between the original `tools/call` request and its terminal JSON-RPC response, and clients can cancel an in-flight call without dropping the connection. The Free tier ships no streaming tools; the wire is ready for Gate 8's Pro write tools (eager resave, content audit, batch import/export).
+
+**Client opt-in.** Clients request the SSE response by sending `Accept: text/event-stream` on the `tools/call` POST. MCP-spec-compliant clients (Claude Desktop, Claude Code, Cursor) send the SSE Accept by default. Cortex falls back to the JSON response when the header is absent or doesn't mention `text/event-stream`.
+
+```
+POST /cortex/mcp
+Accept: text/event-stream
+Content-Type: application/json
+Authorization: Bearer <token>
+Mcp-Session-Id: <session-id>
+MCP-Protocol-Version: 2025-06-18
+
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"<tool>","arguments":{...},"_meta":{"progressToken":"prog-1"}}}
+```
+
+**Response wire format.** SSE frames, one event per line block:
+
+```
+id: <uuid>
+event: message
+data: {"jsonrpc":"2.0","method":"notifications/progress","params":{"progressToken":"prog-1","progress":1,"total":3}}
+
+id: <uuid>
+event: message
+data: {"jsonrpc":"2.0","method":"notifications/progress","params":{"progressToken":"prog-1","progress":2,"total":3}}
+
+id: <uuid>
+event: message
+data: {"jsonrpc":"2.0","id":2,"result":{"content":[...],"isError":false}}
+```
+
+The terminal frame carries the original request id and the `tools/call` result envelope; intermediate frames are `notifications/progress` envelopes carrying the client's `progressToken` (when supplied in `_meta`) plus `progress` and optional `total` / `message` fields. Each frame's `id:` is a UUIDv4 — currently emitted for forward compatibility with `Last-Event-ID` resumability (deferred to Phase 3); no replay buffer exists today, so reconnects after a dropped connection lose in-flight frames.
+
+**Cancellation.** Send a JSON-RPC `notifications/cancelled` notification (not a request — no `id` field) referencing the in-flight request id:
+
+```
+POST /cortex/mcp
+Authorization: Bearer <token>
+Mcp-Session-Id: <session-id>
+MCP-Protocol-Version: 2025-06-18
+
+{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":2,"reason":"user requested"}}
+```
+
+The server flips a cache-backed cancellation flag the running tool observes between yields. Cooperative tools short-circuit and the server emits a terminal `notifications/cancelled` envelope on the SSE stream. Tools that ignore the flag (pure CPU loops without yield checkpoints) cannot be cancelled — the contract is cooperative, not preemptive. The cancellation slot's TTL is one hour: a delayed `notifications/cancelled` arriving after a network blip still flips a running stream.
+
+**Audit logging.** Streamed invocations write exactly one row to `cortex_invocations` per stream completion, not per frame. The `durationMs` column reflects wall-clock from stream start to stream end. Cancellation events surface as `kind=cancelled` rows (distinct from `tool_error`, `internal_error`, and `rate_limited`); `errorClass` / `errorMessage` stay null — cancellation isn't an error.
+
+**Operator smoke test.** A built-in fixture tool — `_streaming_test` — exists for end-to-end SSE health checks. It's gated behind the `CORTEX_STREAMING_FIXTURE=1` env var and never registers in production unless an operator opts in. Flip the env var, restart your PHP-FPM workers, and:
+
+```bash
+curl -N -X POST https://your-site.test/cortex/mcp \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Mcp-Session-Id: $SESSION" \
+  -H 'Accept: text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-06-18' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"_streaming_test","arguments":{},"_meta":{"progressToken":"prog-1"}}}'
+```
+
+Expect: HTTP 200, `Content-Type: text/event-stream`, three progress frames (`progress: 1..3, total: 3`), then a terminal response with `done: true`. If you see anything else — nginx buffering the response into one block, FPM workers not flushing, an SSE-aware proxy rewriting the Content-Type — the fixture's deterministic output makes the misconfiguration easy to spot.
+
 ### Auto-detect and apply (fastest)
 
 If you're running Cortex from the host (not inside a container), this is one command:
