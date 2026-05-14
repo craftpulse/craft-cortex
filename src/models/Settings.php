@@ -82,6 +82,39 @@ class Settings extends Model
      */
     public int $runtimeOverrideTtl = 604800;
 
+    /**
+     * @var bool Whether the HTTP transport (`POST/GET/DELETE
+     *          /cortex/mcp`) accepts requests. Defaults to false so
+     *          production installs stay off until auth (sub-gates
+     *          7.2 / 7.3) and per-user filtering (7.4) land. With
+     *          this flag false, every request to the endpoint returns
+     *          503 Service Unavailable regardless of headers or
+     *          credentials.
+     */
+    public bool $httpEnabled = false;
+
+    /**
+     * @var string[] Allowlist of `Origin` header values the HTTP
+     *               transport accepts. Empty means permissive — every
+     *               Origin is accepted, intended for dev only. When
+     *               the list is non-empty, requests whose `Origin`
+     *               does not match exactly are rejected with 403
+     *               Forbidden. DNS-rebinding defense per MCP 2025-06-
+     *               18 ("Servers MUST validate the Origin header on
+     *               all incoming connections").
+     */
+    public array $allowedOrigins = [];
+
+    /**
+     * @var int Sliding TTL (in seconds) applied to HTTP-transport
+     *          sessions in cache. Every `Sessions::touch()` resets the
+     *          expiry, so an active client stays alive while idle
+     *          clients evict naturally. Default: 1 hour. Override
+     *          higher for long-running coding sessions, lower for
+     *          tighter session-affinity rotation.
+     */
+    public int $sessionTtl = 3600;
+
     // Protected Methods
     // =========================================================================
 
@@ -96,9 +129,9 @@ class Settings extends Model
     protected function defineRules(): array
     {
         $rules = parent::defineRules();
-        $rules[] = [['runtimeOverrideTtl'], 'integer', 'min' => 1];
-        $rules[] = [['execEnabled', 'execDryRunDefault'], 'boolean'];
-        $rules[] = [['allowedCommands'], 'each', 'rule' => ['string', 'min' => 1]];
+        $rules[] = [['runtimeOverrideTtl', 'sessionTtl'], 'integer', 'min' => 1];
+        $rules[] = [['execEnabled', 'execDryRunDefault', 'httpEnabled'], 'boolean'];
+        $rules[] = [['allowedCommands', 'allowedOrigins'], 'each', 'rule' => ['string', 'min' => 1]];
         return $rules;
     }
 }

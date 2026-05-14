@@ -5,12 +5,15 @@ namespace craftpulse\cortex;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\events\RegisterComponentTypesEvent;
+use craft\events\RegisterUrlRulesEvent;
 use craft\services\Gc;
+use craft\web\UrlManager;
 use craftpulse\cortex\generator\Tool as ToolGenerator;
 use craftpulse\cortex\models\Settings;
 use craftpulse\cortex\services\Allowlist;
 use craftpulse\cortex\services\Prompts;
 use craftpulse\cortex\services\Resources;
+use craftpulse\cortex\services\Sessions;
 use craftpulse\cortex\services\Tools;
 use yii\base\Event;
 
@@ -37,6 +40,7 @@ use yii\base\Event;
  * @property-read Allowlist $allowlist
  * @property-read Prompts $prompts
  * @property-read Resources $resources
+ * @property-read Sessions $sessions
  * @property-read Tools $tools
  */
 class Plugin extends BasePlugin
@@ -75,6 +79,7 @@ class Plugin extends BasePlugin
                 'allowlist' => ['class' => Allowlist::class],
                 'prompts' => ['class' => Prompts::class],
                 'resources' => ['class' => Resources::class],
+                'sessions' => ['class' => Sessions::class],
                 'tools' => ['class' => Tools::class],
             ],
         ];
@@ -118,6 +123,27 @@ class Plugin extends BasePlugin
             Gc::EVENT_RUN,
             static function(): void {
                 Plugin::getInstance()->allowlist->pruneExpired();
+            },
+        );
+
+        // Register the HTTP transport endpoint at /cortex/mcp. The route
+        // sits under the site URL rules (front-end-style endpoint, no
+        // cpTrigger) because MCP clients hit a stable public URL that
+        // doesn't move with `cpTrigger` reconfiguration.
+        //
+        // POST is the JSON-RPC entry point; GET is reserved for SSE
+        // upgrade (lands in sub-gate 7.7); DELETE terminates the
+        // session. The controller refuses every request when
+        // `Settings::$httpEnabled` is false, so registering the route
+        // unconditionally is safe — feature gating happens at the
+        // controller layer, not at the route layer.
+        Event::on(
+            UrlManager::class,
+            UrlManager::EVENT_REGISTER_SITE_URL_RULES,
+            static function(RegisterUrlRulesEvent $event): void {
+                $event->rules['POST cortex/mcp'] = 'cortex/mcp/index';
+                $event->rules['GET cortex/mcp'] = 'cortex/mcp/index';
+                $event->rules['DELETE cortex/mcp'] = 'cortex/mcp/index';
             },
         );
     }

@@ -110,6 +110,53 @@ return [
          */
         // 'runtimeOverrideTtl' => 604800,
 
+        // ---------------------------------------------------------------------
+        // HTTP transport
+        // ---------------------------------------------------------------------
+
+        /**
+         * Whether the HTTP transport (`POST/GET/DELETE /cortex/mcp`)
+         * accepts requests. Defaults to false so production installs
+         * stay off until per-user filtering (sub-gate 7.4) and bearer-
+         * token auth (sub-gates 7.2 / 7.3) land. With this flag false,
+         * every request to the endpoint returns 503 Service
+         * Unavailable regardless of headers or credentials.
+         *
+         * @var bool
+         */
+        // 'httpEnabled' => false,
+
+        /**
+         * Allowlist of `Origin` header values the HTTP transport will
+         * accept. Empty means permissive — every Origin is accepted,
+         * which is fine for local dev but unsafe for any deployed
+         * environment because the MCP spec mandates Origin validation
+         * as DNS-rebinding defense. When non-empty, requests whose
+         * `Origin` does not match exactly are rejected with 403.
+         *
+         * Set this to the explicit URLs of every client that talks to
+         * the endpoint — Claude Desktop's local proxy, Cursor's HTTP
+         * setup, etc.
+         *
+         * @var string[]
+         */
+        // 'allowedOrigins' => [
+        //     'http://localhost:6274',
+        //     'https://claude.ai',
+        // ],
+
+        /**
+         * Sliding TTL (in seconds) applied to HTTP-transport sessions
+         * in cache. Every authenticated request resets the expiry, so
+         * an active client stays alive while idle clients evict
+         * naturally. Default: 1 hour. Override higher for long-
+         * running coding sessions, lower for tighter session-affinity
+         * rotation.
+         *
+         * @var int
+         */
+        // 'sessionTtl' => 3600,
+
     ],
 
     // 'production' => [

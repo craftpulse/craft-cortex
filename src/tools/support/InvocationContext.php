@@ -41,24 +41,44 @@ use craftpulse\cortex\mcp\Server;
  */
 final class InvocationContext
 {
+    // Private Properties
+    // =========================================================================
+
+    /**
+     * @var CancellationToken Cooperative cancellation signal. Streaming
+     *                        tools check `isCancelled()` between yields
+     *                        and short-circuit when the flag is up. The
+     *                        contract lives here from sub-gate 7.1; the
+     *                        wire implementation (HTTP/SSE flipping the
+     *                        flag on `notifications/cancelled`) lands in
+     *                        7.7. stdio invocations construct a fresh,
+     *                        unfired token and never call `cancel()`.
+     */
+    private readonly CancellationToken $_cancellationToken;
+
     // Public Methods
     // =========================================================================
 
     /**
-     * @param string          $transport   Transport identifier — `stdio` or
-     *                                     `http`. Mirrors `mcp/Server`'s
-     *                                     `TRANSPORT_*` constants.
-     * @param string|int|null $requestId   JSON-RPC request id (string or
-     *                                     int per spec; null for the rare
-     *                                     in-process invocation that
-     *                                     bypasses JSON-RPC entirely).
-     * @param int|null        $userId      Craft user id. Always null on
-     *                                     stdio (single-process, local
-     *                                     OS user — no per-request
-     *                                     Craft identity).
-     * @param string|null     $clientName  Client name from
-     *                                     `initialize.clientInfo.name`.
-     *                                     Null before initialize.
+     * @param string                $transport         Transport identifier — `stdio` or
+     *                                                 `http`. Mirrors `mcp/Server`'s
+     *                                                 `TRANSPORT_*` constants.
+     * @param string|int|null       $requestId         JSON-RPC request id (string or
+     *                                                 int per spec; null for the rare
+     *                                                 in-process invocation that
+     *                                                 bypasses JSON-RPC entirely).
+     * @param int|null              $userId            Craft user id. Always null on
+     *                                                 stdio (single-process, local
+     *                                                 OS user — no per-request
+     *                                                 Craft identity).
+     * @param string|null           $clientName        Client name from
+     *                                                 `initialize.clientInfo.name`.
+     *                                                 Null before initialize.
+     * @param CancellationToken|null $cancellationToken Cooperative cancellation
+     *                                                 signal. Defaults to a fresh,
+     *                                                 unfired token so non-streaming
+     *                                                 call sites don't have to know
+     *                                                 about it.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -68,6 +88,20 @@ final class InvocationContext
         public readonly string|int|null $requestId = null,
         public readonly ?int $userId = null,
         public readonly ?string $clientName = null,
+        ?CancellationToken $cancellationToken = null,
     ) {
+        $this->_cancellationToken = $cancellationToken ?? new CancellationToken();
+    }
+
+    /**
+     * Get the cancellation token. Streaming tools call this between
+     * yields and bail when `isCancelled()` returns true.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getCancellationToken(): CancellationToken
+    {
+        return $this->_cancellationToken;
     }
 }

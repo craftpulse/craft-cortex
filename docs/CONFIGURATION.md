@@ -14,6 +14,10 @@ This document covers each setting in detail, then explains how to use the CP UI 
   - [`execEnabled`](#execenabled)
   - [`execDryRunDefault`](#execdryrundefault)
   - [`runtimeOverrideTtl`](#runtimeoverridettl)
+  - [`httpEnabled`](#httpenabled)
+  - [`allowedOrigins`](#allowedorigins)
+  - [`sessionTtl`](#sessionttl)
+- [HTTP transport](#http-transport)
 - [The CP settings page](#the-cp-settings-page)
 - [`config/cortex.php`](#configcortexphp)
 - [Logging](#logging)
@@ -63,6 +67,47 @@ Flipping this to `false` makes evaluation the default. This is **not** a securit
 The default TTL applied to a new runtime override when no expiry is supplied at creation time. Shorter values produce a tighter security posture (overrides expire faster, fewer surprise grants in the system); longer values reduce friction for teams that often need short-term command grants.
 
 Runtime overrides are admin-issued through the CP and stored in the `cortex_runtime_overrides` DB table. Expired overrides remain in the table (soft-delete) but no longer count toward the effective allowlist. Expired non-deleted overrides are hard-deleted inline during Craft's regular garbage-collection sweep.
+
+### `httpEnabled`
+
+**Type:** `bool` &nbsp;&nbsp; **Default:** `false`
+
+Whether the HTTP transport (`POST/GET/DELETE /cortex/mcp`) accepts requests. **Defaults to off in 5.0 — the HTTP transport ships as scaffolding in this release; auth, per-user filtering, audit, and rate limiting land across sub-gates 7.2–7.6 before it is production-ready.** Flip to `true` only in local-dev environments to experiment with the endpoint.
+
+When this flag is `false`, every request to `/cortex/mcp` returns `503 Service Unavailable` regardless of headers or credentials.
+
+### `allowedOrigins`
+
+**Type:** `string[]` &nbsp;&nbsp; **Default:** `[]`
+
+Allowlist of `Origin` header values the HTTP transport accepts. The MCP spec mandates Origin validation as DNS-rebinding defense — when a request's `Origin` header does not match an entry in this list, Cortex rejects it with `403 Forbidden`.
+
+Empty means permissive (every Origin accepted). That's fine for local development; it is **not** fine for any deployed environment. Cortex logs a warning to the `cortex` channel on every request when the allowlist is empty and `httpEnabled` is `true`, so configuration drift is visible in your logs.
+
+Set this to the explicit URLs of every client that talks to the endpoint — Claude Desktop's local proxy, Cursor's HTTP setup, etc.
+
+### `sessionTtl`
+
+**Type:** `int` (seconds) &nbsp;&nbsp; **Default:** `3600` (1 hour)
+
+Sliding TTL applied to HTTP-transport sessions in Craft's cache. Every authenticated request resets the cache entry's expiry, so an active client stays alive indefinitely while idle clients evict naturally.
+
+Sessions are keyed by an opaque `Mcp-Session-Id` returned in the response header on `initialize` and required on every subsequent POST. They are stored in the configured cache backend (PSR-16) — no DB write — and survive request boundaries but not cache flushes.
+
+## HTTP transport
+
+The Streamable HTTP transport at `/cortex/mcp` is dev-mode-only in 5.0. Setting `httpEnabled = true` exposes the JSON-RPC dispatcher to HTTP clients with no authentication in front — the transport currently allows anonymous access so the skeleton can be exercised. Bearer-token auth lands in sub-gate 7.2; do not expose the endpoint to the public internet until at least that release.
+
+The endpoint supports three methods:
+
+- **`POST`** — single JSON-RPC message per request. Headers required:
+  - `MCP-Protocol-Version: 2025-06-18` (missing/wrong → 400).
+  - `Origin: …` (must match `allowedOrigins` when the list is non-empty → 403).
+  - `Mcp-Session-Id: …` (required on every request except `initialize` → 400; unknown id → 404).
+- **`GET`** — reserved for SSE upgrade (sub-gate 7.7). Currently returns 405.
+- **`DELETE`** — terminates the session identified by the `Mcp-Session-Id` header. Returns 204 on success, 404 if the session is unknown.
+
+`craft_exec` is stdio-only and rejected at the dispatcher when called over HTTP regardless of caller permissions. The rejection comes back as a JSON-RPC error envelope (HTTP 200, JSON-RPC code -32601) so spec-compliant clients can render the message correctly.
 
 ## The CP settings page
 
