@@ -63,6 +63,86 @@ All notable changes to Cortex are documented here. Format follows
   emitted ids and a `GET /cortex/mcp?Last-Event-ID=…` resume path
   without changing the wire shape.
 
+### Added — Gate 7.6 (Pro tier, rate limit + burst-quota observability)
+
+- `RateLimiter` service — token-bucket per authenticated HTTP user.
+  Default burst 60 / refill 5 per second; configurable via
+  `rateLimitBurst` and `rateLimitPerSecond` in `config/cortex.php`.
+  Bucket state is stored in Craft's cache so the limiter survives
+  process restarts without losing accumulated debt.
+- `RateLimitStatus` value object returned by `RateLimiter::consume()`
+  carries `allowed`, `remaining`, `resetAt`, and `retryAfter` — the
+  controller reads these without knowing how the limit is implemented.
+- `McpController::beforeAction()` checks the limiter after successful
+  auth. Exhausted callers receive `429 Too Many Requests` with a
+  `Retry-After` header; the body is a standard MCP error envelope.
+- Throttled requests write a `kind=rate_limited` audit row to
+  `cortex_invocations` (Gate 7.5 table) with `rateLimitRemaining = 0`
+  and no `toolName` / `responseExcerpt`. Audit retention and the
+  `EVENT_LOG_CALL` event fire for rate-limited rows the same as for
+  tool-call rows.
+- 9 new Pest tests across `tests/Services/RateLimiterTest.php` and
+  `tests/Controllers/McpControllerTest.php` covering: first-request
+  allowed, burst exhaustion returns 429, `Retry-After` header set,
+  bucket refills after the quota window, per-user isolation (user A
+  exhausted does not throttle user B), and `kind=rate_limited` audit
+  row written on 429.
+
+### Added — Gate 7.5 (Pro tier, audit log DB table)
+
+- `cortex_invocations` table — one row per authenticated HTTP
+  `tools/call`. Columns: `userId`, `clientId`, `toolName`,
+  `arguments` (post-redaction JSON excerpt), `responseExcerpt`
+  (capped at `auditResponseExcerptBytes`, default 2048),
+  `durationMs`, `kind` (`success`, `tool_error`, `internal_error`,
+  `rate_limited`, `cancelled`), `rateLimitRemaining`, `dateCreated`.
+- `Invocations` service — `log(InvocationRecord): void` is the
+  soft-write contract: failures are logged at `warning` level and
+  suppressed so a DB hiccup never interrupts an MCP response. A
+  configurable `auditRetentionDays` (default `null` = forever)
+  prunes rows during Craft's `gc` sweep via `Gc::EVENT_RUN`.
+- `EVENT_LOG_CALL` fires after each row is persisted, carrying the
+  hydrated `InvocationRecord`. Operators and third-party plugins can
+  forward rows to Elasticsearch, Datadog, etc. without touching core.
+- `InvocationQuery` — fluent query builder over `cortex_invocations`.
+  Supports `byUser()`, `byTool()`, `byKind()`, `since()`, `until()`,
+  `limit()`, and `latest()`. Intended as the read surface for a
+  future CP audit dashboard.
+- `auditResponseExcerptBytes` and `auditRetentionDays` settings
+  added to `models/Settings`. Documented in `config/cortex.php`.
+- 12 new Pest tests across `tests/Services/InvocationsTest.php`
+  covering: row written on success, suppressed on DB error, retention
+  prune removes old rows only, `InvocationQuery` filters, and
+  `EVENT_LOG_CALL` fires with the correct record.
+
+### Added — Gate 7.4 (Pro tier, per-user tool filtering)
+
+- Three-method gating contract added to `ToolInterface`:
+  `shouldRegister(): bool` — static, runs once at boot, removes
+  tools nobody on the install can use (e.g. `craft_exec` when
+  `execEnabled = false`); `filterFor(?User $user): bool` — per-
+  request per-user gating, default `true`, Pro tools override to
+  check Craft permissions; `inputSchemaFor(?User $user): array` —
+  per-request schema rewrite, default delegates to static
+  `getInputSchema()`, mode-gated tools filter their `mode` enum.
+- `Tools::asListPayloadFor(?User)` and `Tools::getByNameFor(string,
+  ?User)` are the HTTP variants consumed by `McpController`. The
+  existing `asListPayload()` and `getByName()` stay for stdio (`null`
+  user is the default-true path).
+- `shouldRegister()` promoted from instance to static per the Craft
+  contract idiom — the service calls it once at registry build time
+  without instantiating the tool.
+- No concrete tool overrides ship in Gate 7.4 — all existing Free
+  tools default to `filterFor() = true` and `inputSchemaFor() =
+  getInputSchema()`. The Pro override layer (entry-save gate,
+  user-edit gate, etc.) lands with the first Pro write-tool in a
+  future gate.
+- 8 new Pest tests in `tests/Services/ToolsTest.php` covering:
+  `asListPayloadFor(null)` matches `asListPayload()`, `filterFor`
+  returning `false` hides the tool from `asListPayloadFor`, `getByNameFor`
+  returns null for filtered tools, and `inputSchemaFor` override
+  narrows the schema for the requesting user.
+
 ### Added — Gate 7.3 (Pro tier, OAuth 2.1 + DCR + discovery metadata)
 
 - `league/oauth2-server` dependency. Authorization Code + PKCE (S256
