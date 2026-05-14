@@ -522,13 +522,20 @@ it('POST /oauth/revoke returns 200 even for unknown tokens (RFC 7009 §2.2)', fu
 });
 
 it('POST /oauth/revoke flips the dateRevoked on a known refresh token', function() {
+    // Register a real client so the FK constraint on clientId is satisfied.
+    $clientResp = Plugin::getInstance()->oauth->registerClient([
+        'client_name' => '_test_/revoke-controller-refresh',
+        'redirect_uris' => ['https://example.com/cb'],
+        'token_endpoint_auth_method' => 'none',
+    ]);
+
     $opaque = bin2hex(random_bytes(40));
     $hash = hash('sha256', $opaque);
 
     $record = new OauthTokenRecord();
     $record->tokenType = 'refresh';
     $record->tokenHash = $hash;
-    $record->clientId = 'test-client';
+    $record->clientId = $clientResp['client_id'];
     $record->expiresAt = date('Y-m-d H:i:s', time() + 86400);
     $record->save(false);
 
