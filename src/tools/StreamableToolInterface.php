@@ -78,6 +78,28 @@ interface StreamableToolInterface extends ToolInterface
      * `notifications/progress` JSON-RPC envelope; the generator's
      * return value becomes the terminal `tools/call` response.
      *
+     * **Cancellation forwarding:** sub-generators delegated via
+     * `yield from` do NOT automatically inherit the cancellation-token
+     * check from the parent generator. PHP generator semantics hand
+     * control to the sub-generator until it completes or returns; the
+     * parent's poll loop between yields never runs during that window.
+     * A tool that uses `yield from $someSubGenerator()` and lets the
+     * sub-generator do significant work without checking the token will
+     * be unresponsive to mid-stream cancellation for the duration of
+     * that delegation.
+     *
+     * To keep a sub-generator cancellable, either:
+     *   - Pass the full `InvocationContext` (or at minimum its
+     *     `CancellationToken`) to the sub-generator as an argument and
+     *     check `$ctx->getCancellationToken()->isCancelled()` inside it
+     *     between yields; or
+     *   - Break the delegation into explicit yield points in the parent
+     *     generator rather than using `yield from`.
+     *
+     * This is a property of PHP's generator semantics, not a cortex
+     * limitation — the same constraint applies to any PHP generator
+     * that delegates via `yield from`.
+     *
      * @param array<string,mixed> $arguments Validated against `getInputSchema()` upstream.
      * @param InvocationContext   $ctx       Per-invocation context — carries the cancellation token, transport, user, audit fields.
      * @return Generator<int,array<string,mixed>,mixed,array<int|string,mixed>>
