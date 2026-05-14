@@ -1,8 +1,8 @@
 # Cortex plugin for Craft CMS 5.x
 
-Cortex is a [Model Context Protocol](https://modelcontextprotocol.io/) server for Craft CMS 5. It connects your AI assistant — Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf — directly to your Craft project so the assistant can answer questions about your content model, run safe inspections, and learn Craft conventions from bundled expert skills.
+Cortex is a [Model Context Protocol](https://modelcontextprotocol.io/) server that gives your AI assistant a direct line into your Craft 5 project. Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf — they all connect over a single stdio transport and immediately have read access to your content model, your content, and a bundled ~27,000-line corpus of authored Craft expertise. Stop pasting Craft docs into your chat window.
 
-The free tier ships **32 tools**, **8 prompts**, and **77 resources** over a local stdio transport. The upcoming Pro tier (Phase 2) adds an authenticated HTTP transport with content-write capabilities for non-developer operators.
+The free tier ships **33 tools**, **8 prompts**, and **77 resources**. The upcoming Pro tier (Phase 2) adds an authenticated HTTP transport with content-write capabilities for non-developer operators — agencies hand it to their clients without handing over shell access.
 
 ## Requirements
 
@@ -32,32 +32,48 @@ Cortex works on Craft 5.x.
 
 ## Connect your MCP client
 
-After installation, run the install helper from your project root:
+Cortex ships four console actions for hooking up your MCP client, in increasing order of magic:
 
 ```bash
-ddev craft cortex/install --client=claude-desktop
-```
+# 1. Print copy-paste snippets for all seven supported clients
+ddev craft cortex/install
 
-This prints a copy-paste config snippet for the client you named. Cortex supports seven clients today — Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf. Drop `--client=...` to print snippets for all of them.
-
-To skip the copy-paste step entirely, use the auto-config writer:
-
-```bash
+# 2. Write Cortex config to one specific client's config file
 ddev craft cortex/install/apply --client=claude-desktop --dry-run
 ddev craft cortex/install/apply --client=claude-desktop
+
+# 3. Scan your host for installed clients and print a status table
+php craft cortex/install/detect
+
+# 4. Scan, then prompt to apply Cortex config for each detected client
+php craft cortex/install/auto
 ```
 
-The `--dry-run` flag prints the would-be diff so you can preview before writing. Without it, Cortex writes the entry atomically (temp file + rename) and backs the original file up to `<file>.bak.<unix-timestamp>`. Re-runs are idempotent — pass `--force` if you want to overwrite an existing Cortex entry.
+The `apply` action writes atomically (temp file + rename), backs the original up to `<file>.bak.<unix-timestamp>`, and is idempotent — re-runs are no-ops unless you pass `--force`. The `detect` and `auto` actions scan `/Applications`, `PATH`, and `%LOCALAPPDATA%\Programs` for installed clients, plus the per-client config directories for "configured" signals.
 
-Full per-client instructions, troubleshooting, and the manual snippet flow are in **[`docs/INSTALL.md`](docs/INSTALL.md)**.
+**`detect` and `auto` refuse to run from inside a container** (DDEV, Docker, Lando, Sail, Podman, LXC, Kubernetes) because the container can't see your host's `/Applications`, `~/.cursor`, etc. — detection from inside would return false negatives. Run them from your host's PHP, or stick with the snippet form (`ddev craft cortex/install`) which works fine inside DDEV.
+
+Cortex supports seven clients today — Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf. Full per-client instructions, troubleshooting, and per-platform config paths are in **[`docs/INSTALL.md`](docs/INSTALL.md)**.
+
+## What makes Cortex different
+
+**The bundled skills are the moat.** Cortex ships [`craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) — eight skills, ~27,000 lines of authored Craft expertise — as MCP prompts that your assistant picks up automatically when the conversation touches Craft architecture, content modelling, Twig templating, PHP standards, DDEV, or Garnish. This isn't a vectorised docs lookup. It's reverse-engineered internals — the 15-step element save lifecycle, the four-layer authorization model, the dual-layer session architecture — that don't exist in the public docs.
+
+**Lean tool surface, parameter-rich.** 33 thick tools cover broader ground than a 50-tool catalogue would by collapsing `list_*`/`get_*` pairs into single tools with optional `handle`/`id` parameters, exposing a `count: true` mode on every list-capable tool, and offering the full element-query surface (`relatedTo`, `with: [...]` eager loading, structure params, site filter) on the content tools. Smaller `tools/list` = faster LLM tool selection + fewer tokens consumed by the system prompt every turn.
+
+**Defense in depth, not naive blocklisting.** `craft_exec` runs PHP `eval` behind six layered security gates — dry-run-by-default, structured output, secret redaction, destructive-op guard, hard HTTP-transport rejection (stdio only), and the MCP `destructiveHint` annotation so spec-aware clients warn before invoking. Nothing else in the source uses `eval` / `shell_exec` / `proc_open` / `passthru` / `popen` / backticks, enforced by a tokenising architecture test. No raw SQL tool. No PII in Free. The threat model isn't sandbox escape — it's an LLM choosing destructive operations because it misread context, and the gates are designed around that.
+
+**MCP 2025-06-18 spec compliance.** Five tools declare `outputSchema`; the dispatcher dual-emits `structuredContent` alongside the legacy text block per §6.2. PHP 8 attributes (`#[IsReadOnly]`, `#[IsDestructive]`, `#[IsIdempotent]`, `#[IsOpenWorld]`, `#[IsStdioOnly]`, `#[Title]`) carry the MCP `ToolAnnotations`. JSON-RPC 2.0 dispatcher uses correct error codes (-32600 / -32601 / -32602 / -32603) and returns tool-execution errors as `isError: true` envelopes (not protocol errors) so the LLM can self-correct.
 
 ## What the AI gets
 
 After Cortex is connected, your assistant can:
 
-- **Inspect your content model.** 32 read-only tools cover sections, entry types, fields, field types, category groups, tag groups, sites, image transforms, volumes, filesystems, plugins, routes, system info, permissions, GraphQL schemas, the database schema, and more. List/get/count modes collapse behind a single `handle` argument so the LLM picks the right tool faster and uses fewer tokens.
+- **Get oriented in one call.** `get_initial_context` returns Craft version + edition + environment, your primary site, a thin index of sites / sections / element types, the bundled `craftcms_*` skill prompts, the `craft_exec` security posture, and the effective command allowlist — all in one tool call. Fresh agents stop wasting four turns on orientation tools.
+- **Inspect your content model.** Read-only tools cover sections, entry types, fields, field types, category groups, tag groups, sites, image transforms, volumes, filesystems, plugins, routes, system info, permissions, GraphQL schemas, the database schema, and more. List / get / count modes collapse behind a single `handle` argument so the LLM picks the right tool faster and uses fewer tokens.
 - **Read your content safely.** `entries`, `assets`, `categories`, `tags`, `globals` expose the full element-query surface (filters, eager loading, pagination, count mode). Relational fields stub to `{type: "relation", loaded: false}` by default — pass `with: [...]` to materialise them, so the LLM never accidentally triggers an N+1 walk.
-- **Run safe dev actions.** `clear_caches`, `resave`, `craft_command` (allowlisted), `craft_exec` (six security gates including dry-run-default and stdio-only), and `import_export` (export-only in Free; round-trippable JSON envelope).
+- **Run safe dev actions.** `clear_caches`, `resave`, `craft_command` (allowlisted), `craft_exec` (six security gates including dry-run-default and stdio-only).
+- **Audit workflow state.** `drafts_and_revisions` (list and compare drafts / revisions), `content_audit` (broken relations / unused assets / propagation gaps), `import_export` (structured-JSON export in Free; round-trippable import in Pro). Fix-mode unlocks in Pro.
 - **Search 27,000+ lines of Craft expertise.** `search_skills` does keyword search across the bundled `michtio/craftcms-claude-skills` corpus — eight skills covering Craft internals, templating, content modelling, PHP/Twig standards, DDEV, project setup, and Garnish. The matching skill content is also exposed as MCP **prompts** so the LLM picks them up automatically when relevant. **Resources** expose the per-skill reference deep-dives and the five bundled Claude Code agents.
 
 For the full reference (per-tool argument schemas, annotations, and prompt / resource catalogue), see:
@@ -86,7 +102,7 @@ Cortex's security model treats the transport as the boundary. The Phase 1 stdio 
 
 Highlights:
 
-- `craft_exec` runs through Craft's own `ExecController` with six layered gates: dry-run-default, structured output, secret redaction, destructive-op guard, hard HTTP rejection, and `destructiveHint: true` annotation.
+- `craft_exec` runs PHP `eval` behind six layered security gates (same approach as Craft's own `ExecController`, not a wrapper around it): dry-run-default, structured output, secret redaction, destructive-op guard, hard HTTP rejection, and `destructiveHint: true` annotation.
 - `craft_command` enforces an allowlist at the tool layer, layered as project-config defaults + admin-issued runtime overrides + optional `config/cortex.php` overrides.
 - No `eval` / `shell_exec` / `proc_open` / `passthru` / `popen` / backticks anywhere in the source — verified by the architecture test suite.
 - Every tool invocation emits one structured audit-log line (`cortex` channel) with secret-redacted arguments. The line shape is locked across Phase 1 and Phase 2 so log consumers stay stable through the transport upgrade.
@@ -162,9 +178,9 @@ The `initialize` handshake should succeed (`cortex 5.0.0`, protocol `2025-06-18`
 
 ## Roadmap
 
-- **Phase 1 — Free.** 32 tools, 8 prompts, 77 resources, stdio transport, allowlist UI, install command (snippet printer + auto-config writer), docs generators, extension events. Shipping.
-- **Phase 2 — Pro.** Streamable HTTP transport with OAuth 2.1, per-user permission filtering, DB-backed audit log, 7 net-new write tools, mode unlocks on Free tools (`drafts_and_revisions` apply/discard, `content_audit` fix modes, `import_export` import), Pro-exclusive custom-skills element type, minimal CP UI for tokens / activity / connection.
-- **Phase 3 — Polish.** Install wizard auto-detecting installed clients, formal real-LLM E2E harness, vectorised docs search, third-party tool registration battle-tested across the ecosystem, skill remote-fetch.
+- **Phase 1 — Free. Shipping.** 33 tools, 8 prompts, 77 resources, stdio transport, allowlist UI, full install toolkit (snippet printer + per-client auto-apply + auto-detect + interactive auto-apply across detected clients), MCP `outputSchema` / `structuredContent` dual-emit per MCP 2025-06-18, docs generators, extension events for third-party tools / prompts / resources, full Pest + PHPStan level 8 + ECS green.
+- **Phase 2 — Pro.** Streamable HTTP transport with OAuth 2.1, per-user permission filtering on `tools/list` (architecture locked: static `shouldRegister()` + instance `filterFor($user)` + instance `inputSchemaFor($user)`), DB-backed audit log, 7 net-new write tools (`entry`, `category`, `tag`, `address`, `global_set`, `users`, `bulk_entries`), mode unlocks on Free tools (`drafts_and_revisions apply/discard`, `content_audit` fix modes, `import_export` import, `system_diagnostics manage_queue`), Pro-exclusive custom-skills element type, minimal CP UI for tokens / activity / connection.
+- **Phase 3 — Polish.** CP-side install wizard (GUI affordance on top of the Phase 1 console actions, not a re-implementation), formal real-LLM E2E harness, vectorised docs search complementary to the authored skills corpus, third-party tool registration battle-tested across the ecosystem, skill remote-fetch.
 
 ## Support
 
