@@ -168,7 +168,7 @@ it('skips a tool whose shouldRegister() returns false', function() {
                 return 'Permission-gated fixture — should never appear.';
             }
 
-            public function shouldRegister(): bool
+            public static function shouldRegister(): bool
             {
                 return false;
             }

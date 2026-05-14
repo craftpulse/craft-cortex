@@ -30,6 +30,7 @@
     "require": {
         "php": ">=8.2",
         "craftcms/cms": "^5.0",
+        "league/oauth2-server": "^9.0",
         "michtio/craftcms-claude-skills": "^1.4.2"
     },
     "require-dev": {

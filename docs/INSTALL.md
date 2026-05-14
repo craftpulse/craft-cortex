@@ -91,6 +91,192 @@ php /path/to/project/craft cortex/install/auto
 
 Or stick with the manual snippet form (`ddev craft cortex/install`), which works fine inside DDEV.
 
+### Bearer-token authentication for the HTTP transport
+
+Cortex also exposes an HTTP transport at `POST /cortex/mcp` for clients that don't speak stdio (Claude Desktop's hosted MCP setup, browser-based agents, anything behind a remote agent). The HTTP transport is **disabled by default** — flip `Settings::$httpEnabled = true` in `config/cortex.php` to expose it.
+
+Once enabled, every request to `/cortex/mcp` must carry `Authorization: Bearer <token>`. Issue a token from the console:
+
+```bash
+ddev craft cortex/token/issue <user> [--name=<name>] [--ttl=<seconds>]
+```
+
+The plaintext token prints **exactly once** at issuance — copy it then. Cortex stores only the SHA-256 hash; if you lose the plaintext, revoke the token and issue a fresh one. By default tokens never expire; pass `--ttl=<seconds>` (e.g. `--ttl=2592000` for 30 days) for shorter rotation, or set `Settings::$tokenTtlDefault` for a global default.
+
+Configure your MCP client with:
+
+```
+Authorization: Bearer <plaintext-token>
+```
+
+Manage tokens with two more actions:
+
+```bash
+ddev craft cortex/token/list [--user=<email-or-username>]
+ddev craft cortex/token/revoke <id>
+```
+
+Revocation is immediate for new requests — in-flight requests on a revoked token complete normally, the next request fails 401.
+
+### OAuth 2.1 for the HTTP transport (optional, MCP-spec-compliant)
+
+For clients that auto-discover and self-register against a remote MCP server — Claude Desktop's hosted MCP setup, Anthropic's `/.well-known` flow, IDE plugins that ship with OAuth support — Cortex also exposes a full OAuth 2.1 surface: Authorization Code + PKCE (S256), Refresh Token, RFC 7591 Dynamic Client Registration, RFC 7009 token revocation, and RFC 8414 / RFC 9728 discovery metadata.
+
+The OAuth surface coexists with bearer tokens — both authenticate against the same `cortex/mcp` endpoint, OAuth checked first per RFC 8707 audience binding, bearer as fallback for the long-lived admin-issued credentials.
+
+**One-time setup:**
+
+```bash
+ddev craft cortex/oauth/init-keys
+```
+
+This generates an RSA 2048-bit key pair at `storage/cortex/oauth-keys/{private,public}.key`. The private key is set to `0600` and signs every JWT access token Cortex issues; the public key verifies them. The pair stays put across deploys (Git ignores `storage/`). Rotating with `--force` invalidates every in-flight access token.
+
+**Discovery endpoints** (no auth required):
+
+```
+GET https://your-site.test/.well-known/oauth-authorization-server   # RFC 8414
+GET https://your-site.test/.well-known/oauth-protected-resource     # RFC 9728
+```
+
+MCP-spec-aware clients hit these on first contact to discover the authorization server, registration endpoint, supported scopes (`read`, `write`), and PKCE methods (`S256` only — `plain` is rejected).
+
+**Dynamic Client Registration (RFC 7591):**
+
+```bash
+curl -X POST https://your-site.test/oauth/register \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "client_name": "My MCP Client",
+    "redirect_uris": ["https://my-client.test/callback"],
+    "token_endpoint_auth_method": "none"
+  }'
+```
+
+Returns a fresh `client_id` (and `client_secret` if the method is not `none`). DCR is open-by-default (`Settings::$dcrEnabled = true`) — set it to false to require out-of-band client provisioning.
+
+**Full PKCE flow:**
+
+1. Generate a code verifier (43+ chars, `[A-Za-z0-9-._~]`) and SHA-256 it for the `code_challenge`.
+2. Redirect the user to:
+   ```
+   https://your-site.test/oauth/authorize?
+     response_type=code&
+     client_id=<from DCR>&
+     redirect_uri=<one of registered>&
+     code_challenge=<S256 challenge>&
+     code_challenge_method=S256&
+     scope=read&
+     state=<random>&
+     resource=https://your-site.test/cortex/mcp
+   ```
+3. The user lands on Cortex's consent screen (Craft CP login required); approving redirects back to `redirect_uri` with `code` and `state`.
+4. Exchange the code for tokens:
+   ```bash
+   curl -X POST https://your-site.test/oauth/token \
+     -d 'grant_type=authorization_code' \
+     -d 'code=<from redirect>' \
+     -d 'redirect_uri=<same as step 2>' \
+     -d 'client_id=<from DCR>' \
+     -d 'code_verifier=<original verifier>' \
+     -d 'resource=https://your-site.test/cortex/mcp'
+   ```
+5. Use the resulting access token:
+   ```bash
+   curl -X POST https://your-site.test/cortex/mcp \
+     -H 'MCP-Protocol-Version: 2025-06-18' \
+     -H 'Authorization: Bearer <access_token>' \
+     -H 'Content-Type: application/json' \
+     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":"my-client","version":"1.0"}}}'
+   ```
+
+**Audience binding (RFC 8707):** The `resource` parameter on `/authorize` and `/token` ends up in the JWT `aud` claim. Cortex verifies it matches the canonical `cortex/mcp` URL on every request — a token issued for resource A can't be replayed against resource B. Pass `resource=<absolute URL to /cortex/mcp>` on both endpoints.
+
+**Token lifetimes** (defaults; configurable via `Settings::$oauthAccessTokenTtl` / `$oauthRefreshTokenTtl`):
+- Access tokens: 1 hour (`PT1H`).
+- Refresh tokens: 30 days (`P30D`).
+
+Refresh:
+
+```bash
+curl -X POST https://your-site.test/oauth/token \
+  -d 'grant_type=refresh_token' \
+  -d 'refresh_token=<from previous exchange>' \
+  -d 'client_id=<from DCR>'
+```
+
+Revoke (RFC 7009):
+
+```bash
+curl -X POST https://your-site.test/oauth/revoke -d 'token=<access or refresh>'
+```
+
+Per RFC 7009 §2.2 the endpoint returns 200 regardless of whether the token was known — no information leakage.
+
+### Streaming Tools (SSE over HTTP)
+
+Cortex's HTTP transport supports MCP's Streamable HTTP profile — long-running tools can emit progress frames between the original `tools/call` request and its terminal JSON-RPC response, and clients can cancel an in-flight call without dropping the connection. The Free tier ships no streaming tools; the wire is ready for Gate 8's Pro write tools (eager resave, content audit, batch import/export).
+
+**Client opt-in.** Clients request the SSE response by sending `Accept: text/event-stream` on the `tools/call` POST. MCP-spec-compliant clients (Claude Desktop, Claude Code, Cursor) send the SSE Accept by default. Cortex falls back to the JSON response when the header is absent or doesn't mention `text/event-stream`.
+
+```
+POST /cortex/mcp
+Accept: text/event-stream
+Content-Type: application/json
+Authorization: Bearer <token>
+Mcp-Session-Id: <session-id>
+MCP-Protocol-Version: 2025-06-18
+
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"<tool>","arguments":{...},"_meta":{"progressToken":"prog-1"}}}
+```
+
+**Response wire format.** SSE frames, one event per line block:
+
+```
+id: <uuid>
+event: message
+data: {"jsonrpc":"2.0","method":"notifications/progress","params":{"progressToken":"prog-1","progress":1,"total":3}}
+
+id: <uuid>
+event: message
+data: {"jsonrpc":"2.0","method":"notifications/progress","params":{"progressToken":"prog-1","progress":2,"total":3}}
+
+id: <uuid>
+event: message
+data: {"jsonrpc":"2.0","id":2,"result":{"content":[...],"isError":false}}
+```
+
+The terminal frame carries the original request id and the `tools/call` result envelope; intermediate frames are `notifications/progress` envelopes carrying the client's `progressToken` (when supplied in `_meta`) plus `progress` and optional `total` / `message` fields. Each frame's `id:` is a UUIDv4 — currently emitted for forward compatibility with `Last-Event-ID` resumability (deferred to Phase 3); no replay buffer exists today, so reconnects after a dropped connection lose in-flight frames.
+
+**Cancellation.** Send a JSON-RPC `notifications/cancelled` notification (not a request — no `id` field) referencing the in-flight request id:
+
+```
+POST /cortex/mcp
+Authorization: Bearer <token>
+Mcp-Session-Id: <session-id>
+MCP-Protocol-Version: 2025-06-18
+
+{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":2,"reason":"user requested"}}
+```
+
+The server flips a cache-backed cancellation flag the running tool observes between yields. Cooperative tools short-circuit and the server emits a terminal `notifications/cancelled` envelope on the SSE stream. Tools that ignore the flag (pure CPU loops without yield checkpoints) cannot be cancelled — the contract is cooperative, not preemptive. The cancellation slot's TTL is one hour: a delayed `notifications/cancelled` arriving after a network blip still flips a running stream.
+
+**Audit logging.** Streamed invocations write exactly one row to `cortex_invocations` per stream completion, not per frame. The `durationMs` column reflects wall-clock from stream start to stream end. Cancellation events surface as `kind=cancelled` rows (distinct from `tool_error`, `internal_error`, and `rate_limited`); `errorClass` / `errorMessage` stay null — cancellation isn't an error.
+
+**Operator smoke test.** A built-in fixture tool — `_streaming_test` — exists for end-to-end SSE health checks. It's gated behind the `CORTEX_STREAMING_FIXTURE=1` env var and never registers in production unless an operator opts in. Flip the env var, restart your PHP-FPM workers, and:
+
+```bash
+curl -N -X POST https://your-site.test/cortex/mcp \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Mcp-Session-Id: $SESSION" \
+  -H 'Accept: text/event-stream' \
+  -H 'MCP-Protocol-Version: 2025-06-18' \
+  -H 'Content-Type: application/json' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"_streaming_test","arguments":{},"_meta":{"progressToken":"prog-1"}}}'
+```
+
+Expect: HTTP 200, `Content-Type: text/event-stream`, three progress frames (`progress: 1..3, total: 3`), then a terminal response with `done: true`. If you see anything else — nginx buffering the response into one block, FPM workers not flushing, an SSE-aware proxy rewriting the Content-Type — the fixture's deterministic output makes the misconfiguration easy to spot.
+
 ### Auto-detect and apply (fastest)
 
 If you're running Cortex from the host (not inside a container), this is one command:

@@ -2,6 +2,7 @@
 
 namespace craftpulse\cortex\services;
 
+use craft\elements\User;
 use craftpulse\cortex\events\RegisterToolsEvent;
 use craftpulse\cortex\tools\content\Assets;
 use craftpulse\cortex\tools\content\Categories;
@@ -12,6 +13,7 @@ use craftpulse\cortex\tools\dev\ClearCaches;
 use craftpulse\cortex\tools\dev\CraftCommand;
 use craftpulse\cortex\tools\dev\CraftExec;
 use craftpulse\cortex\tools\dev\Resave;
+use craftpulse\cortex\tools\dev\StreamingFixtureTool;
 use craftpulse\cortex\tools\graphql\Graphql;
 use craftpulse\cortex\tools\schema\CategoryGroups;
 use craftpulse\cortex\tools\schema\ElementTypes;
@@ -102,8 +104,10 @@ class Tools extends Component
             if (!$tool instanceof ToolInterface) {
                 continue;
             }
-            if (!$tool->shouldRegister()) {
-                // Pro-tier permission gating opts a tool out per request.
+            if (!$tool::shouldRegister()) {
+                // Boot-time license / edition / settings gating per
+                // the static class-level contract. Per-request per-user
+                // visibility is `filterFor()`'s job downstream.
                 continue;
             }
             $name = $tool::getName();
@@ -165,6 +169,11 @@ class Tools extends Component
      * test can assert the registry's external shape without booting the
      * JSON-RPC layer.
      *
+     * stdio path. The HTTP transport calls `asListPayloadFor($user)` so
+     * per-user `filterFor()` / `inputSchemaFor()` hooks fire; this
+     * method is the `null`-user invariant — `asListPayloadFor(null)`
+     * MUST equal `asListPayload()` so stdio output never drifts.
+     *
      * @return array<int,array<string,mixed>>
      *
      * @author Craftpulse
@@ -172,32 +181,102 @@ class Tools extends Component
      */
     public function asListPayload(): array
     {
-        return array_map(
-            static function(ToolInterface $t): array {
-                $entry = [
-                    'name' => $t::getName(),
-                    'description' => $t::getDescription(),
-                    'inputSchema' => $t::getInputSchema(),
-                ];
+        return $this->asListPayloadFor(null);
+    }
 
-                $outputSchema = $t::outputSchema();
-                if ($outputSchema !== []) {
-                    $entry['outputSchema'] = $outputSchema;
-                }
+    /**
+     * Per-user `tools/list` payload. Tools where `filterFor($user)`
+     * returns `false` are omitted entirely — the LLM never sees them.
+     * Tools that survive get their `inputSchema` from
+     * `inputSchemaFor($user)` so mode-gated tools can rewrite their
+     * schema per the user's permissions.
+     *
+     * stdio passes `null` and the default-true / static-schema path
+     * applies — `asListPayloadFor(null) === asListPayload()` is the
+     * locked invariant (tested in `tests/Services/ToolsTest.php`).
+     *
+     * Locked architectural contract — see
+     * `.claude/rules/architecture.md` "Per-user tool visibility" and
+     * `docs/plans/gate-7.md` locked decision 3.
+     *
+     * @return array<int,array<string,mixed>>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function asListPayloadFor(?User $user): array
+    {
+        $payload = [];
+        foreach ($this->_tools as $tool) {
+            if (!$tool->filterFor($user)) {
+                continue;
+            }
+            $payload[] = $this->_buildListEntry($tool, $user);
+        }
+        return $payload;
+    }
 
-                $annotations = AttributeReader::annotationsFor($t);
-                if ($annotations !== []) {
-                    $entry['annotations'] = $annotations;
-                }
-
-                return $entry;
-            },
-            $this->_tools,
-        );
+    /**
+     * Per-user variant of `getByName()`. Returns the tool only when
+     * it's registered AND `filterFor($user)` returns `true`. Otherwise
+     * `null` — the dispatcher then converts the miss to JSON-RPC
+     * `-32602 Invalid params` "Unknown tool", same as if the tool had
+     * never been registered. Failing closed: a hidden tool is
+     * indistinguishable from a missing tool to the caller.
+     *
+     * Locked architectural contract — see
+     * `.claude/rules/architecture.md` "Per-user tool visibility" and
+     * `docs/plans/gate-7.md` locked decision 3.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getByNameFor(string $name, ?User $user): ?ToolInterface
+    {
+        $tool = $this->_byName[$name] ?? null;
+        if ($tool === null) {
+            return null;
+        }
+        if (!$tool->filterFor($user)) {
+            return null;
+        }
+        return $tool;
     }
 
     // Private Methods
     // =========================================================================
+
+    /**
+     * Build one `tools/list` entry for the given tool. Shared between
+     * `asListPayload()` (stdio, `null` user) and `asListPayloadFor()`
+     * (HTTP, resolved user). The only per-user surface is
+     * `inputSchemaFor($user)` — everything else is static metadata.
+     *
+     * @return array<string,mixed>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _buildListEntry(ToolInterface $tool, ?User $user): array
+    {
+        $entry = [
+            'name' => $tool::getName(),
+            'description' => $tool::getDescription(),
+            'inputSchema' => $tool->inputSchemaFor($user),
+        ];
+
+        $outputSchema = $tool::outputSchema();
+        if ($outputSchema !== []) {
+            $entry['outputSchema'] = $outputSchema;
+        }
+
+        $annotations = AttributeReader::annotationsFor($tool);
+        if ($annotations !== []) {
+            $entry['annotations'] = $annotations;
+        }
+
+        return $entry;
+    }
 
     /**
      * Build the tool registry. Order here is the order tools appear in
@@ -251,6 +330,7 @@ class Tools extends Component
             new Resave(),
             new CraftCommand(),
             new CraftExec(),
+            new StreamingFixtureTool(),
 
             // Workflow & audit (read modes).
             new DraftsAndRevisions(),

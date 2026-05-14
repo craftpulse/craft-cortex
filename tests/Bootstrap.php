@@ -54,6 +54,18 @@ if (!defined('CRAFT_ENVIRONMENT')) {
 // resolves cortex.
 require CRAFT_VENDOR_PATH . '/craftcms/cms/bootstrap/console.php';
 
+// Register the test-namespace PSR-4 mapping on the playground's
+// autoloader so test fixtures under `tests/Tools/Fixtures/` (and any
+// other namespaced test helpers we add later) resolve without an
+// explicit `require`. The playground's `vendor/composer/autoload_psr4.php`
+// only knows about `craftpulse\cortex\` → `src/`; the dev autoload from
+// the plugin's own composer.json never lands in the playground's
+// vendor dir, so we plumb it in here.
+$composerLoader = require CRAFT_VENDOR_PATH . '/autoload.php';
+if (is_object($composerLoader) && method_exists($composerLoader, 'addPsr4')) {
+    $composerLoader->addPsr4('craftpulse\\cortex\\tests\\', __DIR__ . '/');
+}
+
 // Pest's auto-discovery looks for `tests/Pest.php` relative to its working
 // directory; since pest runs from the playground but our config lives in
 // cortex/tests/, we load it explicitly here so `uses()` and the custom
