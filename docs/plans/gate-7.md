@@ -33,6 +33,7 @@ These are settled. Don't relitigate without good reason.
 14. **`Last-Event-ID` SSE resumability**: deferred to Phase 3. Purely additive when added.
 15. **Sub-gate sequencing**: 7.1 → 7.2 → 7.3 → 7.4 → 7.5 → 7.6 → 7.7. Each merges independently green.
 16. **Token revocation in-flight semantics**: in-flight requests on a revoked token complete normally; no new requests on the revoked token are accepted. Bearer lookup happens once in `McpController::beforeAction()`; revocation is not propagated as a `CancellationToken` flip to running tools (that mechanism is reserved for the explicit `notifications/cancelled` MCP message in 7.7). Simplest correct behaviour per PLANNING.md §4.9.
+17. **Bearer + OAuth lookup precedence (7.3)**: `McpController::beforeAction()` tries OAuth tokens first (short-lived, audience-bound, narrower scope), falls back to long-lived bearer tokens on miss. Rationale: checking the more-constrained credential first means a leaked long-lived bearer can never be silently treated as an OAuth access token with narrower scope. Both lookups memoize per-request via their respective services (`Oauth::lookupAccessToken()` and `Tokens::lookup()`). The disambiguation mechanism (JWT structure detection, sequential opaque lookup, etc.) is an implementation detail — what's locked is the precedence order.
 
 ## Sub-gate map
 
@@ -113,7 +114,7 @@ These are settled. Don't relitigate without good reason.
 - `src/console/controllers/OauthController.php` — `init-keys` action.
 
 **Modified**:
-- `src/controllers/McpController.php::beforeAction()` — bearer lookup extended to check `cortex_oauth_tokens` too (not just `cortex_tokens`). 401 includes `resource_metadata=` URI.
+- `src/controllers/McpController.php::beforeAction()` — bearer lookup extended to check `cortex_oauth_tokens` too (not just `cortex_tokens`). OAuth-first precedence per locked decision 17. 401 includes `resource_metadata="https://<host>/.well-known/oauth-protected-resource"` per RFC 9728.
 - `src/Plugin.php` — register OAuth + well-known URL rules. `/.well-known/*` paths at root (RFC requirement).
 
 **Tests**: Full PKCE flow E2E (`register → authorize → token → tools/call → refresh`), metadata docs valid, audience binding (token for resource A rejected at resource B), PKCE S256 verification, code re-use rejected.
