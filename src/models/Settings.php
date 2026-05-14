@@ -115,6 +115,17 @@ class Settings extends Model
      */
     public int $sessionTtl = 3600;
 
+    /**
+     * @var int|null Default TTL (in seconds) applied to a new bearer
+     *               token when `cortex/token/issue` is invoked without
+     *               an explicit `--ttl=<seconds>` flag. Null (the
+     *               default) means tokens have no expiry — admin-
+     *               issued credentials live until revoked. Operators
+     *               with a tighter rotation policy set this to e.g.
+     *               2592000 (30 days) to force regular re-issuance.
+     */
+    public ?int $tokenTtlDefault = null;
+
     // Protected Methods
     // =========================================================================
 
@@ -130,6 +141,7 @@ class Settings extends Model
     {
         $rules = parent::defineRules();
         $rules[] = [['runtimeOverrideTtl', 'sessionTtl'], 'integer', 'min' => 1];
+        $rules[] = [['tokenTtlDefault'], 'integer', 'min' => 1];
         $rules[] = [['execEnabled', 'execDryRunDefault', 'httpEnabled'], 'boolean'];
         $rules[] = [['allowedCommands', 'allowedOrigins'], 'each', 'rule' => ['string', 'min' => 1]];
         return $rules;

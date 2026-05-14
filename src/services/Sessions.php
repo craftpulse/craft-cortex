@@ -7,6 +7,7 @@ use Craft;
 use craftpulse\cortex\mcp\Session;
 use craftpulse\cortex\Plugin;
 use yii\base\Component;
+use yii\caching\CacheInterface;
 
 /**
  * =========================================================================
@@ -95,8 +96,7 @@ class Sessions extends Component
             return null;
         }
 
-        $cache = Craft::$app->getCache();
-        $blob = $cache->get(self::CACHE_KEY_PREFIX . $id);
+        $blob = $this->_cache()->get(self::CACHE_KEY_PREFIX . $id);
         if (!is_array($blob)) {
             return null;
         }
@@ -106,21 +106,55 @@ class Sessions extends Component
 
     /**
      * Mark the session active. Bumps `lastSeenAt` and re-writes the
-     * cache entry with a fresh TTL — sliding expiry. No-op when the
-     * session id is unknown.
+     * cache entry with a fresh TTL — sliding expiry. Returns the
+     * touched `Session` on success, or null when the session id is
+     * unknown / terminated / mismatched.
+     *
+     * `$currentUserId` is the user id resolved by the bearer-token
+     * lookup on this request. When the stored session's `userId`
+     * doesn't match the current request's bearer token, the session
+     * is terminated and null is returned — that's the mid-session
+     * token-swap defense locked in `docs/plans/gate-7.md` item 16.
+     * Sessions stored with `userId === null` (created before auth
+     * resolved) pre-bind on the first matching touch.
+     *
+     * `null` is a "treat as not-found" sentinel — the HTTP
+     * controller maps it to a 401, which the client handles the
+     * same way as any other unknown session.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public function touch(string $id): void
+    public function touch(string $id, ?int $currentUserId = null): ?Session
     {
         $session = $this->get($id);
         if ($session === null) {
-            return;
+            return null;
+        }
+
+        // Mid-session token-swap detection. Pre-bound sessions only:
+        // when the session carries a `userId` and the current request's
+        // bearer token resolves to a different user, terminate the
+        // session and report it as gone. The controller surfaces this
+        // as a 401, which forces the client to re-handshake under the
+        // correct identity.
+        if ($currentUserId !== null && $session->userId !== null && $session->userId !== $currentUserId) {
+            $this->terminate($id);
+            return null;
+        }
+
+        // Late-bind the userId on the session when the bearer token
+        // resolves to a user but the session was created without one.
+        // This happens when the HTTP controller mints a session before
+        // the bearer-token surface lands — keeps existing sessions
+        // hot across the 7.1 → 7.2 cutover.
+        if ($currentUserId !== null && $session->userId === null) {
+            $session->userId = $currentUserId;
         }
 
         $session->lastSeenAt = Carbon::now();
         $this->_persist($session);
+        return $session;
     }
 
     /**
@@ -138,7 +172,7 @@ class Sessions extends Component
         if ($id === '') {
             return;
         }
-        Craft::$app->getCache()->delete(self::CACHE_KEY_PREFIX . $id);
+        $this->_cache()->delete(self::CACHE_KEY_PREFIX . $id);
     }
 
     // Private Methods
@@ -166,10 +200,34 @@ class Sessions extends Component
     private function _persist(Session $session): void
     {
         $ttl = Plugin::getInstance()->getSettings()->sessionTtl;
-        Craft::$app->getCache()->set(
+        $this->_cache()->set(
             self::CACHE_KEY_PREFIX . $session->id,
             $session->toArray(),
             $ttl,
         );
+    }
+
+    /**
+     * Narrow `Craft::$app->getCache()` to a non-null
+     * `CacheInterface`. Yii's stub returns `CacheInterface|null`
+     * because the cache component is technically optional; in
+     * practice Craft always ships one, so a null return is a fatal
+     * misconfiguration the install never reaches. The narrow
+     * helper concentrates the assertion in one spot instead of
+     * scattering `assert()` calls across each call site.
+     *
+     * @throws \RuntimeException When Craft is misconfigured to the
+     *                           point of having no cache component.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _cache(): CacheInterface
+    {
+        $cache = Craft::$app->getCache();
+        if ($cache === null) {
+            throw new \RuntimeException('Craft cache component is not configured; cortex sessions cannot persist.');
+        }
+        return $cache;
     }
 }

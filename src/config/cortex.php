@@ -157,6 +157,23 @@ return [
          */
         // 'sessionTtl' => 3600,
 
+        // ---------------------------------------------------------------------
+        // Bearer tokens
+        // ---------------------------------------------------------------------
+
+        /**
+         * Default TTL (in seconds) applied to a new bearer token issued
+         * via `cortex/token/issue` when no explicit `--ttl=<seconds>`
+         * flag is passed. Null (the default) means tokens never expire
+         * — admin-issued credentials live until revoked. Set this to
+         * e.g. 2592000 (30 days) to force a regular rotation cadence
+         * on every newly-issued token without remembering to pass
+         * `--ttl` every time.
+         *
+         * @var int|null
+         */
+        // 'tokenTtlDefault' => null,
+
     ],
 
     // 'production' => [

@@ -14,6 +14,7 @@ use craftpulse\cortex\services\Allowlist;
 use craftpulse\cortex\services\Prompts;
 use craftpulse\cortex\services\Resources;
 use craftpulse\cortex\services\Sessions;
+use craftpulse\cortex\services\Tokens;
 use craftpulse\cortex\services\Tools;
 use yii\base\Event;
 
@@ -41,6 +42,7 @@ use yii\base\Event;
  * @property-read Prompts $prompts
  * @property-read Resources $resources
  * @property-read Sessions $sessions
+ * @property-read Tokens $tokens
  * @property-read Tools $tools
  */
 class Plugin extends BasePlugin
@@ -80,6 +82,7 @@ class Plugin extends BasePlugin
                 'prompts' => ['class' => Prompts::class],
                 'resources' => ['class' => Resources::class],
                 'sessions' => ['class' => Sessions::class],
+                'tokens' => ['class' => Tokens::class],
                 'tools' => ['class' => Tools::class],
             ],
         ];

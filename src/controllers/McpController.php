@@ -6,6 +6,7 @@ use Craft;
 use craft\web\Controller;
 use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\mcp\transport\Http;
+use craftpulse\cortex\models\Token;
 use craftpulse\cortex\Plugin;
 use yii\web\Response;
 
@@ -15,34 +16,47 @@ use yii\web\Response;
  *
  * Parallel to the stdio loop in `console/controllers/ServeController`,
  * but for the Streamable HTTP transport per MCP 2025-06-18. Header
- * validation, session lookup, and dispatcher construction live here;
- * the transport-agnostic JSON-RPC routing lives in `mcp/Server`.
+ * validation, session lookup, bearer-token authentication, and
+ * dispatcher construction live here; the transport-agnostic JSON-RPC
+ * routing lives in `mcp/Server`.
  *
- * Sub-gate 7.1 scope: skeleton only. No auth — `$allowAnonymous` lifts
- * in 7.2 when bearer tokens land. No rate limit (7.6). No SSE upgrade
- * (7.7). The endpoint is gated behind `Settings::$httpEnabled = false`
- * by default so production installs stay off until per-user filtering
- * (7.4) ships.
+ * Sub-gate 7.2 lifts the 7.1 anonymous-allowed posture: every request
+ * must carry `Authorization: Bearer <token>`, where `<token>` resolves
+ * to a live row in `cortex_tokens`. Missing / malformed / unknown
+ * credentials return 401 with `WWW-Authenticate: Bearer realm="cortex"`
+ * per RFC 6750. The authenticated user is bound to the session at
+ * initialize and validated against the bearer token on every touch —
+ * mid-session token-swap (initialize with token A, then `tools/call`
+ * with token B for a different user) is detected and the session is
+ * terminated.
+ *
+ * Bearer lookup happens once per request in `beforeAction()`. In-flight
+ * requests on a revoked token complete normally — revocation only
+ * blocks the *next* request — per the locked decision in
+ * `docs/plans/gate-7.md` item 16. The `CancellationToken` mechanism
+ * on `InvocationContext` is reserved for the explicit
+ * `notifications/cancelled` MCP message in sub-gate 7.7, not for
+ * server-side token revocation.
  *
  * Request-level enforcement order:
  *
  *   1. `httpEnabled` flag — 503 if off (`Retry-After: 0` advisory).
  *   2. `Origin` header — 403 if the allowlist is non-empty and the
  *      header doesn't match (DNS-rebinding defense per MCP spec).
- *   3. HTTP method — POST is JSON-RPC, GET is 405 in 7.1 (SSE upgrade
- *      lands in 7.7), DELETE terminates the session and returns 204.
+ *   3. HTTP method — POST is JSON-RPC, GET is 405 in 7.1/7.2 (SSE
+ *      upgrade lands in 7.7), DELETE terminates the session and
+ *      returns 204.
  *   4. `MCP-Protocol-Version` header — 400 if missing or unrecognised.
- *   5. `Mcp-Session-Id` header — required on every POST except
- *      `initialize`. Missing → 400; unknown / terminated → 404 per the
- *      spec ("Servers MAY terminate sessions at any time, after which
- *      they MUST respond to requests containing that session ID with
- *      HTTP 404 Not Found").
+ *   5. `Authorization: Bearer <token>` — 401 with `WWW-Authenticate`
+ *      if missing / malformed / unknown.
+ *   6. `Mcp-Session-Id` header — required on every POST except
+ *      `initialize`. Missing → 400; unknown / terminated → 404 per
+ *      the spec.
  *
  * `$enableCsrfValidation = false` because this is a JSON-RPC endpoint
- * keyed by header-based auth (in 7.2+), not a CP form keyed by Craft
- * session. Anonymous access is allowed in 7.1 only; 7.2 flips
- * `$allowAnonymous` to `[]` and `beforeAction()` enforces bearer
- * authentication.
+ * keyed by header-based auth, not a CP form keyed by Craft session.
+ * `$allowAnonymous = []` because every request authenticates via
+ * bearer token.
  * =========================================================================
  *
  * @author Craftpulse
@@ -55,8 +69,12 @@ class McpController extends Controller
 
     /**
      * @inheritdoc
+     *
+     * Gate 7.2 flips this from `['index']` to `[]` — every action on
+     * this controller authenticates via bearer token in
+     * `beforeAction()`.
      */
-    protected array|int|bool $allowAnonymous = ['index'];
+    protected array|int|bool $allowAnonymous = [];
 
     // Public Properties
     // =========================================================================
@@ -66,8 +84,150 @@ class McpController extends Controller
      */
     public $enableCsrfValidation = false;
 
+    // Private Properties
+    // =========================================================================
+
+    /**
+     * @var Token|null Bearer token resolved by `beforeAction()`. Set
+     *                 once auth succeeds; consumed by `_handlePost()`
+     *                 to bind the session's `userId` at initialize
+     *                 time and to validate the session on touch.
+     *                 Stashed (rather than re-looked-up downstream)
+     *                 so subsequent gates' audit-log writers
+     *                 correlate the invocation back to the issuing
+     *                 token row without a second DB probe.
+     */
+    private ?Token $_authenticatedToken = null;
+
     // Public Methods
     // =========================================================================
+
+    /**
+     * @inheritdoc
+     *
+     * Five gates run before the action body sees the request:
+     *
+     *   1. `parent::beforeAction()` — Yii's standard pipeline.
+     *   2. `httpEnabled` 503 check — kill switch.
+     *   3. `Origin` allowlist — DNS-rebinding defense.
+     *   4. `MCP-Protocol-Version` header.
+     *   5. `Authorization: Bearer` lookup against `cortex_tokens`.
+     *
+     * DELETE skips the bearer check because it carries no JSON-RPC
+     * payload and only references an `Mcp-Session-Id` for
+     * termination — clients that have already lost their session
+     * (e.g. server-side revocation, cache eviction) can still call
+     * DELETE to clean up their local state without re-authenticating.
+     * Every other method MUST carry a valid bearer.
+     *
+     * Returns true to continue with `actionIndex()`; false (with the
+     * response populated) to short-circuit.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function beforeAction($action): bool
+    {
+        // Run the cortex transport gates BEFORE the Craft parent's
+        // `beforeAction()` because the parent's `_enforceAllowAnonymous`
+        // throws on guest requests for a non-CP controller with
+        // `$allowAnonymous = []`. Setting the bearer-bound identity
+        // here flips the guest flag before the parent sees it.
+        //
+        // Order:
+        //   1. httpEnabled kill switch.
+        //   2. Origin allowlist.
+        //   3. DELETE early-exit (no bearer required — see below).
+        //   4. Method check (GET = 405, non-POST = 405).
+        //   5. MCP-Protocol-Version header.
+        //   6. Authorization: Bearer lookup + identity binding.
+        //   7. parent::beforeAction() — now sees an authenticated user.
+
+        $settings = Plugin::getInstance()->getSettings();
+
+        // Gate 1 — kill switch.
+        if (!$settings->httpEnabled) {
+            $this->_status(503, 'HTTP transport is disabled. Set Settings::$httpEnabled = true to enable.');
+            return false;
+        }
+
+        // Gate 2 — Origin allowlist.
+        if (!$this->_passesOrigin($settings->allowedOrigins)) {
+            return false;
+        }
+
+        $method = strtoupper($this->request->getMethod());
+
+        // Gate 3 — DELETE bypasses bearer auth: it's a side-channel
+        // for session cleanup that doesn't carry a JSON-RPC payload
+        // and references only the opaque session id. The session id
+        // itself is unguessable (`random_bytes(16)`), and termination
+        // is idempotent and harmless — the worst case for an
+        // anonymous DELETE with a guessed id is the legitimate owner
+        // re-initializes on their next request.
+        //
+        // DELETE skips the Craft parent's `_enforceAllowAnonymous`
+        // entirely because we return early — that gate's guest check
+        // would otherwise force authentication for a logically-
+        // unauthenticated cleanup call.
+        if ($method === 'DELETE') {
+            return true;
+        }
+
+        // Gate 3b — GET is reserved for SSE upgrade in 7.7. Reject
+        // before authenticating so we don't burn a DB probe on a
+        // method that can't proceed anyway.
+        if ($method === 'GET') {
+            $this->_status(405, 'GET is not supported on this endpoint. SSE upgrade lands in a future release.');
+            return false;
+        }
+
+        if ($method !== 'POST') {
+            $this->_status(405, "Method {$method} is not supported on this endpoint.");
+            return false;
+        }
+
+        // Gate 4 — MCP-Protocol-Version. Validated before auth so
+        // wrong-version clients get the spec-shaped 400 they expect
+        // rather than a misleading 401.
+        if (!$this->_passesProtocolVersion()) {
+            return false;
+        }
+
+        // Gate 5 — bearer-token authentication. 401 with
+        // WWW-Authenticate: Bearer realm="cortex" on every reject
+        // path per RFC 6750.
+        $bearer = $this->_extractBearer();
+        if ($bearer === null) {
+            $this->_unauthorized('Missing or malformed Authorization header. Expected: Authorization: Bearer <token>.');
+            return false;
+        }
+
+        $token = Plugin::getInstance()->tokens->lookup($bearer);
+        if ($token === null) {
+            $this->_unauthorized('Invalid or revoked bearer token.');
+            return false;
+        }
+
+        $this->_authenticatedToken = $token;
+
+        // Bind the resolved user onto Craft's auth surface so the
+        // parent `_enforceAllowAnonymous` gate sees a non-guest, and
+        // downstream permission checks (Gate 7.4 per-user filtering
+        // and Pro tools that gate on Craft permissions) see the
+        // bearer's identity.
+        $user = $token->getUser();
+        if ($user !== null) {
+            Craft::$app->getUser()->setIdentity($user);
+        }
+
+        // Gate 6 — Craft's own beforeAction pipeline. Runs CSRF
+        // exemption, `_enforceAllowAnonymous`, and any further
+        // base-class checks. With the identity bound above, the
+        // `allowAnonymous = []` posture passes for the authenticated
+        // user (i.e. no `ForbiddenHttpException` thrown on the way in).
+        return parent::beforeAction($action);
+    }
 
     /**
      * Dispatch one HTTP request to the MCP server. Branches on the HTTP
@@ -76,7 +236,7 @@ class McpController extends Controller
      *   - POST: parses the body, validates session affinity, hands the
      *     JSON-RPC envelope to `Server::dispatch()`, surfaces the
      *     response as `application/json`.
-     *   - GET: 405 in sub-gate 7.1. SSE upgrade lands in 7.7.
+     *   - GET: 405 in sub-gates 7.1–7.2. SSE upgrade lands in 7.7.
      *   - DELETE: terminates the session referenced by
      *     `Mcp-Session-Id`. 204 No Content on success; 404 if the
      *     session is unknown.
@@ -93,47 +253,17 @@ class McpController extends Controller
      */
     public function actionIndex(): Response
     {
-        $settings = Plugin::getInstance()->getSettings();
-
-        // Gate 1 — kill switch. 503 Service Unavailable signals the
-        // endpoint exists but the operator hasn't enabled it.
-        if (!$settings->httpEnabled) {
-            return $this->_status(503, 'HTTP transport is disabled. Set Settings::$httpEnabled = true to enable.');
-        }
-
-        // Gate 2 — Origin allowlist (DNS-rebinding defense).
-        $originResult = $this->_validateOrigin($settings->allowedOrigins);
-        if ($originResult !== null) {
-            return $originResult;
-        }
-
         $method = strtoupper($this->request->getMethod());
 
-        // Gate 3 — DELETE is a side-channel for session termination
-        // and doesn't carry a JSON-RPC body. Handle it before falling
-        // through to the body-bearing flow.
         if ($method === 'DELETE') {
             return $this->_handleDelete();
         }
 
-        // Gate 3b — GET is reserved for SSE upgrade in 7.7. Reject for
-        // now per MCP spec ("The server MAY respond to this request
-        // with HTTP 405 Method Not Allowed").
-        if ($method === 'GET') {
-            return $this->_status(405, 'GET is not supported on this endpoint. SSE upgrade lands in a future release.');
-        }
-
-        if ($method !== 'POST') {
-            return $this->_status(405, "Method {$method} is not supported on this endpoint.");
-        }
-
-        // Gate 4 — MCP-Protocol-Version header. Required on every
-        // request including initialize.
-        $protocolError = $this->_validateProtocolVersion();
-        if ($protocolError !== null) {
-            return $protocolError;
-        }
-
+        // GET / wrong-method / header validation failures already
+        // short-circuited in `beforeAction()` with the response
+        // populated. By the time `actionIndex()` runs, we know the
+        // request is a POST with a valid protocol version and a
+        // resolved bearer token.
         return $this->_handlePost();
     }
 
@@ -146,14 +276,15 @@ class McpController extends Controller
      * operators that flip `httpEnabled=true` without configuring
      * `allowedOrigins` see the soft-landing diagnostic in the log.
      *
-     * Returns a 403 response on rejection, null on accept.
+     * Returns true to continue, false (with the response populated)
+     * to short-circuit.
      *
      * @param string[] $allowedOrigins
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _validateOrigin(array $allowedOrigins): ?Response
+    private function _passesOrigin(array $allowedOrigins): bool
     {
         $origin = $this->request->getHeaders()->get(Http::HEADER_ORIGIN);
 
@@ -163,41 +294,78 @@ class McpController extends Controller
                 . 'Configure Settings::$allowedOrigins for any non-dev environment.',
                 'cortex',
             );
-            return null;
+            return true;
         }
 
         if (!is_string($origin) || $origin === '') {
-            return $this->_status(403, 'Origin header is required.');
+            $this->_status(403, 'Origin header is required.');
+            return false;
         }
 
         if (!in_array($origin, $allowedOrigins, true)) {
-            return $this->_status(403, 'Origin not permitted.');
+            $this->_status(403, 'Origin not permitted.');
+            return false;
         }
 
-        return null;
+        return true;
     }
 
     /**
-     * Validate the `MCP-Protocol-Version` header. Returns a 400
-     * response on missing / unrecognised version, null on accept.
+     * Validate the `MCP-Protocol-Version` header. Returns true to
+     * continue, false (with the response populated) to short-circuit.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _validateProtocolVersion(): ?Response
+    private function _passesProtocolVersion(): bool
     {
         $version = $this->request->getHeaders()->get(Http::HEADER_PROTOCOL_VERSION);
         if (!is_string($version) || $version === '') {
-            return $this->_status(400, 'Missing MCP-Protocol-Version header.');
+            $this->_status(400, 'Missing MCP-Protocol-Version header.');
+            return false;
         }
         if ($version !== Server::PROTOCOL_VERSION) {
-            return $this->_status(400, sprintf(
+            $this->_status(400, sprintf(
                 'Unsupported MCP-Protocol-Version: "%s". This server supports "%s".',
                 $version,
                 Server::PROTOCOL_VERSION,
             ));
+            return false;
         }
-        return null;
+        return true;
+    }
+
+    /**
+     * Pull the bearer token out of the `Authorization` header. Returns
+     * the raw plaintext on success, null when:
+     *
+     *   - the header is absent,
+     *   - the header value doesn't start with `Bearer ` (case-
+     *     insensitive per RFC 6750),
+     *   - the token portion is empty.
+     *
+     * The plaintext returned here is never logged. Callers hash it
+     * before any persistent surface.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _extractBearer(): ?string
+    {
+        $header = $this->request->getHeaders()->get('Authorization');
+        if (!is_string($header) || $header === '') {
+            return null;
+        }
+
+        // RFC 6750 §2.1: the scheme is `Bearer` (case-insensitive)
+        // followed by a single space and the token. `stripos`
+        // anchored at offset 0 is the cleanest case-insensitive match.
+        if (stripos($header, 'Bearer ') !== 0) {
+            return null;
+        }
+
+        $bearer = trim(substr($header, 7));
+        return $bearer !== '' ? $bearer : null;
     }
 
     /**
@@ -250,13 +418,31 @@ class McpController extends Controller
         $sessionIdHeader = $this->request->getHeaders()->get(Http::HEADER_SESSION_ID);
         $sessionId = is_string($sessionIdHeader) && $sessionIdHeader !== '' ? $sessionIdHeader : null;
 
+        // The authenticated token is guaranteed non-null here —
+        // `beforeAction()` short-circuits any path that doesn't resolve
+        // one before reaching the action body.
+        $authenticatedUserId = $this->_authenticatedToken?->userId;
+
+        // The dispatcher uses the captured client name as the session's
+        // `clientName`; capture it from the request before constructing
+        // the server so initialize and the session row converge on the
+        // same value.
+        $server = new Server(Server::TRANSPORT_HTTP);
+        if ($authenticatedUserId !== null) {
+            $server->setUserId($authenticatedUserId);
+        }
+
         if ($isInitialize) {
             // Initialize starts a fresh session. Any previously-issued
             // header on this request is informational only — we ignore
-            // it and mint a new id.
+            // it and mint a new id. The session binds the authenticated
+            // userId at creation so subsequent touches can detect a
+            // mid-session token swap.
+            $clientName = $this->_clientNameFromInitialize($request['params'] ?? []);
             $session = $sessions->create(
                 protocolVersion: Server::PROTOCOL_VERSION,
-                clientName: $this->_extractClientName($request['params'] ?? []),
+                clientName: $clientName,
+                userId: $authenticatedUserId,
             );
         } else {
             // Every non-initialize POST MUST carry an Mcp-Session-Id
@@ -268,10 +454,16 @@ class McpController extends Controller
             if ($session === null) {
                 return $this->_status(404, 'Session not found. Send `initialize` to start a new session.');
             }
-            $sessions->touch($sessionId);
+
+            // Touch validates the bearer's user id against the
+            // session's bound user id. Mismatch → terminate +
+            // return null → we 401 to force a re-handshake.
+            $touched = $sessions->touch($sessionId, $authenticatedUserId);
+            if ($touched === null) {
+                return $this->_unauthorized('Session does not match the presented bearer token.');
+            }
         }
 
-        $server = new Server(Server::TRANSPORT_HTTP);
         $response = $server->dispatch($request);
 
         // Notifications get acknowledged silently per JSON-RPC 2.0 spec.
@@ -294,15 +486,18 @@ class McpController extends Controller
 
     /**
      * Pull `clientInfo.name` out of an `initialize` request's params,
-     * or null when absent / malformed. Centralised so the controller
-     * and the stdio dispatcher converge on the same extraction shape.
+     * or null when absent / malformed. The Server itself captures the
+     * same name during dispatch (for audit logging); this controller
+     * needs the value before dispatch to write it onto the session
+     * row at creation time, so we duplicate the parse here rather
+     * than depending on Server's internal capture timing.
      *
      * @param array<string,mixed>|mixed $params
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _extractClientName(mixed $params): ?string
+    private function _clientNameFromInitialize(mixed $params): ?string
     {
         if (!is_array($params)) {
             return null;
@@ -316,6 +511,26 @@ class McpController extends Controller
             return null;
         }
         return $name;
+    }
+
+    /**
+     * Write a 401 with the canonical `WWW-Authenticate: Bearer realm="cortex"`
+     * challenge header and a JSON body. RFC 6750 §3 requires the
+     * challenge header on every 401 from a bearer-protected resource;
+     * RFC 9728 (sub-gate 7.3) will extend this with `resource_metadata=`
+     * to advertise OAuth metadata.
+     *
+     * Returns the populated response so `beforeAction()` can surface
+     * the same object Yii would otherwise expect to short-circuit
+     * around.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _unauthorized(string $message): Response
+    {
+        $this->response->headers->set('WWW-Authenticate', 'Bearer realm="cortex"');
+        return $this->_status(401, $message);
     }
 
     /**

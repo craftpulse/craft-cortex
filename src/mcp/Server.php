@@ -76,6 +76,18 @@ class Server
      */
     private ?string $_clientName = null;
 
+    /**
+     * @var int|null Craft user id resolved by the HTTP transport's
+     *               `beforeAction()` from the `Authorization: Bearer`
+     *               header. Stamped onto every invocation context so
+     *               audit log lines carry `user=<id>`. Request-scoped
+     *               — each `new Server()` instance owns its own slot
+     *               because the controller mints one per request.
+     *               Always null on stdio (single-process, no
+     *               per-request Craft identity).
+     */
+    private ?int $_userId = null;
+
     // Public Methods
     // =========================================================================
 
@@ -92,6 +104,42 @@ class Server
     public function __construct(string $transport = self::TRANSPORT_STDIO)
     {
         $this->_transport = $transport;
+    }
+
+    /**
+     * Bind the authenticated Craft user id for this dispatcher's
+     * lifetime. Called by `McpController::beforeAction()` once the
+     * bearer-token lookup resolves. Subsequent `_invocationContext()`
+     * builds carry the id forward into the audit log.
+     *
+     * Request-scoped — the HTTP controller mints a fresh `Server`
+     * per request, so no static state ever leaks between requests.
+     * stdio leaves this null and the dispatcher never calls this
+     * setter.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function setUserId(?int $userId): void
+    {
+        $this->_userId = $userId;
+    }
+
+    /**
+     * Most-recently captured client name from the `initialize`
+     * handshake's `clientInfo.name`, or null when no handshake has
+     * yet occurred (or the handshake omitted `clientInfo`). Exposed
+     * publicly so the HTTP controller can stamp the same name onto
+     * the Session row without re-parsing the request body — single
+     * source of truth across `_initializeResult()` and the session
+     * write.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getClientName(): ?string
+    {
+        return $this->_clientName;
     }
 
     /**
@@ -389,9 +437,10 @@ class Server
     /**
      * Build an `InvocationContext` for the current dispatch. The
      * stdio transport populates transport, request id, and client
-     * name (when captured from initialize); user is always null. The
-     * HTTP transport will subclass / extend the dispatcher to populate
-     * authenticated user before constructing the context.
+     * name (when captured from initialize); user is always null.
+     * The HTTP transport calls `setUserId()` after bearer-token
+     * lookup resolves, so the context here carries the authenticated
+     * user id forward into the audit log.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -401,7 +450,7 @@ class Server
         return new InvocationContext(
             transport: $this->_transport,
             requestId: $requestId,
-            userId: null,
+            userId: $this->_userId,
             clientName: $this->_clientName,
         );
     }
