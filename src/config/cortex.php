@@ -158,6 +158,43 @@ return [
         // 'sessionTtl' => 3600,
 
         // ---------------------------------------------------------------------
+        // OAuth 2.1
+        // ---------------------------------------------------------------------
+
+        /**
+         * Whether Dynamic Client Registration (RFC 7591) is open. When
+         * `true` (default), any caller can POST to `/oauth/register`
+         * to mint a new OAuth client without an initial-access-token
+         * check — the MCP-native flow Claude Desktop and Cursor use.
+         * Set to `false` to require out-of-band client provisioning on
+         * production installs where open DCR is not appropriate.
+         *
+         * @var bool
+         */
+        // 'dcrEnabled' => true,
+
+        /**
+         * Time-to-live for OAuth access tokens as an ISO 8601 duration
+         * string (`DateInterval` format). Default `'PT1H'` — one hour.
+         * Shorter values tighten the revocation window; longer values
+         * reduce refresh overhead for long-running AI sessions. The
+         * value is parsed via `new DateInterval($ttl)` at server boot.
+         *
+         * @var string
+         */
+        // 'oauthAccessTokenTtl' => 'PT1H',
+
+        /**
+         * Time-to-live for OAuth refresh tokens as an ISO 8601 duration
+         * string. Default `'P30D'` — 30 days. Refresh tokens are
+         * opaque and stored hashed at rest; this TTL controls how long
+         * the client can renew access without prompting the user again.
+         *
+         * @var string
+         */
+        // 'oauthRefreshTokenTtl' => 'P30D',
+
+        // ---------------------------------------------------------------------
         // Bearer tokens
         // ---------------------------------------------------------------------
 
