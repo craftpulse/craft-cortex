@@ -74,18 +74,23 @@ interface ToolInterface
     public static function outputSchema(): array;
 
     /**
-     * Whether this tool should appear in the registry for the current
-     * request. `AbstractTool` returns `true` by default; concrete tools
-     * override to gate visibility — for example, a Pro tool checking
-     * `saveEntries:{section}` so a user without the permission doesn't
-     * see the corresponding mode surfaces in `tools/list`. Returning
-     * `false` removes the tool entirely from the registry for that
-     * build.
+     * Whether this tool should register at all on this install. Runs
+     * once at boot, before per-request user filtering. License /
+     * edition / settings gating belongs here — e.g. `craft_exec`
+     * returning `false` when `Settings::$execEnabled` is `false`, or a
+     * Pro-only tool returning `false` when the edition is Free.
+     * Returns `false` to remove the tool from every user's `tools/list`
+     * for the lifetime of the process.
+     *
+     * Per-request per-user permission gating is `filterFor()`'s job,
+     * not this method's. Mirrors Craft's own static class-level
+     * decision contracts (`ComponentInterface::isSelectable()`,
+     * `ElementInterface::hasUris()`, `FieldInterface::isMultiInstance()`).
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public function shouldRegister(): bool;
+    public static function shouldRegister(): bool;
 
     /**
      * Per-request, per-user visibility check. Returns whether the tool

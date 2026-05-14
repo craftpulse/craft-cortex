@@ -67,13 +67,14 @@ abstract class AbstractTool implements ToolInterface
     /**
      * @inheritdoc
      *
-     * Default: every tool registers. Pro write tools override to gate
-     * visibility on Craft permissions for the current user.
+     * Default: every tool registers. Tools with license / edition /
+     * settings gating override (e.g. `craft_exec` checks
+     * `Settings::$execEnabled`; future Pro tools check the edition).
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public function shouldRegister(): bool
+    public static function shouldRegister(): bool
     {
         return true;
     }

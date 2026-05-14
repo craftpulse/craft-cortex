@@ -103,8 +103,10 @@ class Tools extends Component
             if (!$tool instanceof ToolInterface) {
                 continue;
             }
-            if (!$tool->shouldRegister()) {
-                // Pro-tier permission gating opts a tool out per request.
+            if (!$tool::shouldRegister()) {
+                // Boot-time license / edition / settings gating per
+                // the static class-level contract. Per-request per-user
+                // visibility is `filterFor()`'s job downstream.
                 continue;
             }
             $name = $tool::getName();
