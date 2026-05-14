@@ -361,6 +361,125 @@ it('record() round-trip parity — DB row reconstitutes byte-equal KV line', fun
 });
 
 // -----------------------------------------------------------------------------
+// find() — fluent query
+// -----------------------------------------------------------------------------
+
+it('find() returns an InvocationQuery bound to the cortex_invocations table', function() {
+    $query = $this->service->find();
+
+    expect($query)->toBeInstanceOf(\craftpulse\cortex\db\InvocationQuery::class);
+    expect($query->from)->toBe([\craftpulse\cortex\db\Table::INVOCATIONS]);
+});
+
+it('find() filters compose — toolName + kind + userId resolve to the right rows', function() {
+    // Seed three rows: two matching, one off on toolName.
+    foreach (['_test_/q-a', '_test_/q-a', '_test_/q-b'] as $i => $tool) {
+        $this->service->record([
+            'tool' => $tool,
+            'kind' => 'success',
+            'duration_ms' => 10,
+            'transport' => 'http',
+            'user' => $this->userId,
+            'token_id' => $this->tokenId,
+            'request_id' => "req-{$i}",
+        ]);
+    }
+
+    $count = $this->service->find()
+        ->toolName('_test_/q-a')
+        ->kind('success')
+        ->userId($this->userId)
+        ->count();
+
+    expect((int) $count)->toBe(2);
+});
+
+it('find() hasError isolates error rows from success rows', function() {
+    $this->service->record([
+        'tool' => '_test_/q-clean',
+        'kind' => 'success',
+        'duration_ms' => 5,
+        'transport' => 'http',
+        'user' => $this->userId,
+        'token_id' => $this->tokenId,
+    ]);
+    $this->service->record([
+        'tool' => '_test_/q-error',
+        'kind' => 'tool_error',
+        'duration_ms' => 5,
+        'transport' => 'http',
+        'user' => $this->userId,
+        'token_id' => $this->tokenId,
+        'error_class' => 'RuntimeException',
+        'error_message' => 'boom',
+    ]);
+
+    $errors = $this->service->find()
+        ->toolName(['_test_/q-clean', '_test_/q-error'])
+        ->hasError(true)
+        ->count();
+    $clean = $this->service->find()
+        ->toolName(['_test_/q-clean', '_test_/q-error'])
+        ->hasError(false)
+        ->count();
+
+    expect((int) $errors)->toBe(1);
+    expect((int) $clean)->toBe(1);
+});
+
+it('find() date filters bracket rows by dateCreated', function() {
+    $this->service->record([
+        'tool' => '_test_/q-date',
+        'kind' => 'success',
+        'duration_ms' => 1,
+        'transport' => 'http',
+        'user' => $this->userId,
+        'token_id' => $this->tokenId,
+    ]);
+
+    $hasRow = $this->service->find()
+        ->toolName('_test_/q-date')
+        ->after(Carbon::now()->subMinute()->toDateTimeImmutable())
+        ->before(Carbon::now()->addMinute()->toDateTimeImmutable())
+        ->count();
+
+    $beforePast = $this->service->find()
+        ->toolName('_test_/q-date')
+        ->before(Carbon::now()->subYear()->toDateTimeImmutable())
+        ->count();
+
+    expect((int) $hasRow)->toBe(1);
+    expect((int) $beforePast)->toBe(0);
+});
+
+it('find() null filters are no-ops so optional UI filters chain cleanly', function() {
+    $this->service->record([
+        'tool' => '_test_/q-null',
+        'kind' => 'success',
+        'duration_ms' => 1,
+        'transport' => 'http',
+        'user' => $this->userId,
+        'token_id' => $this->tokenId,
+    ]);
+
+    $count = $this->service->find()
+        ->toolName('_test_/q-null')
+        ->kind(null)
+        ->userId(null)
+        ->tokenId(null)
+        ->sessionId(null)
+        ->clientName(null)
+        ->requestId(null)
+        ->transport(null)
+        ->before(null)
+        ->after(null)
+        ->hasError(null)
+        ->count();
+
+    expect((int) $count)->toBe(1);
+});
+
+// -----------------------------------------------------------------------------
 // Structural
 // -----------------------------------------------------------------------------
 

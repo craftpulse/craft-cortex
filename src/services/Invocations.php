@@ -4,6 +4,7 @@ namespace craftpulse\cortex\services;
 
 use Carbon\Carbon;
 use Craft;
+use craftpulse\cortex\db\InvocationQuery;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\records\Invocation as InvocationRecord;
 use Throwable;
@@ -154,6 +155,34 @@ class Invocations extends Component
         return (int) InvocationRecord::deleteAll([
             '<', 'dateCreated', new Expression(':cutoff', [':cutoff' => $cutoff]),
         ]);
+    }
+
+    /**
+     * Open a fluent query against the `cortex_invocations` table. The
+     * canonical entry point for CP dashboards (Gate 9), GraphQL
+     * resolvers, and any third-party consumer that wants to read the
+     * audit log. Returns rows as associative arrays shaped like the
+     * `Invocation` Record's `@property` table.
+     *
+     * Chain filters and finalise with `all()` / `one()` / `count()`:
+     *
+     *     $rows = Plugin::getInstance()->invocations->find()
+     *         ->kind('tool_error')
+     *         ->after(Carbon::now()->subDay())
+     *         ->orderBy(['dateCreated' => SORT_DESC])
+     *         ->limit(50)
+     *         ->all();
+     *
+     * Single source of truth for the table name lives in
+     * `InvocationQuery::init()`. Routing every read through this method
+     * keeps the call sites column-uniform.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function find(): InvocationQuery
+    {
+        return new InvocationQuery();
     }
 
     // Private Methods
