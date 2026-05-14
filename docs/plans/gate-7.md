@@ -175,15 +175,35 @@ Indexes: `toolName`, `userId`, `(transport, dateCreated)`, `kind`.
 
 **Configurable**: `Settings::$auditResponseExcerptBytes = 2048`, `Settings::$auditRetentionDays = null`.
 
-## Sub-gate 7.6 — Rate limit
+## Sub-gate 7.6 — Rate limit + burst-quota observability
 
-**Goal**: per-user token bucket via PSR-16 cache. Prevent runaway agents.
+**Goal**: per-user token bucket via PSR-16 cache. Prevent runaway agents. Surface bucket headroom on every audit row so operators can see throttle pressure before users hit the wall.
 
-**New**: `src/services/RateLimiter.php` — `check(int $userId): bool`, `consume(int $userId, int $cost = 1): void`. Cache key `cortex:ratelimit:user:{id}`. Throws `RateLimitExceededException` on exhaustion.
+**New**:
+- `src/services/RateLimiter.php` — `check(int $userId): RateLimitStatus` (read, doesn't consume), `consume(int $userId, int $cost = 1): RateLimitStatus`, `getStatus(int $userId): RateLimitStatus` (snapshot, used by CP widgets in Gate 9 and live ops introspection). Cache key `cortex:ratelimit:user:{id}`. Throws `RateLimitExceededException` carrying the status object when `consume()` exhausts the bucket.
+- `src/values/RateLimitStatus.php` — readonly value object: `{remaining: int, limit: int, refilledAt: \DateTimeImmutable, retryAfter: int}`. Single return shape across `check()` / `consume()` / `getStatus()` so callers don't double-hit the cache for headroom.
+- `src/exceptions/RateLimitExceededException.php` — carries the status + `retryAfter` seconds. The controller maps to the HTTP 429 + `Retry-After` header.
+- `src/migrations/m260514_120300_cortex_invocations_rate_limit.php` — adds nullable `rateLimitRemaining` (int) column to `cortex_invocations`. Index unnecessary (analytic field, not a query predicate).
 
-**Modified**: `McpController::beforeAction()` — after auth, check rate limit. On exceed: 429 + `Retry-After`. `Settings::$rateLimitBurst = 60`, `$rateLimitPerSecond = 5`.
+**Modified**:
+- `src/controllers/McpController.php::beforeAction()` — after auth, before `parent::beforeAction()`: `consume()` the bucket. On `RateLimitExceededException`: write a `cortex_invocations` row with `kind=rate_limited`, then return 429 + `Retry-After`. On success: thread the post-consume `remaining` onto the dispatcher.
+- `src/mcp/Server.php` — `setRateLimitRemaining(?int)` setter (parallels existing `setUserId` / `setTokenId` / `setSessionId` pattern). Threads into `InvocationContext`.
+- `src/tools/support/InvocationContext.php` — readonly `?int $rateLimitRemaining` slot.
+- `src/tools/support/InvocationLogger.php` — additively grows the KV line with `rate_limit_remaining=<int|->`. `formatEntry()` + `buildEntry()` both extended. The schema invariant test from Gate 7.5 verifies KV ⊆ DB stays true.
+- `src/services/Invocations.php::record()` — persists `rateLimitRemaining` from the entry.
+- `src/records/Invocation.php` — `kind` enum validator gains a fourth value: `rate_limited`. PHPDoc `@property` table grows the `rateLimitRemaining` slot.
+- `src/models/Settings.php` — `$rateLimitBurst = 60`, `$rateLimitPerSecond = 5`. Validators on both (`> 0`).
 
-**Tests**: burst allows N rapid calls, then 429; refill after sleep (fake clock) allows again.
+**Tests**:
+- Bucket allows N rapid calls, 429s on N+1, refills after sleep (fake clock).
+- `consume()` returns a `RateLimitStatus` whose `remaining` matches the bucket state.
+- A successful HTTP `tools/call` writes a `cortex_invocations` row carrying the post-consume `rateLimitRemaining`.
+- A throttled call writes ONE row with `kind=rate_limited`, `errorClass` carrying `RateLimitExceededException::class`, and the response carries `Retry-After: <int>`.
+- `getStatus()` returns the same shape `consume()` returns, without mutating the bucket — bucket state before and after `getStatus()` is identical.
+- Schema invariant: `cortex_invocations` columns ⊇ KV fields (re-runs the Gate 7.5 invariant test against the extended KV line).
+
+**Deferred (not in 7.6 scope, documented for completeness)**:
+- A separate `RateLimiter::EVENT_THROTTLED` event for SIEM hooks. The `kind=rate_limited` audit row carries the same forensic data already; an event would be gold-plating until concrete demand surfaces.
 
 ## Sub-gate 7.7 — Streaming infrastructure
 
