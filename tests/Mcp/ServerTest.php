@@ -767,6 +767,157 @@ it('matchTemplate returns null when no template matches', function() {
     expect($service->matchTemplate('_unknown://nothing'))->toBeNull();
 });
 
+// -----------------------------------------------------------------------------
+// Per-user filtering — HTTP routes through asListPayloadFor / getByNameFor
+// -----------------------------------------------------------------------------
+
+it('tools/list over HTTP omits a tool whose filterFor returns false for the resolved user', function() {
+    // Register a stub tool that only the null-user (stdio) caller sees.
+    // The HTTP path resolves the bound userId to a real User and the
+    // stub returns false for it, so the tool drops out of tools/list.
+    $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event): void {
+        $event->tools[] = new class() extends AbstractTool {
+            public static function getName(): string
+            {
+                return '_test_/stdio-only-filter';
+            }
+
+            public static function getDescription(): string
+            {
+                return 'Fixture — filterFor only allows null (stdio).';
+            }
+
+            public function filterFor(?\craft\elements\User $user = null): bool
+            {
+                return $user === null;
+            }
+
+            public function execute(array $arguments): array
+            {
+                return ['ok' => true];
+            }
+        };
+    };
+    \yii\base\Event::on(
+        \craftpulse\cortex\services\Tools::class,
+        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        $listener,
+    );
+
+    $originalTools = Plugin::getInstance()->tools;
+    $freshTools = new \craftpulse\cortex\services\Tools();
+    $freshTools->init();
+    Plugin::getInstance()->set('tools', $freshTools);
+
+    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
+        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    expect($admin)->not->toBeNull();
+
+    try {
+        $http = new Server(Server::TRANSPORT_HTTP);
+        $http->setUserId((int) $admin->id);
+        $httpResponse = $http->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/list',
+        ]);
+
+        $httpNames = array_column($httpResponse['result']['tools'], 'name');
+        expect($httpNames)->not->toContain('_test_/stdio-only-filter');
+
+        // Default stdio dispatcher passes null and the stub allows null.
+        $stdioResponse = $this->server->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 2,
+            'method' => 'tools/list',
+        ]);
+        $stdioNames = array_column($stdioResponse['result']['tools'], 'name');
+        expect($stdioNames)->toContain('_test_/stdio-only-filter');
+    } finally {
+        Plugin::getInstance()->set('tools', $originalTools);
+        \yii\base\Event::off(
+            \craftpulse\cortex\services\Tools::class,
+            \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+            $listener,
+        );
+    }
+});
+
+it('tools/call over HTTP rejects a tool whose filterFor returns false as Unknown tool', function() {
+    // A non-admin user (null-user-only stub) tries to call the tool
+    // through the HTTP path. The dispatcher must fail closed —
+    // indistinguishable from "tool not registered" on the wire.
+    $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event): void {
+        $event->tools[] = new class() extends AbstractTool {
+            public static function getName(): string
+            {
+                return '_test_/http-rejected-filter';
+            }
+
+            public static function getDescription(): string
+            {
+                return 'Fixture — filterFor only allows null (stdio).';
+            }
+
+            public function filterFor(?\craft\elements\User $user = null): bool
+            {
+                return $user === null;
+            }
+
+            public function execute(array $arguments): array
+            {
+                return ['ok' => true];
+            }
+        };
+    };
+    \yii\base\Event::on(
+        \craftpulse\cortex\services\Tools::class,
+        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        $listener,
+    );
+
+    $originalTools = Plugin::getInstance()->tools;
+    $freshTools = new \craftpulse\cortex\services\Tools();
+    $freshTools->init();
+    Plugin::getInstance()->set('tools', $freshTools);
+
+    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
+        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    expect($admin)->not->toBeNull();
+
+    try {
+        $http = new Server(Server::TRANSPORT_HTTP);
+        $http->setUserId((int) $admin->id);
+        $response = $http->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => ['name' => '_test_/http-rejected-filter'],
+        ]);
+
+        expect($response)->toHaveKey('error');
+        expect($response['error']['code'])->toBe(Server::ERR_INVALID_PARAMS);
+        expect($response['error']['message'])->toContain('Unknown tool');
+
+        // stdio path (null user) succeeds — same tool, no user binding.
+        $stdioResponse = $this->server->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 2,
+            'method' => 'tools/call',
+            'params' => ['name' => '_test_/http-rejected-filter'],
+        ]);
+        expect($stdioResponse)->toHaveKey('result');
+        expect($stdioResponse['result'])->toHaveKey('isError', false);
+    } finally {
+        Plugin::getInstance()->set('tools', $originalTools);
+        \yii\base\Event::off(
+            \craftpulse\cortex\services\Tools::class,
+            \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+            $listener,
+        );
+    }
+});
+
 it('falls back to the last yielded value when a Generator has no explicit return', function() {
     $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event): void {
         $event->tools[] = new class() extends \craftpulse\cortex\tools\AbstractTool {
