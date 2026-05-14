@@ -4,6 +4,24 @@ All notable changes to Cortex are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning per
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added — Gate 7.1 (Pro tier, HTTP transport scaffolding)
+
+- HTTP transport skeleton at `POST/GET/DELETE /cortex/mcp`. Behind
+  `Settings::$httpEnabled = false` by default; flip to true to expose.
+  Spec target MCP 2025-06-18 — `MCP-Protocol-Version` header validated,
+  `Origin` header validated against `Settings::$allowedOrigins`,
+  `Mcp-Session-Id` header drives stateful session lookup, single
+  JSON-RPC message per POST.
+- Session storage in PSR-16 cache via new `Sessions` service; sliding
+  TTL via `Settings::$sessionTtl` (default 3600).
+- `CancellationToken` added to `InvocationContext` (contract-now per
+  `docs/plans/gate-7.md`). Wire implementation in 7.7; contract here
+  locks the shape so streaming tools can opt in cooperatively without
+  a later interface break.
+- No auth on the endpoint in 7.1 — auth lands in 7.2 (bearer tokens).
+
 ## [5.0.0] — 2026-05-14
 
 ### Initial release
