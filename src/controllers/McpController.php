@@ -8,6 +8,7 @@ use craft\web\Controller;
 use craftpulse\cortex\exceptions\RateLimitExceededException;
 use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\mcp\transport\Http;
+use craftpulse\cortex\mcp\transport\SseEmitter;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\support\InvocationLogger;
 use craftpulse\cortex\values\RateLimitStatus;
@@ -330,6 +331,24 @@ class McpController extends Controller
         return $this->_handlePost();
     }
 
+    // Protected Methods
+    // =========================================================================
+
+    /**
+     * Construct the SSE emitter used for streaming responses. Pulled
+     * out of `_streamPost()` as a seam so test harnesses can inject a
+     * capturing writer without standing up a real HTTP socket — the
+     * production path returns a default-constructed emitter that
+     * writes to PHP's output stream via `echo` + `flush()`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _buildSseEmitter(): SseEmitter
+    {
+        return new SseEmitter();
+    }
+
     // Private Methods
     // =========================================================================
 
@@ -549,6 +568,22 @@ class McpController extends Controller
             }
         }
 
+        // SSE upgrade: when the client's `Accept` header advertises
+        // `text/event-stream` AND the dispatched method is `tools/call`,
+        // route through the streaming dispatcher and pipe each yielded
+        // envelope through `SseEmitter`. Non-`tools/call` methods stay
+        // on the JSON path even when the client asks for SSE — the spec
+        // only mandates the upgrade option on tools/call.
+        //
+        // Streamable tools yield N progress frames + 1 terminal
+        // response; non-streamable tools collapse to one frame
+        // (`Server::dispatchStreaming()` handles both paths uniformly).
+        $isToolsCall = $method === 'tools/call';
+        $clientWantsSse = $this->_acceptsEventStream();
+        if ($isToolsCall && $clientWantsSse) {
+            return $this->_streamPost($server, $request, $isInitialize, $session->id);
+        }
+
         $response = $server->dispatch($request);
 
         // Notifications get acknowledged silently per JSON-RPC 2.0 spec.
@@ -567,6 +602,101 @@ class McpController extends Controller
             $httpResponse->headers->set(Http::HEADER_SESSION_ID, $session->id);
         }
         return $httpResponse;
+    }
+
+    /**
+     * Whether the client's `Accept` header advertises support for
+     * `text/event-stream`. Per the MCP 2025-06-18 spec §"Sending
+     * Messages to the Server", clients on the Streamable HTTP
+     * transport MUST send `Accept: application/json, text/event-stream`
+     * — so most well-behaved clients always pass this check. The
+     * controller still gates on it explicitly so JSON-only clients
+     * (curl without `-H 'Accept: text/event-stream'`) keep getting
+     * single JSON responses.
+     *
+     * Match is substring on the raw Accept value — the spec doesn't
+     * require q-value parsing for this binary "client supports SSE"
+     * decision.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _acceptsEventStream(): bool
+    {
+        $accept = $this->request->getHeaders()->get('Accept');
+        if (!is_string($accept) || $accept === '') {
+            return false;
+        }
+        return stripos($accept, SseEmitter::CONTENT_TYPE_SSE) !== false;
+    }
+
+    /**
+     * Drive a `tools/call` through `Server::dispatchStreaming()` and
+     * write each yielded JSON-RPC envelope through `SseEmitter` as one
+     * SSE frame on the wire.
+     *
+     * Yii response framing is bypassed: `SseEmitter::start()` sends
+     * the response headers and disables output buffering directly via
+     * `header()` + `flush()`, so by the time `actionIndex()` returns
+     * Yii's `Response::send()` step finds an empty `FORMAT_RAW` body
+     * and is effectively a no-op. The wire has already received every
+     * frame.
+     *
+     * The `Mcp-Session-Id` response header lands on the underlying
+     * `$this->response->headers` collection on the initialize path so
+     * subsequent calls reference the same session id — but in practice
+     * initialize never streams (no `tools/call`), so this defensive
+     * branch is unreachable today. Kept for forward-compatibility with
+     * a future spec revision that permits initialize-time streaming.
+     *
+     * @param array<string,mixed> $request
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _streamPost(Server $server, array $request, bool $isInitialize, string $sessionId): Response
+    {
+        $emitter = $this->_buildSseEmitter();
+
+        if ($isInitialize) {
+            $this->response->headers->set(Http::HEADER_SESSION_ID, $sessionId);
+        }
+        // SSE response headers go on the underlying Yii response too so
+        // Yii's pipeline doesn't append a competing Content-Type. The
+        // emitter itself calls `header()` directly — Yii's headers
+        // collection is the fallback for whatever the runtime layer
+        // sees after the emitter has already written the wire.
+        $this->response->headers->set('Content-Type', SseEmitter::CONTENT_TYPE_SSE);
+        $this->response->headers->set('Cache-Control', 'no-cache, no-transform');
+        $this->response->headers->set('X-Accel-Buffering', 'no');
+
+        $emitter->start();
+
+        foreach ($server->dispatchStreaming($request) as $envelope) {
+            $emitter->emit(SseEmitter::EVENT_NAME, $envelope);
+        }
+
+        $emitter->end();
+
+        // Terminate Yii's pipeline. The emitter has already written
+        // every byte to the SAPI via `header()` + `echo` + `flush()`;
+        // letting Yii's `Response::send()` run after the fact raises
+        // `HeadersAlreadySentException` because the headers have
+        // physically left. We mark the response as already sent so
+        // Yii's send() turns into a no-op and exit the controller
+        // pipeline cleanly.
+        //
+        // The test harness leaves `_writer` set on the emitter, so
+        // headers were NOT physically sent — in that case the
+        // `isSent` short-circuit also avoids Yii double-writing into
+        // the test's response object, keeping the test's view of the
+        // status code + headers consistent with what would land on
+        // the wire in production.
+        $this->response->format = Response::FORMAT_RAW;
+        $this->response->setStatusCode(200);
+        $this->response->content = '';
+        $this->response->isSent = true;
+        return $this->response;
     }
 
     /**

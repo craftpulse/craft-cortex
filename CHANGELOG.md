@@ -6,6 +6,63 @@ All notable changes to Cortex are documented here. Format follows
 
 ## [Unreleased]
 
+### Added — Gate 7.7 (Pro tier, SSE streaming infrastructure)
+
+- `StreamableToolInterface` — opt-in contract for tools that stream
+  progress. `stream(array, InvocationContext): Generator` yields
+  `{progress, total?, message?}` frames and returns the terminal
+  payload. Non-streamable tools (the existing 33 Free tools) are
+  unaffected — the dispatcher's degrade-gracefully path collapses
+  them to a single one-frame SSE response.
+- `Server::dispatchStreaming()` — generator-driven counterpart to
+  `dispatch()`. Yields one `notifications/progress` JSON-RPC envelope
+  per progress frame, plus one terminal `tools/call` response. Pulls
+  `_meta.progressToken` from the original `tools/call` and threads it
+  onto every progress frame per MCP spec §progress.
+- `notifications/cancelled` is now wired end-to-end. The client posts
+  a JSON-RPC notification referencing the in-flight request id; the
+  server writes a cache slot the streaming dispatcher's
+  `CancellationToken` poll-callback observes between yields. On flip
+  the tool short-circuits with a `notifications/cancelled` terminal
+  envelope and an audit row with `kind=cancelled`.
+- `SseEmitter` — wire framing for `text/event-stream` responses. Sets
+  the canonical headers (Content-Type, Cache-Control, X-Accel-
+  Buffering, Connection), disables PHP output buffering, writes
+  `id`/`event`/`data` framed lines with UUIDv4 frame ids
+  (forward-compatible with Phase-3 Last-Event-ID resumability),
+  bypasses Yii's response framing.
+- `McpController` upgrades `tools/call` to SSE when the client
+  advertises `Accept: text/event-stream`. Other methods stay on the
+  JSON path even with the SSE Accept header per the spec's
+  "single-frame SSE for non-tools/call is optional" guidance.
+- `cortex_invocations.kind` enum gains `cancelled` for mid-stream
+  cancellation events. The schema-invariant test (locked Gate-7.5
+  decision 5) ratifies the addition; existing `success`,
+  `tool_error`, `internal_error`, and `rate_limited` rows are
+  unaffected.
+- `_streaming_test` operator-facing fixture tool under
+  `src/tools/dev/StreamingFixtureTool.php`. Opt-in via
+  `CORTEX_STREAMING_FIXTURE=1` env var; production installs never see
+  it. Yields three deterministic progress frames + a terminal
+  payload, with cooperative cancellation between yields — drive it
+  with `curl -H 'Accept: text/event-stream'` to verify end-to-end
+  SSE health on a new install.
+- 8 new Pest tests across `tests/Mcp/StreamingTest.php` and
+  `tests/Controllers/McpControllerTest.php` covering: progress-frames
+  yielded + terminal envelope, non-streamable degrade to one-frame
+  SSE, `notifications/cancelled` mid-stream flips the token,
+  cancellation writes a `kind=cancelled` row, exactly one audit row
+  per stream completion (not per frame), and the SSE-vs-JSON wire
+  selection based on `Accept` header.
+
+### Deferred to Phase 3
+
+- `Last-Event-ID` SSE resumability (locked decision 14). Frame ids
+  are already emitted on every frame, so the wire is forward-
+  compatible — Phase 3 adds a per-stream replay buffer keyed off the
+  emitted ids and a `GET /cortex/mcp?Last-Event-ID=…` resume path
+  without changing the wire shape.
+
 ### Added — Gate 7.3 (Pro tier, OAuth 2.1 + DCR + discovery metadata)
 
 - `league/oauth2-server` dependency. Authorization Code + PKCE (S256

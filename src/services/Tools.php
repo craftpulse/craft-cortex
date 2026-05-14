@@ -13,6 +13,7 @@ use craftpulse\cortex\tools\dev\ClearCaches;
 use craftpulse\cortex\tools\dev\CraftCommand;
 use craftpulse\cortex\tools\dev\CraftExec;
 use craftpulse\cortex\tools\dev\Resave;
+use craftpulse\cortex\tools\dev\StreamingFixtureTool;
 use craftpulse\cortex\tools\graphql\Graphql;
 use craftpulse\cortex\tools\schema\CategoryGroups;
 use craftpulse\cortex\tools\schema\ElementTypes;
@@ -329,6 +330,7 @@ class Tools extends Component
             new Resave(),
             new CraftCommand(),
             new CraftExec(),
+            new StreamingFixtureTool(),
 
             // Workflow & audit (read modes).
             new DraftsAndRevisions(),

@@ -39,20 +39,71 @@ final class CancellationToken
      */
     private bool $_cancelled = false;
 
+    /**
+     * @var (\Closure(): bool)|null Optional poll callback consulted on
+     *                              every `isCancelled()` check. Set by
+     *                              the streaming dispatcher to read a
+     *                              cache-backed cancellation slot
+     *                              without subclassing this final class.
+     *                              A truthy return flips the token
+     *                              permanently — the dispatcher's
+     *                              cancellation contract is monotonic.
+     *
+     *                              Sub-gate 7.7 contract: the streaming
+     *                              dispatcher binds the callback at
+     *                              token construction; stdio invocations
+     *                              never bind one and the callback stays
+     *                              null.
+     */
+    private readonly ?\Closure $_pollCallback;
+
     // Public Methods
     // =========================================================================
+
+    /**
+     * @param (callable(): bool)|null $pollCallback Optional callback
+     *                                              consulted on every
+     *                                              `isCancelled()` read.
+     *                                              When the callback
+     *                                              returns true the
+     *                                              token flips
+     *                                              permanently.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function __construct(?callable $pollCallback = null)
+    {
+        $this->_pollCallback = $pollCallback !== null
+            ? \Closure::fromCallable($pollCallback)
+            : null;
+    }
 
     /**
      * Whether cancellation has been requested. Streaming tools should
      * check this between yields / between batched units of work so the
      * client's cancellation reaches the running tool promptly.
      *
+     * When a poll callback was supplied at construction (sub-gate 7.7
+     * streaming dispatcher) the callback is consulted on every read —
+     * a truthy return flips the token permanently. This is how the
+     * cache-backed `notifications/cancelled` arrival reaches a running
+     * generator without the dispatcher needing to subclass this
+     * final class.
+     *
      * @author Craftpulse
      * @since  5.0.0
      */
     public function isCancelled(): bool
     {
-        return $this->_cancelled;
+        if ($this->_cancelled) {
+            return true;
+        }
+        if ($this->_pollCallback !== null && ($this->_pollCallback)()) {
+            $this->_cancelled = true;
+            return true;
+        }
+        return false;
     }
 
     /**
