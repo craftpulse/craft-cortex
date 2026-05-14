@@ -4,7 +4,6 @@ namespace craftpulse\cortex\controllers;
 
 use Craft;
 use craft\elements\User;
-use craft\helpers\UrlHelper;
 use craft\web\Controller;
 use craftpulse\cortex\oauth\entities\UserEntity;
 use craftpulse\cortex\Plugin;
@@ -67,7 +66,7 @@ class OauthController extends Controller
     /**
      * @inheritdoc
      */
-    protected array|int|bool $allowAnonymous = ['authorize', 'token', 'register', 'revoke'];
+    protected array|int|bool $allowAnonymous = ['token', 'register', 'revoke'];
 
     // Public Properties
     // =========================================================================
@@ -85,6 +84,11 @@ class OauthController extends Controller
      * + renders the consent screen; POST captures the user's
      * approval and resumes league's flow.
      *
+     * Login is enforced by Craft's standard pipeline — `authorize` is
+     * not listed in `$allowAnonymous`, so unauthenticated visitors are
+     * redirected to the CP login page (with a return URL) automatically
+     * before this action body runs.
+     *
      * @throws \yii\base\InvalidConfigException When the OAuth keys
      *         are not yet generated. Operators run
      *         `cortex/oauth/init-keys` once per install.
@@ -94,19 +98,17 @@ class OauthController extends Controller
      */
     public function actionAuthorize(): Response
     {
-        // Anonymous visitors land on `/admin/login` with a return URL
-        // pointing back here. The consent screen requires a Craft
-        // session because we need the user identity to issue the auth
-        // code for.
-        $userComponent = Craft::$app->getUser();
-        $currentUser = $userComponent->getIdentity();
-        if (!$currentUser instanceof User) {
-            $returnUrl = $this->request->getAbsoluteUrl();
-            if ($userComponent instanceof \craft\web\User) {
-                $userComponent->setReturnUrl($returnUrl);
-            }
-            return $this->redirect(UrlHelper::cpUrl('login'));
+        /** @var \craft\web\Application $app */
+        $app = Craft::$app;
+        $identity = $app->getUser()->getIdentity();
+        if (!$identity instanceof User) {
+            // Hard-impossible: Craft's pipeline requires a valid
+            // session before this action body runs (authorize is not
+            // in $allowAnonymous). A non-User identity here is a
+            // misconfigured install or a test harness gap.
+            throw new \yii\web\ForbiddenHttpException('OAuth authorize requires an authenticated Craft user.');
         }
+        $currentUser = $identity;
 
         $oauth = Plugin::getInstance()->oauth;
         $psrRequest = $this->_buildPsrRequest();
