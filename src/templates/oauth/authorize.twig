@@ -1,0 +1,115 @@
+{#
+ # =========================================================================
+ # OAuth 2.1 consent screen.
+ #
+ # Rendered by `OauthController::actionAuthorize()` when the request
+ # is a GET. POST back to the same URL with `approve=1` (Authorize)
+ # or `approve=0` (Deny). Hidden form fields carry the full original
+ # query string so league's `validateAuthorizationRequest()` sees the
+ # same parameters on the POST resume as on the initial GET.
+ #
+ # Strict template isolation per craft-twig-guidelines — every
+ # variable consumed is explicitly declared in the controller's
+ # `render()` call.
+ # =========================================================================
+ #
+ # @author Craftpulse
+ # @since  5.0.0
+ #}
+<!DOCTYPE html>
+<html lang="{{ craft.app.language }}">
+<head>
+    <meta charset="utf-8">
+    <title>{{ 'Authorize OAuth client'|t('cortex') }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: light dark;
+            --bg: #f7f7f9;
+            --panel: #fff;
+            --text: #1c2329;
+            --muted: #5b6470;
+            --accent: #226de4;
+            --accent-text: #fff;
+            --border: #e4e7eb;
+            --danger: #c33;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #14171b;
+                --panel: #1d2228;
+                --text: #e7eaee;
+                --muted: #8e98a4;
+                --border: #2a3038;
+            }
+        }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+        .container { max-width: 480px; margin: 80px auto; padding: 0 16px; }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 28px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        h1 { margin: 0 0 16px; font-size: 22px; font-weight: 600; }
+        .lead { margin: 0 0 24px; color: var(--muted); line-height: 1.5; }
+        .client { font-weight: 600; color: var(--text); }
+        .scopes { margin: 0 0 24px; padding: 0; list-style: none; }
+        .scopes li { padding: 12px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; margin-bottom: 8px; }
+        .scope-name { font-weight: 600; display: block; margin-bottom: 4px; }
+        .scope-desc { color: var(--muted); font-size: 13px; line-height: 1.4; }
+        .user-row { padding: 10px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+        .user-row strong { color: var(--text); }
+        .actions { display: flex; gap: 12px; }
+        button { flex: 1; padding: 11px 16px; border-radius: 6px; font-size: 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
+        button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+        button.primary:hover { opacity: 0.92; }
+        button:focus { outline: 2px solid var(--accent); outline-offset: 2px; }
+        .meta { margin-top: 20px; font-size: 12px; color: var(--muted); text-align: center; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="panel">
+        <h1>{{ 'Authorize {client}'|t('cortex', { client: clientName }) }}</h1>
+        <p class="lead">
+            {{ '{client} is requesting access to your Craft account.'|t('cortex', { client: '<span class="client">' ~ clientName ~ '</span>' })|raw }}
+        </p>
+
+        <div class="user-row">
+            {{ 'Signed in as'|t('cortex') }} <strong>{{ username }}</strong>
+        </div>
+
+        {% if scopes is not empty %}
+            <ul class="scopes">
+                {% for scope in scopes %}
+                    <li>
+                        <span class="scope-name">{{ scope }}</span>
+                        <span class="scope-desc">
+                            {%- if scope == 'read' -%}
+                                {{ 'Read content, schema, and configuration. No writes.'|t('cortex') }}
+                            {%- elseif scope == 'write' -%}
+                                {{ 'Modify entries, fields, and other Craft state.'|t('cortex') }}
+                            {%- else -%}
+                                {{ 'Additional scope.'|t('cortex') }}
+                            {%- endif -%}
+                        </span>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <form method="POST" action="{{ url('oauth/authorize') }}">
+            {% for key, value in query %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endfor %}
+            <input type="hidden" name="{{ craft.app.config.general.csrfTokenName }}" value="{{ craft.app.request.csrfToken }}">
+
+            <div class="actions">
+                <button type="submit" name="approve" value="0">{{ 'Deny'|t('cortex') }}</button>
+                <button type="submit" name="approve" value="1" class="primary">{{ 'Authorize'|t('cortex') }}</button>
+            </div>
+        </form>
+
+        <div class="meta">
+            {{ 'Cortex OAuth — Powered by craftpulse/craft-cortex'|t('cortex') }}
+        </div>
+    </div>
+</div>
+</body>
+</html>

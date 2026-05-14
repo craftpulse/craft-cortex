@@ -25,8 +25,13 @@
 use craftpulse\cortex\controllers\McpController;
 use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\mcp\transport\Http;
+use craftpulse\cortex\oauth\entities\AccessTokenEntity;
+use craftpulse\cortex\oauth\entities\ClientEntity;
 use craftpulse\cortex\Plugin;
+use craftpulse\cortex\records\OauthClient as OauthClientRecord;
+use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
 use craftpulse\cortex\records\Token as TokenRecord;
+use League\OAuth2\Server\CryptKey;
 use yii\web\HeaderCollection;
 use yii\web\Response;
 
@@ -208,6 +213,18 @@ afterEach(function() {
     $settings->httpEnabled = $this->originalHttpEnabled;
     $settings->allowedOrigins = $this->originalAllowedOrigins;
     TokenRecord::deleteAll(['like', 'name', '_test_/%', false]);
+
+    // Cleanup OAuth fixtures from Gate 7.3 tests too. The clientId
+    // pattern `_test_/mcp-oauth-*` is unique to this file's
+    // `_cortex_mint_oauth_access_token` helper.
+    $clientIds = OauthClientRecord::find()
+        ->where(['like', 'clientName', '_test_/mcp-oauth-%', false])
+        ->select(['clientId'])
+        ->column();
+    if ($clientIds !== []) {
+        OauthTokenRecord::deleteAll(['clientId' => $clientIds]);
+        OauthClientRecord::deleteAll(['clientId' => $clientIds]);
+    }
 });
 
 // -----------------------------------------------------------------------------
@@ -566,7 +583,8 @@ it('POST without Authorization header returns 401 + WWW-Authenticate', function(
     $response = $controller->runIndex();
 
     expect($response->statusCode)->toBe(401);
-    expect($response->headers->get('WWW-Authenticate'))->toBe('Bearer realm="cortex"');
+    expect($response->headers->get('WWW-Authenticate'))->toContain('Bearer realm="cortex"');
+    expect($response->headers->get('WWW-Authenticate'))->toContain('resource_metadata=');
 });
 
 it('POST with a malformed Authorization header (no Bearer prefix) returns 401', function() {
@@ -586,7 +604,8 @@ it('POST with a malformed Authorization header (no Bearer prefix) returns 401', 
     $response = $controller->runIndex();
 
     expect($response->statusCode)->toBe(401);
-    expect($response->headers->get('WWW-Authenticate'))->toBe('Bearer realm="cortex"');
+    expect($response->headers->get('WWW-Authenticate'))->toContain('Bearer realm="cortex"');
+    expect($response->headers->get('WWW-Authenticate'))->toContain('resource_metadata=');
 });
 
 it('POST with an unknown bearer token returns 401', function() {
@@ -606,7 +625,8 @@ it('POST with an unknown bearer token returns 401', function() {
     $response = $controller->runIndex();
 
     expect($response->statusCode)->toBe(401);
-    expect($response->headers->get('WWW-Authenticate'))->toBe('Bearer realm="cortex"');
+    expect($response->headers->get('WWW-Authenticate'))->toContain('Bearer realm="cortex"');
+    expect($response->headers->get('WWW-Authenticate'))->toContain('resource_metadata=');
 });
 
 it('POST with valid bearer authenticates and dispatches', function() {
@@ -789,4 +809,165 @@ it('audit log line carries user=<id> when authenticated over HTTP', function() {
     expect($auditLine)->not->toContain('user=-');
 
     Plugin::getInstance()->sessions->terminate($sessionId);
+});
+
+// -----------------------------------------------------------------------------
+// Sub-gate 7.3 — OAuth access-token path
+// -----------------------------------------------------------------------------
+
+/**
+ * Mint an OAuth access-token JWT bound to the playground admin user
+ * with the given audience. Persists a matching token row so league's
+ * resource server doesn't see it as revoked.
+ */
+function _cortex_mint_oauth_access_token(int $userId, string $audience, int $expiresIn = 3600): array
+{
+    $client = new OauthClientRecord();
+    $client->clientId = bin2hex(random_bytes(16));
+    $client->clientName = '_test_/mcp-oauth-' . bin2hex(random_bytes(4));
+    $client->redirectUris = json_encode(['https://example.com/cb']);
+    $client->isPublic = true;
+    $client->save();
+
+    $clientEntity = new ClientEntity();
+    $clientEntity->setIdentifier($client->clientId);
+    $clientEntity->setName($client->clientName);
+    $clientEntity->setRedirectUri('https://example.com/cb');
+    $clientEntity->setIsConfidential(false);
+
+    $entity = new AccessTokenEntity();
+    $entity->setClient($clientEntity);
+    $entity->setIdentifier(bin2hex(random_bytes(20)));
+    $entity->setUserIdentifier((string) $userId);
+    $entity->setExpiryDateTime(new \DateTimeImmutable('@' . (time() + $expiresIn)));
+    $entity->setAudience($audience);
+    $entity->setPrivateKey(new CryptKey('file://' . Plugin::getInstance()->oauth->getPrivateKeyPath()));
+
+    $record = new OauthTokenRecord();
+    $record->tokenType = 'access';
+    $record->tokenHash = hash('sha256', $entity->getIdentifier());
+    $record->userId = $userId;
+    $record->clientId = $client->clientId;
+    $record->audience = $audience;
+    $record->expiresAt = date('Y-m-d H:i:s', time() + max($expiresIn, 1));
+    $record->save();
+
+    return [
+        'jwt' => $entity->toString(),
+        'jti' => $entity->getIdentifier(),
+        'clientId' => $client->clientId,
+        'tokenId' => $record->id,
+    ];
+}
+
+it('POST with a valid OAuth access token authenticates and dispatches', function() {
+    // Audience must match the playground's canonical MCP endpoint URL
+    // because `McpController::beforeAction()` enforces it.
+    $expectedAudience = \craft\helpers\UrlHelper::siteUrl('cortex/mcp');
+    $minted = _cortex_mint_oauth_access_token($this->userId, $expectedAudience);
+
+    $body = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => 'Bearer ' . $minted['jwt'],
+    ], $body);
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(200);
+    expect(Craft::$app->getUser()->getId())->toBe($this->userId);
+
+    Plugin::getInstance()->sessions->terminate((string) $response->headers->get(Http::HEADER_SESSION_ID));
+});
+
+it('POST with an OAuth token whose audience does not match returns 401', function() {
+    $minted = _cortex_mint_oauth_access_token($this->userId, 'https://different-resource.invalid/mcp');
+
+    $body = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => 'Bearer ' . $minted['jwt'],
+    ], $body);
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(401);
+    expect($response->headers->get('WWW-Authenticate'))->toContain('resource_metadata=');
+});
+
+it('POST with an expired OAuth token returns 401', function() {
+    $expectedAudience = \craft\helpers\UrlHelper::siteUrl('cortex/mcp');
+    $minted = _cortex_mint_oauth_access_token($this->userId, $expectedAudience, expiresIn: -3600);
+
+    $body = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => 'Bearer ' . $minted['jwt'],
+    ], $body);
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(401);
+});
+
+it('POST with a revoked OAuth token returns 401', function() {
+    $expectedAudience = \craft\helpers\UrlHelper::siteUrl('cortex/mcp');
+    $minted = _cortex_mint_oauth_access_token($this->userId, $expectedAudience);
+
+    // Flip dateRevoked.
+    OauthTokenRecord::updateAll(
+        ['dateRevoked' => date('Y-m-d H:i:s')],
+        ['tokenHash' => hash('sha256', $minted['jti'])],
+    );
+
+    $body = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => 'Bearer ' . $minted['jwt'],
+    ], $body);
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(401);
+});
+
+it('401 challenge header carries the canonical resource_metadata URL', function() {
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => 'Bearer totally-bogus',
+    ], '{}');
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(401);
+    $challenge = $response->headers->get('WWW-Authenticate');
+    expect($challenge)->toContain('Bearer realm="cortex"');
+    expect($challenge)->toContain('.well-known/oauth-protected-resource');
 });

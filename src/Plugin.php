@@ -11,6 +11,7 @@ use craft\web\UrlManager;
 use craftpulse\cortex\generator\Tool as ToolGenerator;
 use craftpulse\cortex\models\Settings;
 use craftpulse\cortex\services\Allowlist;
+use craftpulse\cortex\services\Oauth;
 use craftpulse\cortex\services\Prompts;
 use craftpulse\cortex\services\Resources;
 use craftpulse\cortex\services\Sessions;
@@ -39,6 +40,7 @@ use yii\base\Event;
  * @method static Plugin getInstance()
  * @method Settings getSettings()
  * @property-read Allowlist $allowlist
+ * @property-read Oauth $oauth
  * @property-read Prompts $prompts
  * @property-read Resources $resources
  * @property-read Sessions $sessions
@@ -79,6 +81,7 @@ class Plugin extends BasePlugin
         return [
             'components' => [
                 'allowlist' => ['class' => Allowlist::class],
+                'oauth' => ['class' => Oauth::class],
                 'prompts' => ['class' => Prompts::class],
                 'resources' => ['class' => Resources::class],
                 'sessions' => ['class' => Sessions::class],
@@ -140,6 +143,13 @@ class Plugin extends BasePlugin
         // `Settings::$httpEnabled` is false, so registering the route
         // unconditionally is safe — feature gating happens at the
         // controller layer, not at the route layer.
+        //
+        // OAuth endpoints sit at /oauth/* (not under /cortex/) for
+        // client compatibility — most MCP clients expect bare
+        // /oauth/authorize, /oauth/token, etc. The `.well-known/*`
+        // discovery endpoints land at the site root per RFC 8414 §3
+        // and RFC 9728 §3 — both RFCs explicitly require the
+        // well-known paths to be at the root of the issuer URL.
         Event::on(
             UrlManager::class,
             UrlManager::EVENT_REGISTER_SITE_URL_RULES,
@@ -147,6 +157,15 @@ class Plugin extends BasePlugin
                 $event->rules['POST cortex/mcp'] = 'cortex/mcp/index';
                 $event->rules['GET cortex/mcp'] = 'cortex/mcp/index';
                 $event->rules['DELETE cortex/mcp'] = 'cortex/mcp/index';
+
+                $event->rules['GET oauth/authorize'] = 'cortex/oauth/authorize';
+                $event->rules['POST oauth/authorize'] = 'cortex/oauth/authorize';
+                $event->rules['POST oauth/token'] = 'cortex/oauth/token';
+                $event->rules['POST oauth/register'] = 'cortex/oauth/register';
+                $event->rules['POST oauth/revoke'] = 'cortex/oauth/revoke';
+
+                $event->rules['GET .well-known/oauth-authorization-server'] = 'cortex/well-known/authorization-server';
+                $event->rules['GET .well-known/oauth-protected-resource'] = 'cortex/well-known/protected-resource';
             },
         );
     }

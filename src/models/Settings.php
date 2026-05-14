@@ -126,6 +126,37 @@ class Settings extends Model
      */
     public ?int $tokenTtlDefault = null;
 
+    /**
+     * @var bool Whether RFC 7591 Dynamic Client Registration is open
+     *           on `POST /oauth/register`. Default: true (open-
+     *           registration variant, no initial-access-token
+     *           requirement). MCP-native clients (Claude Desktop's
+     *           hosted setup, etc.) self-register on first contact;
+     *           operators with a stricter posture flip this to false
+     *           and seed clients out-of-band via a future console
+     *           command or the CP UI in Gate 9.
+     */
+    public bool $dcrEnabled = true;
+
+    /**
+     * @var string ISO 8601 `DateInterval` string defining the OAuth
+     *             access-token TTL. Default `PT1H` (1 hour) per the
+     *             OAuth 2.1 spec recommendation for short-lived
+     *             access tokens. Override to `PT15M` for tighter
+     *             rotation or `PT8H` for longer-lived sessions.
+     *             Refresh tokens cover the gap between expiries.
+     */
+    public string $oauthAccessTokenTtl = 'PT1H';
+
+    /**
+     * @var string ISO 8601 `DateInterval` string defining the OAuth
+     *             refresh-token TTL. Default `P30D` (30 days).
+     *             Clients that go quiet for longer than this lose
+     *             their refresh ability and must re-authorize
+     *             through the consent screen.
+     */
+    public string $oauthRefreshTokenTtl = 'P30D';
+
     // Protected Methods
     // =========================================================================
 
@@ -142,8 +173,9 @@ class Settings extends Model
         $rules = parent::defineRules();
         $rules[] = [['runtimeOverrideTtl', 'sessionTtl'], 'integer', 'min' => 1];
         $rules[] = [['tokenTtlDefault'], 'integer', 'min' => 1];
-        $rules[] = [['execEnabled', 'execDryRunDefault', 'httpEnabled'], 'boolean'];
+        $rules[] = [['execEnabled', 'execDryRunDefault', 'httpEnabled', 'dcrEnabled'], 'boolean'];
         $rules[] = [['allowedCommands', 'allowedOrigins'], 'each', 'rule' => ['string', 'min' => 1]];
+        $rules[] = [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl'], 'string', 'min' => 2];
         return $rules;
     }
 }
