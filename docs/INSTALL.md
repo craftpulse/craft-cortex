@@ -91,6 +91,33 @@ php /path/to/project/craft cortex/install/auto
 
 Or stick with the manual snippet form (`ddev craft cortex/install`), which works fine inside DDEV.
 
+### Bearer-token authentication for the HTTP transport
+
+Cortex also exposes an HTTP transport at `POST /cortex/mcp` for clients that don't speak stdio (Claude Desktop's hosted MCP setup, browser-based agents, anything behind a remote agent). The HTTP transport is **disabled by default** — flip `Settings::$httpEnabled = true` in `config/cortex.php` to expose it.
+
+Once enabled, every request to `/cortex/mcp` must carry `Authorization: Bearer <token>`. Issue a token from the console:
+
+```bash
+ddev craft cortex/token/issue <user> [--name=<name>] [--ttl=<seconds>]
+```
+
+The plaintext token prints **exactly once** at issuance — copy it then. Cortex stores only the SHA-256 hash; if you lose the plaintext, revoke the token and issue a fresh one. By default tokens never expire; pass `--ttl=<seconds>` (e.g. `--ttl=2592000` for 30 days) for shorter rotation, or set `Settings::$tokenTtlDefault` for a global default.
+
+Configure your MCP client with:
+
+```
+Authorization: Bearer <plaintext-token>
+```
+
+Manage tokens with two more actions:
+
+```bash
+ddev craft cortex/token/list [--user=<email-or-username>]
+ddev craft cortex/token/revoke <id>
+```
+
+Revocation is immediate for new requests — in-flight requests on a revoked token complete normally, the next request fails 401.
+
 ### Auto-detect and apply (fastest)
 
 If you're running Cortex from the host (not inside a container), this is one command:

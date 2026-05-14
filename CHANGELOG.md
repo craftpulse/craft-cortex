@@ -6,6 +6,26 @@ All notable changes to Cortex are documented here. Format follows
 
 ## [Unreleased]
 
+### Added — Gate 7.2 (Pro tier, bearer token auth)
+
+- `cortex_tokens` table + `Tokens` service. SHA-256-hashed-at-rest;
+  the plaintext is surfaced ONCE at issuance and never returned by
+  any service method again. Soft-delete + per-request lookup
+  memoization.
+- Three console actions: `cortex/token/issue`, `cortex/token/revoke`,
+  `cortex/token/list`. Plaintext token printed only on issue, never
+  by list. `--ttl=<seconds>` flag on issue; `Settings::$tokenTtlDefault`
+  for the global default (null = no expiry).
+- HTTP transport `/cortex/mcp` now requires `Authorization: Bearer
+  <token>`. Missing / invalid credentials return 401 with
+  `WWW-Authenticate: Bearer realm="cortex"`. Authenticated user is
+  bound to the session at initialize and validated against the
+  bearer token on every touch (catches mid-session token-swap).
+- In-flight revocation semantics: revoked tokens fail the next
+  `beforeAction()` lookup; in-flight requests on a revoked token
+  complete normally. Per PLANNING.md §4.9 and the locked decision
+  in `docs/plans/gate-7.md`.
+
 ### Added — Gate 7.1 (Pro tier, HTTP transport scaffolding)
 
 - HTTP transport skeleton at `POST/GET/DELETE /cortex/mcp`. Behind

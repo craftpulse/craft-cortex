@@ -317,6 +317,43 @@ it('returns JSON-RPC -32601 for an unknown method', function() {
 });
 
 // -----------------------------------------------------------------------------
+// setUserId() — request-scoped, no static state leak between instances
+// -----------------------------------------------------------------------------
+
+it('setUserId() is request-scoped — separate Server instances do not share user state', function() {
+    $a = new Server(Server::TRANSPORT_HTTP);
+    $a->setUserId(101);
+
+    $b = new Server(Server::TRANSPORT_HTTP);
+    $b->setUserId(202);
+
+    // Drive a tools/call through each so the audit-log line surfaces
+    // the bound userId. We re-use the existing `sections` tool which
+    // is a no-arg success path; the assertion target is the
+    // `user=` field on the locked audit line.
+    $a->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'tools/call',
+        'params' => ['name' => 'sections'],
+    ]);
+    $aLine = _cortex_last_audit_line();
+    expect($aLine)->toContain('user=101');
+
+    $b->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 2,
+        'method' => 'tools/call',
+        'params' => ['name' => 'sections'],
+    ]);
+    $bLine = _cortex_last_audit_line();
+    expect($bLine)->toContain('user=202');
+    // Confirm the second dispatch produced a different line — same
+    // text would mean we accidentally read the cached one from `$a`.
+    expect($bLine)->not->toBe($aLine);
+});
+
+// -----------------------------------------------------------------------------
 // stdio-only enforcement
 // -----------------------------------------------------------------------------
 
