@@ -8,15 +8,19 @@ use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\services\Gc;
 use craft\web\UrlManager;
+use craftpulse\cortex\events\LogCallEvent;
 use craftpulse\cortex\generator\Tool as ToolGenerator;
 use craftpulse\cortex\models\Settings;
 use craftpulse\cortex\services\Allowlist;
+use craftpulse\cortex\services\Invocations;
 use craftpulse\cortex\services\Oauth;
 use craftpulse\cortex\services\Prompts;
 use craftpulse\cortex\services\Resources;
 use craftpulse\cortex\services\Sessions;
 use craftpulse\cortex\services\Tokens;
 use craftpulse\cortex\services\Tools;
+use craftpulse\cortex\tools\support\InvocationLogger;
+use Throwable;
 use yii\base\Event;
 
 /**
@@ -40,6 +44,7 @@ use yii\base\Event;
  * @method static Plugin getInstance()
  * @method Settings getSettings()
  * @property-read Allowlist $allowlist
+ * @property-read Invocations $invocations
  * @property-read Oauth $oauth
  * @property-read Prompts $prompts
  * @property-read Resources $resources
@@ -81,6 +86,7 @@ class Plugin extends BasePlugin
         return [
             'components' => [
                 'allowlist' => ['class' => Allowlist::class],
+                'invocations' => ['class' => Invocations::class],
                 'oauth' => ['class' => Oauth::class],
                 'prompts' => ['class' => Prompts::class],
                 'resources' => ['class' => Resources::class],
@@ -120,15 +126,47 @@ class Plugin extends BasePlugin
             );
         }
 
-        // Prune expired runtime-override rows during Craft's gc sweep.
-        // The delete is a single indexed deleteAll, faster than the
-        // overhead of pushing a queue job — and Craft's gc already
-        // runs heavier cleanups inline in the same pass.
+        // Prune expired runtime-override rows + (when audit retention
+        // is configured) old `cortex_invocations` rows during Craft's
+        // gc sweep. Both deletes are single indexed deleteAll calls,
+        // faster than the overhead of pushing a queue job — and
+        // Craft's gc already runs heavier cleanups inline in the same
+        // pass. Audit retention defaults to forever
+        // (`Settings::$auditRetentionDays = null`); when null the
+        // prune call is a no-op.
         Event::on(
             Gc::class,
             Gc::EVENT_RUN,
             static function(): void {
-                Plugin::getInstance()->allowlist->pruneExpired();
+                $plugin = Plugin::getInstance();
+                $plugin->allowlist->pruneExpired();
+                $plugin->invocations->prune();
+            },
+        );
+
+        // Wire the Gate 7.5 audit-log writer to the InvocationLogger's
+        // structured-entry event. The listener is wrapped in a
+        // try/catch so a thrown exception inside the audit-write path
+        // cannot break the dispatcher — defense in depth on top of
+        // `Invocations::record()`'s internal try/catch. The KV file
+        // log line is the secondary audit trail when the DB write
+        // fails.
+        Event::on(
+            InvocationLogger::class,
+            InvocationLogger::EVENT_LOG_CALL,
+            static function(LogCallEvent $event): void {
+                try {
+                    Plugin::getInstance()->invocations->record($event->entry);
+                } catch (Throwable $e) {
+                    \Craft::error(
+                        sprintf(
+                            'Audit-log listener raised %s: %s',
+                            $e::class,
+                            $e->getMessage(),
+                        ),
+                        Invocations::LOG_CATEGORY,
+                    );
+                }
             },
         );
 

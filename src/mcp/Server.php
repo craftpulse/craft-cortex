@@ -90,6 +90,31 @@ class Server
     private ?int $_userId = null;
 
     /**
+     * @var int|null Row id from `cortex_tokens` when authentication
+     *               was via a long-lived bearer token. Set by the HTTP
+     *               controller's `beforeAction()` once the bearer
+     *               lookup resolves. Null for stdio (no bearer auth)
+     *               and for OAuth-authenticated HTTP requests (OAuth
+     *               correlation lives implicitly on the audit row's
+     *               `userId + clientName + dateCreated` triple
+     *               because we have two source tables for OAuth-
+     *               issued tokens; the `tokenId` FK is bearer-only).
+     */
+    private ?int $_tokenId = null;
+
+    /**
+     * @var string|null Value of the `Mcp-Session-Id` request header,
+     *                  set by the HTTP controller for non-initialize
+     *                  requests. Threaded onto every invocation
+     *                  context so audit log lines can group every
+     *                  call in the same HTTP session. Null on stdio
+     *                  (no sessions) and on the `initialize` call
+     *                  itself (the session id is minted in the
+     *                  response, not the request).
+     */
+    private ?string $_sessionId = null;
+
+    /**
      * @var User|null Memoized result of resolving `$_userId` through
      *                `Users::getUserById()`. Lazy — populated on the
      *                first call to `_resolveUser()` for the request,
@@ -144,6 +169,58 @@ class Server
     public function setUserId(?int $userId): void
     {
         $this->_userId = $userId;
+    }
+
+    /**
+     * Bind the issuing bearer-token row id for this dispatcher's
+     * lifetime. Parallel to `setUserId()`. Called by
+     * `McpController::beforeAction()` after the bearer lookup resolves
+     * to a `cortex_tokens` row. OAuth-authenticated requests leave
+     * this null — OAuth correlation flows through the (userId,
+     * clientName, dateCreated) tuple on the audit row instead.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function setTokenId(?int $tokenId): void
+    {
+        $this->_tokenId = $tokenId;
+    }
+
+    /**
+     * Bind a `clientInfo.name` captured outside the `initialize`
+     * handshake. The HTTP controller calls this on non-initialize
+     * dispatches by pulling the client name off the resolved `Session`
+     * row — the dispatcher is fresh per request, but the session row
+     * remembers the name across the lifetime of the MCP session, so
+     * subsequent `tools/list` / `tools/call` audit lines carry the
+     * same client identifier the initial handshake established.
+     *
+     * Initialize itself overwrites this slot via `_initializeResult()`;
+     * the controller's pre-dispatch hint is the fall-through for
+     * non-initialize calls.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function setClientName(?string $clientName): void
+    {
+        $this->_clientName = $clientName;
+    }
+
+    /**
+     * Bind the `Mcp-Session-Id` for this dispatcher's lifetime.
+     * Parallel to `setUserId()` and `setTokenId()`. Called by
+     * `McpController::beforeAction()` once the session id is
+     * extracted from the request headers. Null for stdio and for
+     * `initialize` (the session id is minted in the response).
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function setSessionId(?string $sessionId): void
+    {
+        $this->_sessionId = $sessionId;
     }
 
     /**
@@ -465,7 +542,12 @@ class Server
             return $this->_internalError($id, $e, sprintf('Internal error executing tool "%s".', $name));
         }
 
-        InvocationLogger::logCall($name, $arguments, null, $this->_elapsedMs($startNs), $context);
+        // Serialize the tool result for the audit log's response excerpt.
+        // The wire payload to the MCP client is built separately by
+        // `_toolResultEnvelope()` and is unaffected by this — the
+        // excerpt is for forensics only.
+        $responsePayload = (string) json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        InvocationLogger::logCall($name, $arguments, null, $this->_elapsedMs($startNs), $context, $responsePayload);
 
         return $this->_successResponse($id, $this->_toolResultEnvelope($tool, $result));
     }
@@ -488,6 +570,8 @@ class Server
             requestId: $requestId,
             userId: $this->_userId,
             clientName: $this->_clientName,
+            tokenId: $this->_tokenId,
+            sessionId: $this->_sessionId,
         );
     }
 

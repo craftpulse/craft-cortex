@@ -29,6 +29,18 @@ use craftpulse\cortex\mcp\Server;
  *     "claude-code", "cursor"). Captured at initialize time and
  *     attached to every subsequent invocation context. `null` until
  *     initialize fires.
+ *   - `tokenId` — row id from `cortex_tokens` when authentication was
+ *     via a long-lived bearer token. Null for stdio, null for OAuth-
+ *     authenticated requests (OAuth correlation lives implicitly via
+ *     `userId + clientName + dateCreated`; the FK is bearer-only).
+ *     Threaded into `cortex_invocations.tokenId` for first-class
+ *     bearer-row correlation in the audit dashboard.
+ *   - `sessionId` — value of the `Mcp-Session-Id` request header. Null
+ *     for stdio (no sessions) and for the `initialize` request itself
+ *     (the session id is minted in the response, not echoed back on
+ *     the same call). Threaded into `cortex_invocations.sessionId`
+ *     so the audit dashboard can group every invocation in the same
+ *     HTTP session.
  *
  * Locked because third-party log consumers (Pro audit dashboard,
  * external SIEM forwarders) will pin against the field names. Adding
@@ -74,6 +86,14 @@ final class InvocationContext
      * @param string|null           $clientName        Client name from
      *                                                 `initialize.clientInfo.name`.
      *                                                 Null before initialize.
+     * @param int|null              $tokenId           Row id from `cortex_tokens`
+     *                                                 when authentication was via a
+     *                                                 long-lived bearer; null for
+     *                                                 stdio and for OAuth-
+     *                                                 authenticated requests.
+     * @param string|null           $sessionId         Value of the `Mcp-Session-Id`
+     *                                                 request header. Null on stdio
+     *                                                 and on the `initialize` call.
      * @param CancellationToken|null $cancellationToken Cooperative cancellation
      *                                                 signal. Defaults to a fresh,
      *                                                 unfired token so non-streaming
@@ -88,6 +108,8 @@ final class InvocationContext
         public readonly string|int|null $requestId = null,
         public readonly ?int $userId = null,
         public readonly ?string $clientName = null,
+        public readonly ?int $tokenId = null,
+        public readonly ?string $sessionId = null,
         ?CancellationToken $cancellationToken = null,
     ) {
         $this->_cancellationToken = $cancellationToken ?? new CancellationToken();

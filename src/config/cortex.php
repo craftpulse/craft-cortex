@@ -174,6 +174,35 @@ return [
          */
         // 'tokenTtlDefault' => null,
 
+        // ---------------------------------------------------------------------
+        // Audit log (Gate 7.5)
+        // ---------------------------------------------------------------------
+
+        /**
+         * Number of bytes of the (post-redaction) JSON-encoded tool
+         * response persisted to `cortex_invocations.responseExcerpt`.
+         * The DB column is `text`, so values up to 65535 fit; the
+         * default 2048 keeps the audit table footprint small while
+         * surfacing enough payload for forensics. The full response
+         * still goes back to the MCP client over the wire — this
+         * excerpt is for the audit dashboard only.
+         *
+         * @var int
+         */
+        // 'auditResponseExcerptBytes' => 2048,
+
+        /**
+         * Retention window (in days) for `cortex_invocations` rows.
+         * Null (the default) means audit history is retained forever
+         * — the compliance-friendly default that punts the eviction
+         * decision to operators with local-policy knowledge. Set
+         * this to e.g. 90 to prune rows older than 90 days during
+         * Craft's `gc` sweep.
+         *
+         * @var int|null
+         */
+        // 'auditRetentionDays' => null,
+
     ],
 
     // 'production' => [

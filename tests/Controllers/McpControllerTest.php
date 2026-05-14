@@ -971,3 +971,147 @@ it('401 challenge header carries the canonical resource_metadata URL', function(
     expect($challenge)->toContain('Bearer realm="cortex"');
     expect($challenge)->toContain('.well-known/oauth-protected-resource');
 });
+
+// -----------------------------------------------------------------------------
+// Sub-gate 7.5 — audit log DB persistence
+// -----------------------------------------------------------------------------
+
+it('tools/call over HTTP writes one cortex_invocations row with the right context', function() {
+    // Initialize, then drive a real tools/call so the audit-log
+    // listener persists a row to cortex_invocations.
+    $initBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest-audit', 'version' => '0'],
+        ],
+    ]);
+    $initController = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $this->bearerHeader,
+    ], $initBody);
+    $initResponse = $initController->runIndex();
+    $sessionId = (string) $initResponse->headers->get(Http::HEADER_SESSION_ID);
+
+    $callBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 2,
+        'method' => 'tools/call',
+        'params' => ['name' => 'sections'],
+    ]);
+    $callController = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        Http::HEADER_SESSION_ID => $sessionId,
+        'Authorization' => $this->bearerHeader,
+    ], $callBody);
+    $callResponse = $callController->runIndex();
+    expect($callResponse->statusCode)->toBe(200);
+
+    // One row for the sections invocation, scoped to this test's
+    // bearer + session.
+    $row = \craftpulse\cortex\records\Invocation::find()
+        ->where([
+            'toolName' => 'sections',
+            'sessionId' => $sessionId,
+        ])
+        ->orderBy(['id' => SORT_DESC])
+        ->one();
+
+    expect($row)->not->toBeNull();
+    expect($row->kind)->toBe('success');
+    expect($row->transport)->toBe('http');
+    expect($row->userId)->toBe($this->userId);
+    expect($row->tokenId)->toBe($this->bearerTokenId);
+    expect($row->sessionId)->toBe($sessionId);
+    expect($row->clientName)->toBe('pest-audit');
+
+    \craftpulse\cortex\records\Invocation::deleteAll(['id' => $row->id]);
+    Plugin::getInstance()->sessions->terminate($sessionId);
+});
+
+it('a failing tool over HTTP writes a tool_error row with the error class/message', function() {
+    // Initialize the session.
+    $initBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest-audit-err', 'version' => '0'],
+        ],
+    ]);
+    $initController = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $this->bearerHeader,
+    ], $initBody);
+    $initResponse = $initController->runIndex();
+    $sessionId = (string) $initResponse->headers->get(Http::HEADER_SESSION_ID);
+
+    // `craft_command` with a command outside the allowlist raises a
+    // ToolException — gives us a predictable tool_error path.
+    $callBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 2,
+        'method' => 'tools/call',
+        'params' => [
+            'name' => 'craft_command',
+            'arguments' => ['command' => 'definitely-not-allowed/this-route-does-not-exist'],
+        ],
+    ]);
+    $callController = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        Http::HEADER_SESSION_ID => $sessionId,
+        'Authorization' => $this->bearerHeader,
+    ], $callBody);
+    $callController->runIndex();
+
+    $row = \craftpulse\cortex\records\Invocation::find()
+        ->where([
+            'toolName' => 'craft_command',
+            'sessionId' => $sessionId,
+        ])
+        ->orderBy(['id' => SORT_DESC])
+        ->one();
+
+    expect($row)->not->toBeNull();
+    expect($row->kind)->toBe('tool_error');
+    expect($row->errorClass)->toBeString()->not->toBeEmpty();
+    expect($row->errorMessage)->toBeString()->not->toBeEmpty();
+
+    \craftpulse\cortex\records\Invocation::deleteAll(['id' => $row->id]);
+    Plugin::getInstance()->sessions->terminate($sessionId);
+});
+
+it('a revoked bearer 401s before dispatch — no audit row written', function() {
+    // Establish the baseline row count for the test's bearer.
+    $before = (int) \craftpulse\cortex\records\Invocation::find()
+        ->where(['userId' => $this->userId])
+        ->count();
+
+    // Revoke the bearer before any call lands.
+    Plugin::getInstance()->tokens->revoke($this->bearerTokenId);
+
+    $body = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest-revoked', 'version' => '0'],
+        ],
+    ]);
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $this->bearerHeader,
+    ], $body);
+    $response = $controller->runIndex();
+    expect($response->statusCode)->toBe(401);
+
+    $after = (int) \craftpulse\cortex\records\Invocation::find()
+        ->where(['userId' => $this->userId])
+        ->count();
+
+    expect($after)->toBe($before);
+});
