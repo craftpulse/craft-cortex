@@ -4,24 +4,27 @@ All notable changes to Cortex are documented here. Format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning per
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [5.0.0] — 2026-05-14
 
 ### Initial release
 
 Cortex is a [Model Context Protocol](https://modelcontextprotocol.io/) server for Craft CMS 5. It connects MCP-capable AI assistants — Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf — to your Craft project so they can introspect your content model, read your content safely, run guarded dev actions, and learn Craft conventions from a bundled expert-skill corpus.
 
-This release ships the free tier: a stdio-transport MCP server with **32 tools**, **8 prompts**, and **77 resources**. The Pro tier (HTTP transport, content-write capabilities, Craft permission gating, audit-log UI) is on the Phase 2 roadmap.
+This release ships the free tier: a stdio-transport MCP server with **33 tools**, **8 prompts**, and **77 resources**. The Pro tier (HTTP transport, content-write capabilities, Craft permission gating, audit-log UI) is on the Phase 2 roadmap.
 
 ### Added
 
-#### Tool catalogue (32 tools)
+#### Tool catalogue (33 tools)
 
+- **Orientation (1):** `get_initial_context` — bootstrap snapshot a fresh agent should call first. Returns Craft version + edition + environment, primary site, sites/sections/element-types index, the bundled `craftcms_*` skill prompts, `craft_exec` posture, effective command allowlist, and a short operating-hints list. Replaces three or four orientation tool calls. Registered first in `tools/list`. Name matches Contentful's convention so clients with heuristics around `get_initial_context` pick it up.
 - **Schema & structure (10):** `sections`, `entry_types`, `fields`, `field_types`, `category_groups`, `tag_groups`, `volumes_and_filesystems`, `sites`, `image_transforms`, `element_types`. Each collapses list / get / count behind a single optional `handle` argument.
 - **Content reading (5):** `entries`, `assets`, `categories`, `tags`, `globals`. Full element-query surface — section / type / status / author / `relatedTo` filters, eager loading via `with: [...]`, structure params, pagination (default 100, max 1000), site filter, count mode, single-id shortcut. Relational fields stub by default (`{type: "relation", loaded: false}`) so the LLM never accidentally triggers an N+1 walk.
 - **System & diagnostics (9):** `system_info`, `config`, `plugins`, `routes`, `system_diagnostics`, `database_schema`, `extensibility`, `permissions_and_groups`, `search_skills`. `config` and `system_diagnostics` are multi-mode introspection tools; `search_skills` does keyword search across the bundled skills corpus.
 - **GraphQL (1):** `graphql` — list schemas, get SDL, list tokens (token values are never returned; a SHA-256 fingerprint surfaces for correlation only).
 - **Dev actions (4):** `clear_caches`, `resave`, `craft_command` (allowlist-gated), `craft_exec` (six security gates, stdio-only).
 - **Workflow & audit (3):** `drafts_and_revisions` (list / compare drafts and revisions), `content_audit` (relations / unused-assets / propagation audits), `import_export` (structured-JSON export with format-versioned envelope; Pro adds the round-trip import).
+
+Five tools (`get_initial_context`, `system_info`, `routes`, `plugins`, `permissions_and_groups`) declare an MCP `outputSchema`. The dispatcher dual-emits `structuredContent` alongside the legacy text-content block per MCP 2025-06-18 §6.2 — spec-aware clients read `structuredContent` and can validate against the schema; older clients still consume the text block. Polymorphic tools (list-or-single-or-count) intentionally skip `outputSchema` to avoid hand-written `oneOf` schemas that drift from runtime; the convention is documented on `AbstractTool::outputSchema()`.
 
 The full per-tool argument schemas, output schemas, and MCP annotations live in [`docs/TOOLS.md`](docs/TOOLS.md), regenerated via `ddev craft cortex/docs/all`.
 
