@@ -32,6 +32,7 @@ These are settled. Don't relitigate without good reason.
 13. **SSE cancellation**: contract lands in 7.1 (`CancellationToken` on `InvocationContext`); wire implementation in 7.7 or later. Adding the contract now avoids retrofitting every streaming tool later.
 14. **`Last-Event-ID` SSE resumability**: deferred to Phase 3. Purely additive when added.
 15. **Sub-gate sequencing**: 7.1 → 7.2 → 7.3 → 7.4 → 7.5 → 7.6 → 7.7. Each merges independently green.
+16. **Token revocation in-flight semantics**: in-flight requests on a revoked token complete normally; no new requests on the revoked token are accepted. Bearer lookup happens once in `McpController::beforeAction()`; revocation is not propagated as a `CancellationToken` flip to running tools (that mechanism is reserved for the explicit `notifications/cancelled` MCP message in 7.7). Simplest correct behaviour per PLANNING.md §4.9.
 
 ## Sub-gate map
 
