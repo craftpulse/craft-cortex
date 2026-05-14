@@ -79,4 +79,20 @@ final class Table
      * @since  5.0.0
      */
     public const OAUTH_TOKENS = '{{%cortex_oauth_tokens}}';
+
+    /**
+     * HTTP-transport tool-invocation audit log. One row per
+     * authenticated `tools/call` over the HTTP transport. stdio
+     * invocations leave the KV log line in Craft's logger only —
+     * the DB rows are the HTTP-only audit surface per PLANNING.md
+     * §4.9 and Gate 7.5's locked decision 11. Round-trip invariant:
+     * every field on the KV log line has a corresponding column
+     * here, so `InvocationLogger::formatEntry(row)` reconstitutes
+     * the same byte-form a SIEM forwarder would see in the file
+     * log.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public const INVOCATIONS = '{{%cortex_invocations}}';
 }

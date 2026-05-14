@@ -157,6 +157,28 @@ class Settings extends Model
      */
     public string $oauthRefreshTokenTtl = 'P30D';
 
+    /**
+     * @var int Number of bytes of the (post-redaction) JSON-encoded tool
+     *          response to persist in `cortex_invocations.responseExcerpt`.
+     *          The DB column is `text`, so values up to 65535 fit; the
+     *          default 2048 keeps the audit table footprint small while
+     *          surfacing enough payload for forensics. The full response
+     *          still goes over the wire to the MCP client — this excerpt
+     *          is for the audit dashboard only.
+     */
+    public int $auditResponseExcerptBytes = 2048;
+
+    /**
+     * @var int|null Retention window (in days) for `cortex_invocations`
+     *               rows. Null (the default) means audit history is
+     *               retained forever — a regulatory-friendly posture
+     *               that punts the eviction decision to operators with
+     *               local-policy knowledge. Set this to e.g. 90 to
+     *               prune rows older than 90 days during Craft's `gc`
+     *               sweep.
+     */
+    public ?int $auditRetentionDays = null;
+
     // Protected Methods
     // =========================================================================
 
@@ -176,6 +198,8 @@ class Settings extends Model
         $rules[] = [['execEnabled', 'execDryRunDefault', 'httpEnabled', 'dcrEnabled'], 'boolean'];
         $rules[] = [['allowedCommands', 'allowedOrigins'], 'each', 'rule' => ['string', 'min' => 1]];
         $rules[] = [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl'], 'string', 'min' => 2];
+        $rules[] = [['auditResponseExcerptBytes'], 'integer', 'min' => 1, 'max' => 65535];
+        $rules[] = [['auditRetentionDays'], 'integer', 'min' => 1];
         return $rules;
     }
 }

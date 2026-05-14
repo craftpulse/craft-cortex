@@ -93,11 +93,24 @@ class McpController extends Controller
      *               the bearer path sets this from the token's bound
      *               user id. Single source of truth that
      *               `_handlePost()` reads, independent of which auth
-     *               surface fired. Gate 7.5 audit log will additionally
-     *               correlate the invocation to the issuing bearer-
-     *               token row via a separate lookup at logging time.
+     *               surface fired.
      */
     private ?int $_authenticatedUserId = null;
+
+    /**
+     * @var int|null Row id from `cortex_tokens` when the request was
+     *               authenticated via a long-lived bearer token. Null
+     *               for OAuth-authenticated requests — OAuth
+     *               correlation flows through the `(userId, clientName,
+     *               dateCreated)` tuple on the audit row, not via FK,
+     *               because the OAuth surface has its own source table
+     *               and the audit table carries only one `tokenId` FK
+     *               slot (bearer-only). Threaded onto the dispatcher
+     *               via `Server::setTokenId()` so the Gate 7.5 audit
+     *               log can correlate every HTTP invocation back to
+     *               the issuing bearer.
+     */
+    private ?int $_authenticatedTokenId = null;
 
     // Public Methods
     // =========================================================================
@@ -219,6 +232,7 @@ class McpController extends Controller
         }
 
         $this->_authenticatedUserId = $resolved['userId'];
+        $this->_authenticatedTokenId = $resolved['tokenId'] ?? null;
 
         // Bind the resolved user onto Craft's auth surface so the
         // parent `_enforceAllowAnonymous` gate sees a non-guest, and
@@ -442,6 +456,14 @@ class McpController extends Controller
         if ($authenticatedUserId !== null) {
             $server->setUserId($authenticatedUserId);
         }
+        if ($this->_authenticatedTokenId !== null) {
+            $server->setTokenId($this->_authenticatedTokenId);
+        }
+        // Thread the session id onto the dispatcher so the audit log
+        // can group every invocation in the same HTTP session. Null
+        // for the initialize call (session id is minted in the
+        // response). Set after dispatch produces the new id below.
+        $server->setSessionId($sessionId);
 
         if ($isInitialize) {
             // Initialize starts a fresh session. Any previously-issued
@@ -472,6 +494,16 @@ class McpController extends Controller
             $touched = $sessions->touch($sessionId, $authenticatedUserId);
             if ($touched === null) {
                 return $this->_unauthorized('Session does not match the presented bearer token.');
+            }
+
+            // The dispatcher is fresh per request, so the
+            // `clientInfo.name` captured during the original
+            // `initialize` doesn't survive to subsequent calls in the
+            // same session. Replay it from the session row so audit
+            // lines on `tools/list` / `tools/call` carry the same
+            // identifier as the initialize line.
+            if ($session->clientName !== null) {
+                $server->setClientName($session->clientName);
             }
         }
 
@@ -558,7 +590,14 @@ class McpController extends Controller
      * resource A presented at resource B is rejected — RFC 8707
      * confused-deputy defense.
      *
-     * @return array{userId:?int}|null
+     * The bearer path carries the resolved `cortex_tokens.id` so the
+     * Gate 7.5 audit log can FK-correlate the invocation back to the
+     * issuing bearer row. The OAuth path leaves `tokenId` null —
+     * OAuth tokens live in a separate table (`cortex_oauth_tokens`)
+     * and the audit table's single `tokenId` FK slot is bearer-only
+     * per the locked schema decision in the migration's docblock.
+     *
+     * @return array{userId:?int, tokenId:?int}|null
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -582,14 +621,14 @@ class McpController extends Controller
                 return null;
             }
 
-            return ['userId' => $oauthHit['userId']];
+            return ['userId' => $oauthHit['userId'], 'tokenId' => null];
         }
 
         $token = Plugin::getInstance()->tokens->lookup($bearer);
         if ($token === null) {
             return null;
         }
-        return ['userId' => $token->userId];
+        return ['userId' => $token->userId, 'tokenId' => $token->id];
     }
 
     /**
