@@ -273,17 +273,64 @@ it('lookupAccessToken() returns null for a token whose nbf is in the future', fu
 });
 
 // -----------------------------------------------------------------------------
+// FK cascade — deleting a client removes its codes and tokens
+// -----------------------------------------------------------------------------
+
+it('deleting a client row cascades to its oauth codes and tokens', function() {
+    $client = _cortex_oauth_mint_client();
+
+    // Mint a code row directly — simulates an in-flight auth code.
+    \Craft::$app->getDb()->createCommand()->insert(
+        \craftpulse\cortex\db\Table::OAUTH_CODES,
+        [
+            'code' => bin2hex(random_bytes(20)),
+            'clientId' => $client->clientId,
+            'isRevoked' => false,
+            'expiresAt' => date('Y-m-d H:i:s', time() + 300),
+            'dateCreated' => date('Y-m-d H:i:s'),
+            'dateUpdated' => date('Y-m-d H:i:s'),
+        ],
+    )->execute();
+
+    // Mint a token row.
+    $tokenRecord = new OauthTokenRecord();
+    $tokenRecord->tokenType = 'access';
+    $tokenRecord->tokenHash = hash('sha256', bin2hex(random_bytes(20)));
+    $tokenRecord->clientId = $client->clientId;
+    $tokenRecord->audience = 'https://test-audience.invalid/cascade';
+    $tokenRecord->expiresAt = date('Y-m-d H:i:s', time() + 3600);
+    $tokenRecord->save(false);
+
+    $tokenId = $tokenRecord->id;
+
+    // Delete the client — CASCADE should remove codes and tokens.
+    $client->delete();
+
+    // Verify the token row is gone.
+    $stillThere = OauthTokenRecord::findOne($tokenId);
+    expect($stillThere)->toBeNull();
+
+    // Verify the code row is gone.
+    $codeCount = (int) \Craft::$app->getDb()->createCommand(
+        'SELECT COUNT(*) FROM {{%cortex_oauth_codes}} WHERE clientId = :cid',
+        [':cid' => $client->clientId],
+    )->queryScalar();
+    expect($codeCount)->toBe(0);
+});
+
+// -----------------------------------------------------------------------------
 // revokeToken() — RFC 7009
 // -----------------------------------------------------------------------------
 
 it('revokeToken() flips dateRevoked for a known refresh token', function() {
+    $client = _cortex_oauth_mint_client();
     $opaque = bin2hex(random_bytes(40));
     $hash = hash('sha256', $opaque);
 
     $record = new OauthTokenRecord();
     $record->tokenType = 'refresh';
     $record->tokenHash = $hash;
-    $record->clientId = 'test-client';
+    $record->clientId = $client->clientId;
     $record->audience = 'https://test-audience.invalid/c';
     $record->expiresAt = date('Y-m-d H:i:s', time() + 86400);
     $record->save(false);
