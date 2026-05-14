@@ -20,15 +20,17 @@ use yii\base\Event;
  * audit dashboard, external SIEM forwarders) don't break when HTTP
  * lands. Format:
  *
- *   tool=<name> kind=<success|tool_error|internal_error>
+ *   tool=<name> kind=<success|tool_error|internal_error|rate_limited>
  *   duration_ms=<int> transport=<stdio|http> request_id=<id|->
  *   user=<id|-> client=<name|-> token_id=<id|-> session_id=<id|->
- *   args=<redacted-json>
+ *   rate_limit_remaining=<int|-> args=<redacted-json>
  *
  * Unknown fields emit `-`; the line is one space-separated KV record
  * per call. Adding a field is backward-compatible by definition (a
  * positional regex would break, but space/`=`-splitting parsers stay
- * happy).
+ * happy). Gate 7.6 added `rate_limited` to the kind enum and
+ * `rate_limit_remaining` to the field set; the schema-invariant test
+ * keeps DB columns ⊇ KV fields true.
  *
  * Field lifecycle is documented on `InvocationContext`. The summary:
  *   - `transport` — always populated by the dispatcher.
@@ -79,6 +81,7 @@ final class InvocationLogger
     public const KIND_SUCCESS = 'success';
     public const KIND_TOOL_ERROR = 'tool_error';
     public const KIND_INTERNAL_ERROR = 'internal_error';
+    public const KIND_RATE_LIMITED = 'rate_limited';
 
     /**
      * Fired once per `logCall()` invocation, after the formatted KV
@@ -187,7 +190,7 @@ final class InvocationLogger
         $ctx = $context ?? new InvocationContext(transport: Server::TRANSPORT_UNKNOWN);
 
         $line = sprintf(
-            'tool=%s kind=%s duration_ms=%d transport=%s request_id=%s user=%s client=%s token_id=%s session_id=%s args=%s',
+            'tool=%s kind=%s duration_ms=%d transport=%s request_id=%s user=%s client=%s token_id=%s session_id=%s rate_limit_remaining=%s args=%s',
             $toolName,
             $kind,
             $durationMs,
@@ -197,6 +200,7 @@ final class InvocationLogger
             self::_orDash($ctx->clientName),
             self::_orDash($ctx->tokenId),
             self::_orDash($ctx->sessionId),
+            self::_orDash($ctx->rateLimitRemaining),
             $argsJson,
         );
 
@@ -263,6 +267,7 @@ final class InvocationLogger
             'client' => $ctx->clientName,
             'token_id' => $ctx->tokenId,
             'session_id' => $ctx->sessionId,
+            'rate_limit_remaining' => $ctx->rateLimitRemaining,
             'args' => $argsJson,
             'response_excerpt' => $responsePayload !== null
                 ? self::_excerptResponse($responsePayload)

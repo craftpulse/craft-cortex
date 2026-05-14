@@ -38,6 +38,7 @@ use craftpulse\cortex\db\Table;
  * @property string|null $errorMessage
  * @property int|null $tokenId
  * @property string|null $sessionId
+ * @property int|null $rateLimitRemaining
  * @property string $dateCreated
  * @property string $uid
  *
@@ -66,8 +67,9 @@ class Invocation extends ActiveRecord
      * Mirrors the migration's column constraints at the model layer so
      * `save()` fails cleanly via validation rather than as a raw DB
      * exception. The `kind` enum is enforced as a list-membership check
-     * to match the three documented values
-     * (`success` / `tool_error` / `internal_error`).
+     * to match the four documented values
+     * (`success` / `tool_error` / `internal_error` / `rate_limited`) —
+     * Gate 7.6 added `rate_limited` for throttle events.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -78,12 +80,12 @@ class Invocation extends ActiveRecord
             [['toolName', 'kind', 'durationMs', 'transport'], 'required'],
             [['toolName'], 'string', 'max' => 64],
             [['kind'], 'string', 'max' => 20],
-            [['kind'], 'in', 'range' => ['success', 'tool_error', 'internal_error']],
+            [['kind'], 'in', 'range' => ['success', 'tool_error', 'internal_error', 'rate_limited']],
             [['transport'], 'string', 'max' => 10],
             [['requestId', 'clientName', 'errorClass'], 'string', 'max' => 255],
             [['errorMessage'], 'string', 'max' => 1000],
             [['sessionId'], 'string', 'max' => 64],
-            [['durationMs', 'userId', 'tokenId'], 'integer'],
+            [['durationMs', 'userId', 'tokenId', 'rateLimitRemaining'], 'integer'],
             [['argsRedacted', 'responseExcerpt'], 'string'],
         ];
     }

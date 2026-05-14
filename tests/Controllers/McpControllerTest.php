@@ -189,6 +189,8 @@ beforeEach(function() {
     $settings = Plugin::getInstance()->getSettings();
     $this->originalHttpEnabled = $settings->httpEnabled;
     $this->originalAllowedOrigins = $settings->allowedOrigins;
+    $this->originalRateLimitBurst = $settings->rateLimitBurst;
+    $this->originalRateLimitPerSecond = $settings->rateLimitPerSecond;
     // Enable for the majority of cases; the disabled-flag test flips
     // it back off explicitly.
     $settings->httpEnabled = true;
@@ -206,12 +208,20 @@ beforeEach(function() {
     $this->bearerToken = $issued['token'];
     $this->bearerTokenId = (int) $issued['model']->id;
     $this->bearerHeader = 'Bearer ' . $this->bearerToken;
+
+    // Start every test from a known-clean bucket for the admin user
+    // so a chatty sibling test doesn't deplete the bucket and trip
+    // the 429 path under a happy-path assertion.
+    Plugin::getInstance()->rateLimiter->clear($this->userId);
 });
 
 afterEach(function() {
     $settings = Plugin::getInstance()->getSettings();
     $settings->httpEnabled = $this->originalHttpEnabled;
     $settings->allowedOrigins = $this->originalAllowedOrigins;
+    $settings->rateLimitBurst = $this->originalRateLimitBurst;
+    $settings->rateLimitPerSecond = $this->originalRateLimitPerSecond;
+    Plugin::getInstance()->rateLimiter->clear($this->userId);
     TokenRecord::deleteAll(['like', 'name', '_test_/%', false]);
 
     // Cleanup OAuth fixtures from Gate 7.3 tests too. The clientId
@@ -1114,4 +1124,239 @@ it('a revoked bearer 401s before dispatch — no audit row written', function() 
         ->count();
 
     expect($after)->toBe($before);
+});
+
+// -----------------------------------------------------------------------------
+// Sub-gate 7.6 — per-user rate limit + burst-quota observability
+// -----------------------------------------------------------------------------
+
+it('a successful tools/call writes an audit row with rateLimitRemaining = burst - 1', function() {
+    // Initialize then drive a real tools/call so the audit-log
+    // listener persists a row with the post-consume bucket headroom.
+    $initBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest-rl-success', 'version' => '0'],
+        ],
+    ]);
+    $initController = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $this->bearerHeader,
+    ], $initBody);
+    $initResponse = $initController->runIndex();
+    expect($initResponse->statusCode)->toBe(200);
+    $sessionId = (string) $initResponse->headers->get(Http::HEADER_SESSION_ID);
+
+    $callBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 2,
+        'method' => 'tools/call',
+        'params' => ['name' => 'sections'],
+    ]);
+    $callController = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        Http::HEADER_SESSION_ID => $sessionId,
+        'Authorization' => $this->bearerHeader,
+    ], $callBody);
+    $callResponse = $callController->runIndex();
+    expect($callResponse->statusCode)->toBe(200);
+
+    $row = \craftpulse\cortex\records\Invocation::find()
+        ->where([
+            'toolName' => 'sections',
+            'sessionId' => $sessionId,
+        ])
+        ->orderBy(['id' => SORT_DESC])
+        ->one();
+
+    expect($row)->not->toBeNull();
+    // beforeEach cleared the bucket; init + tools/call consumed two
+    // tokens, so the tools/call row carries burst - 2.
+    $burst = Plugin::getInstance()->getSettings()->rateLimitBurst;
+    expect($row->rateLimitRemaining)->toBe($burst - 2);
+
+    \craftpulse\cortex\records\Invocation::deleteAll(['id' => $row->id]);
+    Plugin::getInstance()->sessions->terminate($sessionId);
+});
+
+it('60 rapid successful calls all succeed; the 61st returns 429 with Retry-After', function() {
+    // Use a small burst here so the test doesn't have to drive 60+
+    // full HTTP cycles. The behaviour is identical for any burst > 0.
+    Plugin::getInstance()->getSettings()->rateLimitBurst = 5;
+    Plugin::getInstance()->getSettings()->rateLimitPerSecond = 1;
+    Plugin::getInstance()->rateLimiter->clear($this->userId);
+
+    // Drive `burst` successful initialize-only calls. Initialize is
+    // the cheapest endpoint that consumes a token; we don't need a
+    // session because each call starts fresh.
+    for ($i = 0; $i < 5; $i++) {
+        $body = (string) json_encode([
+            'jsonrpc' => '2.0',
+            'id' => $i,
+            'method' => 'initialize',
+            'params' => [
+                'protocolVersion' => Server::PROTOCOL_VERSION,
+                'clientInfo' => ['name' => 'pest-rl-burst', 'version' => '0'],
+            ],
+        ]);
+        $controller = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            'Authorization' => $this->bearerHeader,
+        ], $body);
+        $response = $controller->runIndex();
+        expect($response->statusCode)->toBe(200);
+        Plugin::getInstance()->sessions->terminate((string) $response->headers->get(Http::HEADER_SESSION_ID));
+    }
+
+    // The next one over the burst must 429 + Retry-After.
+    $body = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 999,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest-rl-burst', 'version' => '0'],
+        ],
+    ]);
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $this->bearerHeader,
+    ], $body);
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(429);
+    $retryAfter = $response->headers->get('Retry-After');
+    expect($retryAfter)->toBeString()->not->toBeEmpty();
+    expect((int) $retryAfter)->toBeGreaterThanOrEqual(1);
+});
+
+it('a throttled call writes one cortex_invocations row with kind=rate_limited and the right context', function() {
+    // Shrink the bucket so the test drains it cheaply.
+    Plugin::getInstance()->getSettings()->rateLimitBurst = 1;
+    Plugin::getInstance()->getSettings()->rateLimitPerSecond = 1;
+    Plugin::getInstance()->rateLimiter->clear($this->userId);
+
+    // Burn the one available token.
+    $firstBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest-rl-audit', 'version' => '0'],
+        ],
+    ]);
+    $first = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $this->bearerHeader,
+    ], $firstBody);
+    $firstResponse = $first->runIndex();
+    expect($firstResponse->statusCode)->toBe(200);
+    $firstSessionId = (string) $firstResponse->headers->get(Http::HEADER_SESSION_ID);
+
+    // Snapshot the count of rate-limited rows for this user BEFORE
+    // the throttle event so we can assert the throttle write was the
+    // ONLY new rate-limited row.
+    $before = (int) \craftpulse\cortex\records\Invocation::find()
+        ->where(['userId' => $this->userId, 'kind' => 'rate_limited'])
+        ->count();
+
+    // Second call is over the burst — must 429 and write a row.
+    $secondBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 2,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest-rl-audit', 'version' => '0'],
+        ],
+    ]);
+    $second = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $this->bearerHeader,
+    ], $secondBody);
+    $secondResponse = $second->runIndex();
+    expect($secondResponse->statusCode)->toBe(429);
+
+    $after = (int) \craftpulse\cortex\records\Invocation::find()
+        ->where(['userId' => $this->userId, 'kind' => 'rate_limited'])
+        ->count();
+    expect($after)->toBe($before + 1);
+
+    $row = \craftpulse\cortex\records\Invocation::find()
+        ->where(['userId' => $this->userId, 'kind' => 'rate_limited'])
+        ->orderBy(['id' => SORT_DESC])
+        ->one();
+    expect($row)->not->toBeNull();
+    expect($row->kind)->toBe('rate_limited');
+    expect($row->transport)->toBe('http');
+    expect($row->userId)->toBe($this->userId);
+    expect($row->tokenId)->toBe($this->bearerTokenId);
+    expect($row->rateLimitRemaining)->toBe(0);
+    expect($row->errorClass)->toBe(\craftpulse\cortex\exceptions\RateLimitExceededException::class);
+    expect($row->errorMessage)->toBeString()->not->toBeEmpty();
+    expect($row->toolName)->toBe('_rate_limited');
+
+    \craftpulse\cortex\records\Invocation::deleteAll(['id' => $row->id]);
+    Plugin::getInstance()->sessions->terminate($firstSessionId);
+});
+
+it('a throttled call does NOT dispatch — no tool-execution audit row, only the throttle row', function() {
+    Plugin::getInstance()->getSettings()->rateLimitBurst = 1;
+    Plugin::getInstance()->getSettings()->rateLimitPerSecond = 1;
+    Plugin::getInstance()->rateLimiter->clear($this->userId);
+
+    // Set up a session by initializing (consumes the only token).
+    $initBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest-rl-no-dispatch', 'version' => '0'],
+        ],
+    ]);
+    $initController = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $this->bearerHeader,
+    ], $initBody);
+    $initResponse = $initController->runIndex();
+    expect($initResponse->statusCode)->toBe(200);
+    $sessionId = (string) $initResponse->headers->get(Http::HEADER_SESSION_ID);
+
+    $beforeSections = (int) \craftpulse\cortex\records\Invocation::find()
+        ->where(['toolName' => 'sections', 'sessionId' => $sessionId])
+        ->count();
+
+    // Now fire a tools/call that would normally dispatch — but the
+    // bucket is empty, so the controller must short-circuit at 429.
+    $callBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 2,
+        'method' => 'tools/call',
+        'params' => ['name' => 'sections'],
+    ]);
+    $callController = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        Http::HEADER_SESSION_ID => $sessionId,
+        'Authorization' => $this->bearerHeader,
+    ], $callBody);
+    $callResponse = $callController->runIndex();
+    expect($callResponse->statusCode)->toBe(429);
+
+    // No `sections` row was written — the throttle blocked dispatch.
+    $afterSections = (int) \craftpulse\cortex\records\Invocation::find()
+        ->where(['toolName' => 'sections', 'sessionId' => $sessionId])
+        ->count();
+    expect($afterSections)->toBe($beforeSections);
+
+    // Cleanup: drop the throttle row + terminate the session.
+    \craftpulse\cortex\records\Invocation::deleteAll([
+        'userId' => $this->userId,
+        'kind' => 'rate_limited',
+    ]);
+    Plugin::getInstance()->sessions->terminate($sessionId);
 });

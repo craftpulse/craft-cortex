@@ -179,6 +179,28 @@ class Settings extends Model
      */
     public ?int $auditRetentionDays = null;
 
+    /**
+     * @var int Burst capacity for the per-user HTTP rate limiter — the
+     *          maximum tokens a single Craft user's bucket can hold at
+     *          any one time. Each authenticated POST to
+     *          `/cortex/mcp` consumes one token; refills accrue at
+     *          `$rateLimitPerSecond` tokens per second. Default 60
+     *          covers a multi-tool LLM conversation turn without
+     *          throttling interactive use, while bounding a runaway
+     *          agent loop to ~60 + sustained * elapsed.
+     */
+    public int $rateLimitBurst = 60;
+
+    /**
+     * @var int Sustained refill rate (tokens per second) for the per-
+     *          user HTTP rate limiter. The bucket refills linearly at
+     *          this rate, clamped to `$rateLimitBurst`. Default 5/sec
+     *          tightens the steady-state pace a single caller can
+     *          drive against the HTTP transport without throttling
+     *          normal interactive use.
+     */
+    public int $rateLimitPerSecond = 5;
+
     // Protected Methods
     // =========================================================================
 
@@ -200,6 +222,8 @@ class Settings extends Model
         $rules[] = [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl'], 'string', 'min' => 2];
         $rules[] = [['auditResponseExcerptBytes'], 'integer', 'min' => 1, 'max' => 65535];
         $rules[] = [['auditRetentionDays'], 'integer', 'min' => 1];
+        $rules[] = [['rateLimitBurst'], 'integer', 'min' => 1, 'max' => 10000];
+        $rules[] = [['rateLimitPerSecond'], 'integer', 'min' => 1, 'max' => 1000];
         return $rules;
     }
 }

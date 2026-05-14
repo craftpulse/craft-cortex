@@ -115,6 +115,20 @@ class Server
     private ?string $_sessionId = null;
 
     /**
+     * @var int|null Post-consume rate-limit bucket headroom for the
+     *               authenticated user, threaded onto every invocation
+     *               context so audit log lines carry the throttle
+     *               pressure each call landed at. Null on stdio (no
+     *               rate-limiting surface) and on HTTP requests that
+     *               pre-date the controller's `RateLimiter::consume()`
+     *               call (in practice never — the controller always
+     *               consumes before `actionIndex()` dispatches, but
+     *               the slot stays nullable for forward compatibility
+     *               with future paths that bypass the limiter).
+     */
+    private ?int $_rateLimitRemaining = null;
+
+    /**
      * @var User|null Memoized result of resolving `$_userId` through
      *                `Users::getUserById()`. Lazy — populated on the
      *                first call to `_resolveUser()` for the request,
@@ -221,6 +235,22 @@ class Server
     public function setSessionId(?string $sessionId): void
     {
         $this->_sessionId = $sessionId;
+    }
+
+    /**
+     * Bind the post-consume rate-limit headroom for this dispatcher's
+     * lifetime. Parallel to `setUserId()` / `setTokenId()` /
+     * `setSessionId()`. Called by `McpController::beforeAction()`
+     * after `RateLimiter::consume()` returns a non-throwing
+     * `RateLimitStatus`. Threaded onto every invocation context so
+     * the Gate 7.6 audit log carries throttle pressure per row.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function setRateLimitRemaining(?int $value): void
+    {
+        $this->_rateLimitRemaining = $value;
     }
 
     /**
@@ -572,6 +602,7 @@ class Server
             clientName: $this->_clientName,
             tokenId: $this->_tokenId,
             sessionId: $this->_sessionId,
+            rateLimitRemaining: $this->_rateLimitRemaining,
         );
     }
 

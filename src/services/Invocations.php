@@ -100,6 +100,7 @@ class Invocations extends Component
             $record->errorMessage = $this->_stringOrNull($entry['error_message'] ?? null);
             $record->tokenId = $this->_intOrNull($entry['token_id'] ?? null);
             $record->sessionId = $this->_stringOrNull($entry['session_id'] ?? null);
+            $record->rateLimitRemaining = $this->_intOrNull($entry['rate_limit_remaining'] ?? null);
 
             if (!$record->save()) {
                 Craft::error(

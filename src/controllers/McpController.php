@@ -5,9 +5,12 @@ namespace craftpulse\cortex\controllers;
 use Craft;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
+use craftpulse\cortex\exceptions\RateLimitExceededException;
 use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\mcp\transport\Http;
 use craftpulse\cortex\Plugin;
+use craftpulse\cortex\tools\support\InvocationLogger;
+use craftpulse\cortex\values\RateLimitStatus;
 use yii\web\Response;
 
 /**
@@ -49,7 +52,10 @@ use yii\web\Response;
  *   4. `MCP-Protocol-Version` header — 400 if missing or unrecognised.
  *   5. `Authorization: Bearer <token>` — 401 with `WWW-Authenticate`
  *      if missing / malformed / unknown.
- *   6. `Mcp-Session-Id` header — required on every POST except
+ *   6. Per-user rate limit — 429 + `Retry-After` when the token bucket
+ *      is exhausted (Gate 7.6). Burst 60 / sustained 5/sec by default.
+ *      DELETE bypasses; consume only runs on the POST dispatch path.
+ *   7. `Mcp-Session-Id` header — required on every POST except
  *      `initialize`. Missing → 400; unknown / terminated → 404 per
  *      the spec.
  *
@@ -112,19 +118,32 @@ class McpController extends Controller
      */
     private ?int $_authenticatedTokenId = null;
 
+    /**
+     * @var int|null Post-consume rate-limit headroom for the request,
+     *               captured in `beforeAction()` after
+     *               `RateLimiter::consume()` succeeds. Threaded onto
+     *               the dispatcher in `_handlePost()` so every audit
+     *               row carries the bucket pressure for the call.
+     *               Null on DELETE (no consume runs), and on the rare
+     *               path where `beforeAction()` short-circuits before
+     *               reaching the consume.
+     */
+    private ?int $_rateLimitRemaining = null;
+
     // Public Methods
     // =========================================================================
 
     /**
      * @inheritdoc
      *
-     * Five gates run before the action body sees the request:
+     * Six gates run before the action body sees the request:
      *
      *   1. `parent::beforeAction()` — Yii's standard pipeline.
      *   2. `httpEnabled` 503 check — kill switch.
      *   3. `Origin` allowlist — DNS-rebinding defense.
      *   4. `MCP-Protocol-Version` header.
      *   5. `Authorization: Bearer` lookup against `cortex_tokens`.
+     *   6. Per-user rate limit consume (Gate 7.6).
      *
      * DELETE skips the bearer check because it carries no JSON-RPC
      * payload and only references an `Mcp-Session-Id` for
@@ -154,7 +173,8 @@ class McpController extends Controller
         //   4. Method check (GET = 405, non-POST = 405).
         //   5. MCP-Protocol-Version header.
         //   6. Authorization: Bearer lookup + identity binding.
-        //   7. parent::beforeAction() — now sees an authenticated user.
+        //   7. Per-user rate limit consume (Gate 7.6).
+        //   8. parent::beforeAction() — now sees an authenticated user.
 
         $settings = Plugin::getInstance()->getSettings();
 
@@ -243,6 +263,24 @@ class McpController extends Controller
             $user = Craft::$app->getUsers()->getUserById($resolved['userId']);
             if ($user !== null) {
                 Craft::$app->getUser()->setIdentity($user);
+            }
+        }
+
+        // Gate 5b — per-user rate limit. One token per authenticated
+        // POST dispatch. DELETE already returned above, so the consume
+        // only runs on the dispatch path. The HTTP rate limit is the
+        // backstop against runaway agents that loop `tools/call`
+        // faster than the install can serve — burst 60, sustained
+        // 5/sec by default. On exhaustion, write a `kind=rate_limited`
+        // audit row and 429 the caller with `Retry-After`.
+        if ($this->_authenticatedUserId !== null) {
+            try {
+                $status = Plugin::getInstance()->rateLimiter->consume($this->_authenticatedUserId);
+                $this->_rateLimitRemaining = $status->remaining;
+            } catch (RateLimitExceededException $e) {
+                $this->_writeRateLimitedAuditRow($e->status);
+                $this->_rateLimited($e->status);
+                return false;
             }
         }
 
@@ -464,6 +502,10 @@ class McpController extends Controller
         // for the initialize call (session id is minted in the
         // response). Set after dispatch produces the new id below.
         $server->setSessionId($sessionId);
+        // Thread the post-consume rate-limit headroom captured in
+        // `beforeAction()` onto the dispatcher so every audit row
+        // carries the bucket pressure the call landed at.
+        $server->setRateLimitRemaining($this->_rateLimitRemaining);
 
         if ($isInitialize) {
             // Initialize starts a fresh session. Any previously-issued
@@ -681,5 +723,68 @@ class McpController extends Controller
         $this->response->setStatusCode(200);
         $this->response->content = $transport->encodeResponse($envelope);
         return $this->response;
+    }
+
+    /**
+     * Write a 429 with the canonical `Retry-After: <seconds>` header
+     * and a JSON body describing the rate-limit exhaustion. Parallel
+     * to `_unauthorized()` but for the Gate 7.6 rate-limit reject
+     * path. The status's `retryAfter` field carries the integer
+     * second count the caller should wait — stamped onto the header
+     * directly so well-behaved clients self-throttle.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _rateLimited(RateLimitStatus $status): Response
+    {
+        $this->response->headers->set('Retry-After', (string) $status->retryAfter);
+        return $this->_status(429, sprintf(
+            'Rate limit exceeded; retry after %ds.',
+            $status->retryAfter,
+        ));
+    }
+
+    /**
+     * Write a `kind=rate_limited` row to `cortex_invocations` so the
+     * audit dashboard captures the throttle event with the same
+     * forensic shape every successful invocation uses. The row's
+     * `toolName` is a sentinel (`_rate_limited`) because the request
+     * never reaches the dispatcher — the body might not be valid
+     * JSON, the tool name might not even be present, so the throttle
+     * never depends on body parsing for correctness. Operators
+     * filtering the audit table by `kind=rate_limited` pick up the
+     * event regardless.
+     *
+     * The write goes through `Invocations::record()` so the soft-
+     * write contract applies — a DB failure inside the audit path
+     * cannot break the throttle response. Failures log to the
+     * `cortex.audit` category and surface to operators tailing
+     * the file log.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _writeRateLimitedAuditRow(RateLimitStatus $status): void
+    {
+        $sessionIdHeader = $this->request->getHeaders()->get(Http::HEADER_SESSION_ID);
+        $sessionId = is_string($sessionIdHeader) && $sessionIdHeader !== '' ? $sessionIdHeader : null;
+
+        Plugin::getInstance()->invocations->record([
+            'tool' => '_rate_limited',
+            'kind' => InvocationLogger::KIND_RATE_LIMITED,
+            'duration_ms' => 0,
+            'transport' => Server::TRANSPORT_HTTP,
+            'request_id' => null,
+            'user' => $this->_authenticatedUserId,
+            'client' => null,
+            'token_id' => $this->_authenticatedTokenId,
+            'session_id' => $sessionId,
+            'rate_limit_remaining' => 0,
+            'args' => null,
+            'response_excerpt' => null,
+            'error_class' => RateLimitExceededException::class,
+            'error_message' => sprintf('Rate limit exceeded; retry after %ds', $status->retryAfter),
+        ]);
     }
 }
