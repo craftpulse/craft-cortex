@@ -15,6 +15,7 @@ use craftpulse\cortex\services\Allowlist;
 use craftpulse\cortex\services\Invocations;
 use craftpulse\cortex\services\Oauth;
 use craftpulse\cortex\services\Prompts;
+use craftpulse\cortex\services\RateLimiter;
 use craftpulse\cortex\services\Resources;
 use craftpulse\cortex\services\Sessions;
 use craftpulse\cortex\services\Tokens;
@@ -47,6 +48,7 @@ use yii\base\Event;
  * @property-read Invocations $invocations
  * @property-read Oauth $oauth
  * @property-read Prompts $prompts
+ * @property-read RateLimiter $rateLimiter
  * @property-read Resources $resources
  * @property-read Sessions $sessions
  * @property-read Tokens $tokens
@@ -89,6 +91,7 @@ class Plugin extends BasePlugin
                 'invocations' => ['class' => Invocations::class],
                 'oauth' => ['class' => Oauth::class],
                 'prompts' => ['class' => Prompts::class],
+                'rateLimiter' => ['class' => RateLimiter::class],
                 'resources' => ['class' => Resources::class],
                 'sessions' => ['class' => Sessions::class],
                 'tokens' => ['class' => Tokens::class],

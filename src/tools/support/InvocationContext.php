@@ -41,6 +41,13 @@ use craftpulse\cortex\mcp\Server;
  *     the same call). Threaded into `cortex_invocations.sessionId`
  *     so the audit dashboard can group every invocation in the same
  *     HTTP session.
+ *   - `rateLimitRemaining` — post-consume bucket headroom for this
+ *     user at the moment the request landed. Set by the HTTP
+ *     controller after `RateLimiter::consume()` succeeds; null on
+ *     stdio (no rate-limiting surface) and on throttle-write paths
+ *     where the exhaustion path inserts `0` directly. Lets the
+ *     audit dashboard render throttle-pressure trendlines without a
+ *     second cache hit.
  *
  * Locked because third-party log consumers (Pro audit dashboard,
  * external SIEM forwarders) will pin against the field names. Adding
@@ -94,6 +101,10 @@ final class InvocationContext
      * @param string|null           $sessionId         Value of the `Mcp-Session-Id`
      *                                                 request header. Null on stdio
      *                                                 and on the `initialize` call.
+     * @param int|null              $rateLimitRemaining Post-consume rate-limit
+     *                                                 bucket headroom for this
+     *                                                 user. Null on stdio. Zero
+     *                                                 on throttle-write paths.
      * @param CancellationToken|null $cancellationToken Cooperative cancellation
      *                                                 signal. Defaults to a fresh,
      *                                                 unfired token so non-streaming
@@ -110,6 +121,7 @@ final class InvocationContext
         public readonly ?string $clientName = null,
         public readonly ?int $tokenId = null,
         public readonly ?string $sessionId = null,
+        public readonly ?int $rateLimitRemaining = null,
         ?CancellationToken $cancellationToken = null,
     ) {
         $this->_cancellationToken = $cancellationToken ?? new CancellationToken();

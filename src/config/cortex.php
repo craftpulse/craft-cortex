@@ -203,6 +203,34 @@ return [
          */
         // 'auditRetentionDays' => null,
 
+        // ---------------------------------------------------------------------
+        // Rate limit (Gate 7.6)
+        // ---------------------------------------------------------------------
+
+        /**
+         * Burst capacity for the per-user HTTP rate limiter — the
+         * maximum tokens a single Craft user's bucket can hold. Each
+         * authenticated POST to `/cortex/mcp` consumes one token;
+         * refills accrue at `rateLimitPerSecond` per second.
+         * Default 60 covers a multi-tool LLM conversation turn without
+         * throttling interactive use, while bounding a runaway agent
+         * to ~60 + sustained * elapsed total calls per user.
+         *
+         * @var int
+         */
+        // 'rateLimitBurst' => 60,
+
+        /**
+         * Sustained refill rate (tokens per second) for the per-user
+         * HTTP rate limiter. The bucket refills linearly at this rate,
+         * clamped to `rateLimitBurst`. Default 5/sec tightens the
+         * steady-state pace a single caller can drive against the HTTP
+         * transport without throttling normal interactive use.
+         *
+         * @var int
+         */
+        // 'rateLimitPerSecond' => 5,
+
     ],
 
     // 'production' => [
