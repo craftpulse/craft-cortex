@@ -246,6 +246,19 @@ it('lookupAccessToken() returns null on a syntactically broken JWT', function() 
     expect($this->service->lookupAccessToken('not-a-jwt'))->toBeNull();
 });
 
+it('lookupAccessToken() returns null for a token whose nbf is in the future', function() {
+    $client = _cortex_oauth_mint_client();
+    $jwt = _cortex_oauth_mint_jwt(
+        clientId: $client->clientId,
+        audience: 'https://test-audience.invalid/nbf',
+        userId: 1,
+        expiresIn: 7200,
+        nbfOffset: 3600, // not-before = now + 1 hour
+    );
+
+    expect($this->service->lookupAccessToken($jwt))->toBeNull();
+});
+
 // -----------------------------------------------------------------------------
 // revokeToken() — RFC 7009
 // -----------------------------------------------------------------------------
@@ -296,8 +309,13 @@ function _cortex_oauth_mint_client(): OauthClientRecord
  * Mint a JWT carrying the given audience + user id. Persists a
  * matching access-token row so `isAccessTokenRevoked()` sees a
  * non-revoked match.
+ *
+ * @param int $nbfOffset Seconds added to `now` for the `nbf` claim.
+ *                       Default 0 (token immediately usable). Pass
+ *                       a positive value to produce a future-`nbf`
+ *                       token that should be rejected at validation.
  */
-function _cortex_oauth_mint_jwt(string $clientId, string $audience, int $userId, int $expiresIn = 3600): string
+function _cortex_oauth_mint_jwt(string $clientId, string $audience, int $userId, int $expiresIn = 3600, int $nbfOffset = 0): string
 {
     $clientEntity = new ClientEntity();
     $clientEntity->setIdentifier($clientId);
@@ -315,6 +333,34 @@ function _cortex_oauth_mint_jwt(string $clientId, string $audience, int $userId,
         'file://' . Plugin::getInstance()->oauth->getPrivateKeyPath(),
     ));
 
+    // When a future nbf is requested, build the JWT directly via
+    // lcobucci's builder so we can control the `nbf` claim.
+    // AccessTokenEntity::toString() always stamps nbf = now, which is
+    // correct at issuance — the nbf test needs a non-default nbf.
+    if ($nbfOffset !== 0) {
+        $privateKeyContent = file_get_contents(Plugin::getInstance()->oauth->getPrivateKeyPath());
+        $signer = new \Lcobucci\JWT\Signer\Rsa\Sha256();
+        $config = \Lcobucci\JWT\Configuration::forAsymmetricSigner(
+            $signer,
+            \Lcobucci\JWT\Signer\Key\InMemory::plainText($privateKeyContent),
+            \Lcobucci\JWT\Signer\Key\InMemory::plainText('not-used'),
+        );
+        $now = new \DateTimeImmutable();
+        $token = $config->builder()
+            ->permittedFor($audience)
+            ->identifiedBy($entity->getIdentifier())
+            ->issuedAt($now)
+            ->canOnlyBeUsedAfter($now->modify('+' . $nbfOffset . ' seconds'))
+            ->expiresAt($now->modify('+' . $expiresIn . ' seconds'))
+            ->relatedTo((string) $userId)
+            ->withClaim('scopes', [])
+            ->withClaim('cid', $clientId)
+            ->getToken($signer, \Lcobucci\JWT\Signer\Key\InMemory::plainText($privateKeyContent));
+        $jwtString = $token->toString();
+    } else {
+        $jwtString = $entity->toString();
+    }
+
     $record = new OauthTokenRecord();
     $record->tokenType = 'access';
     $record->tokenHash = hash('sha256', $entity->getIdentifier());
@@ -324,7 +370,7 @@ function _cortex_oauth_mint_jwt(string $clientId, string $audience, int $userId,
     $record->expiresAt = date('Y-m-d H:i:s', time() + max($expiresIn, 1));
     $record->save();
 
-    return $entity->toString();
+    return $jwtString;
 }
 
 /**
