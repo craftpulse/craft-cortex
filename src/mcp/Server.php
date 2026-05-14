@@ -3,6 +3,7 @@
 namespace craftpulse\cortex\mcp;
 
 use Craft;
+use craft\elements\User;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\support\InvocationContext;
@@ -87,6 +88,26 @@ class Server
      *               per-request Craft identity).
      */
     private ?int $_userId = null;
+
+    /**
+     * @var User|null Memoized result of resolving `$_userId` through
+     *                `Users::getUserById()`. Lazy — populated on the
+     *                first call to `_resolveUser()` for the request,
+     *                then re-used across `tools/list` and every
+     *                `tools/call` so the per-user filter never re-
+     *                queries the DB more than once. Cleared via
+     *                `$_userResolved` to distinguish "not yet
+     *                resolved" from "resolved to null".
+     */
+    private ?User $_user = null;
+
+    /**
+     * @var bool Whether `_resolveUser()` has been called yet for this
+     *           dispatcher instance. Separate slot so the memoization
+     *           treats `null` (stdio / unauthenticated) as a valid
+     *           cached result rather than re-resolving on every call.
+     */
+    private bool $_userResolved = false;
 
     // Public Methods
     // =========================================================================
@@ -245,6 +266,15 @@ class Server
     }
 
     /**
+     * Build the `tools/list` payload. On the HTTP transport with a
+     * resolved user, route through `Tools::asListPayloadFor($user)` so
+     * each tool's `filterFor()` / `inputSchemaFor()` hooks fire — Pro
+     * tools without the relevant permission get omitted, mode-gated
+     * tools get a schema-rewritten enum. On stdio (or HTTP with no
+     * resolved user — pre-auth or anonymous-allowed paths) the user
+     * resolves to `null` and the call goes to `asListPayloadFor(null)`,
+     * which by locked invariant equals the legacy `asListPayload()`.
+     *
      * @return array<string,mixed>
      *
      * @author Craftpulse
@@ -253,7 +283,7 @@ class Server
     private function _toolsList(): array
     {
         return [
-            'tools' => Plugin::getInstance()->tools->asListPayload(),
+            'tools' => Plugin::getInstance()->tools->asListPayloadFor($this->_resolveUser()),
         ];
     }
 
@@ -392,8 +422,14 @@ class Server
             return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: tools/call requires `name` (string)');
         }
 
-        $tool = Plugin::getInstance()->tools->getByName($name);
+        $tool = Plugin::getInstance()->tools->getByNameFor($name, $this->_resolveUser());
         if ($tool === null) {
+            // Indistinguishable from "tool not registered" on the wire —
+            // a tool the user lacks permission for fails closed as
+            // "Unknown tool", same JSON-RPC error code, same message
+            // shape. Security boundary: `tools/list` filtering hides
+            // the existence of the tool; `tools/call` filtering refuses
+            // the call.
             return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, "Unknown tool: {$name}");
         }
 
@@ -453,6 +489,37 @@ class Server
             userId: $this->_userId,
             clientName: $this->_clientName,
         );
+    }
+
+    /**
+     * Resolve the bound `$_userId` to a `User` element, or `null` when
+     * the dispatcher has no bound user (stdio, or HTTP requests that
+     * arrive before / outside the bearer-token lookup). Memoized per
+     * dispatcher instance so `tools/list` followed by N `tools/call`
+     * requests within the same HTTP session execute one
+     * `getUserById()` at most.
+     *
+     * The `$_userResolved` flag distinguishes "not yet resolved" from
+     * "resolved to null" — a missing/disabled user id should not
+     * trigger a fresh lookup on every dispatched method.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _resolveUser(): ?User
+    {
+        if ($this->_userResolved) {
+            return $this->_user;
+        }
+        $this->_userResolved = true;
+
+        if ($this->_userId === null) {
+            $this->_user = null;
+            return null;
+        }
+
+        $this->_user = Craft::$app->getUsers()->getUserById($this->_userId);
+        return $this->_user;
     }
 
     /**
