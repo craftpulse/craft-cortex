@@ -10,6 +10,8 @@ use craftpulse\cortex\attributes\IsDestructive;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\IdempotencyTrait;
+use craftpulse\cortex\tools\PermissionedToolTrait;
 use craftpulse\cortex\tools\ProToolTrait;
 use craftpulse\cortex\tools\support\ElementSerializer;
 use craftpulse\cortex\tools\support\Schema;
@@ -67,41 +69,20 @@ use craftpulse\cortex\tools\ToolException;
 #[Title('Category — create / update / delete')]
 class Category extends AbstractTool
 {
+    use IdempotencyTrait;
+    use PermissionedToolTrait;
     use ProToolTrait;
 
     // Constants
     // =========================================================================
 
     /**
-     * JSON-RPC error code emitted on permission denial. Matches the
-     * shape every Gate 8 Pro tool returns per locked decision 3 of
-     * `docs/plans/gate-8.md`.
-     *
-     * @since 5.0.0
-     */
-    public const ERROR_PERMISSION_DENIED = -32002;
-
-    /**
      * Idempotency cache key prefix. Mirrors the `cortex:{toolName}:idem:`
-     * shape from `Entry`.
+     * shape from `Entry`. Consumed by `IdempotencyTrait`.
      *
      * @since 5.0.0
      */
     public const IDEMPOTENCY_CACHE_PREFIX = 'cortex:category:idem:';
-
-    /**
-     * TTL applied to cached idempotency envelopes. 24 hours.
-     *
-     * @since 5.0.0
-     */
-    public const IDEMPOTENCY_TTL = 86400;
-
-    /**
-     * Max length for `idempotencyKey`.
-     *
-     * @since 5.0.0
-     */
-    public const IDEMPOTENCY_KEY_MAX_LENGTH = 64;
 
     // Public Methods
     // =========================================================================
@@ -342,6 +323,29 @@ class Category extends AbstractTool
         };
     }
 
+    /**
+     * Override `PermissionedToolTrait::_buildPermissionDeniedMessage()`
+     * to emit the rich category-specific format existing tests assert
+     * on (mode + group UID + the missing permission string).
+     *
+     * @param array<string,mixed> $arguments
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
+    {
+        $mode = $this->_mode($arguments) ?? '?';
+        $groupUid = $this->_resolveGroupUid($arguments) ?? '?';
+
+        return sprintf(
+            'permission denied — mode `%s` on group `%s` requires `%s`.',
+            $mode,
+            $groupUid,
+            $missingPermission,
+        );
+    }
+
     // Private Methods
     // =========================================================================
 
@@ -370,7 +374,7 @@ class Category extends AbstractTool
             throw new ToolException('category: create requires one of groupId / groupUid / groupHandle.');
         }
 
-        $this->_assertPermission('create', $group->uid);
+        $this->_assertPermission($arguments + ['groupUid' => $group->uid]);
 
         $element = new CategoryElement();
         $element->groupId = (int) $group->id;
@@ -425,7 +429,7 @@ class Category extends AbstractTool
         $element = $this->_resolveCategory($arguments);
         $group = $element->getGroup();
 
-        $this->_assertPermission('update', $group->uid);
+        $this->_assertPermission($arguments + ['groupUid' => $group->uid]);
 
         $this->_applyAttributes($element, $arguments, isCreate: false);
         $this->_applyFields($element, $arguments);
@@ -468,7 +472,7 @@ class Category extends AbstractTool
         $element = $this->_resolveCategory($arguments);
         $group = $element->getGroup();
 
-        $this->_assertPermission('delete', $group->uid);
+        $this->_assertPermission($arguments + ['groupUid' => $group->uid]);
 
         $hardDelete = (bool) ($arguments['hardDelete'] ?? false);
 
@@ -487,47 +491,6 @@ class Category extends AbstractTool
         ];
     }
 
-    /**
-     * Permission re-check on the resolved group UID. Throws the Gate 8
-     * standard JSON-RPC `-32002` envelope on miss. Admins bypass —
-     * Craft's `User::can()` already returns true for admins, but the
-     * explicit branch is defensive.
-     *
-     * @throws ToolException
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _assertPermission(string $mode, ?string $groupUid): void
-    {
-        if ($groupUid === null) {
-            throw new ToolException('category: cannot resolve group UID for permission check.');
-        }
-
-        $user = Craft::$app->getUser()->getIdentity();
-        if ($user === null) {
-            // stdio path — trusted local user. Skip the check.
-            return;
-        }
-
-        if ($user->admin) {
-            return;
-        }
-
-        $permission = match ($mode) {
-            'delete' => "deleteCategories:{$groupUid}",
-            default => "saveCategories:{$groupUid}",
-        };
-
-        if (!$user->can($permission)) {
-            throw new ToolException(sprintf(
-                'permission denied — mode `%s` on group `%s` requires `%s`.',
-                $mode,
-                $groupUid,
-                $permission,
-            ));
-        }
-    }
 
     /**
      * Resolve the target group by groupId / groupUid / groupHandle in
@@ -651,58 +614,6 @@ class Category extends AbstractTool
     }
 
     /**
-     * Resolve the target site id from siteId / siteHandle, falling back
-     * to the primary site.
-     *
-     * @param array<string,mixed> $arguments
-     * @throws ToolException
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _resolveSiteId(array $arguments): int
-    {
-        $siteId = $this->_resolveOptionalSiteId($arguments);
-        if ($siteId !== null) {
-            return $siteId;
-        }
-        return (int) Craft::$app->getSites()->getPrimarySite()->id;
-    }
-
-    /**
-     * Resolve the target site id from siteId / siteHandle, returning
-     * null when neither is supplied.
-     *
-     * @param array<string,mixed> $arguments
-     * @throws ToolException
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _resolveOptionalSiteId(array $arguments): ?int
-    {
-        $siteId = $arguments['siteId'] ?? null;
-        if (is_int($siteId) || (is_string($siteId) && ctype_digit($siteId))) {
-            $site = Craft::$app->getSites()->getSiteById((int) $siteId);
-            if ($site === null) {
-                throw new ToolException("category: site id={$siteId} not found.");
-            }
-            return (int) $site->id;
-        }
-
-        $siteHandle = $arguments['siteHandle'] ?? null;
-        if (is_string($siteHandle) && $siteHandle !== '') {
-            $site = Craft::$app->getSites()->getSiteByHandle($siteHandle);
-            if ($site === null) {
-                throw new ToolException("category: site handle=`{$siteHandle}` not found.");
-            }
-            return (int) $site->id;
-        }
-
-        return null;
-    }
-
-    /**
      * Apply scalar / parent attributes to the element. `setFieldValues()`
      * handles the custom-field surface separately in `_applyFields()`.
      *
@@ -733,23 +644,6 @@ class Category extends AbstractTool
                 $element->setParentId((int) $parentId);
             }
         }
-    }
-
-    /**
-     * Forward `fields: {handle: value}` to Craft's setFieldValues().
-     *
-     * @param array<string,mixed> $arguments
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _applyFields(CategoryElement $element, array $arguments): void
-    {
-        $fields = $arguments['fields'] ?? null;
-        if (!is_array($fields) || $fields === []) {
-            return;
-        }
-        $element->setFieldValues($fields);
     }
 
     /**
@@ -814,103 +708,5 @@ class Category extends AbstractTool
             'mode' => $mode,
             'category' => $serializer->serializeElement($element),
         ];
-    }
-
-    /**
-     * Validation envelope shape returned when `saveElement(runValidation:
-     * true)` returns false.
-     *
-     * @return array<string,mixed>
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _validationEnvelope(CategoryElement $element, string $mode): array
-    {
-        return [
-            'success' => false,
-            'mode' => $mode,
-            'id' => $element->id !== null ? (int) $element->id : null,
-            'uid' => $element->uid,
-            'errors' => $element->getErrors(),
-        ];
-    }
-
-    /**
-     * Look up a cached idempotency envelope for the
-     * `{userId, idempotencyKey}` pair.
-     *
-     * @param array<string,mixed> $arguments
-     * @return array<string,mixed>|null
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _idempotencyCacheHit(array $arguments): ?array
-    {
-        $key = $this->_idempotencyCacheKey($arguments);
-        if ($key === null) {
-            return null;
-        }
-
-        $cache = Craft::$app->getCache();
-        if ($cache === null) {
-            return null;
-        }
-        $cached = $cache->get($key);
-        if (!is_array($cached)) {
-            return null;
-        }
-
-        /** @var array<string,mixed> $cached */
-        return $cached;
-    }
-
-    /**
-     * Cache the success envelope under the `{userId, idempotencyKey}`
-     * pair with the standard 24h TTL.
-     *
-     * @param array<string,mixed> $arguments
-     * @param array<string,mixed> $envelope
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _cacheIdempotencyEnvelope(array $arguments, array $envelope): void
-    {
-        $key = $this->_idempotencyCacheKey($arguments);
-        if ($key === null) {
-            return;
-        }
-        $cache = Craft::$app->getCache();
-        if ($cache === null) {
-            return;
-        }
-        $cache->set($key, $envelope, self::IDEMPOTENCY_TTL);
-    }
-
-    /**
-     * Build the cache key for an idempotent request, scoping by the
-     * current user id. Returns null when no idempotencyKey was supplied
-     * or when the user isn't resolved (stdio path).
-     *
-     * @param array<string,mixed> $arguments
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _idempotencyCacheKey(array $arguments): ?string
-    {
-        $idempotencyKey = $arguments['idempotencyKey'] ?? null;
-        if (!is_string($idempotencyKey) || $idempotencyKey === '') {
-            return null;
-        }
-
-        $user = Craft::$app->getUser()->getIdentity();
-        if (!$user instanceof User) {
-            return null;
-        }
-
-        return self::IDEMPOTENCY_CACHE_PREFIX . $user->id . ':' . $idempotencyKey;
     }
 }

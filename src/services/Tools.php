@@ -4,6 +4,7 @@ namespace craftpulse\cortex\services;
 
 use craft\elements\User;
 use craftpulse\cortex\events\RegisterToolsEvent;
+use craftpulse\cortex\tools\content\Address;
 use craftpulse\cortex\tools\content\Assets;
 use craftpulse\cortex\tools\content\Categories;
 use craftpulse\cortex\tools\content\Category;
@@ -320,11 +321,13 @@ class Tools extends Component
             // Content writing (Pro). `Entry::shouldRegister()` returns
             // false on Free installs so the registration loop skips it
             // before the instance is exposed to `tools/list`. Same for
-            // the Gate 8.3 siblings (`Category`, `Tag`, `GlobalSet`).
+            // the Gate 8.3 siblings (`Category`, `Tag`, `GlobalSet`) and
+            // the Gate 8.4 sibling (`Address`).
             new Entry(),
             new Category(),
             new Tag(),
             new GlobalSet(),
+            new Address(),
 
             // System & diagnostics.
             new SystemInfo(),

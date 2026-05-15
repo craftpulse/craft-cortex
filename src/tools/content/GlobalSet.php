@@ -9,6 +9,8 @@ use craftpulse\cortex\attributes\IsDestructive;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\IdempotencyTrait;
+use craftpulse\cortex\tools\PermissionedToolTrait;
 use craftpulse\cortex\tools\ProToolTrait;
 use craftpulse\cortex\tools\support\ElementSerializer;
 use craftpulse\cortex\tools\support\Schema;
@@ -53,38 +55,19 @@ use craftpulse\cortex\tools\ToolException;
 #[Title('Global Set — update field values')]
 class GlobalSet extends AbstractTool
 {
+    use IdempotencyTrait;
+    use PermissionedToolTrait;
     use ProToolTrait;
 
     // Constants
     // =========================================================================
 
     /**
-     * JSON-RPC error code emitted on permission denial.
-     *
-     * @since 5.0.0
-     */
-    public const ERROR_PERMISSION_DENIED = -32002;
-
-    /**
-     * Idempotency cache key prefix.
+     * Idempotency cache key prefix. Consumed by `IdempotencyTrait`.
      *
      * @since 5.0.0
      */
     public const IDEMPOTENCY_CACHE_PREFIX = 'cortex:global_set:idem:';
-
-    /**
-     * TTL applied to cached idempotency envelopes. 24 hours.
-     *
-     * @since 5.0.0
-     */
-    public const IDEMPOTENCY_TTL = 86400;
-
-    /**
-     * Max length for `idempotencyKey`.
-     *
-     * @since 5.0.0
-     */
-    public const IDEMPOTENCY_KEY_MAX_LENGTH = 64;
 
     // Public Methods
     // =========================================================================
@@ -230,6 +213,27 @@ class GlobalSet extends AbstractTool
         return ["editGlobalSet:{$globalSetUid}"];
     }
 
+    /**
+     * Override `PermissionedToolTrait::_buildPermissionDeniedMessage()`
+     * to emit the rich global_set-specific format existing tests assert
+     * on (set UID + the missing permission string).
+     *
+     * @param array<string,mixed> $arguments
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
+    {
+        $globalSetUid = $this->_resolveGlobalSetUid($arguments) ?? '?';
+
+        return sprintf(
+            'permission denied — global_set update on set `%s` requires `%s`.',
+            $globalSetUid,
+            $missingPermission,
+        );
+    }
+
     // Private Methods
     // =========================================================================
 
@@ -252,53 +256,18 @@ class GlobalSet extends AbstractTool
         }
 
         $element = $this->_resolveGlobalSet($arguments);
-        $this->_assertPermission($element->uid);
+        $this->_assertPermission($arguments + ['uid' => $element->uid]);
 
         $this->_applyFields($element, $arguments);
 
         if (!Craft::$app->getElements()->saveElement($element, runValidation: true)) {
-            return $this->_validationEnvelope($element);
+            return $this->_validationEnvelope($element, 'update');
         }
 
         $envelope = $this->_successEnvelope($element);
         $this->_cacheIdempotencyEnvelope($arguments, $envelope);
 
         return $envelope;
-    }
-
-    /**
-     * Permission re-check on the resolved set UID. Throws the Gate 8
-     * standard JSON-RPC `-32002` envelope on miss.
-     *
-     * @throws ToolException
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _assertPermission(?string $globalSetUid): void
-    {
-        if ($globalSetUid === null) {
-            throw new ToolException('global_set: cannot resolve set UID for permission check.');
-        }
-
-        $user = Craft::$app->getUser()->getIdentity();
-        if ($user === null) {
-            // stdio path — trusted local user. Skip the check.
-            return;
-        }
-
-        if ($user->admin) {
-            return;
-        }
-
-        $permission = "editGlobalSet:{$globalSetUid}";
-        if (!$user->can($permission)) {
-            throw new ToolException(sprintf(
-                'permission denied — global_set update on set `%s` requires `%s`.',
-                $globalSetUid,
-                $permission,
-            ));
-        }
     }
 
     /**
@@ -374,56 +343,6 @@ class GlobalSet extends AbstractTool
     }
 
     /**
-     * Resolve the target site id from siteId / siteHandle, falling back
-     * to the primary site.
-     *
-     * @param array<string,mixed> $arguments
-     * @throws ToolException
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _resolveSiteId(array $arguments): int
-    {
-        $siteId = $arguments['siteId'] ?? null;
-        if (is_int($siteId) || (is_string($siteId) && ctype_digit($siteId))) {
-            $site = Craft::$app->getSites()->getSiteById((int) $siteId);
-            if ($site === null) {
-                throw new ToolException("global_set: site id={$siteId} not found.");
-            }
-            return (int) $site->id;
-        }
-
-        $siteHandle = $arguments['siteHandle'] ?? null;
-        if (is_string($siteHandle) && $siteHandle !== '') {
-            $site = Craft::$app->getSites()->getSiteByHandle($siteHandle);
-            if ($site === null) {
-                throw new ToolException("global_set: site handle=`{$siteHandle}` not found.");
-            }
-            return (int) $site->id;
-        }
-
-        return (int) Craft::$app->getSites()->getPrimarySite()->id;
-    }
-
-    /**
-     * Forward `fields: {handle: value}` to Craft's setFieldValues().
-     *
-     * @param array<string,mixed> $arguments
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _applyFields(GlobalSetElement $element, array $arguments): void
-    {
-        $fields = $arguments['fields'] ?? null;
-        if (!is_array($fields) || $fields === []) {
-            return;
-        }
-        $element->setFieldValues($fields);
-    }
-
-    /**
      * Success envelope shape.
      *
      * @return array<string,mixed>
@@ -439,99 +358,5 @@ class GlobalSet extends AbstractTool
             'mode' => 'update',
             'globalSet' => $serializer->serializeElement($element),
         ];
-    }
-
-    /**
-     * Validation envelope shape returned when `saveElement(runValidation:
-     * true)` returns false.
-     *
-     * @return array<string,mixed>
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _validationEnvelope(GlobalSetElement $element): array
-    {
-        return [
-            'success' => false,
-            'mode' => 'update',
-            'id' => $element->id !== null ? (int) $element->id : null,
-            'uid' => $element->uid,
-            'errors' => $element->getErrors(),
-        ];
-    }
-
-    /**
-     * Look up a cached idempotency envelope.
-     *
-     * @param array<string,mixed> $arguments
-     * @return array<string,mixed>|null
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _idempotencyCacheHit(array $arguments): ?array
-    {
-        $key = $this->_idempotencyCacheKey($arguments);
-        if ($key === null) {
-            return null;
-        }
-
-        $cache = Craft::$app->getCache();
-        if ($cache === null) {
-            return null;
-        }
-        $cached = $cache->get($key);
-        if (!is_array($cached)) {
-            return null;
-        }
-
-        /** @var array<string,mixed> $cached */
-        return $cached;
-    }
-
-    /**
-     * Cache the success envelope.
-     *
-     * @param array<string,mixed> $arguments
-     * @param array<string,mixed> $envelope
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _cacheIdempotencyEnvelope(array $arguments, array $envelope): void
-    {
-        $key = $this->_idempotencyCacheKey($arguments);
-        if ($key === null) {
-            return;
-        }
-        $cache = Craft::$app->getCache();
-        if ($cache === null) {
-            return;
-        }
-        $cache->set($key, $envelope, self::IDEMPOTENCY_TTL);
-    }
-
-    /**
-     * Build the idempotency cache key.
-     *
-     * @param array<string,mixed> $arguments
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _idempotencyCacheKey(array $arguments): ?string
-    {
-        $idempotencyKey = $arguments['idempotencyKey'] ?? null;
-        if (!is_string($idempotencyKey) || $idempotencyKey === '') {
-            return null;
-        }
-
-        $user = Craft::$app->getUser()->getIdentity();
-        if (!$user instanceof User) {
-            return null;
-        }
-
-        return self::IDEMPOTENCY_CACHE_PREFIX . $user->id . ':' . $idempotencyKey;
     }
 }

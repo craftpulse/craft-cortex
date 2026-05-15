@@ -25,6 +25,7 @@
  */
 
 use craftpulse\cortex\Cortex;
+use craftpulse\cortex\tools\content\Address;
 use craftpulse\cortex\tools\content\Category;
 use craftpulse\cortex\tools\content\Entry;
 use craftpulse\cortex\tools\content\GlobalSet;
@@ -49,6 +50,7 @@ function _cortex_pro_tool_classes(): array
         Category::class,
         Tag::class,
         GlobalSet::class,
+        Address::class,
     ];
 }
 

@@ -10,6 +10,7 @@ use craftpulse\cortex\attributes\IsDestructive;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\IdempotencyTrait;
 use craftpulse\cortex\tools\ProToolTrait;
 use craftpulse\cortex\tools\support\ElementSerializer;
 use craftpulse\cortex\tools\support\Schema;
@@ -55,38 +56,23 @@ use craftpulse\cortex\tools\ToolException;
 #[Title('Tag — create / update / delete (admin only)')]
 class Tag extends AbstractTool
 {
+    use IdempotencyTrait;
     use ProToolTrait;
 
     // Constants
     // =========================================================================
 
     /**
-     * JSON-RPC error code emitted on permission denial.
+     * Idempotency cache key prefix. Consumed by `IdempotencyTrait`.
      *
-     * @since 5.0.0
-     */
-    public const ERROR_PERMISSION_DENIED = -32002;
-
-    /**
-     * Idempotency cache key prefix.
+     * Tag opts out of `PermissionedToolTrait` — it uses a whole-tool
+     * admin gate via `_assertAdmin()` in `execute()` instead. Craft 5
+     * has no per-tag-group permission to delegate to (see class-level
+     * PHPDoc).
      *
      * @since 5.0.0
      */
     public const IDEMPOTENCY_CACHE_PREFIX = 'cortex:tag:idem:';
-
-    /**
-     * TTL applied to cached idempotency envelopes. 24 hours.
-     *
-     * @since 5.0.0
-     */
-    public const IDEMPOTENCY_TTL = 86400;
-
-    /**
-     * Max length for `idempotencyKey`.
-     *
-     * @since 5.0.0
-     */
-    public const IDEMPOTENCY_KEY_MAX_LENGTH = 64;
 
     // Public Methods
     // =========================================================================
@@ -464,58 +450,6 @@ class Tag extends AbstractTool
     }
 
     /**
-     * Resolve the target site id from siteId / siteHandle, falling back
-     * to the primary site.
-     *
-     * @param array<string,mixed> $arguments
-     * @throws ToolException
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _resolveSiteId(array $arguments): int
-    {
-        $siteId = $this->_resolveOptionalSiteId($arguments);
-        if ($siteId !== null) {
-            return $siteId;
-        }
-        return (int) Craft::$app->getSites()->getPrimarySite()->id;
-    }
-
-    /**
-     * Resolve the target site id from siteId / siteHandle, returning
-     * null when neither is supplied.
-     *
-     * @param array<string,mixed> $arguments
-     * @throws ToolException
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _resolveOptionalSiteId(array $arguments): ?int
-    {
-        $siteId = $arguments['siteId'] ?? null;
-        if (is_int($siteId) || (is_string($siteId) && ctype_digit($siteId))) {
-            $site = Craft::$app->getSites()->getSiteById((int) $siteId);
-            if ($site === null) {
-                throw new ToolException("tag: site id={$siteId} not found.");
-            }
-            return (int) $site->id;
-        }
-
-        $siteHandle = $arguments['siteHandle'] ?? null;
-        if (is_string($siteHandle) && $siteHandle !== '') {
-            $site = Craft::$app->getSites()->getSiteByHandle($siteHandle);
-            if ($site === null) {
-                throw new ToolException("tag: site handle=`{$siteHandle}` not found.");
-            }
-            return (int) $site->id;
-        }
-
-        return null;
-    }
-
-    /**
      * Apply scalar attributes to the element.
      *
      * @param array<string,mixed> $arguments
@@ -541,23 +475,6 @@ class Tag extends AbstractTool
     }
 
     /**
-     * Forward `fields: {handle: value}` to Craft's setFieldValues().
-     *
-     * @param array<string,mixed> $arguments
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _applyFields(TagElement $element, array $arguments): void
-    {
-        $fields = $arguments['fields'] ?? null;
-        if (!is_array($fields) || $fields === []) {
-            return;
-        }
-        $element->setFieldValues($fields);
-    }
-
-    /**
      * Success envelope shape returned by create / update.
      *
      * @return array<string,mixed>
@@ -573,99 +490,5 @@ class Tag extends AbstractTool
             'mode' => $mode,
             'tag' => $serializer->serializeElement($element),
         ];
-    }
-
-    /**
-     * Validation envelope shape returned when `saveElement(runValidation:
-     * true)` returns false.
-     *
-     * @return array<string,mixed>
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _validationEnvelope(TagElement $element, string $mode): array
-    {
-        return [
-            'success' => false,
-            'mode' => $mode,
-            'id' => $element->id !== null ? (int) $element->id : null,
-            'uid' => $element->uid,
-            'errors' => $element->getErrors(),
-        ];
-    }
-
-    /**
-     * Look up a cached idempotency envelope.
-     *
-     * @param array<string,mixed> $arguments
-     * @return array<string,mixed>|null
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _idempotencyCacheHit(array $arguments): ?array
-    {
-        $key = $this->_idempotencyCacheKey($arguments);
-        if ($key === null) {
-            return null;
-        }
-
-        $cache = Craft::$app->getCache();
-        if ($cache === null) {
-            return null;
-        }
-        $cached = $cache->get($key);
-        if (!is_array($cached)) {
-            return null;
-        }
-
-        /** @var array<string,mixed> $cached */
-        return $cached;
-    }
-
-    /**
-     * Cache the success envelope.
-     *
-     * @param array<string,mixed> $arguments
-     * @param array<string,mixed> $envelope
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _cacheIdempotencyEnvelope(array $arguments, array $envelope): void
-    {
-        $key = $this->_idempotencyCacheKey($arguments);
-        if ($key === null) {
-            return;
-        }
-        $cache = Craft::$app->getCache();
-        if ($cache === null) {
-            return;
-        }
-        $cache->set($key, $envelope, self::IDEMPOTENCY_TTL);
-    }
-
-    /**
-     * Build the idempotency cache key.
-     *
-     * @param array<string,mixed> $arguments
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _idempotencyCacheKey(array $arguments): ?string
-    {
-        $idempotencyKey = $arguments['idempotencyKey'] ?? null;
-        if (!is_string($idempotencyKey) || $idempotencyKey === '') {
-            return null;
-        }
-
-        $user = Craft::$app->getUser()->getIdentity();
-        if (!$user instanceof User) {
-            return null;
-        }
-
-        return self::IDEMPOTENCY_CACHE_PREFIX . $user->id . ':' . $idempotencyKey;
     }
 }

@@ -12,6 +12,8 @@ use craftpulse\cortex\attributes\IsDestructive;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\IdempotencyTrait;
+use craftpulse\cortex\tools\PermissionedToolTrait;
 use craftpulse\cortex\tools\ProToolTrait;
 use craftpulse\cortex\tools\support\ElementSerializer;
 use craftpulse\cortex\tools\support\Schema;
@@ -84,50 +86,23 @@ use Throwable;
 #[Title('Entry — create / update / delete / restore / apply_draft')]
 class Entry extends AbstractTool
 {
+    use IdempotencyTrait;
+    use PermissionedToolTrait;
     use ProToolTrait;
 
     // Constants
     // =========================================================================
 
     /**
-     * JSON-RPC error code emitted on permission denial. Matches the
-     * shape every Gate 8 Pro tool returns per locked decision 3 of
-     * `docs/plans/gate-8.md` — `-32002` is the cortex-wide "permission
-     * denied" code and stays stable across `filterFor()`-level and
-     * per-mode denials.
+     * Idempotency cache key prefix. Gate 8.3+ Pro tools follow the
+     * same `cortex:{toolName}:idem:{userId}:{key}` shape so the cache
+     * namespace stays grep-able and the per-user scope is uniform.
      *
-     * @since 5.0.0
-     */
-    public const ERROR_PERMISSION_DENIED = -32002;
-
-    /**
-     * Idempotency cache key prefix. Gate 8.3+ Pro tools should follow
-     * the same `cortex:{toolName}:idem:{userId}:{key}` shape so the
-     * cache namespace stays grep-able and the per-user scope is
-     * uniform.
+     * Consumed by `IdempotencyTrait` via `static::IDEMPOTENCY_CACHE_PREFIX`.
      *
      * @since 5.0.0
      */
     public const IDEMPOTENCY_CACHE_PREFIX = 'cortex:entry:idem:';
-
-    /**
-     * TTL applied to cached idempotency envelopes. 24 hours mirrors
-     * common API conventions (Stripe, GitHub) without being so long
-     * the cache table fills up. Beyond TTL, the same key re-runs the
-     * save — the LLM gets a fresh attempt.
-     *
-     * @since 5.0.0
-     */
-    public const IDEMPOTENCY_TTL = 86400;
-
-    /**
-     * Max length for `idempotencyKey`. Matches the schema's
-     * `maxLength` constraint. Longer keys are rejected at JSON-Schema
-     * validation upstream; execute() does not re-check.
-     *
-     * @since 5.0.0
-     */
-    public const IDEMPOTENCY_KEY_MAX_LENGTH = 64;
 
     // Public Methods
     // =========================================================================
@@ -435,7 +410,7 @@ class Entry extends AbstractTool
             );
         }
 
-        $this->_assertPermission('create', $section->uid);
+        $this->_assertPermission($arguments + ['sectionUid' => $section->uid]);
 
         if ($entryType->id === null) {
             throw new ToolException("entry: resolved entry-type has no id (unsaved?).");
@@ -493,7 +468,7 @@ class Entry extends AbstractTool
             );
         }
 
-        $this->_assertPermission('update', $section->uid);
+        $this->_assertPermission($arguments + ['sectionUid' => $section->uid]);
 
         // Optional entry-type switch — when the caller supplied
         // entryTypeId/Uid/Handle the resolved type is set; otherwise
@@ -540,7 +515,7 @@ class Entry extends AbstractTool
             );
         }
 
-        $this->_assertPermission('delete', $section->uid);
+        $this->_assertPermission($arguments + ['sectionUid' => $section->uid]);
 
         $hardDelete = (bool) ($arguments['hardDelete'] ?? false);
 
@@ -596,7 +571,7 @@ class Entry extends AbstractTool
             );
         }
 
-        $this->_assertPermission('restore', $section->uid);
+        $this->_assertPermission($arguments + ['sectionUid' => $section->uid]);
 
         if (!Craft::$app->getElements()->restoreElement($element)) {
             throw new ToolException(
@@ -656,7 +631,7 @@ class Entry extends AbstractTool
             );
         }
 
-        $this->_assertPermission('apply_draft', $canonicalSection->uid);
+        $this->_assertPermission($arguments + ['sectionUid' => $canonicalSection->uid]);
 
         try {
             $applied = Craft::$app->getDrafts()->applyDraft($draft);
@@ -674,53 +649,27 @@ class Entry extends AbstractTool
     }
 
     /**
-     * Permission re-check on the resolved section UID. Throws the
-     * Gate 8 standard JSON-RPC `-32002` envelope on miss. Admins
-     * bypass — Craft's `User::can()` already returns true for admins,
-     * but the explicit branch is defensive against accidental
-     * permission-system reconfiguration that flips that default.
+     * Override `PermissionedToolTrait::_buildPermissionDeniedMessage()`
+     * to emit the rich entry-specific format existing tests assert on
+     * (mode + section UID + the missing permission string). Inherits
+     * the stdio / admin skip logic from the trait.
      *
-     * `$sectionUid` is nominally typed `?string` only because Craft
-     * declares Section::$uid as nullable on the base model; in
-     * practice every persisted section has a UID, and a null arrival
-     * here indicates an unsaved-section programmer error. We throw a
-     * `ToolException` in that case rather than `\TypeError` so the
-     * MCP envelope stays well-formed.
-     *
-     * @throws ToolException
+     * @param array<string,mixed> $arguments
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _assertPermission(string $mode, ?string $sectionUid): void
+    protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
     {
-        if ($sectionUid === null) {
-            throw new ToolException("entry: cannot resolve section UID for permission check.");
-        }
+        $mode = $this->_mode($arguments) ?? '?';
+        $sectionUid = $this->_resolveSectionUid($arguments) ?? '?';
 
-        $user = Craft::$app->getUser()->getIdentity();
-        if ($user === null) {
-            // stdio path — trusted local user. Skip the check.
-            return;
-        }
-
-        if ($user->admin) {
-            return;
-        }
-
-        $permission = match ($mode) {
-            'delete' => "deleteEntries:{$sectionUid}",
-            default => "saveEntries:{$sectionUid}",
-        };
-
-        if (!$user->can($permission)) {
-            throw new ToolException(sprintf(
-                'permission denied — mode `%s` on section `%s` requires `%s`.',
-                $mode,
-                $sectionUid,
-                $permission,
-            ));
-        }
+        return sprintf(
+            'permission denied — mode `%s` on section `%s` requires `%s`.',
+            $mode,
+            $sectionUid,
+            $missingPermission,
+        );
     }
 
     /**
@@ -911,61 +860,6 @@ class Entry extends AbstractTool
     }
 
     /**
-     * Resolve the target site id from siteId / siteHandle, falling
-     * back to the primary site. Used by `create` where a site is
-     * always required.
-     *
-     * @param array<string,mixed> $arguments
-     * @throws ToolException
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _resolveSiteId(array $arguments): int
-    {
-        $siteId = $this->_resolveOptionalSiteId($arguments);
-        if ($siteId !== null) {
-            return $siteId;
-        }
-        return (int) Craft::$app->getSites()->getPrimarySite()->id;
-    }
-
-    /**
-     * Resolve the target site id from siteId / siteHandle, returning
-     * null when neither is supplied. Used by `update / delete /
-     * restore / apply_draft` where the site is optional (Craft picks
-     * the default for the entry when no site is set).
-     *
-     * @param array<string,mixed> $arguments
-     * @throws ToolException
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _resolveOptionalSiteId(array $arguments): ?int
-    {
-        $siteId = $arguments['siteId'] ?? null;
-        if (is_int($siteId) || (is_string($siteId) && ctype_digit($siteId))) {
-            $site = Craft::$app->getSites()->getSiteById((int) $siteId);
-            if ($site === null) {
-                throw new ToolException("entry: site id={$siteId} not found.");
-            }
-            return (int) $site->id;
-        }
-
-        $siteHandle = $arguments['siteHandle'] ?? null;
-        if (is_string($siteHandle) && $siteHandle !== '') {
-            $site = Craft::$app->getSites()->getSiteByHandle($siteHandle);
-            if ($site === null) {
-                throw new ToolException("entry: site handle=`{$siteHandle}` not found.");
-            }
-            return (int) $site->id;
-        }
-
-        return null;
-    }
-
-    /**
      * Apply scalar / date / author / parent / propagation attributes
      * to the element. `setFieldValues()` handles the custom-field
      * surface separately in `_applyFields()`.
@@ -1024,25 +918,6 @@ class Entry extends AbstractTool
     }
 
     /**
-     * Forward `fields: {handle: value}` to Craft's setFieldValues().
-     * The contract is pass-through — Craft normalises per field type
-     * at save time. Document this in the tool's PHPDoc.
-     *
-     * @param array<string,mixed> $arguments
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _applyFields(EntryElement $element, array $arguments): void
-    {
-        $fields = $arguments['fields'] ?? null;
-        if (!is_array($fields) || $fields === []) {
-            return;
-        }
-        $element->setFieldValues($fields);
-    }
-
-    /**
      * Success envelope shape returned by create / update / restore /
      * apply_draft. The serialised entry sits under `entry` so the
      * envelope is forward-compatible — additional metadata (propagation
@@ -1062,115 +937,5 @@ class Entry extends AbstractTool
             'mode' => $mode,
             'entry' => $serializer->serializeElement($element),
         ];
-    }
-
-    /**
-     * Validation envelope shape returned when `saveElement(runValidation: true)`
-     * returns false. The LLM iterates on `errors` (keyed by field
-     * handle, listing every messages a field gathered) and retries
-     * with corrected values. Not cached against the idempotency key
-     * — the LLM should be free to retry with different inputs.
-     *
-     * @return array<string,mixed>
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _validationEnvelope(EntryElement $element, string $mode): array
-    {
-        return [
-            'success' => false,
-            'mode' => $mode,
-            'id' => $element->id !== null ? (int) $element->id : null,
-            'uid' => $element->uid,
-            'errors' => $element->getErrors(),
-        ];
-    }
-
-    /**
-     * Look up a cached idempotency envelope for the
-     * `{userId, idempotencyKey}` pair. Returns the cached value (so
-     * the caller can `return` it directly) or `null` when no cache
-     * entry exists or when the request didn't carry an
-     * idempotencyKey at all.
-     *
-     * @param array<string,mixed> $arguments
-     * @return array<string,mixed>|null
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _idempotencyCacheHit(array $arguments): ?array
-    {
-        $key = $this->_idempotencyCacheKey($arguments);
-        if ($key === null) {
-            return null;
-        }
-
-        $cache = Craft::$app->getCache();
-        if ($cache === null) {
-            return null;
-        }
-        $cached = $cache->get($key);
-        if (!is_array($cached)) {
-            return null;
-        }
-
-        /** @var array<string,mixed> $cached */
-        return $cached;
-    }
-
-    /**
-     * Cache the success envelope under the
-     * `{userId, idempotencyKey}` pair with the standard 24h TTL.
-     * No-op when no idempotencyKey was supplied.
-     *
-     * @param array<string,mixed> $arguments
-     * @param array<string,mixed> $envelope
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _cacheIdempotencyEnvelope(array $arguments, array $envelope): void
-    {
-        $key = $this->_idempotencyCacheKey($arguments);
-        if ($key === null) {
-            return;
-        }
-        $cache = Craft::$app->getCache();
-        if ($cache === null) {
-            return;
-        }
-        $cache->set($key, $envelope, self::IDEMPOTENCY_TTL);
-    }
-
-    /**
-     * Build the cache key for an idempotent request, scoping by the
-     * current user id so two users with the same key don't collide.
-     * Returns null when no idempotencyKey was supplied or when the
-     * user isn't resolved (stdio path falls into this case — stdio
-     * is single-process and doesn't need server-side dedup).
-     *
-     * @param array<string,mixed> $arguments
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _idempotencyCacheKey(array $arguments): ?string
-    {
-        $idempotencyKey = $arguments['idempotencyKey'] ?? null;
-        if (!is_string($idempotencyKey) || $idempotencyKey === '') {
-            return null;
-        }
-
-        $user = Craft::$app->getUser()->getIdentity();
-        if (!$user instanceof User) {
-            // stdio path — no per-request identity. Skip caching;
-            // stdio is single-process and the LLM-driven retry path
-            // is unlikely to fire there.
-            return null;
-        }
-
-        return self::IDEMPOTENCY_CACHE_PREFIX . $user->id . ':' . $idempotencyKey;
     }
 }
