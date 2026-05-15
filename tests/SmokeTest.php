@@ -3,7 +3,7 @@
 /**
  * =========================================================================
  * Smoke test — proves the bootstrap actually booted Craft and registered
- * the cortex plugin. If any test in the suite fails because Plugin::
+ * the cortex plugin. If any test in the suite fails because Cortex::
  * getInstance() returns null, this file's failure tells us why faster
  * than 50 individual tool tests would.
  * =========================================================================
@@ -12,7 +12,7 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\services\Tools;
 
 it('boots Craft', function() {
@@ -21,12 +21,12 @@ it('boots Craft', function() {
 });
 
 it('registers the cortex plugin', function() {
-    $plugin = Plugin::getInstance();
+    $plugin = Cortex::getInstance();
     expect($plugin)->not->toBeNull();
     expect($plugin->handle)->toBe('cortex');
 });
 
 it('exposes the Tools service via the plugin component', function() {
-    $tools = Plugin::getInstance()->tools;
+    $tools = Cortex::getInstance()->tools;
     expect($tools)->toBeInstanceOf(Tools::class);
 });

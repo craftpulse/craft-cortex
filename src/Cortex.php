@@ -51,10 +51,10 @@ use yii\base\Event;
  * @author Craftpulse
  * @since  5.0.0
  *
- * @method static Plugin getInstance()
+ * @method static Cortex getInstance()
  * @method Settings getSettings()
  */
-class Plugin extends BasePlugin
+class Cortex extends BasePlugin
 {
     use CortexServices;
 
@@ -129,7 +129,7 @@ class Plugin extends BasePlugin
      * @inheritdoc
      *
      * Returns the edition handles in ascending order — Free first, Pro
-     * last. Order matters: Craft's `Plugin::is($edition, '>=')` walks
+     * last. Order matters: Craft's `BasePlugin::is($edition, '>=')` walks
      * the array by index, so a Pro install satisfies `is(EDITION_FREE,
      * '>=')` but a Free install does not satisfy `is(EDITION_PRO, '>=')`.
      *
@@ -190,7 +190,7 @@ class Plugin extends BasePlugin
             Gc::class,
             Gc::EVENT_RUN,
             static function(): void {
-                $plugin = Plugin::getInstance();
+                $plugin = Cortex::getInstance();
                 $plugin->allowlist->pruneExpired();
                 $plugin->invocations->prune();
             },
@@ -208,7 +208,7 @@ class Plugin extends BasePlugin
             InvocationLogger::EVENT_LOG_CALL,
             static function(LogCallEvent $event): void {
                 try {
-                    Plugin::getInstance()->invocations->record($event->entry);
+                    Cortex::getInstance()->invocations->record($event->entry);
                 } catch (Throwable $e) {
                     \Craft::error(
                         sprintf(

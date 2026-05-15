@@ -18,11 +18,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('craft_exec');
+    $this->tool = Cortex::getInstance()->tools->getByName('craft_exec');
 });
 
 it('throws when expression is missing', function() {
@@ -209,7 +209,7 @@ it('exposes destructiveHint:true via attribute reader', function() {
 // -----------------------------------------------------------------------------
 
 it('execDryRunDefault=false makes evaluation the default when confirm is absent', function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $original = $settings->execDryRunDefault;
     $settings->execDryRunDefault = false;
 
@@ -227,7 +227,7 @@ it('execDryRunDefault=false makes evaluation the default when confirm is absent'
 });
 
 it('execDryRunDefault=false still respects explicit confirm=false (caller wins)', function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $original = $settings->execDryRunDefault;
     $settings->execDryRunDefault = false;
 
@@ -246,7 +246,7 @@ it('execDryRunDefault=false still respects explicit confirm=false (caller wins)'
 });
 
 it('execDryRunDefault=false does not bypass the destructive guard', function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $original = $settings->execDryRunDefault;
     $settings->execDryRunDefault = false;
 

@@ -4,7 +4,7 @@ namespace craftpulse\cortex\controllers;
 
 use Craft;
 use craft\web\Controller;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use yii\base\Exception;
 use yii\web\Response;
 
@@ -63,7 +63,7 @@ class SettingsController extends Controller
 
         $userId = Craft::$app->getUser()->getId();
         try {
-            Plugin::getInstance()->allowlist->add(
+            Cortex::getInstance()->allowlist->add(
                 pattern: $pattern,
                 userId: is_int($userId) ? $userId : null,
                 note: $note,
@@ -98,7 +98,7 @@ class SettingsController extends Controller
         $id = (int) $this->request->getRequiredBodyParam('id');
 
         try {
-            $removed = Plugin::getInstance()->allowlist->remove($id);
+            $removed = Cortex::getInstance()->allowlist->remove($id);
         } catch (Exception $e) {
             Craft::error($e->getMessage(), 'cortex');
             Craft::$app->getSession()->setError(

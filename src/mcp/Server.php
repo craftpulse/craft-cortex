@@ -4,8 +4,8 @@ namespace craftpulse\cortex\mcp;
 
 use Craft;
 use craft\elements\User;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\events\LogCallEvent;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\StreamableToolInterface;
 use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\support\CancellationToken;
@@ -538,7 +538,7 @@ class Server
     private function _toolsList(): array
     {
         return [
-            'tools' => Plugin::getInstance()->tools->asListPayloadFor($this->_resolveUser()),
+            'tools' => Cortex::getInstance()->tools->asListPayloadFor($this->_resolveUser()),
         ];
     }
 
@@ -551,7 +551,7 @@ class Server
     private function _promptsList(): array
     {
         return [
-            'prompts' => Plugin::getInstance()->prompts->asListPayload(),
+            'prompts' => Cortex::getInstance()->prompts->asListPayload(),
         ];
     }
 
@@ -564,7 +564,7 @@ class Server
     private function _resourcesList(): array
     {
         return [
-            'resources' => Plugin::getInstance()->resources->asListPayload(),
+            'resources' => Cortex::getInstance()->resources->asListPayload(),
         ];
     }
 
@@ -589,7 +589,7 @@ class Server
             return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: prompts/get requires `name` (string)');
         }
 
-        $prompt = Plugin::getInstance()->prompts->getByName($name);
+        $prompt = Cortex::getInstance()->prompts->getByName($name);
         if ($prompt === null) {
             return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, "Unknown prompt: {$name}");
         }
@@ -628,7 +628,7 @@ class Server
             return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: resources/read requires `uri` (string)');
         }
 
-        $resource = Plugin::getInstance()->resources->getByUri($uri);
+        $resource = Cortex::getInstance()->resources->getByUri($uri);
         if ($resource !== null) {
             try {
                 $block = $resource->read();
@@ -643,7 +643,7 @@ class Server
         // future per-element resource use these. Concrete URIs are
         // tried first so a templated resource never shadows a bundled
         // entry.
-        $match = Plugin::getInstance()->resources->matchTemplate($uri);
+        $match = Cortex::getInstance()->resources->matchTemplate($uri);
         if ($match !== null) {
             [$template, $captures] = $match;
             try {
@@ -748,7 +748,7 @@ class Server
             return $miss;
         }
 
-        $tool = Plugin::getInstance()->tools->getByNameFor($name, $this->_resolveUser());
+        $tool = Cortex::getInstance()->tools->getByNameFor($name, $this->_resolveUser());
         if ($tool === null) {
             // Indistinguishable from "tool not registered" on the wire —
             // a tool the user lacks permission for fails closed as

@@ -7,7 +7,7 @@
  * Runs once before any test. Boots Craft's console application against
  * the surrounding install (the playground at /var/www/html/cms when run
  * via `ddev exec` from the playground), then leaves `Craft::$app`
- * primed so tests can call `Plugin::getInstance()->tools->...` directly.
+ * primed so tests can call `Cortex::getInstance()->tools->...` directly.
  *
  * We deliberately use the playground's existing Craft instance rather
  * than spinning up an isolated fixtures install: cortex tools introspect
@@ -50,7 +50,7 @@ if (!defined('CRAFT_ENVIRONMENT')) {
 }
 
 // Boot the console application. After this, Craft::$app is the
-// ConsoleApplication, plugins are registered, and Plugin::getInstance()
+// ConsoleApplication, plugins are registered, and Cortex::getInstance()
 // resolves cortex.
 require CRAFT_VENDOR_PATH . '/craftcms/cms/bootstrap/console.php';
 

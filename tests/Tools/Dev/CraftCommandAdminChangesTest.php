@@ -33,14 +33,14 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\records\Invocation as InvocationRecord;
 use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\support\InvocationLogger;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('craft_command');
+    $this->tool = Cortex::getInstance()->tools->getByName('craft_command');
 });
 
 // -----------------------------------------------------------------------------
@@ -149,7 +149,7 @@ it('still admits cache/flush when allowAdminChanges is false', function() {
 
 it('Allowlist::getEffective() includes admin commands when allowAdminChanges is true', function() {
     cortex_with_admin_changes(true, function() {
-        $effective = Plugin::getInstance()->allowlist->getEffective();
+        $effective = Cortex::getInstance()->allowlist->getEffective();
 
         // Content-level patterns are always in.
         expect($effective)->toContain('resave/*');
@@ -165,7 +165,7 @@ it('Allowlist::getEffective() includes admin commands when allowAdminChanges is 
 
 it('Allowlist::getEffective() excludes admin commands when allowAdminChanges is false', function() {
     cortex_with_admin_changes(false, function() {
-        $effective = Plugin::getInstance()->allowlist->getEffective();
+        $effective = Cortex::getInstance()->allowlist->getEffective();
 
         // Content-level patterns are always in.
         expect($effective)->toContain('resave/*');
@@ -201,7 +201,7 @@ it('an admin-changes-denied ToolException audit-logs with kind=tool_error', func
     // Drive the same path the HTTP dispatcher takes: catch the
     // ToolException, hand it to InvocationLogger::logCall with an
     // HTTP context, then read back the `cortex_invocations` row the
-    // Plugin::init()-wired listener wrote.
+    // Cortex::init()-wired listener wrote.
     $caught = null;
     cortex_with_admin_changes(false, function() use (&$caught) {
         try {

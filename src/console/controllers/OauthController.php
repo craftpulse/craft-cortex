@@ -3,7 +3,7 @@
 namespace craftpulse\cortex\console\controllers;
 
 use craft\console\Controller;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\services\Oauth;
 use yii\console\ExitCode;
 use yii\helpers\Console;
@@ -68,7 +68,7 @@ class OauthController extends Controller
      */
     public function actionInitKeys(): int
     {
-        $oauth = Plugin::getInstance()->oauth;
+        $oauth = Cortex::getInstance()->oauth;
         $dir = $oauth->getKeysDirectory();
         $privatePath = $dir . DIRECTORY_SEPARATOR . Oauth::PRIVATE_KEY_FILE;
         $publicPath = $dir . DIRECTORY_SEPARATOR . Oauth::PUBLIC_KEY_FILE;

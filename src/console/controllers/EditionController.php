@@ -3,7 +3,7 @@
 namespace craftpulse\cortex\console\controllers;
 
 use craft\console\Controller;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use yii\console\ExitCode;
 use yii\helpers\Console;
 
@@ -17,7 +17,7 @@ use yii\helpers\Console;
  * Sanity-check helper for operators and CI scripts. Prints the
  * active edition handle (`free` or `pro`), the full list of
  * declared editions, and the boolean result of
- * `Plugin::is(EDITION_PRO)` so a one-shot SSH session can confirm
+ * `Cortex::is(EDITION_PRO)` so a one-shot SSH session can confirm
  * which tier is running without booting a CP session.
  *
  * The edition handle lives in project config at
@@ -38,17 +38,17 @@ class EditionController extends Controller
      * the `is(EDITION_PRO)` flag. Exit code is always `OK` (0) — the
      * command is read-only and has no failure surface beyond a
      * misconfigured plugin (which would have failed earlier at
-     * `Plugin::getInstance()`).
+     * `Cortex::getInstance()`).
      *
      * @author Craftpulse
      * @since  5.0.0
      */
     public function actionShow(): int
     {
-        $plugin = Plugin::getInstance();
+        $plugin = Cortex::getInstance();
         $edition = $plugin->edition;
-        $editions = Plugin::editions();
-        $isPro = $plugin->is(Plugin::EDITION_PRO);
+        $editions = Cortex::editions();
+        $isPro = $plugin->is(Cortex::EDITION_PRO);
 
         $this->stdout("\n");
         $this->stdout("Cortex edition\n", Console::FG_GREEN);

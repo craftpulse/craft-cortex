@@ -12,10 +12,10 @@
  */
 
 use Craft;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('get_initial_context');
+    $this->tool = Cortex::getInstance()->tools->getByName('get_initial_context');
 });
 
 it('is registered under the get_initial_context name', function() {
@@ -24,7 +24,7 @@ it('is registered under the get_initial_context name', function() {
 });
 
 it('appears first in tools/list so fresh agents see it first', function() {
-    $payload = Plugin::getInstance()->tools->asListPayload();
+    $payload = Cortex::getInstance()->tools->asListPayload();
     expect($payload[0]['name'])->toBe('get_initial_context');
 });
 
@@ -76,22 +76,22 @@ it('includes the bundled skill prompts so the LLM knows the moat content exists'
     }
 
     // Cross-check: skillPrompts count matches the prompt registry.
-    expect($result['skillPrompts'])->toHaveCount(Plugin::getInstance()->prompts->getCount());
+    expect($result['skillPrompts'])->toHaveCount(Cortex::getInstance()->prompts->getCount());
 });
 
 it('surfaces the craft_exec posture (enabled + dryRunDefault) from settings', function() {
     $result = $this->tool->execute([]);
 
     expect($result['exec'])->toHaveKeys(['enabled', 'dryRunDefault']);
-    expect($result['exec']['enabled'])->toBe(Plugin::getInstance()->getSettings()->execEnabled);
-    expect($result['exec']['dryRunDefault'])->toBe(Plugin::getInstance()->getSettings()->execDryRunDefault);
+    expect($result['exec']['enabled'])->toBe(Cortex::getInstance()->getSettings()->execEnabled);
+    expect($result['exec']['dryRunDefault'])->toBe(Cortex::getInstance()->getSettings()->execDryRunDefault);
 });
 
 it('returns the effective command allowlist (defaults + active runtime overrides)', function() {
     $result = $this->tool->execute([]);
 
     expect($result['allowlist'])->toBeArray()->not->toBeEmpty();
-    expect($result['allowlist'])->toBe(Plugin::getInstance()->allowlist->getEffective());
+    expect($result['allowlist'])->toBe(Cortex::getInstance()->allowlist->getEffective());
 });
 
 it('declares an outputSchema covering the full payload', function() {

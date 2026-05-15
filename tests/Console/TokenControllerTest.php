@@ -20,7 +20,7 @@
  */
 
 use craftpulse\cortex\console\controllers\TokenController;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\records\Token as TokenRecord;
 
 // -----------------------------------------------------------------------------
@@ -138,7 +138,7 @@ it('issue defaults the name when --name is omitted', function() {
 // -----------------------------------------------------------------------------
 
 it('list shows the row by prefix and name, but never the plaintext', function() {
-    $issued = Plugin::getInstance()->tokens->issue($this->userId, '_test_/list-row');
+    $issued = Cortex::getInstance()->tokens->issue($this->userId, '_test_/list-row');
 
     $controller = _cortex_token_harness();
     $exit = $controller->actionList();
@@ -175,7 +175,7 @@ it('list with unknown --user returns USAGE', function() {
 // -----------------------------------------------------------------------------
 
 it('revoke soft-deletes the row and returns OK', function() {
-    $issued = Plugin::getInstance()->tokens->issue($this->userId, '_test_/revoke-action');
+    $issued = Cortex::getInstance()->tokens->issue($this->userId, '_test_/revoke-action');
 
     $controller = _cortex_token_harness();
     $exit = $controller->actionRevoke($issued['model']->id);
@@ -197,8 +197,8 @@ it('revoke on unknown id returns NOUSER exit code', function() {
 });
 
 it('revoke on already-revoked id returns NOUSER (treated as no-live-match)', function() {
-    $issued = Plugin::getInstance()->tokens->issue($this->userId, '_test_/revoke-twice');
-    Plugin::getInstance()->tokens->revoke($issued['model']->id);
+    $issued = Cortex::getInstance()->tokens->issue($this->userId, '_test_/revoke-twice');
+    Cortex::getInstance()->tokens->revoke($issued['model']->id);
 
     // The controller's `getById` filter excludes soft-deleted rows, so
     // the second revoke surfaces as "no live token" — same response

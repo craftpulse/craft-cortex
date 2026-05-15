@@ -24,7 +24,7 @@ use yii\base\InvalidConfigException;
  * class, no drift between the class-level docblock and the actual
  * `config()` map.
  *
- * Components are still declared in `Plugin::config()` (Yii's
+ * Components are still declared in `Cortex::config()` (Yii's
  * component map is what makes `$this->get('xxx')` resolve). The
  * trait provides the typed surface; `config()` provides the
  * dependency wiring. Both files together are the source of truth —

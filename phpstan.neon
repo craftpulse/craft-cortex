@@ -27,10 +27,10 @@ parameters:
         - identifier: missingType.iterableValue
           path: src/tools/*
 
-        # Plugin::config() returns Yii's generic component-config array;
+        # Cortex::config() returns Yii's generic component-config array;
         # the schema isn't worth pinning down for one method.
         - identifier: missingType.iterableValue
-          path: src/Plugin.php
+          path: src/Cortex.php
 
         # Craft's element-query classes use generic templates we don't
         # need to forward in private builder helpers.

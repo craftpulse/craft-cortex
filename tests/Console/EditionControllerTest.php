@@ -19,7 +19,7 @@
  */
 
 use craftpulse\cortex\console\controllers\EditionController;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 // -----------------------------------------------------------------------------
 // Harness
@@ -75,13 +75,13 @@ it('show prints the full editions list', function() {
     expect($exit)->toBe(0);
     // The list shape is `[free, pro]` — assert both handles appear
     // inside the line so a future Commerce edition appended to
-    // `Plugin::editions()` doesn't silently break the contract.
-    expect($controller->captured)->toContain(Plugin::EDITION_FREE);
-    expect($controller->captured)->toContain(Plugin::EDITION_PRO);
+    // `Cortex::editions()` doesn't silently break the contract.
+    expect($controller->captured)->toContain(Cortex::EDITION_FREE);
+    expect($controller->captured)->toContain(Cortex::EDITION_PRO);
 });
 
 it('show prints pro / is(pro): true when the edition is flipped', function() {
-    cortex_with_edition(Plugin::EDITION_PRO, function() {
+    cortex_with_edition(Cortex::EDITION_PRO, function() {
         $controller = _cortex_edition_harness();
         $exit = $controller->actionShow();
 

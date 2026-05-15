@@ -4,7 +4,7 @@ namespace craftpulse\cortex\console\controllers;
 
 use Craft;
 use craft\console\Controller;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use yii\console\ExitCode;
 use yii\helpers\Console;
 
@@ -97,7 +97,7 @@ class TokenController extends Controller
         $name = $this->name ?? ('cli-' . time());
 
         try {
-            $result = Plugin::getInstance()->tokens->issue(
+            $result = Cortex::getInstance()->tokens->issue(
                 userId: (int) $resolved->id,
                 name: $name,
                 ttlSeconds: $this->ttl,
@@ -140,7 +140,7 @@ class TokenController extends Controller
      */
     public function actionRevoke(int $id): int
     {
-        $tokens = Plugin::getInstance()->tokens;
+        $tokens = Cortex::getInstance()->tokens;
         $existing = $tokens->getById($id);
         if ($existing === null) {
             $this->stderr("No live token with id #{$id}.\n", Console::FG_RED);
@@ -176,7 +176,7 @@ class TokenController extends Controller
      */
     public function actionList(): int
     {
-        $tokens = Plugin::getInstance()->tokens;
+        $tokens = Cortex::getInstance()->tokens;
 
         if ($this->user !== null) {
             $resolved = Craft::$app->getUsers()->getUserByUsernameOrEmail($this->user);

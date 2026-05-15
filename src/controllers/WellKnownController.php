@@ -4,8 +4,8 @@ namespace craftpulse\cortex\controllers;
 
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\oauth\repositories\ScopeRepository;
-use craftpulse\cortex\Plugin;
 use yii\web\Response;
 
 /**
@@ -22,7 +22,7 @@ use yii\web\Response;
  * RFC 8414 §3 and RFC 9728 §3 both mandate that the metadata sit at
  * the root of the issuer URL — under `/.well-known/...`, not under
  * any path prefix. The plugin URL rules register them at site root
- * accordingly (`Plugin::init()`).
+ * accordingly (`Cortex::init()`).
  * =========================================================================
  *
  * @author Craftpulse
@@ -69,7 +69,7 @@ class WellKnownController extends Controller
      */
     public function actionAuthorizationServer(): Response
     {
-        $settings = Plugin::getInstance()->getSettings();
+        $settings = Cortex::getInstance()->getSettings();
         $issuer = UrlHelper::baseSiteUrl();
         $issuer = rtrim($issuer, '/');
 

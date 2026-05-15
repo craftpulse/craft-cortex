@@ -3,7 +3,7 @@
 namespace craftpulse\cortex\console\controllers;
 
 use craft\console\Controller;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\support\AttributeReader;
 use yii\console\ExitCode;
 use yii\helpers\Console;
@@ -79,7 +79,7 @@ class DocsController extends Controller
      */
     public function actionTools(): int
     {
-        $tools = Plugin::getInstance()->tools->getAll();
+        $tools = Cortex::getInstance()->tools->getAll();
         $md = $this->_renderToolsMarkdown($tools);
         return $this->_writeDoc('TOOLS.md', $md);
     }
@@ -92,7 +92,7 @@ class DocsController extends Controller
      */
     public function actionPrompts(): int
     {
-        $prompts = Plugin::getInstance()->prompts->getAll();
+        $prompts = Cortex::getInstance()->prompts->getAll();
         $md = $this->_renderPromptsMarkdown($prompts);
         return $this->_writeDoc('PROMPTS.md', $md);
     }
@@ -105,7 +105,7 @@ class DocsController extends Controller
      */
     public function actionResources(): int
     {
-        $resources = Plugin::getInstance()->resources->getAll();
+        $resources = Cortex::getInstance()->resources->getAll();
         $md = $this->_renderResourcesMarkdown($resources);
         return $this->_writeDoc('RESOURCES.md', $md);
     }

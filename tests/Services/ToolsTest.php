@@ -24,8 +24,8 @@
  */
 
 use craft\elements\User;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\events\RegisterToolsEvent;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\services\Tools;
 use craftpulse\cortex\tools\AbstractTool;
 
@@ -58,10 +58,10 @@ function _cortex_register_stub_tool(callable $factory): array
 
     \yii\base\Event::on(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
 
-    $original = Plugin::getInstance()->tools;
+    $original = Cortex::getInstance()->tools;
     $fresh = new Tools();
     $fresh->init();
-    Plugin::getInstance()->set('tools', $fresh);
+    Cortex::getInstance()->set('tools', $fresh);
 
     return [$fresh, $listener, $original];
 }
@@ -73,7 +73,7 @@ function _cortex_register_stub_tool(callable $factory): array
  */
 function _cortex_restore_tools(Tools $original, \Closure $listener): void
 {
-    Plugin::getInstance()->set('tools', $original);
+    Cortex::getInstance()->set('tools', $original);
     \yii\base\Event::off(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
 }
 
@@ -82,7 +82,7 @@ function _cortex_restore_tools(Tools $original, \Closure $listener): void
 // -----------------------------------------------------------------------------
 
 it('asListPayloadFor(null) equals asListPayload() — stdio invariant', function() {
-    $service = Plugin::getInstance()->tools;
+    $service = Cortex::getInstance()->tools;
 
     $stdio = $service->asListPayload();
     $nullUser = $service->asListPayloadFor(null);
@@ -105,7 +105,7 @@ it('asListPayloadFor returns every tool when filterFor defaults to true for all'
     // The full payload for the admin should match the stdio payload —
     // structural equality (fresh `stdClass` instances from
     // `(object) []` casts mean identity-equality would never hold).
-    $service = Plugin::getInstance()->tools;
+    $service = Cortex::getInstance()->tools;
 
     $stdio = $service->asListPayload();
     $admin = $service->asListPayloadFor($this->admin);
@@ -221,7 +221,7 @@ it('getByNameFor returns null when filterFor is false for the user', function() 
 });
 
 it('getByNameFor returns null for an unknown tool name regardless of user', function() {
-    $service = Plugin::getInstance()->tools;
+    $service = Cortex::getInstance()->tools;
     expect($service->getByNameFor('_test_/no-such-tool', $this->admin))->toBeNull();
     expect($service->getByNameFor('_test_/no-such-tool', null))->toBeNull();
 });

@@ -6,10 +6,10 @@
  */
 
 use Craft;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('volumes_and_filesystems');
+    $this->tool = Cortex::getInstance()->tools->getByName('volumes_and_filesystems');
 });
 
 it('returns volumes annotated with filesystems plus orphans plus the type registry', function() {

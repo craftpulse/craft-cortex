@@ -5,11 +5,11 @@ namespace craftpulse\cortex\controllers;
 use Craft;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\exceptions\RateLimitExceededException;
 use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\mcp\transport\Http;
 use craftpulse\cortex\mcp\transport\SseEmitter;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\support\InvocationLogger;
 use craftpulse\cortex\values\RateLimitStatus;
 use yii\web\Response;
@@ -177,7 +177,7 @@ class McpController extends Controller
         //   7. Per-user rate limit consume (Gate 7.6).
         //   8. parent::beforeAction() — now sees an authenticated user.
 
-        $settings = Plugin::getInstance()->getSettings();
+        $settings = Cortex::getInstance()->getSettings();
 
         // Gate 1 — kill switch.
         if (!$settings->httpEnabled) {
@@ -276,7 +276,7 @@ class McpController extends Controller
         // audit row and 429 the caller with `Retry-After`.
         if ($this->_authenticatedUserId !== null) {
             try {
-                $status = Plugin::getInstance()->rateLimiter->consume($this->_authenticatedUserId);
+                $status = Cortex::getInstance()->rateLimiter->consume($this->_authenticatedUserId);
                 $this->_rateLimitRemaining = $status->remaining;
             } catch (RateLimitExceededException $e) {
                 $this->_writeRateLimitedAuditRow($e->status);
@@ -466,7 +466,7 @@ class McpController extends Controller
             return $this->_status(400, 'Missing Mcp-Session-Id header.');
         }
 
-        $sessions = Plugin::getInstance()->sessions;
+        $sessions = Cortex::getInstance()->sessions;
         if ($sessions->get($sessionId) === null) {
             return $this->_status(404, 'Session not found.');
         }
@@ -496,7 +496,7 @@ class McpController extends Controller
         $method = is_string($request['method'] ?? null) ? $request['method'] : '';
         $isInitialize = $method === 'initialize';
 
-        $sessions = Plugin::getInstance()->sessions;
+        $sessions = Cortex::getInstance()->sessions;
         $sessionIdHeader = $this->request->getHeaders()->get(Http::HEADER_SESSION_ID);
         $sessionId = is_string($sessionIdHeader) && $sessionIdHeader !== '' ? $sessionIdHeader : null;
 
@@ -780,7 +780,7 @@ class McpController extends Controller
         $expectedAudience = UrlHelper::siteUrl('cortex/mcp');
 
         if ($hasDots) {
-            $oauthHit = Plugin::getInstance()->oauth->lookupAccessToken($bearer);
+            $oauthHit = Cortex::getInstance()->oauth->lookupAccessToken($bearer);
             if ($oauthHit === null) {
                 return null;
             }
@@ -796,7 +796,7 @@ class McpController extends Controller
             return ['userId' => $oauthHit['userId'], 'tokenId' => null];
         }
 
-        $token = Plugin::getInstance()->tokens->lookup($bearer);
+        $token = Cortex::getInstance()->tokens->lookup($bearer);
         if ($token === null) {
             return null;
         }
@@ -900,7 +900,7 @@ class McpController extends Controller
         $sessionIdHeader = $this->request->getHeaders()->get(Http::HEADER_SESSION_ID);
         $sessionId = is_string($sessionIdHeader) && $sessionIdHeader !== '' ? $sessionIdHeader : null;
 
-        Plugin::getInstance()->invocations->record([
+        Cortex::getInstance()->invocations->record([
             'tool' => '_rate_limited',
             'kind' => InvocationLogger::KIND_RATE_LIMITED,
             'duration_ms' => 0,

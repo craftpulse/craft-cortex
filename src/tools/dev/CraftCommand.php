@@ -7,7 +7,7 @@ use craftpulse\cortex\attributes\IsDestructive;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsOpenWorld;
 use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\ConsoleRunner;
 use craftpulse\cortex\tools\support\Schema;
@@ -209,7 +209,7 @@ class CraftCommand extends AbstractTool
      */
     private function _allowlist(): array
     {
-        $patterns = Plugin::getInstance()->allowlist->getEffective();
+        $patterns = Cortex::getInstance()->allowlist->getEffective();
 
         return array_values(array_filter(
             $patterns,
@@ -233,11 +233,11 @@ class CraftCommand extends AbstractTool
      */
     private function _contentPatterns(): array
     {
-        $settings = Plugin::getInstance()->getSettings();
+        $settings = Cortex::getInstance()->getSettings();
         $defaults = $settings->allowedCommands;
         $overridePatterns = array_map(
             static fn(array $row): string => (string) $row['pattern'],
-            Plugin::getInstance()->allowlist->getActiveOverrides(),
+            Cortex::getInstance()->allowlist->getActiveOverrides(),
         );
 
         return array_values(array_unique(array_filter(
@@ -259,7 +259,7 @@ class CraftCommand extends AbstractTool
      */
     private function _adminPatterns(): array
     {
-        $patterns = Plugin::getInstance()->getSettings()->adminLevelCommands;
+        $patterns = Cortex::getInstance()->getSettings()->adminLevelCommands;
 
         return array_values(array_filter(
             $patterns,

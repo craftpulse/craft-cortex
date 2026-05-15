@@ -4,7 +4,7 @@ namespace craftpulse\cortex\services;
 
 use Carbon\Carbon;
 use Craft;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\records\RuntimeOverride;
 use yii\base\Component;
 use yii\base\Exception;
@@ -87,7 +87,7 @@ class Allowlist extends Component
      */
     public function getEffective(): array
     {
-        $settings = Plugin::getInstance()->getSettings();
+        $settings = Cortex::getInstance()->getSettings();
         $defaults = $settings->allowedCommands;
 
         if (Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
@@ -166,7 +166,7 @@ class Allowlist extends Component
         ?string $note = null,
         ?int $ttlSeconds = null,
     ): RuntimeOverride {
-        $ttl = $ttlSeconds ?? Plugin::getInstance()->getSettings()->runtimeOverrideTtl;
+        $ttl = $ttlSeconds ?? Cortex::getInstance()->getSettings()->runtimeOverrideTtl;
 
         $override = new RuntimeOverride();
         $override->pattern = $pattern;
@@ -201,7 +201,7 @@ class Allowlist extends Component
 
     /**
      * Hard-delete expired overrides in capped batches. Invoked during
-     * Craft's gc sweep via the listener registered in `Plugin::init()`.
+     * Craft's gc sweep via the listener registered in `Cortex::init()`.
      * Returns the number of rows pruned in this call.
      *
      * The cap (`PRUNE_BATCH_LIMIT`) bounds gc's worst-case runtime when

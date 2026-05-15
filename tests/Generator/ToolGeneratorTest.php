@@ -34,7 +34,7 @@ it('exposes a non-empty description', function() {
 });
 
 it('is registered on the make command via EVENT_REGISTER_GENERATORS', function() {
-    // Plugin::init() fires the registration on boot. The Yii Event class
+    // Cortex::init() fires the registration on boot. The Yii Event class
     // tracks listeners on the class itself so we can verify by
     // simulating the event and checking that ToolGenerator appears in
     // the resulting types list.

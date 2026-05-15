@@ -25,9 +25,9 @@
  * @since  5.0.0
  */
 
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\events\RegisterToolsEvent;
 use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\services\Tools;
 use craftpulse\cortex\tests\Tools\Fixtures\StreamingFixtureTool;
 use craftpulse\cortex\tools\support\InvocationLogger;
@@ -49,10 +49,10 @@ function _cortex_streaming_register_fixture(): array
     };
     Event::on(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
 
-    $original = Plugin::getInstance()->tools;
+    $original = Cortex::getInstance()->tools;
     $fresh = new Tools();
     $fresh->init();
-    Plugin::getInstance()->set('tools', $fresh);
+    Cortex::getInstance()->set('tools', $fresh);
 
     return [$original, $listener];
 }
@@ -63,7 +63,7 @@ function _cortex_streaming_register_fixture(): array
 function _cortex_streaming_restore_fixture(array $context): void
 {
     [$original, $listener] = $context;
-    Plugin::getInstance()->set('tools', $original);
+    Cortex::getInstance()->set('tools', $original);
     Event::off(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
 }
 

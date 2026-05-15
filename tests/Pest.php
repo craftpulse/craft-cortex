@@ -16,7 +16,7 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use PHPUnit\Framework\TestCase;
 
 uses(TestCase::class)->in(__DIR__);
@@ -87,13 +87,13 @@ function cortex_unwrap(array $envelope): array
 }
 
 /**
- * Run a callable with `Plugin::getInstance()->edition` temporarily set
+ * Run a callable with `Cortex::getInstance()->edition` temporarily set
  * to the given handle, then restore both the original edition and the
  * project-config `muteEvents` flag in a `finally` block so a thrown
  * exception inside the callback can't leave the plugin in a Pro state
  * for a subsequent test.
  *
- * Mutates `Plugin::getInstance()->edition` directly — Craft owns the
+ * Mutates `Cortex::getInstance()->edition` directly — Craft owns the
  * project-config storage for the edition handle and would otherwise
  * fire `EVENT_BEFORE_APPLY_PLUGIN_SETTINGS` on every assignment, so
  * the mute is required around the flip to prevent listener re-entry
@@ -109,7 +109,7 @@ function cortex_unwrap(array $envelope): array
  */
 function cortex_with_edition(string $edition, callable $fn): mixed
 {
-    $plugin = Plugin::getInstance();
+    $plugin = Cortex::getInstance();
     $original = $plugin->edition;
     $projectConfig = Craft::$app->getProjectConfig();
     $originalMute = $projectConfig->muteEvents;

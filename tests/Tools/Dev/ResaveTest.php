@@ -5,11 +5,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('resave');
+    $this->tool = Cortex::getInstance()->tools->getByName('resave');
 });
 
 it('throws when type is missing', function() {

@@ -25,7 +25,7 @@
  */
 
 use Carbon\Carbon;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\records\Invocation as InvocationRecord;
 use craftpulse\cortex\records\Token as TokenRecord;
 use craftpulse\cortex\services\Invocations;
@@ -33,7 +33,7 @@ use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\support\InvocationLogger;
 
 beforeEach(function() {
-    $this->service = Plugin::getInstance()->invocations;
+    $this->service = Cortex::getInstance()->invocations;
 
     // Real user + token ids so the FK constraints on
     // `cortex_invocations.userId` / `.tokenId` don't trip the
@@ -43,7 +43,7 @@ beforeEach(function() {
     expect($admin)->not->toBeNull();
     $this->userId = (int) $admin->id;
 
-    $issued = Plugin::getInstance()->tokens->issue($this->userId, '_test_/invocations-bearer');
+    $issued = Cortex::getInstance()->tokens->issue($this->userId, '_test_/invocations-bearer');
     $this->tokenId = (int) $issued['model']->id;
 });
 
@@ -187,7 +187,7 @@ it('record() catches DB exceptions and returns null without re-throwing', functi
 // -----------------------------------------------------------------------------
 
 it('prune() returns 0 and deletes nothing when retention is null', function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $original = $settings->auditRetentionDays;
     $settings->auditRetentionDays = null;
 
@@ -213,7 +213,7 @@ it('prune() returns 0 and deletes nothing when retention is null', function() {
 });
 
 it('prune() deletes rows older than the retention window', function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $original = $settings->auditRetentionDays;
     $settings->auditRetentionDays = 30;
 
@@ -258,7 +258,7 @@ it('prune() deletes rows older than the retention window', function() {
 });
 
 it('prune() does not delete rows newer than the retention window', function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $original = $settings->auditRetentionDays;
     $settings->auditRetentionDays = 7;
 
@@ -484,5 +484,5 @@ it('find() null filters are no-ops so optional UI filters chain cleanly', functi
 // -----------------------------------------------------------------------------
 
 it('is registered on the plugin as the `invocations` component', function() {
-    expect(Plugin::getInstance()->invocations)->toBeInstanceOf(Invocations::class);
+    expect(Cortex::getInstance()->invocations)->toBeInstanceOf(Invocations::class);
 });

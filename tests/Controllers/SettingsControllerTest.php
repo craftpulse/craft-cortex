@@ -24,7 +24,7 @@
 use Craft;
 use craft\web\Controller;
 use craftpulse\cortex\controllers\SettingsController;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\services\Allowlist;
 use yii\base\Exception;
 use yii\web\Response;
@@ -217,8 +217,8 @@ it('ships a settings template file', function() {
 
 beforeEach(function() {
     // Swap the Plugin's `allowlist` component for the throwing stub.
-    $this->originalAllowlist = Plugin::getInstance()->allowlist;
-    Plugin::getInstance()->set('allowlist', new _CortexThrowingAllowlist());
+    $this->originalAllowlist = Cortex::getInstance()->allowlist;
+    Cortex::getInstance()->set('allowlist', new _CortexThrowingAllowlist());
 
     // Swap Yii::$app for a proxy that delegates everything but
     // `getSession()` (which would otherwise throw on a console app)
@@ -235,7 +235,7 @@ beforeEach(function() {
 afterEach(function() {
     // Restore the original Yii::$app and the plugin's allowlist.
     \Yii::$app = $this->originalApp;
-    Plugin::getInstance()->set('allowlist', $this->originalAllowlist);
+    Cortex::getInstance()->set('allowlist', $this->originalAllowlist);
 });
 
 /**
@@ -255,7 +255,7 @@ function _cortexCapturedCortexLogs(int $countBefore): array
 }
 
 it('actionAddOverride catches allowlist exceptions, flashes error, redirects, and logs', function() {
-    $controller = new _CortexSettingsControllerHarness('settings', Plugin::getInstance());
+    $controller = new _CortexSettingsControllerHarness('settings', Cortex::getInstance());
     $controller->withBody([
         'pattern' => 'foo/*',
         'note' => null,
@@ -276,7 +276,7 @@ it('actionAddOverride catches allowlist exceptions, flashes error, redirects, an
 });
 
 it('actionRemoveOverride catches allowlist exceptions, flashes error, redirects, and logs', function() {
-    $controller = new _CortexSettingsControllerHarness('settings', Plugin::getInstance());
+    $controller = new _CortexSettingsControllerHarness('settings', Cortex::getInstance());
     $controller->withBody(['id' => 123]);
 
     $response = $controller->actionRemoveOverride();

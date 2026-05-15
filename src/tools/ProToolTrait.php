@@ -2,7 +2,7 @@
 
 namespace craftpulse\cortex\tools;
 
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 /**
  * =========================================================================
@@ -22,7 +22,7 @@ use craftpulse\cortex\Plugin;
  *   hierarchy.
  *
  * Comparison-operator semantics:
- * - `Plugin::editions()` returns `['free', 'pro']` in ascending order
+ * - `Cortex::editions()` returns `['free', 'pro']` in ascending order
  *   (see `src/Plugin.php`).
  * - `is(EDITION_PRO, '>=')` walks the array by index. The check
  *   passes on Pro installs and any hypothetical higher tier we might
@@ -45,10 +45,10 @@ use craftpulse\cortex\Plugin;
  *   $original = $projectConfig->muteEvents;
  *   $projectConfig->muteEvents = true;
  *   try {
- *       Plugin::getInstance()->edition = Plugin::EDITION_PRO;
+ *       Cortex::getInstance()->edition = Cortex::EDITION_PRO;
  *       // ... assertions against ProToolTrait::shouldRegister() ...
  *   } finally {
- *       Plugin::getInstance()->edition = Plugin::EDITION_FREE;
+ *       Cortex::getInstance()->edition = Cortex::EDITION_FREE;
  *       $projectConfig->muteEvents = $original;
  *   }
  *
@@ -76,6 +76,6 @@ trait ProToolTrait
      */
     public static function shouldRegister(): bool
     {
-        return Plugin::getInstance()->is(Plugin::EDITION_PRO, '>=');
+        return Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=');
     }
 }

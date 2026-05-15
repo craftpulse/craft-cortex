@@ -6,11 +6,11 @@
  */
 
 use craft\elements\Entry;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('entries');
+    $this->tool = Cortex::getInstance()->tools->getByName('entries');
 });
 
 it('returns an entries list with pagination metadata', function() {

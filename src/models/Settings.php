@@ -139,7 +139,7 @@ class Settings extends Model
      *          stored but no longer count toward the effective
      *          allowlist; expired rows are pruned during Craft's gc
      *          cycle (see `Allowlist::pruneExpired()` wired to
-     *          `Gc::EVENT_RUN` in `Plugin::init()`).
+     *          `Gc::EVENT_RUN` in `Cortex::init()`).
      */
     public int $runtimeOverrideTtl = 604800;
 

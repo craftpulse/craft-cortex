@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('category_groups');
+    $this->tool = Cortex::getInstance()->tools->getByName('category_groups');
 });
 
 it('lists category groups (possibly empty)', function() {

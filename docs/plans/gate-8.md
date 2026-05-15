@@ -10,9 +10,9 @@ This is the implementation plan for the Pro-tier write surface that sits on top 
 
 These are settled. Don't relitigate without good reason.
 
-1. **Edition detection mechanism**: Craft's native `Plugin::editions()` + `$edition` property (`vendor/craftcms/cms/src/base/Plugin.php:64`, `:294`). `Plugin::editions(): array` returns `['free', 'pro']` in ascending order; `Plugin::getInstance()->is(self::EDITION_PRO)` is the runtime check. Edition handle is stored in project config (`plugins.cortex.edition`) by Craft itself — no plugin-side license table, no phone-home call. The Plugin Store sets the edition handle on purchase; on a Free install the value is `'free'` and stays there. Rejected: a `Settings::$edition` flag (duplicates Craft's storage), a hardcoded constant gated by a license file (re-implements what Plugin Store already provides), composer-suggest-based detection (fragile and out of band).
+1. **Edition detection mechanism**: Craft's native `editions()` / `$edition` API on `craft\base\Plugin` (`vendor/craftcms/cms/src/base/Plugin.php:64`, `:294`). `Cortex::editions(): array` overrides to return `['free', 'pro']` in ascending order; `Cortex::getInstance()->is(self::EDITION_PRO)` is the runtime check. Edition handle is stored in project config (`plugins.cortex.edition`) by Craft itself — no plugin-side license table, no phone-home call. The Plugin Store sets the edition handle on purchase; on a Free install the value is `'free'` and stays there. Rejected: a `Settings::$edition` flag (duplicates Craft's storage), a hardcoded constant gated by a license file (re-implements what Plugin Store already provides), composer-suggest-based detection (fragile and out of band).
 
-2. **`ProToolTrait` carries the default `shouldRegister()` for every Pro tool.** Single trait at `src/tools/ProToolTrait.php` providing `public static function shouldRegister(): bool { return Plugin::getInstance()->is(Plugin::EDITION_PRO, '>='); }`. Mirrors how `CraftExec` already special-cases settings-gating at the handler layer (`src/tools/dev/CraftExec.php:44`) — but for whole-tool removal we want registration-time exclusion, not a friendly error, because Free-tier users should never see the tool in `tools/list` regardless of bearer scope. Settings-gated tools like `craft_exec` keep the at-call rejection; edition-gated tools never register.
+2. **`ProToolTrait` carries the default `shouldRegister()` for every Pro tool.** Single trait at `src/tools/ProToolTrait.php` providing `public static function shouldRegister(): bool { return Cortex::getInstance()->is(Cortex::EDITION_PRO, '>='); }`. Mirrors how `CraftExec` already special-cases settings-gating at the handler layer (`src/tools/dev/CraftExec.php:44`) — but for whole-tool removal we want registration-time exclusion, not a friendly error, because Free-tier users should never see the tool in `tools/list` regardless of bearer scope. Settings-gated tools like `craft_exec` keep the at-call rejection; edition-gated tools never register.
 
 3. **Permission boundary map is the per-tool contract.** Each Pro tool declares its required Craft permission(s) in a `_requiredPermissions(array $arguments): array` protected method (returns the list of permission strings the `execute()` arguments imply). `filterFor()` consults the same method with empty arguments to decide whole-tool visibility — a user with `saveEntries:*` on any section sees `entry`; a user with none doesn't. `execute()` re-checks against the resolved arguments before any element mutation, and throws `ToolException` with JSON-RPC code `-32002` ("permission denied", consistent with the existing not-permitted shape) when the permission is absent. Defense in depth per [`.claude/rules/architecture.md`](../../.claude/rules/architecture.md) "Per-user tool visibility" — `tools/list` filtering is for the LLM's tool-selection UX; `execute()` filtering is for security.
 
@@ -92,7 +92,7 @@ These are settled. Don't relitigate without good reason.
 
 | # | Sub-gate | Complexity | Adds |
 |---|---|---|---|
-| 8.1 | Edition detection foundation + `ProToolTrait` | Medium | `Plugin::editions()` override, `EDITION_FREE`/`EDITION_PRO` constants, `ProToolTrait`, `cortex/edition/show` console action, edition-gating invariant test |
+| 8.1 | Edition detection foundation + `ProToolTrait` | Medium | `Cortex::editions()` override, `EDITION_FREE`/`EDITION_PRO` constants, `ProToolTrait`, `cortex/edition/show` console action, edition-gating invariant test |
 | 8.2 | `entry` Pro tool (create/update/delete/restore/apply_draft) | Large | `src/tools/content/Entry.php` with five modes, per-section permission gating, `setFieldValues()` integration, validation-error envelope |
 | 8.3 | `category`, `tag`, `global_set` Pro tools | Medium | three tools sharing the per-group / per-set permission pattern from 8.2 |
 | 8.4 | `address` Pro tool | Medium | `src/tools/content/Address.php` with five modes, per-owner gating, ISO 3166-1 country validation |
@@ -104,7 +104,7 @@ These are settled. Don't relitigate without good reason.
 
 ## Sub-gate 8.1 — Edition detection foundation
 
-**Goal**: `Plugin::editions()` returns `['free', 'pro']`; `ProToolTrait` gives every Pro tool a one-line `shouldRegister()` override; an architecture invariant test asserts the binding. Everything else in Gate 8 depends on this seam existing.
+**Goal**: `Cortex::editions()` returns `['free', 'pro']`; `ProToolTrait` gives every Pro tool a one-line `shouldRegister()` override; an architecture invariant test asserts the binding. Everything else in Gate 8 depends on this seam existing.
 
 **New**:
 - `src/tools/ProToolTrait.php` — single trait:
@@ -113,7 +113,7 @@ These are settled. Don't relitigate without good reason.
   {
       public static function shouldRegister(): bool
       {
-          return Plugin::getInstance()->is(Plugin::EDITION_PRO, '>=');
+          return Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=');
       }
   }
   ```
@@ -144,7 +144,7 @@ These are settled. Don't relitigate without good reason.
 **Untouched**: `Tools.php` (the existing `shouldRegister()` loop at line 107 already honours the per-tool override).
 
 **Tests**:
-- `tests/Plugin/EditionTest.php` — `Plugin::editions() === ['free', 'pro']`; `Plugin::getInstance()->is(Plugin::EDITION_FREE)` is true on a default install; flipping `$plugin->edition` to `'pro'` makes `is(EDITION_PRO)` true and a `ProToolTrait`-using fixture's `shouldRegister()` return true.
+- `tests/Plugin/EditionTest.php` — `Cortex::editions() === ['free', 'pro']`; `Cortex::getInstance()->is(Cortex::EDITION_FREE)` is true on a default install; flipping `$plugin->edition` to `'pro'` makes `is(EDITION_PRO)` true and a `ProToolTrait`-using fixture's `shouldRegister()` return true.
 - `tests/Console/EditionControllerTest.php` — `cortex/edition/show` exit code 0; stdout contains the current edition handle.
 - `tests/Tools/Dev/CraftCommandAdminChangesTest.php` — per locked decision 14:
   - `allowAdminChanges = true`: a `migrate/up` invocation succeeds (or is at least admitted by the allowlist — actual execution may dry-run); a `make/section` invocation is admitted.
@@ -296,7 +296,7 @@ These are settled. Don't relitigate without good reason.
 **Goal**: extend `drafts_and_revisions`, `audit`, `import_export`, `diagnostics` with Pro modes per PLANNING.md §4.12 lines 921–924. Each existing tool stays Free at registration time; the new modes are reachable only when the caller's `inputSchemaFor()` exposes them AND the user has the matching permission.
 
 **Modified**:
-- `src/tools/workflow/DraftsAndRevisions.php` — add `apply` and `discard` to the mode enum in `getInputSchema()`. New `inputSchemaFor()` override: if Free edition OR `Plugin::getInstance()->is(EDITION_PRO) === false`, strip `apply`/`discard` from the enum. If Pro, walk the user's permissions and strip modes the user can't reach (a user with no `saveEntries:*` sees only `list_drafts` / `list_revisions` / `compare`). New `execute()` branches: `apply` resolves the draft and applies via `Craft::$app->getDrafts()->applyDraft()`; `discard` deletes via `Craft::$app->getDrafts()->discardDraft()`. Permission re-check inside `execute()` — `-32002` on miss.
+- `src/tools/workflow/DraftsAndRevisions.php` — add `apply` and `discard` to the mode enum in `getInputSchema()`. New `inputSchemaFor()` override: if Free edition OR `Cortex::getInstance()->is(EDITION_PRO) === false`, strip `apply`/`discard` from the enum. If Pro, walk the user's permissions and strip modes the user can't reach (a user with no `saveEntries:*` sees only `list_drafts` / `list_revisions` / `compare`). New `execute()` branches: `apply` resolves the draft and applies via `Craft::$app->getDrafts()->applyDraft()`; `discard` deletes via `Craft::$app->getDrafts()->discardDraft()`. Permission re-check inside `execute()` — `-32002` on miss.
 - `src/tools/workflow/Audit.php` — same pattern. Add fix modes per PLANNING.md §4.12 line 922:
   - `fix_relations` (delete broken outgoing relations on the affected element list).
   - `prune_unused_assets` (delete or hard-delete unreferenced assets in the volumes the caller can write).
@@ -383,7 +383,7 @@ After each sub-gate, before moving on:
 
 ## Cross-cutting test strategy
 
-- **Edition flipping in tests**: a single Pest helper sets `Craft::$app->getProjectConfig()->muteEvents = true`, mutates `Plugin::getInstance()->edition`, restores in `afterEach()`. Reused by every Gate 8 sub-gate. Lives in `tests/Pest.php` or a dedicated `EditionHelper` trait — builder for 8.1 decides which.
+- **Edition flipping in tests**: a single Pest helper sets `Craft::$app->getProjectConfig()->muteEvents = true`, mutates `Cortex::getInstance()->edition`, restores in `afterEach()`. Reused by every Gate 8 sub-gate. Lives in `tests/Pest.php` or a dedicated `EditionHelper` trait — builder for 8.1 decides which.
 - **Permission scaffolding**: factory builders for users with scoped permissions per the locked decision 4 table. Reused across every Pro-tool test. Lives in `tests/Factories/UserFactory.php` (extend or add).
 - **Streaming tests in Pest**: spin the generator directly (`iterator_to_array($tool->stream($args, $ctx))`) and assert frame count, monotonicity, and the `getReturn()` value. No real HTTP server. Pattern matches Gate 7.7's `StreamingFixtureTool` test.
 - **Permission boundary as a data provider**: Pest dataset feeding the matrix from locked decision 4. Adding a new Pro tool means adding a row, not a test case.

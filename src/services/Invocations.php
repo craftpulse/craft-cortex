@@ -4,8 +4,8 @@ namespace craftpulse\cortex\services;
 
 use Carbon\Carbon;
 use Craft;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\db\InvocationQuery;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\records\Invocation as InvocationRecord;
 use Throwable;
 use yii\base\Component;
@@ -16,7 +16,7 @@ use yii\db\Expression;
  * HTTP-transport audit-log writer.
  *
  * Subscribes to `InvocationLogger::EVENT_LOG_CALL` (wired in
- * `Plugin::init()`) and persists one row per HTTP `tools/call` to
+ * `Cortex::init()`) and persists one row per HTTP `tools/call` to
  * `cortex_invocations`. stdio invocations are silently dropped per the
  * locked decision in `docs/plans/gate-7.md` item 11: stdio is single-
  * process trusted-local; the DB audit log exists for the HTTP
@@ -25,7 +25,7 @@ use yii\db\Expression;
  * Soft-write contract: a DB failure in `record()` MUST NOT break the
  * dispatch. Every exception is caught, logged to Craft's error log under
  * the `cortex.audit` category for operator awareness, and swallowed. The
- * caller (the event listener in `Plugin::init()`) never sees the
+ * caller (the event listener in `Cortex::init()`) never sees the
  * exception, so the JSON-RPC response continues normally. The KV log
  * line in Craft's file log is the secondary audit trail when the DB
  * write fails.
@@ -139,7 +139,7 @@ class Invocations extends Component
      * retention is null — the forever-retention default.
      *
      * Called inline during Craft's gc sweep via the listener wired in
-     * `Plugin::init()`. The delete is a single indexed range scan on
+     * `Cortex::init()`. The delete is a single indexed range scan on
      * `dateCreated` so it stays cheap even on large audit tables.
      *
      * @author Craftpulse
@@ -147,7 +147,7 @@ class Invocations extends Component
      */
     public function prune(): int
     {
-        $retentionDays = Plugin::getInstance()->getSettings()->auditRetentionDays;
+        $retentionDays = Cortex::getInstance()->getSettings()->auditRetentionDays;
         if ($retentionDays === null) {
             return 0;
         }
@@ -167,7 +167,7 @@ class Invocations extends Component
      *
      * Chain filters and finalise with `all()` / `one()` / `count()`:
      *
-     *     $rows = Plugin::getInstance()->invocations->find()
+     *     $rows = Cortex::getInstance()->invocations->find()
      *         ->kind('tool_error')
      *         ->after(Carbon::now()->subDay())
      *         ->orderBy(['dateCreated' => SORT_DESC])

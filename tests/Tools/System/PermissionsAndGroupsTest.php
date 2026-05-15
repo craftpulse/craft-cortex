@@ -6,10 +6,10 @@
  */
 
 use Craft;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('permissions_and_groups');
+    $this->tool = Cortex::getInstance()->tools->getByName('permissions_and_groups');
 });
 
 it('returns the permissions tree, flat name list, and groups', function() {

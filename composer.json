@@ -69,6 +69,6 @@
         "developer": "Craftpulse",
         "developerUrl": "https://craftpulse.com",
         "documentationUrl": "https://github.com/craftpulse/craft-cortex",
-        "class": "craftpulse\\cortex\\Plugin"
+        "class": "craftpulse\\cortex\\Cortex"
     }
 }

@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('entry_types');
+    $this->tool = Cortex::getInstance()->tools->getByName('entry_types');
 });
 
 it('lists entry types with field-layout summary', function() {

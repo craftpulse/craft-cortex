@@ -26,7 +26,7 @@ use Nette\PhpGenerator\PhpNamespace;
  *   - MCP tool name (snake_case; defaults to `my_tool` from class name)
  *
  * After generation the user must register the tool either through their
- * plugin's `Plugin::init()` via `EVENT_REGISTER_TOOLS`, or directly in
+ * plugin's `Cortex::init()` via `EVENT_REGISTER_TOOLS`, or directly in
  * cortex's own `services/Tools::_buildRegistry()` if extending core.
  * The generator prints the registration snippet on success.
  * =========================================================================

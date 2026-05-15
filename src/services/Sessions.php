@@ -4,8 +4,8 @@ namespace craftpulse\cortex\services;
 
 use Carbon\Carbon;
 use Craft;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\mcp\Session;
-use craftpulse\cortex\Plugin;
 use yii\base\Component;
 use yii\caching\CacheInterface;
 
@@ -199,7 +199,7 @@ class Sessions extends Component
      */
     private function _persist(Session $session): void
     {
-        $ttl = Plugin::getInstance()->getSettings()->sessionTtl;
+        $ttl = Cortex::getInstance()->getSettings()->sessionTtl;
         $this->_cache()->set(
             self::CACHE_KEY_PREFIX . $session->id,
             $session->toArray(),
