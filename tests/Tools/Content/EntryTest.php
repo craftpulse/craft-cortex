@@ -315,6 +315,52 @@ it('update mode throws when the entry does not exist', function() {
     });
 })->throws(ToolException::class);
 
+it('update mode refuses a trashed entry with a restore-hint message', function() {
+    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    if ($section === null) {
+        $this->markTestSkipped('No writable section available in playground.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+        $tool = _cortex_entry_tool();
+        $created = $tool->execute([
+            'mode' => 'create',
+            'sectionHandle' => $section->handle,
+            'title' => $this->fixturePrefix . 'trashed-update',
+        ]);
+        $id = $created['entry']['id'];
+
+        // Soft-delete via the tool to put the entry in the trash.
+        $tool->execute(['mode' => 'delete', 'id' => $id]);
+
+        // Attempting to update the trashed entry must refuse with a
+        // message naming `restore` (so the LLM can recover) and
+        // `hardDelete` (so it sees the alternative for permanent
+        // removal). The trashed entry must not be touched.
+        $caught = null;
+        try {
+            $tool->execute([
+                'mode' => 'update',
+                'id' => $id,
+                'title' => $this->fixturePrefix . 'would-untrash',
+            ]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->not->toBeNull();
+        expect($caught->getMessage())->toContain('is trashed');
+        expect($caught->getMessage())->toContain('mode=restore');
+        expect($caught->getMessage())->toContain('hardDelete=true');
+
+        // Defense-in-depth: the trashed entry's title is unchanged
+        // (no silent un-trash + re-save).
+        $stillTrashed = EntryElement::find()->id($id)->status(null)->trashed(true)->one();
+        expect($stillTrashed)->toBeInstanceOf(EntryElement::class);
+        expect($stillTrashed->title)->toBe($this->fixturePrefix . 'trashed-update');
+    });
+});
+
 // -----------------------------------------------------------------------------
 // delete — soft + hard
 // -----------------------------------------------------------------------------

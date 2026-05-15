@@ -843,13 +843,24 @@ class Entry extends AbstractTool
     }
 
     /**
-     * Resolve the entry by `id` or `uid`. Includes trashed elements
-     * so update/delete on a soft-deleted entry returns the right
-     * "no entry found" message rather than silently misbehaving.
-     * Trashed elements are excluded only when the mode wouldn't
-     * normally see them — but for the call-site (update / delete),
-     * trashed entries should appear (delete on already-trashed is a
-     * no-op; update on trashed re-saves).
+     * Resolve the entry by `id` or `uid` for `update` / `delete`.
+     *
+     * Trashed entries are explicitly excluded. Craft's element-query
+     * default (`$trashed = false`) does this already; this method
+     * does NOT opt back in. The rationale is the trashed-on-`update`
+     * footgun: a re-save of a trashed entry would silently un-trash
+     * it, which is `restore` mode's job and an unexpected effect of
+     * `update`.
+     *
+     * When the lookup misses, the method probes whether the id/uid
+     * matches a trashed row and surfaces a mode-aware error pointing
+     * at `restore` (for mutation) or `delete` + `hardDelete=true`
+     * (for permanent removal). The probe runs only on the slow
+     * (not-found) path, so happy-path calls pay nothing.
+     *
+     * `apply_draft` does NOT route through here — it loads via
+     * `Drafts::getDraftById()` against a draft id, not a canonical
+     * entry.
      *
      * @param array<string,mixed> $arguments
      * @throws ToolException
@@ -878,12 +889,25 @@ class Entry extends AbstractTool
         }
 
         $element = $query->one();
-        if (!$element instanceof EntryElement) {
-            $key = (is_int($id) || (is_string($id) && ctype_digit($id))) ? "id={$id}" : "uid={$uid}";
-            throw new ToolException("entry: no entry found for {$key}.");
+        if ($element instanceof EntryElement) {
+            return $element;
         }
 
-        return $element;
+        // Slow-path probe: does this id/uid match a TRASHED entry?
+        // If yes, surface a mode-aware hint instead of the generic
+        // "no entry found" so the LLM can recover (restore-then-
+        // mutate, or hard-delete to remove permanently).
+        $trashedProbe = (clone $query)->trashed(true)->one();
+        if ($trashedProbe instanceof EntryElement) {
+            $probeKey = $trashedProbe->id !== null ? "id={$trashedProbe->id}" : "uid={$trashedProbe->uid}";
+            throw new ToolException(
+                "entry: {$probeKey} is trashed. To mutate, restore first with " .
+                    "mode=restore; to remove permanently, use mode=delete with hardDelete=true."
+            );
+        }
+
+        $key = (is_int($id) || (is_string($id) && ctype_digit($id))) ? "id={$id}" : "uid={$uid}";
+        throw new ToolException("entry: no entry found for {$key}.");
     }
 
     /**
