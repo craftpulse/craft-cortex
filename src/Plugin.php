@@ -11,6 +11,7 @@ use craft\web\UrlManager;
 use craftpulse\cortex\events\LogCallEvent;
 use craftpulse\cortex\generator\Tool as ToolGenerator;
 use craftpulse\cortex\models\Settings;
+use craftpulse\cortex\plugin\Services as CortexServices;
 use craftpulse\cortex\services\Allowlist;
 use craftpulse\cortex\services\Invocations;
 use craftpulse\cortex\services\Oauth;
@@ -28,15 +29,23 @@ use yii\base\Event;
  * =========================================================================
  * Cortex plugin entry point.
  *
- * Registers under handle `cortex` and wires three services so the MCP
- * server (`cortex/serve` console controller) can resolve them:
- *   - `Plugin::getInstance()->tools`     -> tool registry
- *   - `Plugin::getInstance()->prompts`   -> skill-backed prompts
- *   - `Plugin::getInstance()->resources` -> skill-backed resources
+ * Wires the MCP server's services, console controllers (auto-discovered
+ * from `src/console/controllers/`), and the Gate 7 HTTP transport
+ * (`cortex/mcp` plus the OAuth + `.well-known` URL rules registered in
+ * `init()`).
  *
- * Console controllers are auto-discovered by Craft from
- * src/console/controllers/. Web controllers will land alongside the
- * HTTP transport in a future release.
+ * Service accessors live on the `CortexServices` trait
+ * (`src/plugin/Services.php`) — one typed `getXxx(): Xxx` per registered
+ * component. The trait is the canonical type contract; `config()`
+ * declares the Yii component map that makes `$this->get('xxx')` resolve.
+ * Adding a service means editing both, not the class docblock.
+ * Property-style access (`$plugin->tools`) continues to work via Yii's
+ * `__get()` walking the trait's getter.
+ *
+ * Edition handles (`EDITION_FREE`, `EDITION_PRO`) are declared via
+ * `editions()` per the Plugin Store contract. The active edition lives
+ * in project config at `plugins.cortex.edition`; Craft owns the
+ * storage. Cortex does not run a license network call.
  * =========================================================================
  *
  * @author Craftpulse
@@ -44,18 +53,11 @@ use yii\base\Event;
  *
  * @method static Plugin getInstance()
  * @method Settings getSettings()
- * @property-read Allowlist $allowlist
- * @property-read Invocations $invocations
- * @property-read Oauth $oauth
- * @property-read Prompts $prompts
- * @property-read RateLimiter $rateLimiter
- * @property-read Resources $resources
- * @property-read Sessions $sessions
- * @property-read Tokens $tokens
- * @property-read Tools $tools
  */
 class Plugin extends BasePlugin
 {
+    use CortexServices;
+
     // Constants
     // =========================================================================
 

@@ -1,0 +1,203 @@
+<?php
+
+namespace craftpulse\cortex\plugin;
+
+use craftpulse\cortex\services\Allowlist;
+use craftpulse\cortex\services\Invocations;
+use craftpulse\cortex\services\Oauth;
+use craftpulse\cortex\services\Prompts;
+use craftpulse\cortex\services\RateLimiter;
+use craftpulse\cortex\services\Resources;
+use craftpulse\cortex\services\Sessions;
+use craftpulse\cortex\services\Tokens;
+use craftpulse\cortex\services\Tools;
+use yii\base\InvalidConfigException;
+
+/**
+ * =========================================================================
+ * Cortex service-accessor trait.
+ *
+ * Mirrors the Craft Commerce `plugin/Services` pattern
+ * (`vendor/craftcms/commerce/src/plugin/Services.php`). Each typed
+ * getter wraps Yii's component resolution so callers see a real
+ * return type — no `@property-read` PHPDoc magic on the main plugin
+ * class, no drift between the class-level docblock and the actual
+ * `config()` map.
+ *
+ * Components are still declared in `Plugin::config()` (Yii's
+ * component map is what makes `$this->get('xxx')` resolve). The
+ * trait provides the typed surface; `config()` provides the
+ * dependency wiring. Both files together are the source of truth —
+ * adding a service means editing both.
+ *
+ * `$plugin->tools` continues to resolve via Yii's `__get()` walking
+ * the trait's `getTools()` getter, so existing callers and tests
+ * keep working unchanged. The `@property` tags below teach PHPStan
+ * about the magic-property resolution — without them, level 8
+ * flags every `$plugin->xxx` access as an undefined property.
+ *
+ * Each getter narrows `Component::get()`'s `?object` return via
+ * `assert($component instanceof <Service>)`. PHPStan recognises
+ * the assert and narrows the local type; the assert is also
+ * defense-in-depth when assertions are enabled (dev installs).
+ * =========================================================================
+ *
+ * @property Allowlist $allowlist the runtime-allowlist override service
+ * @property Invocations $invocations the HTTP-transport audit-log writer
+ * @property Oauth $oauth the OAuth 2.1 authorization-server orchestrator
+ * @property Prompts $prompts the MCP prompts registry
+ * @property RateLimiter $rateLimiter the per-user rate limiter
+ * @property Resources $resources the MCP resources registry
+ * @property Sessions $sessions the HTTP-transport session store
+ * @property Tokens $tokens the bearer-token issuance / lookup / revoke service
+ * @property Tools $tools the MCP tool registry
+ *
+ * @author Craftpulse
+ * @since  5.0.0
+ */
+trait Services
+{
+    // Public Methods
+    // =========================================================================
+
+    /**
+     * Returns the runtime command-allowlist override service.
+     *
+     * @throws InvalidConfigException When the component is not registered.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getAllowlist(): Allowlist
+    {
+        $component = $this->get('allowlist');
+        assert($component instanceof Allowlist);
+        return $component;
+    }
+
+    /**
+     * Returns the HTTP-transport audit-log writer.
+     *
+     * @throws InvalidConfigException When the component is not registered.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getInvocations(): Invocations
+    {
+        $component = $this->get('invocations');
+        assert($component instanceof Invocations);
+        return $component;
+    }
+
+    /**
+     * Returns the OAuth 2.1 authorization-server orchestrator
+     * (`league/oauth2-server` wrapper plus DCR + audience binding).
+     *
+     * @throws InvalidConfigException When the component is not registered.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getOauth(): Oauth
+    {
+        $component = $this->get('oauth');
+        assert($component instanceof Oauth);
+        return $component;
+    }
+
+    /**
+     * Returns the MCP prompts registry — one prompt per bundled
+     * `michtio/craftcms-claude-skills` skill.
+     *
+     * @throws InvalidConfigException When the component is not registered.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getPrompts(): Prompts
+    {
+        $component = $this->get('prompts');
+        assert($component instanceof Prompts);
+        return $component;
+    }
+
+    /**
+     * Returns the per-user token-bucket rate limiter (PSR-16 backed).
+     *
+     * @throws InvalidConfigException When the component is not registered.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getRateLimiter(): RateLimiter
+    {
+        $component = $this->get('rateLimiter');
+        assert($component instanceof RateLimiter);
+        return $component;
+    }
+
+    /**
+     * Returns the MCP resources registry — bundled skill + agent
+     * resource URIs.
+     *
+     * @throws InvalidConfigException When the component is not registered.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getResources(): Resources
+    {
+        $component = $this->get('resources');
+        assert($component instanceof Resources);
+        return $component;
+    }
+
+    /**
+     * Returns the HTTP-transport session store (cache-backed
+     * sliding-expiry sessions keyed by `Mcp-Session-Id`).
+     *
+     * @throws InvalidConfigException When the component is not registered.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getSessions(): Sessions
+    {
+        $component = $this->get('sessions');
+        assert($component instanceof Sessions);
+        return $component;
+    }
+
+    /**
+     * Returns the bearer-token issuance / lookup / revocation
+     * service for the HTTP transport.
+     *
+     * @throws InvalidConfigException When the component is not registered.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getTokens(): Tokens
+    {
+        $component = $this->get('tokens');
+        assert($component instanceof Tokens);
+        return $component;
+    }
+
+    /**
+     * Returns the MCP tool registry — the canonical entry point for
+     * tool enumeration, lookup, and per-user filtering.
+     *
+     * @throws InvalidConfigException When the component is not registered.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getTools(): Tools
+    {
+        $component = $this->get('tools');
+        assert($component instanceof Tools);
+        return $component;
+    }
+}
