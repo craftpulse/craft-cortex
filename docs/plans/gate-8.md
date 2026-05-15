@@ -42,7 +42,7 @@ These are settled. Don't relitigate without good reason.
    | `import_export` | `import` | `saveEntries:{sectionUid}` per target section |
    | `diagnostics` | `manage_queue` | `utility:queue-manager` (matches `vendor/craftcms/cms/src/utilities/QueueManager.php:36`) |
 
-   This table is the canonical reference for sub-gate 8.9's permission-boundary test matrix. Builders implementing each sub-gate copy the relevant row into the tool's PHPDoc.
+   This table is the canonical reference for sub-gate 8.10's permission-boundary test matrix. Builders implementing each sub-gate copy the relevant row into the tool's PHPDoc.
 
 5. **PII gating on the `users` tool**: Free-tier exposure stays at zero PII — the current Free `permissions_and_groups` tool already returns "user groups (no PII)" per PLANNING.md §4.5 line 424, and Free has no `users` tool at all. The Pro `users` tool returns:
    - **Always (in any Pro response)**: `id, uid, username, fullName, active, suspended, pending, locked, admin, lastLoginDate, dateCreated, groupUids[]`.
@@ -68,7 +68,7 @@ These are settled. Don't relitigate without good reason.
 
    **Degradation**: every streaming tool MUST work non-streaming. When the client doesn't send `Accept: text/event-stream`, the dispatcher eagerly consumes the generator (per `ToolInterface::execute()`'s `array|\Generator` contract — Gate 7.7) and returns the final value as JSON. Per the locked Gate 7.7 wire shape, streaming is an `Accept`-header upgrade, not a tool capability flag.
 
-8. **Cancellation token forwarding to non-streaming Pro tools.** Pro tools that don't implement `StreamableToolInterface` (`entry`, `category`, `tag`, `address`, `global_set`, `users`) still receive the `InvocationContext` — but cancellation is irrelevant to a single-mutation tool (the operation either completes or doesn't). These tools do NOT need to poll `getCancellationToken()->isCancelled()`. Only the four streaming tools (8.6, 8.7 audit-fix, 8.7 import_export-import, 8.8 resave) cooperate with cancellation.
+8. **Cancellation token forwarding to non-streaming Pro tools.** Pro tools that don't implement `StreamableToolInterface` (`entry`, `category`, `tag`, `address`, `global_set`, `users`) still receive the `InvocationContext` — but cancellation is irrelevant to a single-mutation tool (the operation either completes or doesn't). These tools do NOT need to poll `getCancellationToken()->isCancelled()`. Only the four streaming tools (8.7, 8.8 audit-fix, 8.8 import_export-import, 8.9 resave) cooperate with cancellation.
 
 9. **`bulk_entries` mode shape — combined modes, single tool**: per PLANNING.md §4.7 line 544 — `set_status / update_fields / relate / migrate / scaffold`. Each mode takes a query specification (`{section, entryType, status, search, ids}`) plus mode-specific payload. Per-row permission check (see decision 4) means a user with `saveEntries:posts` only can run a query that includes `news` entries; the dispatcher SKIPS the disallowed rows with a `skipped` entry in the per-row result, never aborts the whole operation. Defense in depth: the per-row check is in `execute()`, not just `filterFor()` — `filterFor()` only requires that the user has `saveEntries:*` on AT LEAST ONE section.
 
@@ -76,17 +76,19 @@ These are settled. Don't relitigate without good reason.
 
 11. **No CP UI in Gate 8.** Pro tools are exercisable end-to-end through the MCP protocol alone. Token issuance, audit review, and connection reference all stay on the console / curl until Gate 9. Console commands ship where the tool's setup would otherwise need a UI (e.g. `cortex/edition/show` for sanity-checking which edition is active).
 
-12. **Project config sync surface for Gate 8.** No new project-config-stored entities — every Pro tool reads existing Craft project config (sections, entry types, category groups, volumes) and writes elements which live in the DB. The custom-skills element type (Gate 8.5) IS project-config-stored but is a separate gate; Gate 8 does not touch project config beyond the edition-handle field Craft already manages.
+12. **Project config sync surface for Gate 8.** Most Pro tools (8.2–8.5, 8.7) read existing Craft project config (sections, entry types, category groups, volumes) and write elements which live in the DB — no new project-config-stored entities. The exception is **Gate 8.6** (custom skill element type), which registers a new Cortex-owned element type via project config (schema, field layout, type definition) while skill instances live in the DB. Standard Craft pattern, same as how `CategoryGroup` registers via PC and `Category` rows live in DB.
 
-13. **Sub-gate sequencing**: 8.1 → 8.2 → 8.3 → 8.4 → 8.5 → 8.6 → 8.7 → 8.8 → 8.9. 8.1 is the foundation everything else depends on. 8.2 is the highest-complexity content tool and seeds the patterns 8.3 / 8.4 reuse. 8.6's streaming work is sequenced after the non-streaming Pro tools to let the streaming infrastructure settle. 8.9 is the cross-cutting test sweep — it runs against every previous sub-gate's surface.
+13. **Sub-gate sequencing**: 8.1 → 8.2 → 8.3 → 8.4 → 8.5 → 8.6 → 8.7 → 8.8 → 8.9 → 8.10. 8.1 is the foundation everything else depends on. 8.2 is the highest-complexity content tool and seeds the patterns 8.3 / 8.4 reuse. 8.6 (custom skill element type) is parallel to the streaming work — it doesn't depend on 8.7's streaming infrastructure and can ship before it. 8.7's streaming work is sequenced after the non-streaming Pro tools to let the streaming infrastructure settle. 8.10 is the cross-cutting test sweep — it runs against every previous sub-gate's surface.
 
 14. **`allowAdminChanges` policy.** When `Craft::$app->getConfig()->getGeneral()->allowAdminChanges === false`, any tool that would mutate admin-only state (project config, schema migrations, plugin install, code-generator scaffolding) MUST refuse. Implementation:
     - **`craft_command` allowlist is split into two arrays.** Existing `Settings::$allowedCommands` shrinks to content-level only: `['resave/*', 'cache/*', 'invalidate-tags/*', 'index-assets/*', 'gc', 'users/create', 'utils/*', 'clear-deprecations', 'mailer/test']`. New `Settings::$adminLevelCommands` carries the admin-level patterns: `['project-config/*', 'migrate/*', 'up', 'make/*', 'entrify/*', 'sections/*', 'fields/*', 'fixture/*']`. The effective allowlist at dispatch time is `$allowedCommands ∪ $adminLevelCommands` when `allowAdminChanges === true`, else `$allowedCommands` only. Pre-ship, so no back-compat to preserve — the existing single-array shape is replaced cleanly.
     - **`craft_exec`** stays stdio-only (Gate 7 locked decision 4); HTTP transport never sees it. No additional gate needed.
-    - **Gate 8 Pro tools** — verified content-level per the permission map in decision 4. None require an `allowAdminChanges` gate. The boundary test matrix in 8.9 covers both `true` and `false` states regardless to lock the contract.
-    - **Architecture invariant test** in 8.9: under `allowAdminChanges = false`, no tool in `Tools::asListPayload()` admits a command/mode/argument shape that would mutate project config or run a migration. The test exercises both states and asserts the bleed-through is zero.
+    - **Gate 8 Pro tools** — verified content-level per the permission map in decision 4. None require an `allowAdminChanges` gate. The boundary test matrix in 8.10 covers both `true` and `false` states regardless to lock the contract.
+    - **Architecture invariant test** in 8.10: under `allowAdminChanges = false`, no tool in `Tools::asListPayload()` admits a command/mode/argument shape that would mutate project config or run a migration. The test exercises both states and asserts the bleed-through is zero.
 
-15. **HARD STOP before Gate 8.5 (custom skills element type).** User has flagged that storing skills in project config (per the current PLANNING.md §4.12 8.5 spec, line 939: "schema (element type config, depth limits) in project config") may not be the right choice — skills are elements, and elements normally live in the DB. **Do not plan or implement Gate 8.5 without first re-opening this storage-location question with the user.** The PLANNING.md spec is provisional on this point and the planner agent for 8.5 must surface it as the first thing to lock. Note in PLANNING.md §4.12 mirrors this flag.
+15. **Custom skill storage (resolved 2026-05-15)**. Storage follows standard Craft patterns: **element-type registration → project config** (schema, handle, field layout, hierarchy semantics — same as `CategoryGroup` / `TagGroup` / `Section`); **skill element instances → DB** (rows in a `cortex_skills` table joined to `elements` / `elements_sites` — same as `Category` / `Tag` / `Entry` instances). No special storage decisions required. Cortex's existing `Settings::$userCustomFieldAllowlist`-style plugin-level toggles about skills (e.g. an `allowOverrideOfBundledHandles` flag, if needed) would live in project config via the `Settings` model. The earlier HARD STOP flag is resolved; PLANNING.md §4.12's earlier wording about depth-limits-in-PC is provisional and lands in 8.6 only if the planner finds it useful.
+
+16. **Bundled vs element-stored skill coexistence (resolved 2026-05-15, option ii)**. `SearchSkills` (the existing Free read tool) returns the **union** of bundled skills (from `~/dev/craftcms-claude-skills/`) and element-stored skills (Gate 8.6). On **handle collision**, element-stored wins — the bundled version is hidden from the merged list. Each returned skill carries a `source: 'bundled' | 'element'` field so the LLM knows which is canonical. Rationale: admins should be able to override a bundled skill without forking the upstream repo, but still inherit the curated bundled corpus by default. Rejected: (i) replace-bundled-entirely (kills the curated value-prop); (iii) separate sources (forces every consumer to query two places). The override semantics live entirely in `SearchSkills`; the new `skill` Pro tool (8.6) operates on element-stored skills only — bundled skills are read-only via the filesystem and not exposed as writes.
 
 ## Sub-gate map
 
@@ -97,10 +99,11 @@ These are settled. Don't relitigate without good reason.
 | 8.3 | `category`, `tag`, `global_set` Pro tools | Medium | three tools sharing the per-group / per-set permission pattern from 8.2 |
 | 8.4 | `address` Pro tool | Medium | `src/tools/content/Address.php` with five modes, per-owner gating, ISO 3166-1 country validation |
 | 8.5 | `users` Pro tool + PII gating | Large | `src/tools/system/Users.php`, `editUsers` / `registerUsers` / `deleteUsers` gating, the PII map from locked decision 5 |
-| 8.6 | `bulk_entries` Pro tool with streaming | Large | `src/tools/content/BulkEntries.php` implementing both `ToolInterface::execute()` and `StreamableToolInterface::stream()`; per-row permission check; first new Pro tool that uses Gate 7.7's streaming infrastructure |
-| 8.7 | Mode unlocks on the four Free tools | Large | `drafts_and_revisions` apply/discard, `audit` fix modes, `import_export` import, `diagnostics` manage_queue. Each gets an `inputSchemaFor()` override + new `execute()` dispatch branches |
-| 8.8 | Streaming enablement on `resave` + the new streaming-capable Pro tools | Medium | `Resave` implements `StreamableToolInterface::stream()`; `audit` fix modes and `import_export` import gain the same; per-tool progress contract from locked decision 7 |
-| 8.9 | Cross-tier integration tests | Medium | `tests/Architecture/EditionGatingTest.php`, `tests/Integration/PermissionBoundaryTest.php` (every Pro write mode tested for refuses-without-and-succeeds-with), mode-not-permitted error-shape invariant |
+| 8.6 | Custom skill element type + `skill` Pro tool | Large | `src/elements/Skill.php` element class, `cortex_skills` DB table + migration, project-config-stored element-type registration with field layout, `src/tools/system/Skill.php` (Pro CRUD), `SearchSkills` updated to merge bundled + element-stored skills with element-stored overriding by handle (locked decision 16) |
+| 8.7 | `bulk_entries` Pro tool with streaming | Large | `src/tools/content/BulkEntries.php` implementing both `ToolInterface::execute()` and `StreamableToolInterface::stream()`; per-row permission check; first new Pro tool that uses Gate 7.7's streaming infrastructure |
+| 8.8 | Mode unlocks on the four Free tools | Large | `drafts_and_revisions` apply/discard, `audit` fix modes, `import_export` import, `diagnostics` manage_queue. Each gets an `inputSchemaFor()` override + new `execute()` dispatch branches |
+| 8.9 | Streaming enablement on `resave` + the new streaming-capable Pro tools | Medium | `Resave` implements `StreamableToolInterface::stream()`; `audit` fix modes and `import_export` import gain the same; per-tool progress contract from locked decision 7 |
+| 8.10 | Cross-tier integration tests | Medium | `tests/Architecture/EditionGatingTest.php`, `tests/Integration/PermissionBoundaryTest.php` (every Pro write mode tested for refuses-without-and-succeeds-with), mode-not-permitted error-shape invariant |
 
 ## Sub-gate 8.1 — Edition detection foundation
 
@@ -119,7 +122,7 @@ These are settled. Don't relitigate without good reason.
   ```
   Tools use it via `use ProToolTrait;` after `extends AbstractTool`.
 - `src/console/controllers/EditionController.php` — `cortex/edition/show` prints the active edition + the `editions()` array. Useful for sanity-checking misconfigured installs without booting a CP session.
-- `tests/Architecture/EditionGatingTest.php` (skeleton — grown by 8.9) — invariant: every class under `src/tools/` using `ProToolTrait` resolves `shouldRegister` to a value that depends on the plugin edition.
+- `tests/Architecture/EditionGatingTest.php` (skeleton — grown by 8.10) — invariant: every class under `src/tools/` using `ProToolTrait` resolves `shouldRegister` to a value that depends on the plugin edition.
 
 **Modified**:
 - `src/Plugin.php` — add edition constants and `editions()` override:
@@ -259,7 +262,43 @@ These are settled. Don't relitigate without good reason.
 - Custom-field-level gating is deferred (Gate 8 returns all custom fields when `editUsers` is held). If a future field-level gate arrives, the `_serializeUser()` method is the seam — document this in the tool's PHPDoc.
 - Admin-account creation: a non-admin caller MUST NOT be able to `create` an admin user. Test explicitly.
 
-## Sub-gate 8.6 — `bulk_entries` Pro tool with streaming
+## Sub-gate 8.6 — Custom skill element type + `skill` Pro tool
+
+**Goal**: ship the first Cortex-owned custom element type so installs can author and override claude-code-skills from the MCP wire. Phase 1 surfaces skills as bundled MCP prompts/resources loaded from `~/dev/craftcms-claude-skills/` via `SkillPrompt` + `SkillResource`. Gate 8.6 adds **element-stored** skills as Craft elements that override bundled ones by handle collision per locked decision 16. CP authoring screens deferred to Gate 9 — for 8.6, element-stored skills are author-able via the new `skill` Pro tool over MCP.
+
+**New**:
+- `src/elements/Skill.php` — custom Craft element class. Native attributes: `handle` (unique, slug-style), `description`. Title field from Craft's `hasTitles() = true`. Body content + structured metadata via a project-config-stored field layout (CKEditor + plain text fields, planner decides exact composition).
+- `src/elements/db/SkillQuery.php` — element query. `handle()` is the primary filter.
+- `src/records/Skill.php` — ActiveRecord for the `cortex_skills` table.
+- `src/migrations/Install.php` — extended with the `cortex_skills` table (`id`, `handle`, `description`, `dateCreated`, FK to `elements`).
+- `src/tools/system/Skill.php` — Pro CRUD tool. Modes `list / get / create / update / delete`. Same trait stack as `category` / `address`. Permission: `manageCortexSkills` (new permission registered via the plugin's permissions event).
+- `src/Cortex.php` — register the Skill element type via `EVENT_REGISTER_ELEMENT_TYPES`; register the `manageCortexSkills` permission via `EVENT_REGISTER_PERMISSIONS`.
+
+**Modified**:
+- `src/tools/system/SearchSkills.php` — merges bundled skills with element-stored skills per locked decision 16. Element-stored wins on handle collision. Each returned entry gains a `source: 'bundled' | 'element'` field.
+- `src/resources/SkillResource.php`, `src/prompts/SkillPrompt.php` — both surfaces consume the merged list so element-stored skills propagate to MCP resources and prompts identically to bundled ones.
+- `src/services/Tools.php` — register `new Skill()` Pro tool in the Pro-write block.
+- `tests/Architecture/EditionGatingTest.php` — append `Skill::class`.
+
+**Tests** (`tests/Elements/SkillTest.php`, `tests/Tools/System/SkillTest.php`, `tests/Tools/System/SearchSkillsCoexistenceTest.php`):
+- Element CRUD via the elements service.
+- Pro `skill` tool round-trips per mode.
+- Permission gating: `manageCortexSkills` required; non-permitted → `-32002`.
+- Coexistence: bundled-only baseline → merged list shows bundled with `source: 'bundled'`; element-stored skill with handle `X` hides the bundled `X` and surfaces with `source: 'element'`; deleting the element-stored `X` restores the bundled version.
+- Free install: `skill` tool absent.
+- Project config sync: changing the field layout via PC and re-running `ddev craft up` propagates; element rows survive across PC re-apply (standard Craft pattern, but worth one integration test).
+
+**Verification gate**: Pest filter `SkillTest|SearchSkillsCoexistenceTest` green. Manual: per the table in §"Per-feature manual verification" — create a skill via the MCP wire, confirm bundled override, then delete.
+
+Full sub-plan produced by the planner agent lives at [`docs/plans/gate-8.6.md`](./gate-8.6.md).
+
+**Risks**:
+- Bundled-vs-element override (option ii) is contract surface the LLM must reason about. `SearchSkills` description and tool docs MUST explain the precedence and the `source` field clearly.
+- Field-layout migrations: future Gate 8.6+ changes to the field layout require careful PC handling. Standard Craft pattern applies — flag in the tool's PHPDoc.
+- `manageCortexSkills` is a Cortex-defined permission, not native Craft. The plugin's `EVENT_REGISTER_PERMISSIONS` handler must register it; verify the permission shows up in `users get` for users with it assigned.
+- The bundled-skills repo (`~/dev/craftcms-claude-skills/`) is currently a hard path. Future portability concern (Composer dep? Repo URL in settings?) — out of scope for 8.6 but worth flagging.
+
+## Sub-gate 8.7 — `bulk_entries` Pro tool with streaming
 
 **Goal**: first streaming Pro tool. Combines five batch modes from PLANNING.md §4.7 line 544 into a single tool, yields progress per row, gracefully degrades to JSON when the client doesn't ask for SSE.
 
@@ -291,7 +330,7 @@ These are settled. Don't relitigate without good reason.
 - Without per-batch transactions, partial-failure recovery is on the caller. Document in the tool's PHPDoc.
 - `migrate` mode is the most invasive — moving entries to a new entry type can drop fields. Lean on Craft's own resave semantics (`Entries::saveElement()` with the new entry type) and document the data-loss surface.
 
-## Sub-gate 8.7 — Mode unlocks on the four Free tools
+## Sub-gate 8.8 — Mode unlocks on the four Free tools
 
 **Goal**: extend `drafts_and_revisions`, `audit`, `import_export`, `diagnostics` with Pro modes per PLANNING.md §4.12 lines 921–924. Each existing tool stays Free at registration time; the new modes are reachable only when the caller's `inputSchemaFor()` exposes them AND the user has the matching permission.
 
@@ -301,7 +340,7 @@ These are settled. Don't relitigate without good reason.
   - `fix_relations` (delete broken outgoing relations on the affected element list).
   - `prune_unused_assets` (delete or hard-delete unreferenced assets in the volumes the caller can write).
   - `repair_propagation` (force-resave elements that lost a per-site copy).
-  Each fix mode runs as a generator and is wired up in 8.8 for streaming. For 8.7, the fix-mode bodies land as plain `array` returns; 8.8 converts them to generators.
+  Each fix mode runs as a generator and is wired up in 8.9 for streaming. For 8.8, the fix-mode bodies land as plain `array` returns; 8.9 converts them to generators.
 - `src/tools/workflow/ImportExport.php` — add `import` to the mode enum. `inputSchemaFor()` strips it for Free / non-permitted users. `execute()` branch: parses the import JSON, validates against the matching section's field layout, dispatches one `Craft::$app->getElements()->saveElement()` per item. Dry-run defaults to true per PLANNING.md §4.12 line 923 — explicit `dryRun: false` required to actually write.
 - `src/tools/system/Diagnostics.php` — add `manage_queue` to the `type` enum. `inputSchemaFor()` strips it unless the user has `utility:queue-manager` permission. Sub-modes via a nested `action` field: `retry / cancel / release` against the job id.
 
@@ -316,11 +355,11 @@ These are settled. Don't relitigate without good reason.
 **Risks**:
 - `repair_propagation` is the most fragile fix mode — propagation bugs are usually a symptom of bad multi-site config, not bad data. Document the "fix what's auditable; report what isn't" rule in the tool's PHPDoc.
 - `import` schema discovery: the import payload references field handles. Validate against the target section's field layout before any write, return validation envelope on miss (same shape as 8.2 `entry` validation).
-- **Size concern (judgment call for the 8.7 builder)**: mode unlocks on four separate tools may exceed the "single focused builder pass" target. If 8.7 ends up >~600 LoC including tests, split into `8.7a — drafts_and_revisions + diagnostics` (simpler unlocks) and `8.7b — audit + import_export` (the streaming-ready unlocks, paired with 8.8). The split is cheap because the four tools don't share state; the only reason to bundle is the shared `inputSchemaFor()` pattern, which is already documented in this plan once. Builder for 8.7 can make the call after scoping the diff.
+- **Size concern (judgment call for the 8.8 builder)**: mode unlocks on four separate tools may exceed the "single focused builder pass" target. If 8.8 ends up >~600 LoC including tests, split into `8.8a — drafts_and_revisions + diagnostics` (simpler unlocks) and `8.8b — audit + import_export` (the streaming-ready unlocks, paired with 8.9). The split is cheap because the four tools don't share state; the only reason to bundle is the shared `inputSchemaFor()` pattern, which is already documented in this plan once. Builder for 8.8 can make the call after scoping the diff.
 
-## Sub-gate 8.8 — Streaming enablement on the four streaming-capable tools
+## Sub-gate 8.9 — Streaming enablement on the four streaming-capable tools
 
-**Goal**: `resave` (Free), `bulk_entries` (Pro, but 8.6 already implements `StreamableToolInterface`), `audit` fix modes, `import_export` import. After this sub-gate the streaming surface matches PLANNING.md §4.12 lines 927–928.
+**Goal**: `resave` (Free), `bulk_entries` (Pro, but 8.7 already implements `StreamableToolInterface`), `audit` fix modes, `import_export` import. After this sub-gate the streaming surface matches PLANNING.md §4.12 lines 927–928.
 
 **Modified**:
 - `src/tools/dev/Resave.php` — implements `StreamableToolInterface`. `stream()` runs Craft's `resave/<type>` action under `ConsoleRunner` and pumps progress from the console controller's progress callbacks via Craft's `Console::startProgress()` shim output. Yield frame: `{progress: int, total: int, message: "Resaving entry {id}"}`. Already-resaved elements persist on cancellation (locked decision 7).
@@ -337,7 +376,7 @@ These are settled. Don't relitigate without good reason.
 **Risks**:
 - `ConsoleRunner` currently captures stdout/stderr post-hoc. The streaming wrap needs to pump output incrementally — likely a new `ConsoleRunner::runStreaming(callable $onProgress)` method or a buffer-flush hook. Audit the current implementation and grow it before wiring the streaming generator.
 
-## Sub-gate 8.9 — Cross-tier integration tests
+## Sub-gate 8.10 — Cross-tier integration tests
 
 **Goal**: the test invariant sweep that proves Gate 8 ships green. Mirrors how `tests/Architecture/ConventionsTest.php` ships invariants across Gate 7.
 
@@ -376,10 +415,11 @@ After each sub-gate, before moving on:
 | 8.3 | Same flow for `category`, `tag`, `global_set`. Confirm `tag` is admin-only by attempting as a non-admin Pro user. |
 | 8.4 | Create / update / delete an address tied to a test user; verify a different user's address is not visible without the right `editUsers` posture. |
 | 8.5 | As `viewUsers` only: `users get` returns no `email`. As `editUsers`: `email` present. As `deleteUsers`: `users delete` works with `transferContentTo`. Confirm a non-admin caller cannot create an admin. |
-| 8.6 | As admin: run `bulk_entries set_status` against ~100 entries with `Accept: text/event-stream`; progress frames stream. Send `notifications/cancelled` halfway — operation stops; processed rows persist. |
-| 8.7 | As a `viewEntries` only user: `drafts_and_revisions` lists drafts but `apply` is absent from the schema and returns `-32002` if invoked. As a `saveEntries` user: `apply` works. Same flow for `audit` / `import_export` / `diagnostics`. |
-| 8.8 | `resave` over SSE shows progress frames. Cancellation mid-resave stops further batches; already-resaved entries stay resaved. `audit` fix modes and `import_export` import expose progress the same way. |
-| 8.9 | `ddev exec vendor/bin/pest` full suite green. `ddev composer phpstan` + `ddev composer check-cs` green. |
+| 8.6 | As admin: `tools/call` for `skill` with `mode=create` (handle, title, body) — skill element appears in the DB. `SearchSkills list` returns it with `source: 'element'`. Create another with a handle that matches a bundled skill — the bundled version disappears from the merged list, element version surfaces with `source: 'element'`. Delete the element-stored skill — bundled version re-appears. Non-`manageCortexSkills` caller — `-32002`. |
+| 8.7 | As admin: run `bulk_entries set_status` against ~100 entries with `Accept: text/event-stream`; progress frames stream. Send `notifications/cancelled` halfway — operation stops; processed rows persist. |
+| 8.8 | As a `viewEntries` only user: `drafts_and_revisions` lists drafts but `apply` is absent from the schema and returns `-32002` if invoked. As a `saveEntries` user: `apply` works. Same flow for `audit` / `import_export` / `diagnostics`. |
+| 8.9 | `resave` over SSE shows progress frames. Cancellation mid-resave stops further batches; already-resaved entries stay resaved. `audit` fix modes and `import_export` import expose progress the same way. |
+| 8.10 | `ddev exec vendor/bin/pest` full suite green. `ddev composer phpstan` + `ddev composer check-cs` green. |
 
 ## Cross-cutting test strategy
 
@@ -395,7 +435,7 @@ After each sub-gate, before moving on:
 Confirmed against PLANNING.md §4.12 and the Gate 7 plan's out-of-scope section:
 
 - **Gate 8 is Pro writes + mode unlocks + streaming enablement.** Nothing else.
-- **Gate 8.5** — Custom skills element type. Independent gate, lands separately. The `users` PII story in this gate does NOT touch the skills element type; that integration lives in 8.5.
+- **Gate 8.6 ships the custom skill element type** — see locked decisions 15 and 16. CP authoring screens for skills deferred to Gate 9 alongside Tokens / Activity / Connection screens.
 - **Gate 9** — Minimal CP UI (Tokens / Activity / Connection). Gate 8 ships zero new CP screens. The Pro tools are exercised end-to-end via the MCP protocol.
 - **Commerce edition** — Deferred per PLANNING.md §4.8 to `craft-cortex-commerce`. Gate 8 leaves the `ownerType`-keyed branch in `address` open for future expansion but does NOT ship Commerce order / variant / customer tools.
 - **License-validation network call** — explicitly NOT introduced. Edition detection is local-only; Plugin Store sets the edition handle at install time; the plugin trusts the resulting value.
@@ -412,16 +452,16 @@ Builder agents start by reading:
 - `src/tools/ProToolTrait.php` — new in 8.1; every Pro tool uses it.
 - `src/tools/ToolInterface.php` — read-only; the three-method contract is locked from Gate 7.4.
 - `src/tools/AbstractTool.php` — read-only; the defaults are inherited.
-- `src/tools/StreamableToolInterface.php` — opt-in surface used by 8.6 + 8.8.
+- `src/tools/StreamableToolInterface.php` — opt-in surface used by 8.7 + 8.9.
 - `src/tools/support/InvocationContext.php` — read-only; carries the `CancellationToken` streaming tools poll.
 - `src/tools/support/CancellationToken.php` — read-only; `isCancelled()` is the cooperation point.
 - `src/mcp/transport/SseEmitter.php` — read-only; the wire layer for streaming.
 - `src/services/Tools.php` — register every new Pro tool in `_buildRegistry()`. The `shouldRegister()` boot loop at line 107 already excludes non-Pro tools on Free installs.
-- `src/tools/workflow/DraftsAndRevisions.php` — extended in 8.7 with `apply` / `discard` modes.
-- `src/tools/workflow/Audit.php` — extended in 8.7 with fix modes.
-- `src/tools/workflow/ImportExport.php` — extended in 8.7 with `import` mode.
-- `src/tools/system/Diagnostics.php` — extended in 8.7 with `manage_queue` type.
-- `src/tools/dev/Resave.php` — extended in 8.8 to implement `StreamableToolInterface`.
+- `src/tools/workflow/DraftsAndRevisions.php` — extended in 8.8 with `apply` / `discard` modes.
+- `src/tools/workflow/Audit.php` — extended in 8.8 with fix modes.
+- `src/tools/workflow/ImportExport.php` — extended in 8.8 with `import` mode.
+- `src/tools/system/Diagnostics.php` — extended in 8.8 with `manage_queue` type.
+- `src/tools/dev/Resave.php` — extended in 8.9 to implement `StreamableToolInterface`.
 - `src/models/Settings.php` — read-only; no new settings needed in Gate 8 (edition is project-config-stored by Craft).
 - `tests/Architecture/ConventionsTest.php` — extend with the edition-gating + Pro-trait + streaming-tool invariants.
 - `tests/Services/ToolsTest.php` — extend with edition-flipped `getByName()` / `asListPayloadFor()` cases.

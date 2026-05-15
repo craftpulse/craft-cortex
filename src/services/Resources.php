@@ -2,6 +2,7 @@
 
 namespace craftpulse\cortex\services;
 
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\events\RegisterResourcesEvent;
 use craftpulse\cortex\resources\AgentResource;
 use craftpulse\cortex\resources\ResourceInterface;
@@ -225,13 +226,37 @@ class Resources extends Component
     private function _buildRegistry(): array
     {
         $registry = [];
+        $bundledHandles = Skills::skillNames();
 
-        foreach (Skills::skillNames() as $skill) {
+        foreach ($bundledHandles as $skill) {
             $registry[] = new SkillResource(skill: $skill);
 
             foreach (Skills::references($skill) as $reference) {
                 $registry[] = new SkillResource(skill: $skill, reference: $reference);
             }
+        }
+
+        // Gate 8.6 — second pass for element-stored handles that have
+        // no bundled counterpart. The merged-corpus `read()` path
+        // synthesises markdown for these on demand; we register one
+        // `SkillResource` per element-only handle so the URI surfaces
+        // in `resources/list` and resolves on `resources/read`.
+        //
+        // The boot-time element query is fail-soft: if the
+        // `cortex_skills` table doesn't exist yet (fresh install
+        // pre-migration) the call returns an empty array. A defensive
+        // try/catch lets the registry boot cleanly in that window.
+        try {
+            $elementHandles = Cortex::getInstance()->skills->allHandles();
+        } catch (\Throwable) {
+            $elementHandles = [];
+        }
+        $bundledSet = array_flip($bundledHandles);
+        foreach ($elementHandles as $handle) {
+            if (isset($bundledSet[$handle])) {
+                continue;
+            }
+            $registry[] = new SkillResource(skill: $handle);
         }
 
         // Agent resources from `michtio/craftcms-claude-skills` v1.4.2+

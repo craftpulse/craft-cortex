@@ -57,11 +57,31 @@ it('snippet includes the matched run', function() {
 
     expect($result['results'])->toHaveCount(1);
     $top = $result['results'][0];
-    expect($top)->toHaveKeys(['kind', 'uri', 'skill', 'name', 'score', 'matches', 'snippet']);
+    expect($top)->toHaveKeys(['kind', 'uri', 'skill', 'name', 'source', 'score', 'matches', 'snippet']);
     expect($top['snippet'])->toBeString()->not->toBeEmpty();
     // The snippet was extracted from a hit so it should mention the
     // query token in some case (snippet preserves original case).
     expect(stripos($top['snippet'], 'element'))->not->toBeFalse();
+});
+
+it('every search result row carries a `source` field', function() {
+    $result = $this->tool->execute([
+        'mode' => 'search',
+        'query' => 'craft',
+        'limit' => 50,
+    ]);
+    foreach ($result['results'] as $row) {
+        expect($row)->toHaveKey('source');
+        expect($row['source'])->toBeIn(['bundled', 'element']);
+    }
+});
+
+it('every topics row carries a `source` field', function() {
+    $result = $this->tool->execute(['mode' => 'topics']);
+    foreach ($result['topics'] as $row) {
+        expect($row)->toHaveKey('source');
+        expect($row['source'])->toBeIn(['bundled', 'element']);
+    }
 });
 
 it('respects the kind filter — agent-only search returns only agents', function() {
@@ -101,7 +121,7 @@ it('topics mode enumerates the corpus without scoring', function() {
     expect($result['mode'])->toBe('topics');
     expect($result['count'])->toBeGreaterThan(8); // at least 8 skill routers + refs + agents
     foreach ($result['topics'] as $row) {
-        expect($row)->toHaveKeys(['kind', 'uri', 'skill', 'name', 'length']);
+        expect($row)->toHaveKeys(['kind', 'uri', 'skill', 'name', 'source', 'length']);
         expect($row['length'])->toBeInt()->toBeGreaterThan(0);
     }
 });

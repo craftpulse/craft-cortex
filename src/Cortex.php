@@ -6,8 +6,12 @@ use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterUrlRulesEvent;
+use craft\events\RegisterUserPermissionsEvent;
+use craft\services\Elements;
 use craft\services\Gc;
+use craft\services\UserPermissions;
 use craft\web\UrlManager;
+use craftpulse\cortex\elements\Skill;
 use craftpulse\cortex\events\LogCallEvent;
 use craftpulse\cortex\generator\Tool as ToolGenerator;
 use craftpulse\cortex\models\Settings;
@@ -19,6 +23,7 @@ use craftpulse\cortex\services\Prompts;
 use craftpulse\cortex\services\RateLimiter;
 use craftpulse\cortex\services\Resources;
 use craftpulse\cortex\services\Sessions;
+use craftpulse\cortex\services\Skills;
 use craftpulse\cortex\services\Tokens;
 use craftpulse\cortex\services\Tools;
 use craftpulse\cortex\tools\support\InvocationLogger;
@@ -119,6 +124,7 @@ class Cortex extends BasePlugin
                 'rateLimiter' => ['class' => RateLimiter::class],
                 'resources' => ['class' => Resources::class],
                 'sessions' => ['class' => Sessions::class],
+                'skills' => ['class' => Skills::class],
                 'tokens' => ['class' => Tokens::class],
                 'tools' => ['class' => Tools::class],
             ],
@@ -221,6 +227,55 @@ class Cortex extends BasePlugin
                 }
             },
         );
+
+        // Register the Cortex Skill element type so the Elements service
+        // includes it in `getAllElementTypes()` / `ElementTypes` tool
+        // discovery and so Craft's element-condition / GraphQL surfaces
+        // pick it up.
+        Event::on(
+            Elements::class,
+            Elements::EVENT_REGISTER_ELEMENT_TYPES,
+            static function(RegisterComponentTypesEvent $event): void {
+                $event->types[] = Skill::class;
+            },
+        );
+
+        // Register the `manageCortexSkills` permission under a `Cortex`
+        // heading on the user-permissions screen. The permission is
+        // global (no per-instance ACL); the element's
+        // `canSave / canDelete / canView / canDuplicate` overrides
+        // consult it directly. Shape verified against
+        // `vendor/craftcms/cms/src/services/UserPermissions.php:85-96`.
+        Event::on(
+            UserPermissions::class,
+            UserPermissions::EVENT_REGISTER_PERMISSIONS,
+            static function(RegisterUserPermissionsEvent $event): void {
+                $event->permissions[] = [
+                    'heading' => 'Cortex',
+                    'permissions' => [
+                        Skill::PERMISSION_MANAGE => [
+                            'label' => \Craft::t('cortex', 'Manage Cortex skills'),
+                            'info' => \Craft::t(
+                                'cortex',
+                                'Allows creating, updating, and deleting Cortex skill elements through the MCP server.',
+                            ),
+                        ],
+                    ],
+                ];
+            },
+        );
+
+        // Wire the PC field-layout change handlers for the single
+        // `plugins.cortex.skillFieldLayout` path. Mirrors Craft's own
+        // `ApplicationTrait::_registerConfigListeners()` shape for
+        // `PATH_ADDRESS_FIELD_LAYOUTS`. The handler runs on add /
+        // update / remove so the field layout stays in sync between
+        // PC and the live `Fields` service across environments.
+        $skillsService = $this->getSkills();
+        \Craft::$app->getProjectConfig()
+            ->onAdd(Skills::CONFIG_FIELDLAYOUT_PATH, [$skillsService, 'handleChangedFieldLayout'])
+            ->onUpdate(Skills::CONFIG_FIELDLAYOUT_PATH, [$skillsService, 'handleChangedFieldLayout'])
+            ->onRemove(Skills::CONFIG_FIELDLAYOUT_PATH, [$skillsService, 'handleChangedFieldLayout']);
 
         // Register the HTTP transport endpoint at /cortex/mcp. The route
         // sits under the site URL rules (front-end-style endpoint, no

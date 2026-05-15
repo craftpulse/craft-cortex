@@ -9,6 +9,7 @@ use craftpulse\cortex\services\Prompts;
 use craftpulse\cortex\services\RateLimiter;
 use craftpulse\cortex\services\Resources;
 use craftpulse\cortex\services\Sessions;
+use craftpulse\cortex\services\Skills;
 use craftpulse\cortex\services\Tokens;
 use craftpulse\cortex\services\Tools;
 use yii\base\InvalidConfigException;
@@ -49,6 +50,7 @@ use yii\base\InvalidConfigException;
  * @property RateLimiter $rateLimiter the per-user rate limiter
  * @property Resources $resources the MCP resources registry
  * @property Sessions $sessions the HTTP-transport session store
+ * @property Skills $skills the Cortex skills service — field layout + merged-corpus lookup
  * @property Tokens $tokens the bearer-token issuance / lookup / revoke service
  * @property Tools $tools the MCP tool registry
  *
@@ -166,6 +168,22 @@ trait Services
     {
         $component = $this->get('sessions');
         assert($component instanceof Sessions);
+        return $component;
+    }
+
+    /**
+     * Returns the Cortex skills service — field-layout management and
+     * merged-corpus lookup combining bundled + element-stored skills.
+     *
+     * @throws InvalidConfigException When the component is not registered.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getSkills(): Skills
+    {
+        $component = $this->get('skills');
+        assert($component instanceof Skills);
         return $component;
     }
 

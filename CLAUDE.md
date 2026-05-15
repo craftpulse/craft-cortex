@@ -78,7 +78,7 @@ src/
     └── workflow/                # drafts_and_revisions, content_audit, import_export
 ```
 
-Not built (deferred or never planned): `elements/`, `enums/`, `jobs/` — gc cleanup runs inline via `Gc::EVENT_RUN` rather than a queue job. Custom skills element type lands in Phase 2 Gate 8.5.
+Not built (deferred or never planned): `enums/`, `jobs/` — gc cleanup runs inline via `Gc::EVENT_RUN` rather than a queue job. Custom skill element type lands in Phase 2 Gate 8.6; `src/elements/` populated then.
 
 ## Paths
 

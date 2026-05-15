@@ -37,3 +37,14 @@ parameters:
         - identifier: missingType.generics
           path: src/tools/content/*
 
+        # `Element::find()` returns its concrete element-query class —
+        # Cortex's `Skill::find()` mirrors Craft's `Tag::find()` shape
+        # (`@return TagQuery` without template parameters). Forwarding
+        # the generics on a public `find()` override leaks Element's
+        # internal `TKey/TElement` covariance constraints into Cortex
+        # callers and conflicts with Element's non-covariant template
+        # types. The query class itself does declare templates on its
+        # own docblock.
+        - identifier: missingType.generics
+          path: src/elements/Skill.php
+

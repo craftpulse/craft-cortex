@@ -31,6 +31,7 @@ use craftpulse\cortex\tools\content\Entry;
 use craftpulse\cortex\tools\content\GlobalSet;
 use craftpulse\cortex\tools\content\Tag;
 use craftpulse\cortex\tools\ProToolTrait;
+use craftpulse\cortex\tools\system\Skill;
 use craftpulse\cortex\tools\system\Users;
 
 // -----------------------------------------------------------------------------
@@ -53,6 +54,7 @@ function _cortex_pro_tool_classes(): array
         GlobalSet::class,
         Address::class,
         Users::class,
+        Skill::class,
     ];
 }
 

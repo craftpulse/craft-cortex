@@ -95,4 +95,18 @@ final class Table
      * @since  5.0.0
      */
     public const INVOCATIONS = '{{%cortex_invocations}}';
+
+    /**
+     * Custom-skill element instances — author-able overrides for the
+     * bundled `michtio/craftcms-claude-skills` corpus. One row per
+     * element, joined to `elements(id)` via FK with ON DELETE CASCADE.
+     * Handle is globally unique (the natural key); description is a
+     * native column so list-view paths don't pay for a content-table
+     * join. The body lives in the field-layout custom-field surface
+     * (per Gate 8.6 locked decision 13).
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public const SKILLS = '{{%cortex_skills}}';
 }
