@@ -3,6 +3,7 @@
 namespace craftpulse\cortex\services;
 
 use Carbon\Carbon;
+use Craft;
 use craftpulse\cortex\Plugin;
 use craftpulse\cortex\records\RuntimeOverride;
 use yii\base\Component;
@@ -66,7 +67,18 @@ class Allowlist extends Component
     // =========================================================================
 
     /**
-     * Effective allowlist — defaults union active overrides, deduplicated.
+     * Effective allowlist — content-level defaults, plus admin-level
+     * defaults when `Craft::$app->getConfig()->getGeneral()->allowAdminChanges`
+     * is `true`, plus active runtime overrides, deduplicated.
+     *
+     * The admin-level merge mirrors the `allowAdminChanges` policy
+     * from `docs/plans/gate-8.md` locked decision 14: when the host
+     * Craft install forbids admin-level changes, no tool — including
+     * `craft_command` — may dispatch a route that mutates project
+     * config, schema, or scaffolding. `getEffective()` is the single
+     * source of truth for both the `craft_command` dispatch gate and
+     * the `get_initial_context` tool's `allowlist` field, so flipping
+     * `allowAdminChanges` is visible to both surfaces in lockstep.
      *
      * @return string[]
      *
@@ -75,7 +87,13 @@ class Allowlist extends Component
      */
     public function getEffective(): array
     {
-        $defaults = Plugin::getInstance()->getSettings()->allowedCommands;
+        $settings = Plugin::getInstance()->getSettings();
+        $defaults = $settings->allowedCommands;
+
+        if (Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            $defaults = array_merge($defaults, $settings->adminLevelCommands);
+        }
+
         $overridePatterns = array_map(
             static fn(array $row): string => (string) $row['pattern'],
             $this->getActiveOverrides(),

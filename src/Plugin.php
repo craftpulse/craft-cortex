@@ -56,6 +56,29 @@ use yii\base\Event;
  */
 class Plugin extends BasePlugin
 {
+    // Constants
+    // =========================================================================
+
+    /**
+     * Edition handle for the Free tier — read-only / dev surface, no
+     * write tools, no PII, no admin-level command patterns. The default
+     * value Craft assigns to `plugins.cortex.edition` on a fresh install.
+     *
+     * @since 5.0.0
+     */
+    public const EDITION_FREE = 'free';
+
+    /**
+     * Edition handle for the Pro tier — adds the content-write tools,
+     * the `users` PII surface, mode unlocks on the four Free workflow
+     * tools, and streaming enablement on bulk-mutation paths. The
+     * Plugin Store sets this handle on purchase; Cortex does not run
+     * a license network call.
+     *
+     * @since 5.0.0
+     */
+    public const EDITION_PRO = 'pro';
+
     // Public Properties
     // =========================================================================
 
@@ -98,6 +121,30 @@ class Plugin extends BasePlugin
                 'tools' => ['class' => Tools::class],
             ],
         ];
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Returns the edition handles in ascending order — Free first, Pro
+     * last. Order matters: Craft's `Plugin::is($edition, '>=')` walks
+     * the array by index, so a Pro install satisfies `is(EDITION_FREE,
+     * '>=')` but a Free install does not satisfy `is(EDITION_PRO, '>=')`.
+     *
+     * The active edition handle lives in project config at
+     * `plugins.cortex.edition` and is stored by Craft itself — the
+     * Plugin Store sets it on purchase. Cortex does not maintain a
+     * separate license table and does not call out to a license
+     * server.
+     *
+     * @return string[]
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public static function editions(): array
+    {
+        return [self::EDITION_FREE, self::EDITION_PRO];
     }
 
     // Public Methods

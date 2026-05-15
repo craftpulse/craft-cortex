@@ -16,6 +16,7 @@
  * @since  5.0.0
  */
 
+use craftpulse\cortex\Plugin;
 use PHPUnit\Framework\TestCase;
 
 uses(TestCase::class)->in(__DIR__);
@@ -83,6 +84,74 @@ function cortex_unwrap(array $envelope): array
     expect($decoded)->toBeArray();
 
     return $decoded;
+}
+
+/**
+ * Run a callable with `Plugin::getInstance()->edition` temporarily set
+ * to the given handle, then restore both the original edition and the
+ * project-config `muteEvents` flag in a `finally` block so a thrown
+ * exception inside the callback can't leave the plugin in a Pro state
+ * for a subsequent test.
+ *
+ * Mutates `Plugin::getInstance()->edition` directly — Craft owns the
+ * project-config storage for the edition handle and would otherwise
+ * fire `EVENT_BEFORE_APPLY_PLUGIN_SETTINGS` on every assignment, so
+ * the mute is required around the flip to prevent listener re-entry
+ * during a test run.
+ *
+ * Used by every Gate 8 sub-gate from 8.1 onwards — the foundation for
+ * boundary tests that need to flip between Free and Pro behaviour
+ * inside a single test file.
+ *
+ * @template T
+ * @param callable(): T $fn
+ * @return T
+ */
+function cortex_with_edition(string $edition, callable $fn): mixed
+{
+    $plugin = Plugin::getInstance();
+    $original = $plugin->edition;
+    $projectConfig = Craft::$app->getProjectConfig();
+    $originalMute = $projectConfig->muteEvents;
+
+    $projectConfig->muteEvents = true;
+    $plugin->edition = $edition;
+
+    try {
+        return $fn();
+    } finally {
+        $plugin->edition = $original;
+        $projectConfig->muteEvents = $originalMute;
+    }
+}
+
+/**
+ * Run a callable with
+ * `Craft::$app->getConfig()->getGeneral()->allowAdminChanges` set to
+ * the given value, then restore the original in a `finally` block.
+ *
+ * `allowAdminChanges` is read at dispatch time by both
+ * `Allowlist::getEffective()` (for the `craft_command` tool's
+ * effective allowlist) and `CraftCommand::execute()` (for the
+ * admin-pattern-blocked rejection message), so flipping it via this
+ * helper exercises the full boundary path without touching
+ * `config/general.php`.
+ *
+ * @template T
+ * @param callable(): T $fn
+ * @return T
+ */
+function cortex_with_admin_changes(bool $allow, callable $fn): mixed
+{
+    $generalConfig = Craft::$app->getConfig()->getGeneral();
+    $original = $generalConfig->allowAdminChanges;
+    $generalConfig->allowAdminChanges = $allow;
+
+    try {
+        return $fn();
+    } finally {
+        $generalConfig->allowAdminChanges = $original;
+    }
 }
 
 /**
