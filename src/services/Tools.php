@@ -7,6 +7,7 @@ use craftpulse\cortex\events\RegisterToolsEvent;
 use craftpulse\cortex\tools\content\Assets;
 use craftpulse\cortex\tools\content\Categories;
 use craftpulse\cortex\tools\content\Entries;
+use craftpulse\cortex\tools\content\Entry;
 use craftpulse\cortex\tools\content\Globals;
 use craftpulse\cortex\tools\content\Tags;
 use craftpulse\cortex\tools\dev\ClearCaches;
@@ -312,6 +313,11 @@ class Tools extends Component
             new Categories(),
             new Tags(),
             new Globals(),
+
+            // Content writing (Pro). `Entry::shouldRegister()` returns
+            // false on Free installs so the registration loop skips it
+            // before the instance is exposed to `tools/list`.
+            new Entry(),
 
             // System & diagnostics.
             new SystemInfo(),
