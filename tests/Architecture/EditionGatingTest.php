@@ -25,7 +25,10 @@
  */
 
 use craftpulse\cortex\Cortex;
+use craftpulse\cortex\tools\content\Category;
 use craftpulse\cortex\tools\content\Entry;
+use craftpulse\cortex\tools\content\GlobalSet;
+use craftpulse\cortex\tools\content\Tag;
 use craftpulse\cortex\tools\ProToolTrait;
 
 // -----------------------------------------------------------------------------
@@ -43,6 +46,9 @@ function _cortex_pro_tool_classes(): array
 {
     return [
         Entry::class,
+        Category::class,
+        Tag::class,
+        GlobalSet::class,
     ];
 }
 
