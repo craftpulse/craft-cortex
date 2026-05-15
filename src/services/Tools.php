@@ -42,6 +42,7 @@ use craftpulse\cortex\tools\system\Plugins;
 use craftpulse\cortex\tools\system\Routes;
 use craftpulse\cortex\tools\system\SearchSkills;
 use craftpulse\cortex\tools\system\SystemInfo;
+use craftpulse\cortex\tools\system\Users;
 use craftpulse\cortex\tools\ToolInterface;
 use craftpulse\cortex\tools\workflow\Audit;
 use craftpulse\cortex\tools\workflow\DraftsAndRevisions;
@@ -328,6 +329,7 @@ class Tools extends Component
             new Tag(),
             new GlobalSet(),
             new Address(),
+            new Users(), // system-namespaced but shares the Pro-write registration block
 
             // System & diagnostics.
             new SystemInfo(),
