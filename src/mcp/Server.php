@@ -184,6 +184,27 @@ class Server
      */
     private bool $_userResolved = false;
 
+    /**
+     * @var CancellationToken|null Token for the currently-streaming
+     *                             tool call, surfaced through
+     *                             `getInFlightCancellationToken()` so
+     *                             the HTTP controller can flip it
+     *                             directly on a real TCP-disconnect
+     *                             (sub-gate 7.7.5). Set when
+     *                             `_streamToolCall()` enters its yield
+     *                             loop, cleared in a `finally` after
+     *                             the loop terminates so the slot
+     *                             never leaks across requests.
+     *
+     *                             Null on every non-streaming path —
+     *                             `dispatch()` (JSON mode) and the
+     *                             single-frame degradation branch
+     *                             inside `dispatchStreaming()` for
+     *                             non-streamable tools both leave it
+     *                             untouched.
+     */
+    private ?CancellationToken $_inFlightCancellationToken = null;
+
     // Public Methods
     // =========================================================================
 
@@ -304,6 +325,29 @@ class Server
     public function getClientName(): ?string
     {
         return $this->_clientName;
+    }
+
+    /**
+     * The `CancellationToken` for the currently-streaming `tools/call`,
+     * or null when this dispatcher is between streaming invocations.
+     * Exposed publicly so `McpController::_streamPost()` can flip the
+     * token directly on a real HTTP TCP-disconnect (sub-gate 7.7.5) —
+     * the controller polls `connection_aborted()` between frames and
+     * calls `cancel('client disconnected')` on a flipped socket.
+     *
+     * Returns null on every non-streaming path. The JSON-mode
+     * `dispatch()` doesn't touch the slot; the single-frame
+     * degradation branch inside `dispatchStreaming()` for non-
+     * streamable tools doesn't either. Only `_streamToolCall()`
+     * populates the slot, and only for the lifetime of its yield
+     * loop.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getInFlightCancellationToken(): ?CancellationToken
+    {
+        return $this->_inFlightCancellationToken;
     }
 
     /**
@@ -820,6 +864,12 @@ class Server
         $context = $this->_invocationContextWithCancellation($id);
         $cancellationToken = $context->getCancellationToken();
 
+        // Surface the in-flight token through `getInFlightCancellationToken()`
+        // so the HTTP controller can flip it on a real TCP-disconnect
+        // (sub-gate 7.7.5). Cleared in `finally` below — the slot must
+        // never outlive the streaming call.
+        $this->_inFlightCancellationToken = $cancellationToken;
+
         $startNs = hrtime(true);
         $gen = null;
         $finalResult = null;
@@ -863,6 +913,8 @@ class Server
             InvocationLogger::logCall($name, $arguments, $e, $this->_elapsedMs($startNs), $context);
             yield $this->_internalError($id, $e, sprintf('Internal error executing tool "%s".', $name));
             return;
+        } finally {
+            $this->_inFlightCancellationToken = null;
         }
 
         if ($cancelledMidStream) {

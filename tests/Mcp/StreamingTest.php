@@ -333,3 +333,135 @@ it('a cancelled stream writes exactly one cortex_invocations row with kind=cance
         _cortex_streaming_restore_fixture($ctx);
     }
 });
+
+// -----------------------------------------------------------------------------
+// Sub-gate 7.7.5 — TCP-disconnect cooperation
+// -----------------------------------------------------------------------------
+//
+// `connection_aborted()` and `ignore_user_abort()` are PHP intrinsics
+// that can't be straightforwardly faked from PHPUnit (there's no real
+// socket under the test's PHP-FPM-shaped harness). We test the surface
+// the controller uses to cooperate with a TCP-disconnect instead: the
+// dispatcher exposes the in-flight cancellation token through
+// `Server::getInFlightCancellationToken()`, and a direct
+// `cancel('client disconnected')` from outside the generator surfaces
+// the same `kind=cancelled` audit row + cancellation reason that the
+// controller's `connection_aborted()` poll would have produced in
+// production. Manual end-to-end verification (curl + `kill -9`) is
+// the complement to this in-process test.
+
+it('Server::getInFlightCancellationToken() exposes the running streaming token mid-loop', function() {
+    $ctx = _cortex_streaming_register_fixture();
+
+    try {
+        $server = new Server(Server::TRANSPORT_HTTP);
+        $server->setSessionId('sess-7.7.5-inflight');
+
+        // Before any dispatch: no in-flight token.
+        expect($server->getInFlightCancellationToken())->toBeNull();
+
+        $gen = $server->dispatchStreaming([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => [
+                'name' => '_streaming_test',
+                'arguments' => [],
+                '_meta' => ['progressToken' => 'prog-inflight'],
+            ],
+        ]);
+
+        // Pull the first frame so the inner generator is mid-loop.
+        $gen->current();
+
+        $token = $server->getInFlightCancellationToken();
+        expect($token)->not->toBeNull();
+        expect($token->isCancelled())->toBeFalse();
+
+        // Drain so the `finally` in `_streamToolCall()` clears the slot.
+        iterator_to_array($gen, preserve_keys: false);
+
+        // After completion: slot is clear, no token leaks into the next
+        // dispatch on the same `Server` instance.
+        expect($server->getInFlightCancellationToken())->toBeNull();
+    } finally {
+        _cortex_streaming_restore_fixture($ctx);
+    }
+});
+
+it('flipping the in-flight token mid-stream surfaces kind=cancelled with the cancellation reason', function() {
+    $ctx = _cortex_streaming_register_fixture();
+
+    try {
+        $sessionId = 'sess-7.7.5-disconnect';
+
+        // Defense against cross-run pollution.
+        \craftpulse\cortex\records\Invocation::deleteAll(['sessionId' => $sessionId]);
+
+        $server = new Server(Server::TRANSPORT_HTTP);
+        $server->setUserId(1);
+        $server->setSessionId($sessionId);
+
+        $gen = $server->dispatchStreaming([
+            'jsonrpc' => '2.0',
+            'id' => 99,
+            'method' => 'tools/call',
+            'params' => [
+                'name' => '_streaming_test',
+                'arguments' => [],
+                '_meta' => ['progressToken' => 'prog-disconnect'],
+            ],
+        ]);
+
+        // First yield: a progress frame. Now the inner generator is
+        // sitting at the yield point inside `_streamToolCall()` — exactly
+        // the controller-loop state where `connection_aborted()` would
+        // observe a dead socket in production.
+        $firstFrame = $gen->current();
+        expect($firstFrame)
+            ->toHaveKey('method', 'notifications/progress')
+            ->and($firstFrame['params']['progress'])->toBe(1);
+
+        // Simulate the controller observing `connection_aborted() === 1`
+        // and flipping the in-flight token directly.
+        $token = $server->getInFlightCancellationToken();
+        expect($token)->not->toBeNull();
+        $token->cancel('client disconnected');
+
+        // Drain the remainder. The dispatcher's cancellation path must
+        // run to completion so the audit row writes — abandoning the
+        // generator here would orphan the row.
+        $remainingFrames = [];
+        $gen->next();
+        while ($gen->valid()) {
+            $remainingFrames[] = $gen->current();
+            $gen->next();
+        }
+
+        // Last frame is the cancellation envelope, not a terminal
+        // tools/call response.
+        expect($remainingFrames)->not->toBeEmpty();
+        $terminal = $remainingFrames[array_key_last($remainingFrames)];
+        expect($terminal)
+            ->toHaveKey('method', 'notifications/cancelled')
+            ->and($terminal['params']['requestId'])->toBe(99);
+
+        // The reason survives on the token for forensic surfaces even
+        // though the wire envelope itself doesn't carry it today.
+        expect($token->getReason())->toBe('client disconnected');
+
+        // Exactly one audit row, with `kind=cancelled`.
+        $rows = \craftpulse\cortex\records\Invocation::find()
+            ->where(['toolName' => '_streaming_test', 'sessionId' => $sessionId])
+            ->all();
+
+        expect($rows)->toHaveCount(1);
+        expect($rows[0]->kind)->toBe(InvocationLogger::KIND_CANCELLED);
+        expect($rows[0]->errorClass)->toBeNull();
+        expect($rows[0]->errorMessage)->toBeNull();
+
+        \craftpulse\cortex\records\Invocation::deleteAll(['id' => $rows[0]->id]);
+    } finally {
+        _cortex_streaming_restore_fixture($ctx);
+    }
+});

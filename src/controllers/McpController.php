@@ -649,6 +649,22 @@ class McpController extends Controller
      * branch is unreachable today. Kept for forward-compatibility with
      * a future spec revision that permits initialize-time streaming.
      *
+     * **Real TCP-disconnect cooperation (sub-gate 7.7.5).** PHP's
+     * default `ignore_user_abort` is `false`, which means the very
+     * next write to a closed socket terminates the script abruptly —
+     * the streaming dispatcher's post-loop audit-log write would never
+     * run and the `kind=cancelled` row would silently disappear. We
+     * flip `ignore_user_abort(true)` so the script survives the
+     * disconnect, then poll `connection_aborted()` after each emitted
+     * frame: on a dead socket we flip the in-flight
+     * `CancellationToken` (via `Server::getInFlightCancellationToken()`)
+     * with reason `'client disconnected'` and stop emitting further
+     * frames — but we keep draining the outer generator so the
+     * dispatcher's own cancellation body (`_logCancelled` +
+     * `_cancelledEnvelope` yield) runs to completion. Abandoning the
+     * generator here would short-circuit the audit write and leave an
+     * orphaned row.
+     *
      * @param array<string,mixed> $request
      *
      * @author Craftpulse
@@ -656,6 +672,13 @@ class McpController extends Controller
      */
     private function _streamPost(Server $server, array $request, bool $isInitialize, string $sessionId): Response
     {
+        // Survive client TCP-disconnects so the post-loop audit-log
+        // write runs even after the wire is gone. Paired with the
+        // `connection_aborted()` poll after each emit below — this
+        // flag alone keeps the script alive, the poll detects the
+        // condition and flips the token cooperatively.
+        ignore_user_abort(true);
+
         $emitter = $this->_buildSseEmitter();
 
         if ($isInitialize) {
@@ -672,8 +695,27 @@ class McpController extends Controller
 
         $emitter->start();
 
+        $clientGone = false;
         foreach ($server->dispatchStreaming($request) as $envelope) {
-            $emitter->emit(SseEmitter::EVENT_NAME, $envelope);
+            if (!$clientGone) {
+                $emitter->emit(SseEmitter::EVENT_NAME, $envelope);
+
+                // Real TCP-disconnect detection. `connection_aborted()`
+                // returns 1 once PHP has observed a write-side failure
+                // on the response socket; we flip the streaming
+                // generator's `CancellationToken` so the dispatcher's
+                // inner loop short-circuits through the cancellation
+                // path (terminal `notifications/cancelled` envelope +
+                // `kind=cancelled` audit row). We keep draining the
+                // outer generator so its `_streamToolCall` cancellation
+                // body runs to completion — abandoning the generator
+                // here would skip the audit-log write and leave an
+                // orphaned row.
+                if (connection_aborted() === 1) {
+                    $clientGone = true;
+                    $server->getInFlightCancellationToken()?->cancel('client disconnected');
+                }
+            }
         }
 
         $emitter->end();
