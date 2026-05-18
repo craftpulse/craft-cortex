@@ -330,6 +330,26 @@ Full sub-plan produced by the planner agent lives at [`docs/plans/gate-8.6.md`](
 - Without per-batch transactions, partial-failure recovery is on the caller. Document in the tool's PHPDoc.
 - `migrate` mode is the most invasive — moving entries to a new entry type can drop fields. Lean on Craft's own resave semantics (`Entries::saveElement()` with the new entry type) and document the data-loss surface.
 
+**Locked decisions for 8.7 (resolved 2026-05-15, supersede the high-level spec above where they conflict):**
+
+1. **Pre-8.7 housekeeping ships as a separate commit BEFORE 8.7**. The commit covers: `Cortex::init()` extraction to `src/plugin/PluginTrait.php` (the largest item — 144 lines of inline event registrations violate the architecture rule), Users.list adds a `total` field for pagination visibility, `SearchSkills::getDescription()` switches from hardcoded "8 skills, 5 agents" to dynamic counts, one-line comment at each idempotency-cache-hit early-return site explaining the deliberate permission-check bypass, Skill list docblock corrected to "skill-kind rows only", and `Users._list()` per-target `canView` gate fixed to honour the filter even when `$caller === null` (stdio consistency).
+
+2. **`scaffold` mode splits out of `bulk_entries`**. It's create-from-template, not query-driven — bundling it muddies the schema. Ship `bulk_entries` with 4 modes (`set_status / update_fields / relate / migrate`) and add a separate `scaffold_entries` Pro tool in the same gate. Both share the trait stack, streaming infrastructure, and idempotency contract.
+
+3. **`migrate` mode defaults to dry-run.** Explicit `dryRun: false` required to actually mutate. Two-call workflow (preview → confirm) is the safer LLM contract; minimises accidental data loss. Mirrors the locked import_export-import dry-run pattern from §8.8 below.
+
+4. **Bulk idempotency contract is whole-operation**. Same query + same payload + same `idempotencyKey` returns the cached envelope without re-running. Cache key shape: `cortex:bulk_entries:idem:{userId}:{key}`. 24h TTL per existing IdempotencyTrait. Documented caveat: if the query result set changes between calls, the cache returns the OLD result. Rejected: per-row idempotency (too complex for the value), skip-on-bulk (LLM retry path is real).
+
+5. **Hard row cap: 10 000 rows per call** with a `force: true` escape hatch. Beyond the cap without `force`, the tool throws `ToolException` naming the cap and the escape mechanism.
+
+6. **`onPermissionDenied` arg exposed**. Default `'skip'` (matches locked decision 9's per-row skip semantics). Optional `'fail'` opts into strict mode where the first denied row aborts with `-32002` listing every row that would have been denied. LLM-friendly: most use cases want skip; strict use cases (compliance bulk-ops) want fail.
+
+7. **`progressInterval` arg, default 100 rows**. Yield one progress frame every N rows processed (success + skipped + failure all count). LLM can lower to 1 for per-row events or raise for less-noisy streams. Locked decision 7's "after every row" wording is amended to "after every `progressInterval` rows."
+
+8. **Fixture scale**: extend `m260413_000000_marvel_seed` (or a companion migration) with ~150 throwaway "minor characters" hero entries before writing 8.7 tests. Per-test factories would also work but the seed extension keeps fixture data centralised and re-runnable. Decision left to the 8.7 builder, with the seed-extension path as the recommendation.
+
+9. **CancellationToken HTTP behaviour MUST be verified by the planner against `src/mcp/transport/SseEmitter.php` source before the builder dispatches.** If the token does NOT fire on real HTTP SSE disconnect, that's a Gate 7.7.5 infrastructure fix that lands BEFORE the 8.7 builder. Builder needs cancellation to actually work for the contract to be testable.
+
 ## Sub-gate 8.8 — Mode unlocks on the four Free tools
 
 **Goal**: extend `drafts_and_revisions`, `audit`, `import_export`, `diagnostics` with Pro modes per PLANNING.md §4.12 lines 921–924. Each existing tool stays Free at registration time; the new modes are reachable only when the caller's `inputSchemaFor()` exposes them AND the user has the matching permission.

@@ -307,9 +307,11 @@ class Skill extends AbstractTool
     // =========================================================================
 
     /**
-     * List-mode dispatch. Returns the merged corpus rows the LLM can
-     * iterate. Filters: `source` (bundled / element / all), `search`
-     * (substring), `limit` / `offset` (pagination).
+     * List-mode dispatch. Returns the `kind: skill` rows from the
+     * merged corpus only — references and agents are addressable
+     * through `search_skills` / `resources.read`, not here. Filters:
+     * `source` (bundled / element / all), `search` (substring),
+     * `limit` / `offset` (pagination).
      *
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
@@ -421,6 +423,8 @@ class Skill extends AbstractTool
      */
     private function _create(array $arguments): array
     {
+        // Permission was checked when this response was originally
+        // computed; userId is in the cache key — see IdempotencyTrait.
         $cacheHit = $this->_idempotencyCacheHit($arguments);
         if ($cacheHit !== null) {
             return $cacheHit;
@@ -476,6 +480,8 @@ class Skill extends AbstractTool
      */
     private function _update(array $arguments): array
     {
+        // Permission was checked when this response was originally
+        // computed; userId is in the cache key — see IdempotencyTrait.
         $cacheHit = $this->_idempotencyCacheHit($arguments);
         if ($cacheHit !== null) {
             return $cacheHit;

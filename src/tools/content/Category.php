@@ -364,6 +364,8 @@ class Category extends AbstractTool
      */
     private function _create(array $arguments): array
     {
+        // Permission was checked when this response was originally
+        // computed; userId is in the cache key — see IdempotencyTrait.
         $cacheHit = $this->_idempotencyCacheHit($arguments);
         if ($cacheHit !== null) {
             return $cacheHit;
@@ -421,6 +423,8 @@ class Category extends AbstractTool
      */
     private function _update(array $arguments): array
     {
+        // Permission was checked when this response was originally
+        // computed; userId is in the cache key — see IdempotencyTrait.
         $cacheHit = $this->_idempotencyCacheHit($arguments);
         if ($cacheHit !== null) {
             return $cacheHit;

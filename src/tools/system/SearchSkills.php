@@ -9,6 +9,7 @@ use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
+use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
 
 /**
  * =========================================================================
@@ -89,11 +90,16 @@ class SearchSkills extends AbstractTool
      */
     public static function getDescription(): string
     {
-        return 'Full-text search across the bundled craft-skills corpus — 8 skills, ' .
-            'their reference deep-dives, and 5 Claude Code agents. `mode: "search"` ' .
-            '(default) returns ranked matches with a snippet and the resource URI for ' .
-            'follow-up reads; `mode: "topics"` enumerates the corpus without scoring. ' .
-            'Filter `kind` to `skill` / `reference` / `agent` to narrow.';
+        $skillCount = count(BundledSkills::skillNames());
+        $agentCount = count(BundledSkills::agentNames());
+
+        return "Full-text search across the bundled craft-skills corpus — {$skillCount} " .
+            "skills, their reference deep-dives, and {$agentCount} Claude Code agents. " .
+            '`mode: "search"` (default) returns ranked matches with a snippet and the ' .
+            'resource URI for follow-up reads; `mode: "topics"` enumerates the corpus ' .
+            'without scoring. Filter `kind` to `skill` / `reference` / `agent` to narrow. ' .
+            'Element-stored Cortex skills override bundled ones by handle and are included ' .
+            'in the merged corpus.';
     }
 
     /**

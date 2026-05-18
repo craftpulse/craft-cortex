@@ -458,6 +458,14 @@ class Users extends AbstractTool
 
         $this->_applyListFilters($query, $arguments);
 
+        // Pre-pagination total — same query without limit/offset.
+        // Mirrors Skill::_list(). Lets the LLM page through
+        // confidently without re-running the query just to see
+        // whether more rows exist.
+        $totalQuery = clone $query;
+        $totalQuery->limit(null)->offset(null);
+        $total = (int) $totalQuery->count();
+
         $caller = Craft::$app->getUser()->getIdentity();
         $users = $query->all();
         $serialised = [];
@@ -476,6 +484,7 @@ class Users extends AbstractTool
             'mode' => 'list',
             'users' => $serialised,
             'count' => count($serialised),
+            'total' => $total,
             'limit' => $limit,
             'offset' => $offset,
         ];
@@ -524,6 +533,8 @@ class Users extends AbstractTool
      */
     private function _create(array $arguments): array
     {
+        // Permission was checked when this response was originally
+        // computed; userId is in the cache key — see IdempotencyTrait.
         $cacheHit = $this->_idempotencyCacheHit($arguments);
         if ($cacheHit !== null) {
             return $cacheHit;
@@ -601,6 +612,8 @@ class Users extends AbstractTool
      */
     private function _update(array $arguments): array
     {
+        // Permission was checked when this response was originally
+        // computed; userId is in the cache key — see IdempotencyTrait.
         $cacheHit = $this->_idempotencyCacheHit($arguments);
         if ($cacheHit !== null) {
             return $cacheHit;

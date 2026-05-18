@@ -4,17 +4,8 @@ namespace craftpulse\cortex;
 
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
-use craft\events\RegisterComponentTypesEvent;
-use craft\events\RegisterUrlRulesEvent;
-use craft\events\RegisterUserPermissionsEvent;
-use craft\services\Elements;
-use craft\services\Gc;
-use craft\services\UserPermissions;
-use craft\web\UrlManager;
-use craftpulse\cortex\elements\Skill;
-use craftpulse\cortex\events\LogCallEvent;
-use craftpulse\cortex\generator\Tool as ToolGenerator;
 use craftpulse\cortex\models\Settings;
+use craftpulse\cortex\plugin\PluginTrait;
 use craftpulse\cortex\plugin\Services as CortexServices;
 use craftpulse\cortex\services\Allowlist;
 use craftpulse\cortex\services\Invocations;
@@ -26,9 +17,6 @@ use craftpulse\cortex\services\Sessions;
 use craftpulse\cortex\services\Skills;
 use craftpulse\cortex\services\Tokens;
 use craftpulse\cortex\services\Tools;
-use craftpulse\cortex\tools\support\InvocationLogger;
-use Throwable;
-use yii\base\Event;
 
 /**
  * =========================================================================
@@ -47,6 +35,11 @@ use yii\base\Event;
  * Property-style access (`$plugin->tools`) continues to work via Yii's
  * `__get()` walking the trait's getter.
  *
+ * Event listeners and project-config handlers live on `PluginTrait`
+ * (`src/plugin/PluginTrait.php`). `init()` delegates to
+ * `onPluginInit()` so each listener is a discrete `_register*()`
+ * method instead of an inline closure block.
+ *
  * Edition handles (`EDITION_FREE`, `EDITION_PRO`) are declared via
  * `editions()` per the Plugin Store contract. The active edition lives
  * in project config at `plugins.cortex.edition`; Craft owns the
@@ -62,6 +55,7 @@ use yii\base\Event;
 class Cortex extends BasePlugin
 {
     use CortexServices;
+    use PluginTrait;
 
     // Constants
     // =========================================================================
@@ -161,11 +155,11 @@ class Cortex extends BasePlugin
     /**
      * @inheritdoc
      *
-     * Registers the cortex-tool generator with Craft's `make` command if
-     * the `craftcms/generator` package is installed (always present in
-     * dev / playground installs; not bundled with the production
-     * `craftcms/cms` runtime). Class-exists guard keeps cortex bootable
-     * on installs that strip dev dependencies.
+     * Parent-boots, then delegates to `PluginTrait::onPluginInit()`
+     * which wires every Cortex event listener and project-config
+     * handler. Splitting registration into the trait keeps the
+     * entry-point class focused on the Plugin Store contract
+     * (`config`, `editions`, settings) and the trait composition.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -174,145 +168,7 @@ class Cortex extends BasePlugin
     {
         parent::init();
 
-        if (class_exists(\craft\generator\Command::class)) {
-            Event::on(
-                \craft\generator\Command::class,
-                \craft\generator\Command::EVENT_REGISTER_GENERATORS,
-                static function(RegisterComponentTypesEvent $event): void {
-                    $event->types[] = ToolGenerator::class;
-                },
-            );
-        }
-
-        // Prune expired runtime-override rows + (when audit retention
-        // is configured) old `cortex_invocations` rows during Craft's
-        // gc sweep. Both deletes are single indexed deleteAll calls,
-        // faster than the overhead of pushing a queue job — and
-        // Craft's gc already runs heavier cleanups inline in the same
-        // pass. Audit retention defaults to forever
-        // (`Settings::$auditRetentionDays = null`); when null the
-        // prune call is a no-op.
-        Event::on(
-            Gc::class,
-            Gc::EVENT_RUN,
-            static function(): void {
-                $plugin = Cortex::getInstance();
-                $plugin->allowlist->pruneExpired();
-                $plugin->invocations->prune();
-            },
-        );
-
-        // Wire the Gate 7.5 audit-log writer to the InvocationLogger's
-        // structured-entry event. The listener is wrapped in a
-        // try/catch so a thrown exception inside the audit-write path
-        // cannot break the dispatcher — defense in depth on top of
-        // `Invocations::record()`'s internal try/catch. The KV file
-        // log line is the secondary audit trail when the DB write
-        // fails.
-        Event::on(
-            InvocationLogger::class,
-            InvocationLogger::EVENT_LOG_CALL,
-            static function(LogCallEvent $event): void {
-                try {
-                    Cortex::getInstance()->invocations->record($event->entry);
-                } catch (Throwable $e) {
-                    \Craft::error(
-                        sprintf(
-                            'Audit-log listener raised %s: %s',
-                            $e::class,
-                            $e->getMessage(),
-                        ),
-                        Invocations::LOG_CATEGORY,
-                    );
-                }
-            },
-        );
-
-        // Register the Cortex Skill element type so the Elements service
-        // includes it in `getAllElementTypes()` / `ElementTypes` tool
-        // discovery and so Craft's element-condition / GraphQL surfaces
-        // pick it up.
-        Event::on(
-            Elements::class,
-            Elements::EVENT_REGISTER_ELEMENT_TYPES,
-            static function(RegisterComponentTypesEvent $event): void {
-                $event->types[] = Skill::class;
-            },
-        );
-
-        // Register the `manageCortexSkills` permission under a `Cortex`
-        // heading on the user-permissions screen. The permission is
-        // global (no per-instance ACL); the element's
-        // `canSave / canDelete / canView / canDuplicate` overrides
-        // consult it directly. Shape verified against
-        // `vendor/craftcms/cms/src/services/UserPermissions.php:85-96`.
-        Event::on(
-            UserPermissions::class,
-            UserPermissions::EVENT_REGISTER_PERMISSIONS,
-            static function(RegisterUserPermissionsEvent $event): void {
-                $event->permissions[] = [
-                    'heading' => 'Cortex',
-                    'permissions' => [
-                        Skill::PERMISSION_MANAGE => [
-                            'label' => \Craft::t('cortex', 'Manage Cortex skills'),
-                            'info' => \Craft::t(
-                                'cortex',
-                                'Allows creating, updating, and deleting Cortex skill elements through the MCP server.',
-                            ),
-                        ],
-                    ],
-                ];
-            },
-        );
-
-        // Wire the PC field-layout change handlers for the single
-        // `plugins.cortex.skillFieldLayout` path. Mirrors Craft's own
-        // `ApplicationTrait::_registerConfigListeners()` shape for
-        // `PATH_ADDRESS_FIELD_LAYOUTS`. The handler runs on add /
-        // update / remove so the field layout stays in sync between
-        // PC and the live `Fields` service across environments.
-        $skillsService = $this->getSkills();
-        \Craft::$app->getProjectConfig()
-            ->onAdd(Skills::CONFIG_FIELDLAYOUT_PATH, [$skillsService, 'handleChangedFieldLayout'])
-            ->onUpdate(Skills::CONFIG_FIELDLAYOUT_PATH, [$skillsService, 'handleChangedFieldLayout'])
-            ->onRemove(Skills::CONFIG_FIELDLAYOUT_PATH, [$skillsService, 'handleChangedFieldLayout']);
-
-        // Register the HTTP transport endpoint at /cortex/mcp. The route
-        // sits under the site URL rules (front-end-style endpoint, no
-        // cpTrigger) because MCP clients hit a stable public URL that
-        // doesn't move with `cpTrigger` reconfiguration.
-        //
-        // POST is the JSON-RPC entry point; GET is reserved for SSE
-        // upgrade (lands in sub-gate 7.7); DELETE terminates the
-        // session. The controller refuses every request when
-        // `Settings::$httpEnabled` is false, so registering the route
-        // unconditionally is safe — feature gating happens at the
-        // controller layer, not at the route layer.
-        //
-        // OAuth endpoints sit at /oauth/* (not under /cortex/) for
-        // client compatibility — most MCP clients expect bare
-        // /oauth/authorize, /oauth/token, etc. The `.well-known/*`
-        // discovery endpoints land at the site root per RFC 8414 §3
-        // and RFC 9728 §3 — both RFCs explicitly require the
-        // well-known paths to be at the root of the issuer URL.
-        Event::on(
-            UrlManager::class,
-            UrlManager::EVENT_REGISTER_SITE_URL_RULES,
-            static function(RegisterUrlRulesEvent $event): void {
-                $event->rules['POST cortex/mcp'] = 'cortex/mcp/index';
-                $event->rules['GET cortex/mcp'] = 'cortex/mcp/index';
-                $event->rules['DELETE cortex/mcp'] = 'cortex/mcp/index';
-
-                $event->rules['GET oauth/authorize'] = 'cortex/oauth/authorize';
-                $event->rules['POST oauth/authorize'] = 'cortex/oauth/authorize';
-                $event->rules['POST oauth/token'] = 'cortex/oauth/token';
-                $event->rules['POST oauth/register'] = 'cortex/oauth/register';
-                $event->rules['POST oauth/revoke'] = 'cortex/oauth/revoke';
-
-                $event->rules['GET .well-known/oauth-authorization-server'] = 'cortex/well-known/authorization-server';
-                $event->rules['GET .well-known/oauth-protected-resource'] = 'cortex/well-known/protected-resource';
-            },
-        );
+        $this->onPluginInit();
     }
 
     // Protected Methods
