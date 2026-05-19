@@ -102,17 +102,26 @@ it('asListPayloadFor(null) equals asListPayload() — stdio invariant', function
 
 it('asListPayloadFor returns every tool when filterFor defaults to true for all', function() {
     // The shipping Free registry has no tool that overrides filterFor.
-    // The full payload for the admin should match the stdio payload —
-    // structural equality (fresh `stdClass` instances from
-    // `(object) []` casts mean identity-equality would never hold).
+    // The full payload for the admin must contain every tool by name
+    // (filterFor defaults to true everywhere).
+    //
+    // Schema-shape equality with stdio held until Gate 8.8 introduced
+    // mode-unlock tools (`drafts_and_revisions`, `system_diagnostics`)
+    // whose `inputSchemaFor()` filters Pro modes out for HTTP callers
+    // on Free installs. The tool-set invariant (every tool surfaces)
+    // is the part that holds; schema-shape equality is not.
     $service = Cortex::getInstance()->tools;
 
     $stdio = $service->asListPayload();
     $admin = $service->asListPayloadFor($this->admin);
 
-    expect($admin)->toEqual($stdio);
-    expect(json_encode($admin))->toBe(json_encode($stdio));
     expect($admin)->toHaveCount($service->getCount());
+
+    $stdioNames = array_column($stdio, 'name');
+    $adminNames = array_column($admin, 'name');
+    sort($stdioNames);
+    sort($adminNames);
+    expect($adminNames)->toBe($stdioNames);
 });
 
 it('asListPayloadFor omits tools whose filterFor returns false for the user', function() {

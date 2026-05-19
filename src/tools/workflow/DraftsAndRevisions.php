@@ -2,20 +2,25 @@
 
 namespace craftpulse\cortex\tools\workflow;
 
+use Craft;
 use craft\elements\Entry;
+use craft\elements\User;
 use craft\helpers\DateTimeHelper;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\PermissionedToolTrait;
 use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
+use Throwable;
 
 /**
  * =========================================================================
  * `drafts_and_revisions` tool — read-only inspection of entry draft and
- * revision history.
+ * revision history, plus Pro-edition apply/discard mutations.
  *
- * Modes:
+ * Free modes (always available):
  *   - `list_drafts` — paginated list of drafts. Filterable by section
  *     handle, canonical entry id, and draft creator. Multi-site by
  *     default (`site('*')`).
@@ -26,14 +31,34 @@ use craftpulse\cortex\tools\ToolException;
  *     map keyed by field handle plus identity summaries of both
  *     sides.
  *
- * Pro adds `apply` / `discard` modes for drafts — those mutate state,
- * gated behind `viewEntries:{section}` plus save permissions on apply.
- * Free is read-only.
+ * Pro modes (Gate 8.8a — mode-unlock composition contract, locked
+ * decision 6 of `docs/plans/gate-8.md`):
+ *   - `apply` — applies a draft to its canonical via Craft's drafts
+ *     service. Permission `saveEntries:{canonicalSectionUid}`.
+ *   - `discard` — hard-deletes the draft, leaves the canonical untouched.
+ *     Permission `saveEntries:{canonicalSectionUid}` (mirrors Craft's
+ *     own `ElementsController::actionDeleteDraft()` semantics, which
+ *     gate draft delete against the canonical's save permission).
+ *
+ * The tool stays Free-registered (`shouldRegister()` always true). Pro
+ * unlock happens at `inputSchemaFor()` (the mode disappears from
+ * `tools/list` for non-permitted callers and from any Free-edition
+ * caller) and at `execute()` (defense-in-depth re-check throws
+ * `ToolException` with the locked rich-format message when a Pro mode
+ * is dispatched without authority). Free behaviour is bit-identical to
+ * Gate 8 baseline.
  *
  * Compare mode emits scalar/array field values directly; relational and
  * other complex field types are stubbed as
  * `{_diff: 'unsupported', _class: '<fqcn>'}` so the LLM can fall back
  * to `entries({with: [...]})` for relational deep-dives.
+ *
+ * Overlap with `entry.apply_draft`: the existing Pro `entry` tool
+ * exposes the same draft-apply operation under a different surface.
+ * Both ship because they target different LLM tool-selection paths —
+ * `drafts_and_revisions.apply` is the natural continuation after
+ * `list_drafts`, while `entry.apply_draft` chains naturally after
+ * `entry.create + draft creation`. The duplicate is deliberate.
  * =========================================================================
  *
  * @author Craftpulse
@@ -43,11 +68,23 @@ use craftpulse\cortex\tools\ToolException;
 #[IsIdempotent]
 class DraftsAndRevisions extends AbstractTool
 {
+    use PermissionedToolTrait;
+
     // Constants
     // =========================================================================
 
     public const DEFAULT_LIMIT = 50;
     public const MAX_LIMIT = 500;
+
+    /**
+     * @var list<string>
+     */
+    private const FREE_MODES = ['list_drafts', 'list_revisions', 'compare'];
+
+    /**
+     * @var list<string>
+     */
+    private const PRO_MODES = ['apply', 'discard'];
 
     // Public Methods
     // =========================================================================
@@ -71,15 +108,18 @@ class DraftsAndRevisions extends AbstractTool
      */
     public static function getDescription(): string
     {
-        return 'Inspect entry drafts and revisions. Modes: `list_drafts` lists drafts ' .
-            '(optionally for a section, canonical entry, or creator); `list_revisions` ' .
-            'lists revisions of a canonical entry id; `compare` returns a field-level diff ' .
-            'between two entries (canonical / draft / revision in any combination). Read-only — ' .
-            'apply/discard unlocks in Pro.';
+        return 'Inspect entry drafts and revisions. Read modes: `list_drafts`, ' .
+            '`list_revisions`, `compare` (field-level diff). Pro modes: `apply` ' .
+            '(merge a draft into its canonical) and `discard` (hard-delete the ' .
+            'draft, canonical untouched). Pro modes require `saveEntries:{section}`.';
     }
 
     /**
      * @inheritdoc
+     *
+     * Base schema — exposes the full enum (Free + Pro). stdio callers
+     * see this verbatim via `inputSchemaFor(null)`. HTTP callers are
+     * filtered down per their permissions in `inputSchemaFor($user)`.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -88,7 +128,7 @@ class DraftsAndRevisions extends AbstractTool
     {
         return Schema::object([
             'mode' => Schema::string()
-                ->enum(['list_drafts', 'list_revisions', 'compare'])
+                ->enum(array_merge(self::FREE_MODES, self::PRO_MODES))
                 ->required()
                 ->description('Required.'),
             'section' => Schema::string()->description('Section handle. Filters list_drafts.'),
@@ -97,9 +137,55 @@ class DraftsAndRevisions extends AbstractTool
             'creatorId' => Schema::integer()->description('User id of draft creator. Filters list_drafts.'),
             'leftId' => Schema::integer()->description('First entry/draft/revision id for `compare` mode.'),
             'rightId' => Schema::integer()->description('Second entry/draft/revision id for `compare` mode.'),
+            'id' => Schema::integer()->description('Draft id for `apply` / `discard` modes.'),
+            'uid' => Schema::string()->description('Draft uid for `apply` / `discard` modes.'),
+            'siteId' => Schema::integer()->description('Site id for the draft lookup in `apply` / `discard`.'),
+            'siteHandle' => Schema::string()->description('Site handle for the draft lookup in `apply` / `discard`.'),
             'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
             'offset' => Schema::integer()->minimum(0),
         ])->toArray();
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Per-user input-schema rewrite. stdio (`null` user) gets the full
+     * static enum verbatim — the trusted local path. Filters happen
+     * only for HTTP callers (non-null user). An HTTP caller on a
+     * Free-edition install never sees the Pro modes regardless of
+     * permission. An HTTP caller on Pro who lacks `saveEntries:*` on
+     * any section is downgraded to the Free enum. `execute()` still
+     * re-validates the resolved mode for security AND blocks Pro modes
+     * on Free installs.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function inputSchemaFor(?User $user = null): array
+    {
+        $schema = static::getInputSchema();
+
+        if ($user === null) {
+            return $schema;
+        }
+
+        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+            $schema['properties']['mode']['enum'] = self::FREE_MODES;
+            return $schema;
+        }
+
+        if ($user->admin) {
+            return $schema;
+        }
+
+        foreach (Craft::$app->getEntries()->getAllSections() as $section) {
+            if ($user->can("saveEntries:{$section->uid}")) {
+                return $schema;
+            }
+        }
+
+        $schema['properties']['mode']['enum'] = self::FREE_MODES;
+        return $schema;
     }
 
     /**
@@ -114,15 +200,82 @@ class DraftsAndRevisions extends AbstractTool
     {
         $mode = $arguments['mode'] ?? null;
         if (!is_string($mode) || $mode === '') {
-            throw new ToolException('`mode` is required (list_drafts / list_revisions / compare).');
+            throw new ToolException('`mode` is required (list_drafts / list_revisions / compare / apply / discard).');
+        }
+
+        if (in_array($mode, self::PRO_MODES, true) && !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+            throw new ToolException("drafts_and_revisions: mode `{$mode}` is unavailable on this edition.");
         }
 
         return match ($mode) {
             'list_drafts' => $this->_listDrafts($arguments),
             'list_revisions' => $this->_listRevisions($arguments),
             'compare' => $this->_compare($arguments),
+            'apply' => $this->_apply($arguments),
+            'discard' => $this->_discard($arguments),
             default => throw new ToolException("Unknown mode: '{$mode}'."),
         };
+    }
+
+    // Protected Methods
+    // =========================================================================
+
+    /**
+     * Per-`PermissionedToolTrait` contract: the Craft permissions the
+     * given arguments imply. Returns the sentinel `saveEntries:*` when
+     * the arguments don't carry a resolvable draft id/uid (e.g. when
+     * `filterFor()` probes with empty args). When an id/uid is present
+     * the draft is loaded so the per-canonical section UID can drive
+     * the gate.
+     *
+     * Only Pro modes consult this method — Free modes never call
+     * `_assertPermission()`. The Free-mode return is harmless because
+     * stdio + admin short-circuit before reaching the permission walk.
+     *
+     * @param array<string,mixed> $arguments
+     * @return string[]
+     * @throws ToolException
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _requiredPermissions(array $arguments): array
+    {
+        $mode = is_string($arguments['mode'] ?? null) ? $arguments['mode'] : null;
+        if (!in_array($mode, self::PRO_MODES, true)) {
+            return [];
+        }
+
+        $sectionUid = $arguments['sectionUid'] ?? null;
+        if (is_string($sectionUid) && $sectionUid !== '') {
+            return ["saveEntries:{$sectionUid}"];
+        }
+
+        return ['saveEntries:*'];
+    }
+
+    /**
+     * Override `PermissionedToolTrait::_buildPermissionDeniedMessage()`
+     * to emit the rich tool-specific format keyed on by 8.10's
+     * `ModeErrorShapeTest`. Inherits the stdio / admin skip logic from
+     * the trait.
+     *
+     * @param array<string,mixed> $arguments
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
+    {
+        $mode = is_string($arguments['mode'] ?? null) ? $arguments['mode'] : '?';
+        $sectionUid = is_string($arguments['sectionUid'] ?? null) ? $arguments['sectionUid'] : '?';
+
+        return sprintf(
+            'permission denied — mode `%s` on section `%s` requires `%s`.',
+            $mode,
+            $sectionUid,
+            $missingPermission,
+        );
     }
 
     // Private Methods
@@ -309,6 +462,156 @@ class DraftsAndRevisions extends AbstractTool
             'differences' => $differences,
             'differenceCount' => count($differences),
         ];
+    }
+
+    /**
+     * Apply-mode dispatch (Pro). Resolves the draft by `id` or `uid`,
+     * loads its canonical, gates on `saveEntries:{canonicalSectionUid}`,
+     * then applies via Craft's drafts service.
+     *
+     * @param array<string,mixed> $arguments
+     * @return array<string,mixed>
+     * @throws ToolException
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _apply(array $arguments): array
+    {
+        $draft = $this->_resolveDraft($arguments);
+        $canonical = $draft->getCanonical(anySite: true);
+        if (!$canonical instanceof Entry) {
+            throw new ToolException(
+                "drafts_and_revisions: apply could not resolve canonical for draft id={$draft->id}."
+            );
+        }
+
+        $canonicalSection = $canonical->getSection();
+        if ($canonicalSection === null) {
+            throw new ToolException(
+                'drafts_and_revisions: apply on a sectionless (nested) entry is not supported.'
+            );
+        }
+
+        $this->_assertPermission($arguments + ['sectionUid' => $canonicalSection->uid]);
+
+        try {
+            $applied = Craft::$app->getDrafts()->applyDraft($draft);
+        } catch (Throwable $e) {
+            throw new ToolException("drafts_and_revisions: apply failed — {$e->getMessage()}");
+        }
+
+        if (!$applied instanceof Entry) {
+            throw new ToolException(
+                "drafts_and_revisions: applyDraft returned non-Entry element for draft id={$draft->id}."
+            );
+        }
+
+        return [
+            'success' => true,
+            'mode' => 'apply',
+            'appliedDraftId' => (int) $draft->id,
+            'canonicalId' => (int) $applied->id,
+            'canonicalUid' => $applied->uid,
+            'siteHandle' => $applied->getSite()->handle,
+        ];
+    }
+
+    /**
+     * Discard-mode dispatch (Pro). Hard-deletes the draft, leaves the
+     * canonical untouched. Permission gate mirrors Craft's own
+     * `ElementsController::actionDeleteDraft()` — the draft's
+     * `canDelete()` ultimately consults `saveEntries` on the canonical's
+     * section.
+     *
+     * @param array<string,mixed> $arguments
+     * @return array<string,mixed>
+     * @throws ToolException
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _discard(array $arguments): array
+    {
+        $draft = $this->_resolveDraft($arguments);
+        $canonical = $draft->getCanonical(anySite: true);
+        if (!$canonical instanceof Entry) {
+            throw new ToolException(
+                "drafts_and_revisions: discard could not resolve canonical for draft id={$draft->id}."
+            );
+        }
+
+        $canonicalSection = $canonical->getSection();
+        if ($canonicalSection === null) {
+            throw new ToolException(
+                'drafts_and_revisions: discard on a sectionless (nested) entry is not supported.'
+            );
+        }
+
+        $this->_assertPermission($arguments + ['sectionUid' => $canonicalSection->uid]);
+
+        $draftId = (int) $draft->id;
+        $canonicalId = (int) $canonical->id;
+        $canonicalUid = $canonical->uid;
+
+        try {
+            $deleted = Craft::$app->getElements()->deleteElement($draft, true);
+        } catch (Throwable $e) {
+            throw new ToolException("drafts_and_revisions: discard failed — {$e->getMessage()}");
+        }
+
+        if (!$deleted) {
+            throw new ToolException(
+                "drafts_and_revisions: discard failed for draft id={$draftId}. See Craft logs for details."
+            );
+        }
+
+        return [
+            'success' => true,
+            'mode' => 'discard',
+            'discardedDraftId' => $draftId,
+            'canonicalId' => $canonicalId,
+            'canonicalUid' => $canonicalUid,
+        ];
+    }
+
+    /**
+     * Resolve a draft by `id` or `uid`, optionally narrowed by
+     * `siteId` / `siteHandle`. Throws `ToolException` when neither id
+     * nor uid is supplied, or when no draft matches.
+     *
+     * @param array<string,mixed> $arguments
+     * @throws ToolException
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _resolveDraft(array $arguments): Entry
+    {
+        $id = $arguments['id'] ?? null;
+        $uid = $arguments['uid'] ?? null;
+
+        $query = Entry::find()->status(null)->drafts(true)->site('*');
+
+        if (is_int($id) || (is_string($id) && ctype_digit($id))) {
+            $query->id((int) $id);
+        } elseif (is_string($uid) && $uid !== '') {
+            $query->uid($uid);
+        } else {
+            throw new ToolException('drafts_and_revisions: `id` or `uid` is required for mode=apply / discard.');
+        }
+
+        $siteId = $this->_resolveOptionalSiteId($arguments);
+        if ($siteId !== null) {
+            $query->siteId($siteId);
+        }
+
+        $draft = $query->one();
+        if (!$draft instanceof Entry) {
+            throw new ToolException('drafts_and_revisions: no draft found.');
+        }
+
+        return $draft;
     }
 
     /**
