@@ -168,7 +168,7 @@ The controller's drain-don't-break loop (`$clientGone` flag at `_streamPost():69
 | mode | string enum (set_status, update_fields, relate, migrate) | yes | Operation. |
 | query | object | yes | `{section?, entryType?, status?, search?, ids?, authorId?, dateCreated?, dateUpdated?, postDate?, expiryDate?}` per Q12. |
 | siteId | int\|"*" | no | Site context. Default primary. |
-| status | string | set_status only | One of enabled/disabled/pending/expired. |
+| status | string enum (enabled, disabled) | set_status only | Direct toggle of `$entry->enabled`. `live` / `pending` / `expired` are computed from `enabled + postDate + expiryDate`; drive those via `update_fields`. |
 | fields | object | update_fields only | `{handle: value}`. |
 | targetField | string | relate only | Field handle (relation field). |
 | targetIds | int[] | relate only | Target element IDs. |

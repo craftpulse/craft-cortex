@@ -66,8 +66,9 @@ afterEach(function() {
     }
 
     // Restore minorHeroes baseline — `enabled = true`, no `expiryDate`.
-    // Tests that flip status leave the seed in disabled/expired state
-    // unless we clean up.
+    // Tests that toggle `enabled` leave rows disabled unless we clean
+    // up. The expiryDate-null reset is defensive in case a follow-up
+    // suite ever sets one through `update_fields`.
     $rows = EntryElement::find()
         ->status(null)
         ->section('minorHeroes')
@@ -779,6 +780,172 @@ it('onPermissionDenied=fail aborts on the first denied row with a ToolException'
             } catch (ToolException $e) {
                 $threw = true;
                 expect($e->getMessage())->toContain('permission denied on row id=');
+            }
+            expect($threw)->toBeTrue();
+        } finally {
+            Craft::$app->getUser()->setIdentity($this->admin);
+            Craft::$app->getElements()->deleteElement($user, hardDelete: true);
+        }
+    });
+});
+
+it('partial section permission routes rows to succeeded vs skipped per section', function() {
+    cortex_with_edition(Cortex::EDITION_PRO, function() {
+        // Pre-flight: the spanning-permission scenario needs a second
+        // writable section. The playground ships heroes/teams/about
+        // alongside minorHeroes; we use heroes here. If the seed
+        // changes shape, the test skips rather than producing a
+        // misleading green.
+        $heroesSection = Craft::$app->getEntries()->getSectionByHandle('heroes');
+        $heroEntryType = Craft::$app->getEntries()->getEntryTypeByHandle('hero');
+        if ($heroesSection === null || $heroEntryType === null) {
+            $this->markTestSkipped('heroes section + hero entry type not present in playground seed.');
+        }
+
+        // Fixture entries in the second section — title-prefixed so the
+        // suite's afterEach cleanup picks them up. Two rows is enough
+        // to prove routing; the test is about classification, not bulk.
+        $heroesIds = [];
+        for ($i = 0; $i < 2; $i++) {
+            $entry = new EntryElement();
+            $entry->sectionId = $heroesSection->id;
+            $entry->typeId = $heroEntryType->id;
+            $entry->title = $this->fixturePrefix . 'hero-' . $i;
+            if (!Craft::$app->getElements()->saveElement($entry)) {
+                $this->markTestSkipped('Could not seed heroes fixture entries.');
+            }
+            $heroesIds[] = (int) $entry->id;
+        }
+
+        // Caller has saveEntries on minorHeroes only — heroes save is
+        // denied, so the per-row gate inside the each-loop routes
+        // those rows to `skipped` with reason `permission_denied`.
+        $user = new User();
+        $user->username = '__cortex_bulk_partial_' . bin2hex(random_bytes(4));
+        $user->email = $user->username . '@example.test';
+        $user->admin = false;
+        if (!Craft::$app->getElements()->saveElement($user)) {
+            $this->markTestSkipped('Could not create fixture user.');
+        }
+        // Craft 5 permission nesting for non-single sections:
+        // `viewEntries → saveEntries` and `viewEntries → viewPeerEntries
+        // → savePeerEntries`. `saveUserPermissions()` drops orphans
+        // (`UserPermissions::_filterOrphanedPermissions()`), so we
+        // grant the whole chain. `savePeerEntries` is required because
+        // the caller doesn't author the seeded minorHeroes rows.
+        Craft::$app->getUserPermissions()->saveUserPermissions(
+            (int) $user->id,
+            [
+                "viewEntries:{$this->section->uid}",
+                "saveEntries:{$this->section->uid}",
+                "viewPeerEntries:{$this->section->uid}",
+                "savePeerEntries:{$this->section->uid}",
+            ],
+        );
+
+        try {
+            Craft::$app->getUser()->setIdentity($user);
+
+            $minorIds = _cortex_bulk_first_ids(3);
+            $spanningIds = array_merge($minorIds, $heroesIds);
+
+            $result = _cortex_bulk_tool()->execute([
+                'mode' => 'set_status',
+                'status' => 'disabled',
+                'query' => ['ids' => $spanningIds],
+            ]);
+
+            expect($result['succeeded'])->toBe(3);
+            expect($result['skipped'])->toBe(2);
+            expect($result['failed'])->toBe(0);
+
+            $succeededIds = [];
+            $skippedIds = [];
+            foreach ($result['results'] as $row) {
+                if ($row['kind'] === 'success') {
+                    $succeededIds[] = $row['id'];
+                } elseif ($row['kind'] === 'skipped') {
+                    $skippedIds[] = $row['id'];
+                    expect($row['reason'])->toBe('permission_denied');
+                }
+            }
+
+            sort($succeededIds);
+            sort($skippedIds);
+            $minorSorted = $minorIds;
+            $heroesSorted = $heroesIds;
+            sort($minorSorted);
+            sort($heroesSorted);
+
+            expect($succeededIds)->toBe($minorSorted);
+            expect($skippedIds)->toBe($heroesSorted);
+        } finally {
+            Craft::$app->getUser()->setIdentity($this->admin);
+            Craft::$app->getElements()->deleteElement($user, hardDelete: true);
+        }
+    });
+});
+
+it('partial section permission with onPermissionDenied=fail aborts on first denied row', function() {
+    cortex_with_edition(Cortex::EDITION_PRO, function() {
+        $heroesSection = Craft::$app->getEntries()->getSectionByHandle('heroes');
+        $heroEntryType = Craft::$app->getEntries()->getEntryTypeByHandle('hero');
+        if ($heroesSection === null || $heroEntryType === null) {
+            $this->markTestSkipped('heroes section + hero entry type not present in playground seed.');
+        }
+
+        $heroEntry = new EntryElement();
+        $heroEntry->sectionId = $heroesSection->id;
+        $heroEntry->typeId = $heroEntryType->id;
+        $heroEntry->title = $this->fixturePrefix . 'hero-fail';
+        if (!Craft::$app->getElements()->saveElement($heroEntry)) {
+            $this->markTestSkipped('Could not seed heroes fixture entry.');
+        }
+
+        $user = new User();
+        $user->username = '__cortex_bulk_partial_fail_' . bin2hex(random_bytes(4));
+        $user->email = $user->username . '@example.test';
+        $user->admin = false;
+        if (!Craft::$app->getElements()->saveElement($user)) {
+            $this->markTestSkipped('Could not create fixture user.');
+        }
+        // Craft 5 permission nesting for non-single sections:
+        // `viewEntries → saveEntries` and `viewEntries → viewPeerEntries
+        // → savePeerEntries`. `saveUserPermissions()` drops orphans
+        // (`UserPermissions::_filterOrphanedPermissions()`), so we
+        // grant the whole chain. `savePeerEntries` is required because
+        // the caller doesn't author the seeded minorHeroes rows.
+        Craft::$app->getUserPermissions()->saveUserPermissions(
+            (int) $user->id,
+            [
+                "viewEntries:{$this->section->uid}",
+                "saveEntries:{$this->section->uid}",
+                "viewPeerEntries:{$this->section->uid}",
+                "savePeerEntries:{$this->section->uid}",
+            ],
+        );
+
+        try {
+            Craft::$app->getUser()->setIdentity($user);
+
+            // Ordering: ids returned by `_cortex_bulk_first_ids()` are
+            // minorHeroes (always allowed); appending the heroes id at
+            // the end means the loop processes the allowed rows first
+            // and aborts on the denied one. The error message must name
+            // that specific id so we know the abort is on the right row.
+            $spanningIds = array_merge(_cortex_bulk_first_ids(2), [(int) $heroEntry->id]);
+
+            $threw = false;
+            try {
+                _cortex_bulk_tool()->execute([
+                    'mode' => 'set_status',
+                    'status' => 'disabled',
+                    'onPermissionDenied' => 'fail',
+                    'query' => ['ids' => $spanningIds],
+                ]);
+            } catch (ToolException $e) {
+                $threw = true;
+                expect($e->getMessage())->toContain('permission denied on row id=' . $heroEntry->id);
             }
             expect($threw)->toBeTrue();
         } finally {

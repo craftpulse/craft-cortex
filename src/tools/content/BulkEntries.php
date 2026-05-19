@@ -38,10 +38,11 @@ use Throwable;
  * outcomes in a `results[]` array.
  *
  * Modes:
- *   - `set_status` — toggles `enabled` (`enabled` / `disabled`) plus a
- *     light heuristic for `pending` (sets a future postDate) and
- *     `expired` (sets a past expiryDate). Native status is recomputed
- *     by Craft at save time.
+ *   - `set_status` — toggles `$entry->enabled` between `enabled` and
+ *     `disabled`. The `live` / `pending` / `expired` states are
+ *     computed by Craft from `enabled + postDate + expiryDate` and are
+ *     not directly settable here — operators that need those drive the
+ *     dates explicitly through `update_fields`.
  *   - `update_fields` — pass-through to `Entry::setFieldValues()` for
  *     each visited row. Per-row validation failures land in `failed`
  *     with the field-keyed `validationErrors` map; the operation
@@ -149,14 +150,16 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
     public const ITER_BATCH_SIZE = 100;
 
     /**
-     * Allowed `set_status` target values. `enabled` and `disabled` flip
-     * the entry's `enabled` flag directly; `pending` and `expired` are
-     * date-driven aliases — Craft recomputes the natural status from
-     * `enabled + postDate + expiryDate` at save time.
+     * Allowed `set_status` target values. The tool only toggles the
+     * `enabled` flag directly — Craft 5 derives the rest of the status
+     * surface (`live` / `pending` / `expired`) from `enabled + postDate
+     * + expiryDate`, and the date columns are editorial intent rather
+     * than a status flip. Operators that want a row to be pending or
+     * expired must drive the dates explicitly through `update_fields`.
      *
      * @since 5.0.0
      */
-    public const STATUSES = ['enabled', 'disabled', 'pending', 'expired'];
+    public const STATUSES = ['enabled', 'disabled'];
 
     /**
      * Allowed `relate` merge strategies.
@@ -195,8 +198,10 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
     public static function getDescription(): string
     {
         return 'Bulk-mutate entries selected by an `EntryQuery`-shaped filter. Modes: ' .
-            'set_status (toggle enabled / disabled / pending / expired) / update_fields ' .
-            '(pass-through `fields: {handle: value}` to setFieldValues) / relate (apply ' .
+            'set_status (toggle the `enabled` flag — set enabled or disabled; `pending` ' .
+            'and `expired` are not status flips, drive postDate / expiryDate via ' .
+            'update_fields instead) / update_fields (pass-through `fields: {handle: value}` ' .
+            'to setFieldValues) / relate (apply ' .
             'replace / add / remove on a relation field) / migrate (move entries to a ' .
             'new section + entry type — defaults to dryRun:true). Permission: per-row ' .
             '`saveEntries:{sectionUid}`. Denied rows go to `skipped[]` by default; pass ' .
@@ -1131,10 +1136,11 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
     // =========================================================================
 
     /**
-     * Apply a `set_status` target value to an entry. `enabled` /
-     * `disabled` toggle `$enabled` directly; `pending` and `expired`
-     * adjust postDate / expiryDate so Craft's natural status resolver
-     * lands on the requested label.
+     * Apply a `set_status` target value to an entry. The tool only
+     * flips the `enabled` column directly; `live` / `pending` /
+     * `expired` are computed states (`enabled + postDate + expiryDate`)
+     * and operators that want those must drive the dates explicitly
+     * via `update_fields`.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -1144,38 +1150,8 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
         match ($status) {
             'enabled' => $entry->enabled = true,
             'disabled' => $entry->enabled = false,
-            'pending' => $this->_applyPending($entry),
-            'expired' => $this->_applyExpired($entry),
             default => null,
         };
-    }
-
-    /**
-     * Pending = enabled + postDate in the future. Pushes the postDate
-     * 30 days out from now and clears any expiryDate so the natural
-     * status resolves to PENDING.
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _applyPending(EntryElement $entry): void
-    {
-        $entry->enabled = true;
-        $entry->postDate = (new DateTime('now'))->modify('+30 days');
-        $entry->expiryDate = null;
-    }
-
-    /**
-     * Expired = enabled + expiryDate in the past. Pulls the expiryDate
-     * 1 day before now so the natural status resolves to EXPIRED.
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    private function _applyExpired(EntryElement $entry): void
-    {
-        $entry->enabled = true;
-        $entry->expiryDate = (new DateTime('now'))->modify('-1 days');
     }
 
     /**

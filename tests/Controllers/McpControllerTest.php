@@ -1527,6 +1527,88 @@ it('a streaming tools/call with Accept: text/event-stream returns SSE frames', f
     }
 });
 
+it('notifications/cancelled mid-stream over the controller writes a cancelled frame + kind=cancelled audit row', function() {
+    $ctx = _cortex_register_streaming_fixture();
+
+    try {
+        // Initialize to mint a session.
+        $initBody = (string) json_encode([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'initialize',
+            'params' => [
+                'protocolVersion' => Server::PROTOCOL_VERSION,
+                'clientInfo' => ['name' => 'pest-cancel', 'version' => '0'],
+            ],
+        ]);
+        $initController = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            'Authorization' => $this->bearerHeader,
+        ], $initBody);
+        $sessionId = (string) $initController->runIndex()->headers->get(Http::HEADER_SESSION_ID);
+
+        // Pre-arm the cancel cache slot for the upcoming request id so
+        // the streaming token observes the flip on its first poll. This
+        // models the wire-level race where the client has already
+        // posted `notifications/cancelled` before the streaming
+        // response sent its first progress frame — exactly the path
+        // that the controller's drain-don't-break loop has to honour.
+        $requestId = 2;
+        $cancelKey = Server::CANCEL_CACHE_KEY_PREFIX . $sessionId . ':' . $requestId;
+        Craft::$app->getCache()->set($cancelKey, true, Server::CANCEL_CACHE_TTL);
+
+        // Defense against stale audit rows from prior runs.
+        \craftpulse\cortex\records\Invocation::deleteAll(['sessionId' => $sessionId]);
+
+        $callBody = (string) json_encode([
+            'jsonrpc' => '2.0',
+            'id' => $requestId,
+            'method' => 'tools/call',
+            'params' => [
+                'name' => '_streaming_test',
+                'arguments' => [],
+                '_meta' => ['progressToken' => 'prog-cancel-controller'],
+            ],
+        ]);
+        $callController = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            Http::HEADER_SESSION_ID => $sessionId,
+            'Authorization' => $this->bearerHeader,
+            'Accept' => 'application/json, text/event-stream',
+        ], $callBody);
+
+        $callResponse = $callController->runIndex();
+
+        expect($callResponse->statusCode)->toBe(200);
+        expect($callResponse->headers->get('Content-Type'))->toContain('text/event-stream');
+
+        // Wire-level: exactly one frame — the cancellation envelope —
+        // because the token tripped before the fixture's first yield.
+        $frames = _cortex_parse_sse($callController->capturedSseBody);
+        expect($frames)->toHaveCount(1);
+        expect($frames[0]['event'])->toBe('message');
+        expect($frames[0]['data']['method'])->toBe('notifications/cancelled');
+        expect($frames[0]['data']['params']['requestId'])->toBe($requestId);
+        expect($frames[0]['data']['params']['progressToken'])->toBe('prog-cancel-controller');
+
+        // Audit row writes despite the cancellation — proves the
+        // drain-don't-break loop completed the dispatcher generator
+        // rather than orphaning the row.
+        $rows = \craftpulse\cortex\records\Invocation::find()
+            ->where(['toolName' => '_streaming_test', 'sessionId' => $sessionId])
+            ->all();
+        expect($rows)->toHaveCount(1);
+        expect($rows[0]->kind)->toBe(\craftpulse\cortex\tools\support\InvocationLogger::KIND_CANCELLED);
+        expect($rows[0]->errorClass)->toBeNull();
+
+        \craftpulse\cortex\records\Invocation::deleteAll(['id' => $rows[0]->id]);
+        Craft::$app->getCache()->delete($cancelKey);
+        Cortex::getInstance()->sessions->terminate($sessionId);
+    } finally {
+        _cortex_restore_streaming_fixture($ctx);
+    }
+});
+
 it('a tools/call without Accept: text/event-stream keeps the JSON response path', function() {
     $ctx = _cortex_register_streaming_fixture();
 
