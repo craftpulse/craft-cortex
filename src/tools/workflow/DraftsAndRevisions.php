@@ -117,18 +117,26 @@ class DraftsAndRevisions extends AbstractTool
     /**
      * @inheritdoc
      *
-     * Base schema — exposes the full enum (Free + Pro). stdio callers
-     * see this verbatim via `inputSchemaFor(null)`. HTTP callers are
-     * filtered down per their permissions in `inputSchemaFor($user)`.
+     * Base schema — exposes the Free + Pro enum on Pro installs, the
+     * Free-only enum on Free installs. The edition gate runs here so
+     * the static surface (`tools/list`, `inputSchemaFor(null)`, and
+     * the architecture invariant at
+     * `tests/Mcp/ToolInterfaceInvariantTest.php`) stay aligned with the
+     * runtime gate in `execute()`. HTTP callers on Pro are further
+     * filtered down per Craft permissions in `inputSchemaFor($user)`.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
+        $modes = Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')
+            ? array_merge(self::FREE_MODES, self::PRO_MODES)
+            : self::FREE_MODES;
+
         return Schema::object([
             'mode' => Schema::string()
-                ->enum(array_merge(self::FREE_MODES, self::PRO_MODES))
+                ->enum($modes)
                 ->required()
                 ->description('Required.'),
             'section' => Schema::string()->description('Section handle. Filters list_drafts.'),
@@ -163,14 +171,12 @@ class DraftsAndRevisions extends AbstractTool
      */
     public function inputSchemaFor(?User $user = null): array
     {
+        // `getInputSchema()` already reflects the edition (Free vs
+        // Pro). For stdio (null user) and Free installs, this is the
+        // final answer — no per-permission filtering applies.
         $schema = static::getInputSchema();
 
-        if ($user === null) {
-            return $schema;
-        }
-
-        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
-            $schema['properties']['mode']['enum'] = self::FREE_MODES;
+        if ($user === null || !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
             return $schema;
         }
 

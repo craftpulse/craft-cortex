@@ -79,15 +79,13 @@ function _cortex_dar_section(): ?\craft\models\Section
 // inputSchemaFor — stdio invariant
 // -----------------------------------------------------------------------------
 
-it('inputSchemaFor(null) returns the full static enum on Free (stdio invariant)', function() {
-    // Stdio is trusted — `inputSchemaFor(null) === static::getInputSchema()`
-    // per the locked Gate 7.4 invariant at
-    // `tests/Mcp/ToolInterfaceInvariantTest.php`. Edition gating for
-    // stdio happens at execute()-time, not at schema-rewrite time.
+it('inputSchemaFor(null) returns the Free enum on Free (edition gate beats stdio trust)', function() {
+    // The runtime execute()-time gate refuses Pro modes on Free
+    // regardless of caller (including stdio); the schema mirrors that
+    // so an LLM is never advertised a mode the runtime would reject.
+    // Pro-install stdio still sees the full enum (next test).
     $schema = _cortex_dar_tool()->inputSchemaFor(null);
-    expect($schema['properties']['mode']['enum'])->toBe([
-        'list_drafts', 'list_revisions', 'compare', 'apply', 'discard',
-    ]);
+    expect($schema['properties']['mode']['enum'])->toBe(['list_drafts', 'list_revisions', 'compare']);
 });
 
 it('inputSchemaFor(null) returns the full static enum on Pro (stdio invariant)', function() {

@@ -102,13 +102,14 @@ function _cortex_diag_mark_failed(string $jobId): void
 // inputSchemaFor — stdio invariant
 // -----------------------------------------------------------------------------
 
-it('inputSchemaFor(null) returns the full static enum on Free (stdio invariant)', function() {
-    // Stdio is trusted — `inputSchemaFor(null) === static::getInputSchema()`
-    // per the locked Gate 7.4 invariant. Edition gating for stdio
-    // happens at execute()-time, not at schema-rewrite time.
+it('inputSchemaFor(null) returns the Free enum on Free (edition gate beats stdio trust)', function() {
+    // The runtime execute()-time gate refuses Pro types on Free
+    // regardless of caller (including stdio); the schema mirrors that
+    // so an LLM is never advertised a type the runtime would reject.
+    // Pro-install stdio still sees the full enum (next test).
     $schema = _cortex_diag_tool()->inputSchemaFor(null);
     expect($schema['properties']['type']['enum'])->toBe([
-        'logs', 'last_error', 'deprecations', 'queue', 'project_config_diff', 'manage_queue',
+        'logs', 'last_error', 'deprecations', 'queue', 'project_config_diff',
     ]);
 });
 

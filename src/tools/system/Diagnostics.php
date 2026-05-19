@@ -120,18 +120,26 @@ class Diagnostics extends AbstractTool
     /**
      * @inheritdoc
      *
-     * Base schema — exposes the full type enum (Free + Pro). stdio
-     * callers see this verbatim via `inputSchemaFor(null)`. HTTP callers
-     * are filtered down per their permissions in `inputSchemaFor($user)`.
+     * Base schema — exposes the Free + Pro types on Pro installs, the
+     * Free-only types on Free installs. The edition gate runs here so
+     * the static surface (`tools/list`, `inputSchemaFor(null)`, and
+     * the architecture invariant at
+     * `tests/Mcp/ToolInterfaceInvariantTest.php`) stay aligned with the
+     * runtime gate in `execute()`. HTTP callers on Pro are further
+     * filtered down per Craft permissions in `inputSchemaFor($user)`.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
+        $types = Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')
+            ? array_merge(self::FREE_TYPES, self::PRO_TYPES)
+            : self::FREE_TYPES;
+
         return Schema::object([
             'type' => Schema::string()
-                ->enum(array_merge(self::FREE_TYPES, self::PRO_TYPES))
+                ->enum($types)
                 ->description('Required.')
                 ->required(),
             'channel' => Schema::string()
@@ -166,14 +174,12 @@ class Diagnostics extends AbstractTool
      */
     public function inputSchemaFor(?User $user = null): array
     {
+        // `getInputSchema()` already reflects the edition (Free vs
+        // Pro). For stdio (null user) and Free installs, this is the
+        // final answer — no per-permission filtering applies.
         $schema = static::getInputSchema();
 
-        if ($user === null) {
-            return $schema;
-        }
-
-        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
-            $schema['properties']['type']['enum'] = self::FREE_TYPES;
+        if ($user === null || !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
             return $schema;
         }
 
