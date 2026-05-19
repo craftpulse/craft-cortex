@@ -26,9 +26,11 @@
 
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\content\Address;
+use craftpulse\cortex\tools\content\BulkEntries;
 use craftpulse\cortex\tools\content\Category;
 use craftpulse\cortex\tools\content\Entry;
 use craftpulse\cortex\tools\content\GlobalSet;
+use craftpulse\cortex\tools\content\ScaffoldEntries;
 use craftpulse\cortex\tools\content\Tag;
 use craftpulse\cortex\tools\ProToolTrait;
 use craftpulse\cortex\tools\system\Skill;
@@ -55,6 +57,8 @@ function _cortex_pro_tool_classes(): array
         Address::class,
         Users::class,
         Skill::class,
+        BulkEntries::class,
+        ScaffoldEntries::class,
     ];
 }
 
