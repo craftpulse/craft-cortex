@@ -147,7 +147,7 @@ Source files consulted (file:line):
 
 15. **`propagateTo` + `--set`/`--to` field rewrites on the streaming path.** `Elements::EVENT_BEFORE_RESAVE_ELEMENT` is what `ResaveController._resaveElements()` uses to apply `--set`/`--to`/`--propagateTo`/`--toDefault`/`--setEnabledForSite` mutations (`ResaveController.php:817-889`). The streaming path must replicate this — registering a `beforeCallback` listener identical in semantics to ResaveController's. Alternatively (and locked): the streaming path **does not support `set`/`to`/`propagateTo`/`toDefault`/`setEnabledForSite` in 8.9a.** These are field-rewrite-heavy paths that benefit less from streaming (the operator usually wants to confirm the rewrite logic via dry-run first; full streaming visibility is overkill). Rejecting them at the streaming entry point keeps 8.9a's diff focused on the progress infrastructure. **Streaming-only restriction**: when `set`/`to`/`propagateTo`/`toDefault`/`setEnabledForSite`/`ifEmpty`/`ifInvalid` are present AND the client requested SSE, throw `ToolException("resave: streaming does not support field-rewrite options (set/to/propagateTo/toDefault/setEnabledForSite/ifEmpty/ifInvalid) — use non-streaming dispatch for those.")`. The non-streaming path keeps the full surface unchanged. Documented in PHPDoc. ~5 LoC validation in `stream()`.
 
-16. **Resave terminal envelope shape (streaming path).** Differs from the non-streaming `execute()` shape because the streaming path has structured per-element data the non-streaming captured-stdout path doesn't. Locked shape for the streaming `getReturn()`:
+16. **Resave terminal envelope shape — unified across both paths.** `execute()` drains `stream()` and returns the same terminal envelope. Matches the `BulkEntries::execute()` precedent at `src/tools/content/BulkEntries.php:339-351`. Locked shape:
     ```
     {
       success: bool,
@@ -158,16 +158,14 @@ Source files consulted (file:line):
       succeeded: int,        // events with $exception === null
       failed: int,           // events with $exception !== null OR $element->hasErrors()
       cancelled: bool,
-      results: [             // per-element outcomes (succeeded + failed only)
-        {kind: "success" | "failure", id: int, type: string, title: string, error?: string},
+      results: [             // per-element outcomes (failures only)
+        {kind: "failure", id: int, type: string, title: string, error?: string},
       ]
     }
     ```
-    The non-streaming `execute()` continues to return its original captured-stdout shape `{type, route, options, exitCode, output, error}`. **The two shapes do NOT match by design** — the streaming path has structured progress data; the non-streaming path doesn't run through the streaming infrastructure and keeps the legacy shape. This is a **deliberate divergence from the BulkEntries pattern** where `execute()` and `stream()->getReturn()` are bit-identical. Justification: BulkEntries owns the iteration; Resave delegates to Craft's resaveElements pipeline. The non-streaming path wraps the controller; the streaming path wraps the service. Different observability surfaces.
+    The non-streaming path no longer wraps `ConsoleRunner::run()`. Both transports surface structured data from the same Fiber-driven pipeline; the SSE client additionally observes intermediate `notifications/progress` frames between dispatch and terminal. The pre-release divergence shipped in 8.9a was justified at the time by "existing non-streaming consumers" — none of which existed in the pre-release codebase. Refactored in a follow-up commit on the `gate-8` branch.
 
-    **Alternative considered and rejected:** route `execute()` through `stream()` too, so both shapes match. Rejected because it forces every non-streaming `resave` caller (existing test surface, `craft_command` users, in-process scripts) onto the new Fiber path. Diff and risk surface grows substantially for marginal consistency benefit. Documented in `Resave.php` PHPDoc with explicit "shape divergence" callout.
-
-    `results[]` cap: do NOT store every element. The succeeded/failed counts are aggregates; `results[]` should be a sliding window — the last 100 failures (the LLM rarely cares about every success). **Locked**: 8.9a only records `kind: "failure"` rows in `results[]`. Successes are counted but not enumerated. ~5 LoC change in the listener.
+    `results[]` cap: do NOT store every element. The succeeded/failed counts are aggregates; `results[]` should be a sliding window — the last 100 failures (the LLM rarely cares about every success). **Locked**: only `kind: "failure"` rows go into `results[]`. Successes are counted but not enumerated. ~5 LoC change in the listener.
 
 ---
 
@@ -458,7 +456,7 @@ After 8.9b:
 
 - **PHP Fiber unfamiliarity.** No existing `Fiber::` usage in `src/`. The `FiberProgressBridge` is new vocabulary. Mitigation: ship it as a separate isolated file with its own test suite BEFORE wiring into `Resave::stream()`. The bridge is generic and reusable — future "stream around a blocking Craft API" tools (export → CSV, search index rebuild, etc.) get the seam for free.
 - **`Fiber::throw()` semantics on cancellation.** `Fiber::throw($exception)` causes the suspended Fiber to throw at the suspension point. Our event listener's `Fiber::suspend()` then throws into the listener, which lets it propagate up to `Elements::resaveElements()`. Craft catches `QueryAbortedException` at `vendor/craftcms/cms/src/services/Elements.php:1677` — verified against source. Other Throwable types would bubble out of `resaveElements()` and break the fail-silently contract — **must use QueryAbortedException specifically**. Documented in `FiberProgressBridge.php` PHPDoc.
-- **Terminal envelope shape divergence between streaming and non-streaming `resave`.** Locked decision 16 — `execute()` returns the captured-stdout shape; `stream()->getReturn()` returns the structured shape. Documented in PHPDoc. The LLM-facing tool description should clarify that streaming clients get the structured envelope and non-streaming clients get the captured-output envelope.
+- **Terminal envelope shape unified across both `resave` paths.** Locked decision 16 — `execute()` drains `stream()` and returns the same terminal envelope. Mirrors the `BulkEntries::execute()` precedent. The 8.9a build initially shipped a divergent legacy `ConsoleRunner`-driven shape for `execute()`; a follow-up commit on the `gate-8` branch dropped the legacy dispatch path. Both transports now surface the same structured envelope.
 - **60Hz emit throttle masking real progress on very fast resaves.** A 10k-entry resave at 1000/sec produces 10s of streaming time with ~600 frames at 60Hz (one frame per ~16 entries). The terminal envelope still carries the true `processed` count. Operators wanting per-element granularity can lower the throttle in a future gate or remove it (the 60Hz cap is a wire-level concern, not a contract guarantee).
 - **`continueOnError: true` on `Elements::resaveElements()`.** Picked so per-element failures don't abort the whole streaming run — failures land in the terminal envelope's `failed` count + `results[]`. Matches Craft's own `ResaveController` semantics (line 916 passes `true`). Documented.
 - **Audit fix-mode default `progressInterval` not exposed.** Locked decision in Phase 8.9b-1. If real-world LLM friction emerges (operator wants per-row events), add the knob in a future gate. Mirrors the gate-8.7 decision for `bulk_entries::progressInterval` but inverted (BulkEntries exposes it; Audit doesn't, because Audit's row caps are an order of magnitude smaller).
@@ -474,6 +472,5 @@ After 8.9b:
 - **Streaming on `content_audit` read modes** (`relations`, `unused_assets`, `propagation`). Those return paged arrays — streaming a paged array is over-engineering. Future gate if real demand emerges.
 - **Streaming on `import_export.export`.** Same reason — `export` builds the payload in memory; streaming an in-memory array isn't meaningful. Future gate if export payloads grow large enough to need chunking.
 - **`set` / `to` / `propagateTo` / `toDefault` / `setEnabledForSite` / `ifEmpty` / `ifInvalid` on the resave streaming path.** Rejected at the entry. Future gate if operators ask for streaming field-rewrite previews.
-- **`Resave::execute()` shape parity with `stream()->getReturn()`.** Deliberate divergence locked in 16. Future gate could route both through `stream()` and converge; not 8.9.
 - **CP authoring UI for any of these tools.** Phase 3.
 - **`Last-Event-ID` SSE resumability** — deferred to Phase 3 per Gate 7 locked decision 14.

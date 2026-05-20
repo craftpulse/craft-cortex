@@ -20,7 +20,6 @@ use craftpulse\cortex\attributes\IsOpenWorld;
 use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\StreamableToolInterface;
-use craftpulse\cortex\tools\support\ConsoleRunner;
 use craftpulse\cortex\tools\support\FiberProgressBridge;
 use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\support\Schema;
@@ -32,57 +31,50 @@ use Throwable;
  * =========================================================================
  * `resave` tool — convenience wrapper for Craft's `resave/*` commands.
  *
- * Translates a structured argument shape into a `Craft::$app->runAction`
- * call against `resave/<type>`. Uses `ConsoleRunner` so stdout/stderr
- * are captured rather than corrupting the JSON-RPC channel.
+ * Translates a structured argument shape into a resave run against
+ * `Craft::$app->getElements()->resaveElements()` for the matching
+ * element class.
  *
  * The tool only exposes the option surface that's safe for AI use:
  *   - `type` selects which element kind to resave (entries / assets /
  *     categories / tags / users / addresses).
  *   - `section`, `group`, `volume`, `entryType` narrow the query.
  *   - `status`, `limit` further narrow it.
- *   - `set` + `to` pair drives the field-rewrite use case.
- *   - `queue` flips between in-process and background dispatch.
+ *   - `touch`, `updateSearchIndex` mirror the corresponding CLI flags.
  *
- * Anything not in this surface (custom criteria, `withFields`, etc.) is
- * left to `craft_command` for raw access to the same controller.
+ * Anything outside this surface (custom criteria, field-rewrite flags,
+ * `--queue` dispatch, `withFields`, etc.) is left to `craft_command`
+ * for raw access to the same controller.
  *
- * # Streaming surface (Gate 8.9a)
+ * # Streaming + non-streaming surfaces share the same terminal shape
  *
  * Implements `StreamableToolInterface`. When the HTTP transport
  * delivers the request with `Accept: text/event-stream`, the dispatcher
- * routes to `stream()`; otherwise the existing `execute()` (captured-
- * stdout) path runs unchanged.
+ * routes to `stream()`; otherwise `execute()` drains `stream()` to
+ * completion and returns the same terminal envelope. Mirrors the
+ * `BulkEntries::execute()` collapse pattern at
+ * `src/tools/content/BulkEntries.php:339-351` — one envelope shape
+ * across both transports, structured progress data either way.
  *
- * The streaming path bypasses `ConsoleRunner` entirely. Instead, it
- * subscribes to `Elements::EVENT_AFTER_RESAVE_ELEMENT` via a
+ * Both paths subscribe to `Elements::EVENT_AFTER_RESAVE_ELEMENT` via a
  * `FiberProgressBridge` so each event surfaces as a `notifications/
- * progress` SSE frame in real time. Cancellation between elements
- * throws `craft\db\QueryAbortedException` into the Fiber — Craft's
- * resave loop catches that exception type at
+ * progress` SSE frame in real time (streaming) or is discarded
+ * (non-streaming). Cancellation between elements throws
+ * `craft\db\QueryAbortedException` into the Fiber — Craft's resave
+ * loop catches that exception type at
  * `vendor/craftcms/cms/src/services/Elements.php:1677` and unwinds
  * cleanly. The in-flight element's save is not interruptible (matches
  * Craft's non-killable per-row model).
  *
- * **Terminal envelope shape divergence.** The streaming
- * `stream()->getReturn()` shape is NOT identical to the non-streaming
- * `execute()` shape — see locked decision 16 in
- * `docs/plans/gate-8.9.md`. The streaming surface has structured per-
- * element data via the events; the non-streaming surface wraps the
- * console controller and only sees the captured stdout/stderr. The
- * two paths are intentionally different observability surfaces; the
- * non-streaming path is left bit-identical to pre-8.9a behaviour.
- *
- * **Streaming restrictions.** `queue: true` is rejected on the
- * streaming path (a queued resave runs out-of-band — nothing to
- * stream). The seven field-rewrite options (`set`, `to`, `ifEmpty`,
+ * **Restrictions (apply to both paths).** `queue: true` is rejected
+ * (a queued resave runs out-of-band — nothing to drive progress from).
+ * The seven field-rewrite options (`set`, `to`, `ifEmpty`,
  * `ifInvalid`, `propagateTo`, `toDefault`, `setEnabledForSite`) are
  * rejected too — those rewrites are driven by
  * `EVENT_BEFORE_RESAVE_ELEMENT` in `ResaveController._resaveElements()`,
- * which Cortex doesn't re-implement in 8.9a to keep the diff focused
- * on the progress infrastructure. Operators wanting streaming field-
- * rewrites get a future gate; for now the non-streaming path accepts
- * the full surface unchanged.
+ * which Cortex doesn't re-implement here. Operators wanting field-
+ * rewrites get a future gate; for now drop them or use `craft_command`
+ * for the raw controller surface.
  * =========================================================================
  *
  * @author Craftpulse
@@ -175,17 +167,19 @@ class Resave extends AbstractTool implements StreamableToolInterface
      */
     public static function getDescription(): string
     {
-        return 'Re-save elements through Craft\'s resave commands. Required `type`: ' .
+        return 'Re-save elements through Craft\'s resave pipeline. Required `type`: ' .
             'entries / assets / categories / tags / users / addresses. Optional filters: ' .
-            'section, entryType, group, volume, status, limit. Optional rewrite: pair ' .
-            '`set` (field handle) with `to` (PHP value expression — see Craft\'s ' .
-            'resave/--to documentation). `queue: true` dispatches as a background job; ' .
-            'otherwise runs in-process. `updateSearchIndex` and `touch` mirror the ' .
-            'corresponding CLI flags. Returns the dispatched route, exit code, captured ' .
-            'output, and any error. Streaming clients (Accept: text/event-stream) get ' .
-            'a structured per-element progress stream plus a structured terminal ' .
-            'envelope; non-streaming clients get the captured-output envelope. The ' .
-            'streaming path does not support `queue: true` or field-rewrite options.';
+            'section, entryType, group, volume, status, limit. `updateSearchIndex` and ' .
+            '`touch` mirror the corresponding CLI flags. Returns a structured envelope ' .
+            '{success, type, route, total, processed, succeeded, failed, cancelled, ' .
+            'results[]} where `results[]` enumerates per-element failures (successes ' .
+            'are counted but not listed). Streaming clients (Accept: text/event-stream) ' .
+            'additionally get one `notifications/progress` frame per element (subject ' .
+            'to a 60Hz wire-level throttle); non-streaming clients get the same terminal ' .
+            'envelope without the intermediate frames. `queue: true` and the field-' .
+            'rewrite options (`set`, `to`, `ifEmpty`, `ifInvalid`, `propagateTo`, ' .
+            '`toDefault`, `setEnabledForSite`) are not supported — use `craft_command` ' .
+            'for raw controller access.';
     }
 
     /**
@@ -222,9 +216,11 @@ class Resave extends AbstractTool implements StreamableToolInterface
     /**
      * @inheritdoc
      *
-     * Non-streaming path. Unchanged from pre-8.9a — wraps
-     * `ConsoleRunner::run('resave/<type>')`. The streaming path lives in
-     * `stream()` and bypasses `ConsoleRunner` entirely.
+     * Non-streaming entry point. Drives `stream()` to completion,
+     * discards progress frames, returns the terminal envelope. Mirrors
+     * `BulkEntries::execute()` at `src/tools/content/BulkEntries.php:339-351`
+     * so the JSON-mode HTTP transport and the synchronous stdio path
+     * surface the same structured envelope as the streaming path.
      *
      * @throws ToolException
      *
@@ -233,28 +229,16 @@ class Resave extends AbstractTool implements StreamableToolInterface
      */
     public function execute(array $arguments): array
     {
-        $type = isset($arguments['type']) && is_string($arguments['type']) ? $arguments['type'] : null;
-        if ($type === null) {
-            throw new ToolException('`type` is required (one of: ' . implode(', ', array_keys(self::TYPE_ROUTES)) . ').');
+        $ctx = new InvocationContext();
+        $gen = $this->stream($arguments, $ctx);
+
+        // Drain progress frames — they're for the streaming surface.
+        while ($gen->valid()) {
+            $gen->next();
         }
 
-        if (!isset(self::TYPE_ROUTES[$type])) {
-            throw new ToolException("Unknown type '{$type}'. Allowed: " . implode(', ', array_keys(self::TYPE_ROUTES)) . '.');
-        }
-
-        $route = self::TYPE_ROUTES[$type];
-        $params = $this->_buildParams($type, $arguments);
-
-        $result = ConsoleRunner::run($route, $params);
-
-        return [
-            'type' => $type,
-            'route' => $route,
-            'options' => $params,
-            'exitCode' => $result['exitCode'],
-            'output' => $result['output'],
-            'error' => $result['error'],
-        ];
+        $return = $gen->getReturn();
+        return is_array($return) ? $return : [];
     }
 
     /**
@@ -269,8 +253,9 @@ class Resave extends AbstractTool implements StreamableToolInterface
      * loop unwinds cleanly via the catch-block at
      * `vendor/craftcms/cms/src/services/Elements.php:1677`.
      *
-     * Terminal envelope shape: see locked decision 16 in
-     * `docs/plans/gate-8.9.md`. Diverges from `execute()` by design.
+     * Terminal envelope shape is shared with `execute()` — both
+     * surfaces return `{success, type, route, total, processed,
+     * succeeded, failed, cancelled, results[]}`.
      *
      * @throws ToolException
      *
@@ -306,11 +291,9 @@ class Resave extends AbstractTool implements StreamableToolInterface
             );
         }
 
-        // Reuse _buildParams() for filter validation. The result is the
-        // same key set the non-streaming path passes to the controller,
-        // but the streaming path consumes individual keys directly to
-        // build an element query rather than dispatching to the
-        // controller binding layer.
+        // Reuse _buildParams() for filter validation. The resulting key
+        // set is what `_streamingResolve()` consumes to build the
+        // element query.
         $params = $this->_buildParams($type, $arguments);
         $route = self::TYPE_ROUTES[$type];
 
@@ -554,11 +537,18 @@ class Resave extends AbstractTool implements StreamableToolInterface
     }
 
     /**
-     * Translate the structured input into the parameter array Yii's
-     * controller-option binding consumes. Yii matches keys against the
-     * controller's public properties by name (camelCase), so we keep the
-     * shape identical to `ResaveController`'s public properties — no
-     * hyphenation or alias mapping.
+     * Translate the structured input into the parameter array used by
+     * `_streamingResolve()` to build the element query. The `entryType`
+     * key is renamed to `type` because Craft's `ResaveController` binds
+     * `--type` to its `$type` property — we accept `entryType` from the
+     * AI (since `type` is already taken at the outer tool level) and
+     * translate it.
+     *
+     * `set`/`to`/`ifEmpty`/`ifInvalid`/`propagateTo`/`toDefault`/
+     * `setEnabledForSite`/`queue` are rejected by `stream()` before
+     * this method runs, so the branches handling them are kept only
+     * as defensive no-ops in case a future call site reuses this
+     * helper without those upstream rejections.
      *
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
@@ -574,7 +564,7 @@ class Resave extends AbstractTool implements StreamableToolInterface
 
         // Type-specific filters (validate at the tool layer; the controller
         // would silently ignore mismatches otherwise). The default branch
-        // is unreachable — `execute()` rejects unknown types — but keeps
+        // is unreachable — `stream()` rejects unknown types — but keeps
         // PHPStan happy without disabling the match-coverage check.
         $allowed = match ($type) {
             'entries' => ['section', 'entryType', 'status', 'limit', 'propagateTo'],

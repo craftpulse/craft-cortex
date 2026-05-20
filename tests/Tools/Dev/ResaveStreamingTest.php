@@ -192,20 +192,34 @@ it('returns the streaming terminal envelope with cancelled=true when the token i
 });
 
 // -----------------------------------------------------------------------------
-// `execute()` ↔ `stream()` shape divergence is documented and intentional —
-// but we explicitly verify the bit-identical pre-8.9a `execute()` envelope
-// still works as a guard.
+// `execute()` ↔ `stream()` shape parity — `execute()` drains `stream()` and
+// returns the same terminal envelope, matching the BulkEntries precedent.
 // -----------------------------------------------------------------------------
 
-it('non-streaming execute() still returns the legacy captured-stdout envelope shape', function() {
-    $result = $this->tool->execute([
+it('non-streaming execute() drains stream() and returns the same terminal envelope', function() {
+    $arguments = [
         'type' => 'entries',
         'section' => 'minorHeroes',
         'limit' => 1,
-    ]);
+    ];
 
-    expect($result)->toHaveKeys(['type', 'route', 'options', 'exitCode', 'output', 'error']);
-    expect($result)->not->toHaveKeys(['total', 'processed', 'succeeded', 'failed', 'cancelled', 'results', 'success']);
-    expect($result['type'])->toBe('entries');
-    expect($result['route'])->toBe('resave/entries');
+    $ctx = new InvocationContext();
+    [, $streamTerminal] = _cortex_resave_drain($this->tool->stream($arguments, $ctx));
+    $executeResult = $this->tool->execute($arguments);
+
+    // Both surfaces emit the unified shape — no legacy `exitCode` /
+    // `output` / `options` keys on either path.
+    expect($executeResult)->toHaveKeys([
+        'success', 'type', 'route', 'total', 'processed', 'succeeded', 'failed', 'cancelled', 'results',
+    ]);
+    expect($executeResult)->not->toHaveKeys(['exitCode', 'output', 'options', 'error']);
+
+    // Structural parity: same keys, same shape. We don't compare the
+    // values directly because two consecutive resaves can record
+    // different `processed` counts when the underlying seed shifts —
+    // but the keyset and per-call invariants match.
+    expect(array_keys($executeResult))->toBe(array_keys($streamTerminal));
+    expect($executeResult['type'])->toBe('entries');
+    expect($executeResult['route'])->toBe('resave/entries');
+    expect($executeResult['cancelled'])->toBeFalse();
 });

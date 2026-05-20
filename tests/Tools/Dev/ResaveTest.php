@@ -22,49 +22,37 @@ it('throws on unknown type', function() {
 
 it('rejects options that do not apply to the chosen type', function() {
     // `volume` is for assets — passing it with `type: tags` must fail before
-    // reaching the controller, so the AI sees a clear validation error.
+    // reaching the resave pipeline, so the AI sees a clear validation error.
     $this->tool->execute(['type' => 'tags', 'volume' => 'images']);
 })->throws(ToolException::class, "Option(s) not supported for type 'tags'");
 
-it('requires set and to to be provided together', function() {
-    $this->tool->execute(['type' => 'entries', 'set' => 'titleField']);
-})->throws(ToolException::class, '`set` and `to` must be provided together.');
-
-it('dispatches resave/entries with mapped options and captures output', function() {
+it('returns the unified terminal envelope shape from execute()', function() {
+    // execute() drains stream() and surfaces its terminal envelope, matching
+    // the BulkEntries precedent. Same shape on both transports.
     $result = $this->tool->execute([
         'type' => 'entries',
-        'section' => '*',
+        'section' => 'minorHeroes',
         'limit' => 1,
     ]);
 
-    expect($result)->toHaveKey('type', 'entries');
-    expect($result)->toHaveKey('route', 'resave/entries');
-    expect($result['options'])->toMatchArray([
-        'section' => '*',
-        'limit' => 1,
+    expect($result)->toHaveKeys([
+        'success',
+        'type',
+        'route',
+        'total',
+        'processed',
+        'succeeded',
+        'failed',
+        'cancelled',
+        'results',
     ]);
-    expect($result)->toHaveKey('exitCode');
-    expect($result['exitCode'])->toBeIn([0, 1]);
-
-    // Output is a string (possibly empty when the playground has no entries),
-    // never a raw resource leak. The captured channel is suppressed from
-    // stdout — this is what proves stdout-capture works.
-    expect($result)->toHaveKey('output');
-    expect($result['output'])->toBeString();
-});
-
-it('renames entryType to the controller property `type`', function() {
-    // ResaveController binds `--type` to `$type` for entry-type filtering.
-    // We accept `entryType` from the AI (since `type` is already taken at
-    // the tool level) and translate it.
-    $result = $this->tool->execute([
-        'type' => 'entries',
-        'entryType' => 'noSuchEntryType',
-        'limit' => 1,
-    ]);
-
-    expect($result['options'])->toHaveKey('type', 'noSuchEntryType');
-    expect($result['options'])->not->toHaveKey('entryType');
+    expect($result['type'])->toBe('entries');
+    expect($result['route'])->toBe('resave/entries');
+    expect($result['cancelled'])->toBeFalse();
+    expect($result['total'])->toBeLessThanOrEqual(1);
+    expect($result['processed'])->toBe($result['total']);
+    expect($result['succeeded'] + $result['failed'])->toBe($result['processed']);
+    expect($result['results'])->toBeArray();
 });
 
 it('exposes destructiveHint and idempotentHint annotations', function() {
