@@ -19,8 +19,11 @@ use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\PermissionedToolTrait;
+use craftpulse\cortex\tools\StreamableToolInterface;
+use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
+use Generator;
 use Throwable;
 
 /**
@@ -80,7 +83,7 @@ use Throwable;
  */
 #[IsReadOnly]
 #[IsIdempotent]
-class Audit extends AbstractTool
+class Audit extends AbstractTool implements StreamableToolInterface
 {
     use PermissionedToolTrait;
 
@@ -89,6 +92,18 @@ class Audit extends AbstractTool
 
     public const DEFAULT_LIMIT = 200;
     public const MAX_LIMIT = 1000;
+
+    /**
+     * Default per-frame row interval for streaming fix modes. Mirrors
+     * `BulkEntries::DEFAULT_PROGRESS_INTERVAL` — fix-mode result sets are
+     * bounded by `MAX_LIMIT` and `PROPAGATION_GLOBAL_GAP_CAP`, so 100
+     * rows-per-frame keeps wire overhead bounded while staying granular
+     * enough for operator visibility. The `progressInterval` argument
+     * overrides per-call (clamped to `>= 1`).
+     *
+     * @since 5.0.0
+     */
+    public const DEFAULT_PROGRESS_INTERVAL = 100;
 
     /**
      * Per-section row cap for the propagation mode's element-fetch step.
@@ -186,6 +201,9 @@ class Audit extends AbstractTool
             'section' => Schema::string()->description('Section handle filter for `propagation` / `repair_propagation`.'),
             'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
             'offset' => Schema::integer()->minimum(0),
+            'progressInterval' => Schema::integer()
+                ->minimum(1)
+                ->description('Streaming-only. Emit one `notifications/progress` frame every N rows processed (default 100). Ignored on non-streaming dispatch.'),
         ])->toArray();
     }
 
@@ -259,6 +277,15 @@ class Audit extends AbstractTool
     /**
      * @inheritdoc
      *
+     * Non-streaming entry point. Read modes (`relations`, `unused_assets`,
+     * `propagation`) dispatch directly to their paged-array helpers —
+     * streaming a paged read is over-engineering. Pro fix modes
+     * (`fix_relations`, `prune_unused_assets`, `repair_propagation`)
+     * collapse `stream()` to its terminal `getReturn()` value, mirroring
+     * the `BulkEntries::execute()` precedent at
+     * `src/tools/content/BulkEntries.php:339-351`. Both transports
+     * surface the same terminal envelope.
+     *
      * @throws ToolException
      *
      * @author Craftpulse
@@ -278,14 +305,73 @@ class Audit extends AbstractTool
             throw new ToolException("content_audit: mode `{$mode}` is unavailable on this edition.");
         }
 
+        if (in_array($mode, self::PRO_MODES, true)) {
+            $ctx = new InvocationContext();
+            $gen = $this->stream($arguments, $ctx);
+
+            // Drain progress frames — they're for the streaming surface.
+            while ($gen->valid()) {
+                $gen->next();
+            }
+
+            $return = $gen->getReturn();
+            return is_array($return) ? $return : [];
+        }
+
         return match ($mode) {
             'relations' => $this->_relations($arguments),
             'unused_assets' => $this->_unusedAssets($arguments),
             'propagation' => $this->_propagation($arguments),
-            'fix_relations' => $this->_fixRelations($arguments),
-            'prune_unused_assets' => $this->_pruneUnusedAssets($arguments),
-            'repair_propagation' => $this->_repairPropagation($arguments),
             default => throw new ToolException("Unknown mode: '{$mode}'."),
+        };
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Streaming entry point. Only Pro fix modes are streamable — read
+     * modes return paged arrays in a single shot via `execute()`.
+     *
+     * Per-mode progress shape per `docs/plans/gate-8.9.md` locked
+     * decision 1:
+     *   - `fix_relations` — frame every `progressInterval` rows;
+     *     message `"Fixing broken relation src={sourceId} → target={targetId}"`.
+     *   - `prune_unused_assets` — frame every `progressInterval` rows;
+     *     message `"Pruning asset {id}"`.
+     *   - `repair_propagation` — frame every `progressInterval` gaps;
+     *     message `"Repairing canonical {canonicalId} ({sectionUid})"`.
+     *
+     * Cancellation polls between rows — the in-flight row's mutation
+     * completes. Terminal envelope carries `cancelled: true` and the
+     * partial `results[]`.
+     *
+     * @throws ToolException
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function stream(array $arguments, InvocationContext $ctx): Generator
+    {
+        $mode = $arguments['mode'] ?? null;
+        if (!is_string($mode) || $mode === '') {
+            throw new ToolException(
+                '`mode` is required (relations / unused_assets / propagation / fix_relations / ' .
+                    'prune_unused_assets / repair_propagation).',
+            );
+        }
+
+        if (!in_array($mode, self::PRO_MODES, true)) {
+            throw new ToolException("content_audit: mode `{$mode}` is not streamable.");
+        }
+
+        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+            throw new ToolException("content_audit: mode `{$mode}` is unavailable on this edition.");
+        }
+
+        return yield from match ($mode) {
+            'fix_relations' => $this->_fixRelations($arguments, $ctx),
+            'prune_unused_assets' => $this->_pruneUnusedAssets($arguments, $ctx),
+            'repair_propagation' => $this->_repairPropagation($arguments, $ctx),
         };
     }
 
@@ -720,21 +806,27 @@ class Audit extends AbstractTool
      * lists. Loops the shared `_brokenRelationsQuery()` set and dispatches
      * each row to `_fixOneRelation()` for per-row permission + delete.
      *
-     * Loop body designed for Gate 8.9 streaming conversion: no closure
-     * captures, no intermediate state outside `$results[]`. The 8.9
-     * generator wrap iterates this same body and yields progress frames
-     * between rows.
+     * Generator surface: yields one `{progress, total, message}` frame
+     * every `progressInterval` rows; returns the terminal envelope. The
+     * per-row mutation in `_fixOneRelation()` is unchanged from 8.8b —
+     * only the outer loop gained yields + cancellation polling.
+     *
+     * Cancellation polled at the top of each iteration. On a flipped
+     * token the loop breaks before the next row is visited; in-flight
+     * rows always complete.
      *
      * @param array<string,mixed> $arguments
-     * @return array<string,mixed>
+     * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _fixRelations(array $arguments): array
+    private function _fixRelations(array $arguments, InvocationContext $ctx): Generator
     {
         $limit = $this->_limit($arguments, self::DEFAULT_LIMIT, self::MAX_LIMIT);
         $offset = $this->_offset($arguments);
+        $progressInterval = $this->_progressInterval($arguments);
+        $token = $ctx->getCancellationToken();
 
         $base = $this->_brokenRelationsQuery();
         $totalCount = (int) (clone $base)->count();
@@ -756,8 +848,14 @@ class Audit extends AbstractTool
         $succeeded = 0;
         $failed = 0;
         $skipped = 0;
+        $cancelled = false;
 
         foreach ($rows as $row) {
+            if ($token->isCancelled()) {
+                $cancelled = true;
+                break;
+            }
+
             $outcome = $this->_fixOneRelation($row);
             $results[] = $outcome;
             $processed++;
@@ -769,16 +867,27 @@ class Audit extends AbstractTool
             } else {
                 $failed++;
             }
+
+            if ($processed % $progressInterval === 0) {
+                $sourceId = (int) ($row['sourceId'] ?? 0);
+                $targetId = (int) ($row['targetId'] ?? 0);
+                yield [
+                    'progress' => $processed,
+                    'total' => $totalCount,
+                    'message' => "Fixing broken relation src={$sourceId} → target={$targetId}",
+                ];
+            }
         }
 
         return [
-            'success' => $failed === 0,
+            'success' => $failed === 0 && !$cancelled,
             'mode' => 'fix_relations',
             'total' => $totalCount,
             'processed' => $processed,
             'succeeded' => $succeeded,
             'failed' => $failed,
             'skipped' => $skipped,
+            'cancelled' => $cancelled,
             'results' => $results,
         ];
     }
@@ -876,18 +985,22 @@ class Audit extends AbstractTool
      * mode lists. Loops the shared `_unusedAssetsQuery()` set and
      * dispatches each asset to `_pruneOneAsset()`.
      *
-     * Loop body designed for Gate 8.9 streaming conversion.
+     * Generator surface: yields one `{progress, total, message}` frame
+     * every `progressInterval` rows; returns the terminal envelope. The
+     * per-row mutation in `_pruneOneAsset()` is unchanged from 8.8b.
      *
      * @param array<string,mixed> $arguments
-     * @return array<string,mixed>
+     * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _pruneUnusedAssets(array $arguments): array
+    private function _pruneUnusedAssets(array $arguments, InvocationContext $ctx): Generator
     {
         $limit = $this->_limit($arguments, self::DEFAULT_LIMIT, self::MAX_LIMIT);
         $offset = $this->_offset($arguments);
+        $progressInterval = $this->_progressInterval($arguments);
+        $token = $ctx->getCancellationToken();
 
         $query = $this->_unusedAssetsQuery($arguments);
         $totalCount = (int) (clone $query)->count();
@@ -903,8 +1016,14 @@ class Audit extends AbstractTool
         $failed = 0;
         $skipped = 0;
         $totalSizeFreed = 0;
+        $cancelled = false;
 
         foreach ($assets as $asset) {
+            if ($token->isCancelled()) {
+                $cancelled = true;
+                break;
+            }
+
             $outcome = $this->_pruneOneAsset($asset);
             $results[] = $outcome;
             $processed++;
@@ -917,10 +1036,19 @@ class Audit extends AbstractTool
             } else {
                 $failed++;
             }
+
+            if ($processed % $progressInterval === 0) {
+                $assetId = (int) ($asset->id ?? 0);
+                yield [
+                    'progress' => $processed,
+                    'total' => $totalCount,
+                    'message' => "Pruning asset {$assetId}",
+                ];
+            }
         }
 
         return [
-            'success' => $failed === 0,
+            'success' => $failed === 0 && !$cancelled,
             'mode' => 'prune_unused_assets',
             'total' => $totalCount,
             'processed' => $processed,
@@ -928,6 +1056,7 @@ class Audit extends AbstractTool
             'failed' => $failed,
             'skipped' => $skipped,
             'totalSizeFreed' => $totalSizeFreed,
+            'cancelled' => $cancelled,
             'results' => $results,
         ];
     }
@@ -1005,18 +1134,22 @@ class Audit extends AbstractTool
      * `_collectPropagationGaps()` set and dispatches each canonical to
      * `_repairOnePropagation()`.
      *
-     * Loop body designed for Gate 8.9 streaming conversion.
+     * Generator surface: yields one `{progress, total, message}` frame
+     * every `progressInterval` gaps; returns the terminal envelope. The
+     * per-gap mutation in `_repairOnePropagation()` is unchanged from 8.8b.
      *
      * @param array<string,mixed> $arguments
-     * @return array<string,mixed>
+     * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _repairPropagation(array $arguments): array
+    private function _repairPropagation(array $arguments, InvocationContext $ctx): Generator
     {
         $limit = $this->_limit($arguments, self::PROPAGATION_GLOBAL_GAP_CAP, self::PROPAGATION_GLOBAL_GAP_CAP);
         $offset = $this->_offset($arguments);
+        $progressInterval = $this->_progressInterval($arguments);
+        $token = $ctx->getCancellationToken();
 
         [$gaps, $truncatedSections, $globalCapReached] = $this->_collectPropagationGaps($arguments);
         $totalCount = count($gaps);
@@ -1027,8 +1160,14 @@ class Audit extends AbstractTool
         $succeeded = 0;
         $failed = 0;
         $skipped = 0;
+        $cancelled = false;
 
         foreach ($page as $gap) {
+            if ($token->isCancelled()) {
+                $cancelled = true;
+                break;
+            }
+
             $outcome = $this->_repairOnePropagation($gap);
             $results[] = $outcome;
             $processed++;
@@ -1040,10 +1179,20 @@ class Audit extends AbstractTool
             } else {
                 $failed++;
             }
+
+            if ($processed % $progressInterval === 0) {
+                $canonicalId = (int) ($gap['canonicalId'] ?? 0);
+                $sectionUid = is_string($gap['sectionUid'] ?? null) ? $gap['sectionUid'] : '?';
+                yield [
+                    'progress' => $processed,
+                    'total' => $totalCount,
+                    'message' => "Repairing canonical {$canonicalId} ({$sectionUid})",
+                ];
+            }
         }
 
         $envelope = [
-            'success' => $failed === 0,
+            'success' => $failed === 0 && !$cancelled,
             'mode' => 'repair_propagation',
             'total' => $totalCount,
             'processed' => $processed,
@@ -1051,6 +1200,7 @@ class Audit extends AbstractTool
             'failed' => $failed,
             'skipped' => $skipped,
             'globalCapReached' => $globalCapReached,
+            'cancelled' => $cancelled,
             'results' => $results,
         ];
 
@@ -1168,6 +1318,23 @@ class Audit extends AbstractTool
 
     // Private Methods — fix-mode helpers
     // =========================================================================
+
+    /**
+     * Read the `progressInterval` argument with `DEFAULT_PROGRESS_INTERVAL`
+     * fallback and a `>= 1` lower clamp. Same contract as
+     * `BulkEntries::_progressInterval()` — keep both tools' streaming
+     * surfaces in lockstep.
+     *
+     * @param array<string,mixed> $arguments
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _progressInterval(array $arguments): int
+    {
+        $value = $arguments['progressInterval'] ?? self::DEFAULT_PROGRESS_INTERVAL;
+        return max(1, (int) $value);
+    }
 
     /**
      * Load any element (entry / category / asset / user / address / …)

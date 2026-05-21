@@ -11,9 +11,12 @@ use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\PermissionedToolTrait;
+use craftpulse\cortex\tools\StreamableToolInterface;
+use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 use DateTimeImmutable;
+use Generator;
 use Throwable;
 
 /**
@@ -96,7 +99,7 @@ use Throwable;
  */
 #[IsReadOnly]
 #[IsIdempotent]
-class ImportExport extends AbstractTool
+class ImportExport extends AbstractTool implements StreamableToolInterface
 {
     use PermissionedToolTrait;
 
@@ -114,6 +117,17 @@ class ImportExport extends AbstractTool
     public const FORMAT_VERSION = 2;
     public const DEFAULT_LIMIT = 100;
     public const MAX_LIMIT = 1000;
+
+    /**
+     * Default per-frame row interval for the streaming `import` mode.
+     * Mirrors `BulkEntries::DEFAULT_PROGRESS_INTERVAL` — payloads are
+     * typically dozens-to-hundreds of items, and 100-row granularity
+     * keeps wire overhead bounded without forfeiting per-batch
+     * visibility. The `progressInterval` argument overrides per-call.
+     *
+     * @since 5.0.0
+     */
+    public const DEFAULT_PROGRESS_INTERVAL = 100;
 
     /**
      * @var list<string>
@@ -191,6 +205,9 @@ class ImportExport extends AbstractTool
                 ->description('Defaults to `true` for `import`. Pass `false` to actually write. Validates against the target section\'s field layout either way.'),
             'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
             'offset' => Schema::integer()->minimum(0),
+            'progressInterval' => Schema::integer()
+                ->minimum(1)
+                ->description('Streaming-only. Emit one `notifications/progress` frame every N items processed (default 100). Ignored on non-streaming dispatch.'),
         ])->toArray();
     }
 
@@ -233,6 +250,13 @@ class ImportExport extends AbstractTool
     /**
      * @inheritdoc
      *
+     * Non-streaming entry point. `export` is a single-shot read — it
+     * dispatches directly to the paged-array helper. `import` collapses
+     * `stream()` to its terminal `getReturn()` value, mirroring the
+     * `BulkEntries::execute()` precedent at
+     * `src/tools/content/BulkEntries.php:339-351`. Both transports
+     * surface the same terminal envelope.
+     *
      * @throws ToolException
      *
      * @author Craftpulse
@@ -249,11 +273,57 @@ class ImportExport extends AbstractTool
             throw new ToolException("import_export: mode `{$mode}` is unavailable on this edition.");
         }
 
+        if ($mode === 'import') {
+            $ctx = new InvocationContext();
+            $gen = $this->stream($arguments, $ctx);
+
+            // Drain progress frames — they're for the streaming surface.
+            while ($gen->valid()) {
+                $gen->next();
+            }
+
+            $return = $gen->getReturn();
+            return is_array($return) ? $return : [];
+        }
+
         return match ($mode) {
             'export' => $this->_export($arguments),
-            'import' => $this->_import($arguments),
             default => throw new ToolException("Unknown mode: '{$mode}'."),
         };
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Streaming entry point. Only `import` is streamable — `export`
+     * returns a single materialised envelope in one shot via `execute()`.
+     *
+     * Per `docs/plans/gate-8.9.md` locked decision 1: yields one
+     * `{progress, total, message}` frame every `progressInterval` items
+     * processed; `message` is `"Importing item index={index} uid={uid}"`.
+     * Cancellation polls between items; in-flight items always complete.
+     *
+     * @throws ToolException
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function stream(array $arguments, InvocationContext $ctx): Generator
+    {
+        $mode = $arguments['mode'] ?? null;
+        if (!is_string($mode) || $mode === '') {
+            throw new ToolException('`mode` is required (export / import).');
+        }
+
+        if ($mode !== 'import') {
+            throw new ToolException("import_export: mode `{$mode}` is not streamable.");
+        }
+
+        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+            throw new ToolException("import_export: mode `{$mode}` is unavailable on this edition.");
+        }
+
+        return yield from $this->_import($arguments, $ctx);
     }
 
     // Protected Methods
@@ -452,19 +522,19 @@ class ImportExport extends AbstractTool
      * and saves create/update by uid. Defaults to `dryRun: true` —
      * explicit `dryRun: false` required to mutate.
      *
-     * Loop body designed for Gate 8.9 streaming conversion: no closure
-     * captures, no intermediate state outside `$results[]`. The per-item
-     * helper `_importOneEntry()` stays independent so the outer loop
-     * can be swapped for a `Generator` returning the same envelope.
+     * Generator surface: yields one `{progress, total, message}` frame
+     * every `progressInterval` items; returns the terminal envelope. The
+     * per-item helper `_importOneEntry()` is unchanged from 8.8b — only
+     * the outer loop gained yields + cancellation polling.
      *
      * @param array<string,mixed> $arguments
-     * @return array<string,mixed>
+     * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      * @throws ToolException
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _import(array $arguments): array
+    private function _import(array $arguments, InvocationContext $ctx): Generator
     {
         $payload = $arguments['payload'] ?? null;
         if (!is_array($payload)) {
@@ -486,14 +556,23 @@ class ImportExport extends AbstractTool
         }
 
         $dryRun = !array_key_exists('dryRun', $arguments) || $arguments['dryRun'] === true;
+        $progressInterval = $this->_progressInterval($arguments);
+        $token = $ctx->getCancellationToken();
+        $total = count($items);
 
         $results = [];
         $processed = 0;
         $succeeded = 0;
         $failed = 0;
         $skipped = 0;
+        $cancelled = false;
 
         foreach ($items as $index => $item) {
+            if ($token->isCancelled()) {
+                $cancelled = true;
+                break;
+            }
+
             if (!is_array($item)) {
                 $results[] = [
                     'kind' => 'failure',
@@ -502,6 +581,13 @@ class ImportExport extends AbstractTool
                 ];
                 $failed++;
                 $processed++;
+                if ($processed % $progressInterval === 0) {
+                    yield [
+                        'progress' => $processed,
+                        'total' => $total,
+                        'message' => "Importing item index={$index} uid=?",
+                    ];
+                }
                 continue;
             }
 
@@ -516,20 +602,46 @@ class ImportExport extends AbstractTool
             } else {
                 $failed++;
             }
+
+            if ($processed % $progressInterval === 0) {
+                $uid = is_string($item['uid'] ?? null) ? $item['uid'] : '?';
+                yield [
+                    'progress' => $processed,
+                    'total' => $total,
+                    'message' => "Importing item index={$index} uid={$uid}",
+                ];
+            }
         }
 
         return [
-            'success' => $failed === 0,
+            'success' => $failed === 0 && !$cancelled,
             'mode' => 'import',
             'dryRun' => $dryRun,
             'committed' => $dryRun ? 0 : $succeeded,
-            'total' => count($items),
+            'total' => $total,
             'processed' => $processed,
             'succeeded' => $succeeded,
             'failed' => $failed,
             'skipped' => $skipped,
+            'cancelled' => $cancelled,
             'results' => $results,
         ];
+    }
+
+    /**
+     * Read the `progressInterval` argument with `DEFAULT_PROGRESS_INTERVAL`
+     * fallback and a `>= 1` lower clamp. Same contract as
+     * `BulkEntries::_progressInterval()` and `Audit::_progressInterval()`.
+     *
+     * @param array<string,mixed> $arguments
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _progressInterval(array $arguments): int
+    {
+        $value = $arguments['progressInterval'] ?? self::DEFAULT_PROGRESS_INTERVAL;
+        return max(1, (int) $value);
     }
 
     /**
