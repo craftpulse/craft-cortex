@@ -26,7 +26,7 @@
  */
 
 use craftpulse\cortex\controllers\OauthController;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\records\OauthClient as OauthClientRecord;
 use craftpulse\cortex\records\OauthCode as OauthCodeRecord;
 use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
@@ -156,7 +156,7 @@ function _cortex_oauth_request(
     array $headers = [],
     string $url = 'https://test.invalid/oauth/authorize',
 ): _CortexOauthControllerHarness {
-    $controller = new _CortexOauthControllerHarness('oauth', Plugin::getInstance());
+    $controller = new _CortexOauthControllerHarness('oauth', Cortex::getInstance());
     $controller->withRequest(new _CortexOauthRequest(
         method: $method,
         queryParams: $queryParams,
@@ -228,7 +228,7 @@ it('POST /oauth/register returns 400 on invalid redirect URI', function() {
 });
 
 it('POST /oauth/register returns 404 when DCR is disabled', function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $original = $settings->dcrEnabled;
     $settings->dcrEnabled = false;
 
@@ -271,7 +271,7 @@ it('GET /oauth/authorize rejects plain PKCE with an OAuth error redirect', funct
     Craft::$app->getUser()->setIdentity($this->admin);
 
     $pkce = _cortex_pkce();
-    $client = Plugin::getInstance()->oauth->registerClient([
+    $client = Cortex::getInstance()->oauth->registerClient([
         'client_name' => '_test_/plain-pkce',
         'redirect_uris' => ['https://example.com/cb'],
         'token_endpoint_auth_method' => 'none',
@@ -299,7 +299,7 @@ it('POST /oauth/authorize with approve=0 surfaces an access_denied error', funct
     Craft::$app->getUser()->setIdentity($this->admin);
 
     $pkce = _cortex_pkce();
-    $client = Plugin::getInstance()->oauth->registerClient([
+    $client = Cortex::getInstance()->oauth->registerClient([
         'client_name' => '_test_/deny-flow',
         'redirect_uris' => ['https://example.com/cb'],
         'token_endpoint_auth_method' => 'none',
@@ -335,7 +335,7 @@ it('full PKCE flow: register → authorize → token → MCP call', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
     $pkce = _cortex_pkce();
-    $client = Plugin::getInstance()->oauth->registerClient([
+    $client = Cortex::getInstance()->oauth->registerClient([
         'client_name' => '_test_/full-pkce',
         'redirect_uris' => ['https://example.com/cb'],
         'token_endpoint_auth_method' => 'none',
@@ -396,7 +396,7 @@ it('full PKCE flow: register → authorize → token → MCP call', function() {
     $accessToken = $tokenBody['access_token'];
 
     // Step 3: lookupAccessToken() resolves the JWT to the bound user.
-    $resolved = Plugin::getInstance()->oauth->lookupAccessToken($accessToken);
+    $resolved = Cortex::getInstance()->oauth->lookupAccessToken($accessToken);
     expect($resolved)->not->toBeNull();
     expect($resolved['userId'])->toBe($this->userId);
     expect($resolved['audience'])->toBe($resource);
@@ -407,7 +407,7 @@ it('code re-use returns invalid_grant on the second exchange', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
     $pkce = _cortex_pkce();
-    $client = Plugin::getInstance()->oauth->registerClient([
+    $client = Cortex::getInstance()->oauth->registerClient([
         'client_name' => '_test_/code-reuse',
         'redirect_uris' => ['https://example.com/cb'],
         'token_endpoint_auth_method' => 'none',
@@ -468,7 +468,7 @@ it('PKCE S256 verifier mismatch rejects at the token endpoint', function() {
 
     $pkce = _cortex_pkce();
     $wrongPkce = _cortex_pkce();
-    $client = Plugin::getInstance()->oauth->registerClient([
+    $client = Cortex::getInstance()->oauth->registerClient([
         'client_name' => '_test_/pkce-mismatch',
         'redirect_uris' => ['https://example.com/cb'],
         'token_endpoint_auth_method' => 'none',
@@ -523,7 +523,7 @@ it('POST /oauth/revoke returns 200 even for unknown tokens (RFC 7009 §2.2)', fu
 
 it('POST /oauth/revoke flips the dateRevoked on a known refresh token', function() {
     // Register a real client so the FK constraint on clientId is satisfied.
-    $clientResp = Plugin::getInstance()->oauth->registerClient([
+    $clientResp = Cortex::getInstance()->oauth->registerClient([
         'client_name' => '_test_/revoke-controller-refresh',
         'redirect_uris' => ['https://example.com/cb'],
         'token_endpoint_auth_method' => 'none',

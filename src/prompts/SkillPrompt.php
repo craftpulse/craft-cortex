@@ -2,20 +2,29 @@
 
 namespace craftpulse\cortex\prompts;
 
+use craftpulse\cortex\Cortex;
 use Michtio\CraftCmsClaudeSkills\Skills;
 
 /**
  * =========================================================================
  * Skill-backed MCP prompt.
  *
- * One instance per bundled skill in `michtio/craftcms-claude-skills`.
+ * One instance per bundled skill in `michtio/craftcms-claude-skills`
+ * whose handle appears in `Prompts::PROMPT_MAP` (the authoritative
+ * whitelist). Element-stored skills with matching handles override the
+ * body verbatim via `render()`; element-stored skills NOT in the
+ * whitelist surface only as MCP resources, not prompts (locked
+ * decision 17 of Gate 8.6).
+ *
  * `getName()` returns the public MCP name (e.g. `craftcms_extending`),
  * which differs from the on-disk skill directory name (`craftcms`) —
  * the mapping lives in the `Prompts` service, not here.
  *
  * `render()` returns the full `prompts/get` envelope: a single user
- * message containing the SKILL.md content verbatim. The skill's
- * references are addressable separately as resources under the
+ * message containing the SKILL.md content verbatim. When an element-
+ * stored skill exists for this handle, the synthesized override
+ * bytestream is returned instead. The skill's references are
+ * addressable separately as resources under the
  * `craft-skills://<skill>/<reference>` URI scheme — see `SkillResource`.
  * =========================================================================
  *
@@ -107,7 +116,13 @@ class SkillPrompt extends AbstractPrompt
      */
     public function render(array $arguments): array
     {
-        $text = Skills::content($this->_skill);
+        // Consult the Skills service for an element-stored override
+        // first; fall through to the bundled filesystem reader when
+        // none exists. Same fall-through contract as `SkillResource::read()`.
+        $element = Cortex::getInstance()->skills->getByHandle($this->_skill);
+        $text = $element !== null
+            ? Cortex::getInstance()->skills->synthesizeContent($element)
+            : Skills::content($this->_skill);
 
         return [
             'description' => $this->_description,

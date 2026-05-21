@@ -15,10 +15,10 @@
  */
 
 use craftpulse\cortex\controllers\WellKnownController;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 beforeEach(function() {
-    $this->controller = new WellKnownController('well-known', Plugin::getInstance());
+    $this->controller = new WellKnownController('well-known', Cortex::getInstance());
     $this->controller->response = new \yii\web\Response();
 });
 
@@ -64,7 +64,7 @@ it('authorization-server lists response_types code only', function() {
 });
 
 it('authorization-server includes the registration_endpoint when DCR is enabled', function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $original = $settings->dcrEnabled;
     $settings->dcrEnabled = true;
 
@@ -78,7 +78,7 @@ it('authorization-server includes the registration_endpoint when DCR is enabled'
 });
 
 it('authorization-server omits the registration_endpoint when DCR is disabled', function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $original = $settings->dcrEnabled;
     $settings->dcrEnabled = false;
 

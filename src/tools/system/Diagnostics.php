@@ -3,25 +3,29 @@
 namespace craftpulse\cortex\tools\system;
 
 use Craft;
+use craft\elements\User;
 use craft\helpers\DateTimeHelper;
 use craft\helpers\FileHelper;
 use craft\queue\Queue;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\PermissionedToolTrait;
 use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
+use Throwable;
 
 /**
  * =========================================================================
- * `diagnostics` tool — every "what's wrong?" surface in one read.
+ * `diagnostics` tool — every "what's wrong?" surface in one read, plus
+ * Pro-edition queue-manager actions.
  *
- * Multi-mode tool that consolidates five independent diagnostics
- * surfaces — logs, last error, deprecations, queue jobs, project-config
- * diff — that the AI almost always wants in sequence. Single tool, one
- * `type` param, capped result size to keep responses bounded.
+ * Multi-mode tool that consolidates the independent diagnostics surfaces
+ * the AI almost always wants in sequence. Single tool, one `type` param,
+ * capped result size.
  *
- * Modes:
+ * Free types (always available):
  *   - `logs` — last N lines of `storage/logs/*.log`. Filterable by
  *     log file (`channel`) and minimum level (`error|warning|info|trace`).
  *   - `last_error` — most recent error from the active log channel.
@@ -29,6 +33,18 @@ use craftpulse\cortex\tools\ToolException;
  *   - `queue` — pending / reserved / failed / done counts plus the most
  *     recent N jobs of each.
  *   - `project_config_diff` — `areChangesPending()` summary.
+ *
+ * Pro type (Gate 8.8a — mode-unlock composition contract, locked
+ * decision 6 of `docs/plans/gate-8.md`):
+ *   - `manage_queue` — retry / release single jobs, or bulk
+ *     retry_all / release_all the whole channel. Permission gate is
+ *     Craft's native `utility:queue-manager` (`QueueManager::id()`).
+ *     `release` IS the cancel/delete action — Craft's `Queue` has no
+ *     `cancel()` method; the row is deleted by `release()`.
+ *
+ * The tool stays Free-registered (`shouldRegister()` always true). Pro
+ * unlock happens at `inputSchemaFor()` and at `execute()` per the
+ * mode-unlock composition contract.
  *
  * Default `limit` is 50 items per mode; hard-cap 500.
  * =========================================================================
@@ -40,12 +56,38 @@ use craftpulse\cortex\tools\ToolException;
 #[IsIdempotent]
 class Diagnostics extends AbstractTool
 {
+    use PermissionedToolTrait;
+
     // Constants
     // =========================================================================
 
     public const DEFAULT_LIMIT = 50;
 
     public const MAX_LIMIT = 500;
+
+    /**
+     * @var list<string>
+     */
+    private const FREE_TYPES = ['logs', 'last_error', 'deprecations', 'queue', 'project_config_diff'];
+
+    /**
+     * @var list<string>
+     */
+    private const PRO_TYPES = ['manage_queue'];
+
+    /**
+     * @var list<string>
+     */
+    private const MANAGE_QUEUE_ACTIONS = ['retry', 'retry_all', 'release', 'release_all'];
+
+    /**
+     * Permission required for `type=manage_queue`. Mirrors Craft's own
+     * `utility:queue-manager` permission emitted by
+     * `vendor/craftcms/cms/src/utilities/QueueManager.php` (id =
+     * `queue-manager`) through the `utility:%s` template at
+     * `vendor/craftcms/cms/src/services/UserPermissions.php`.
+     */
+    private const PERMISSION_QUEUE_MANAGER = 'utility:queue-manager';
 
     // Public Methods
     // =========================================================================
@@ -71,20 +113,33 @@ class Diagnostics extends AbstractTool
     {
         return 'Combined diagnostics surface: logs, last_error, deprecations, queue jobs, ' .
             'and project_config_diff. Pick one via `type`. Returns at most `limit` items ' .
-            '(default 50, max 500).';
+            '(default 50, max 500). Pro adds `type=manage_queue` for retry/release actions ' .
+            'gated on `utility:queue-manager`.';
     }
 
     /**
      * @inheritdoc
+     *
+     * Base schema — exposes the Free + Pro types on Pro installs, the
+     * Free-only types on Free installs. The edition gate runs here so
+     * the static surface (`tools/list`, `inputSchemaFor(null)`, and
+     * the architecture invariant at
+     * `tests/Mcp/ToolInterfaceInvariantTest.php`) stay aligned with the
+     * runtime gate in `execute()`. HTTP callers on Pro are further
+     * filtered down per Craft permissions in `inputSchemaFor($user)`.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
     {
+        $types = Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')
+            ? array_merge(self::FREE_TYPES, self::PRO_TYPES)
+            : self::FREE_TYPES;
+
         return Schema::object([
             'type' => Schema::string()
-                ->enum(['logs', 'last_error', 'deprecations', 'queue', 'project_config_diff'])
+                ->enum($types)
                 ->description('Required.')
                 ->required(),
             'channel' => Schema::string()
@@ -92,8 +147,52 @@ class Diagnostics extends AbstractTool
             'minLevel' => Schema::string()
                 ->enum(['trace', 'info', 'warning', 'error'])
                 ->description('Minimum severity to include. Defaults to "warning".'),
+            'action' => Schema::string()
+                ->enum(self::MANAGE_QUEUE_ACTIONS)
+                ->description('Required for `type=manage_queue`. `release` deletes the job; ' .
+                    'Craft has no `cancel()` — `release` IS the cancel action.'),
+            'jobId' => Schema::string()
+                ->description('Queue row id (string). Required for `manage_queue` action=retry / release.'),
             'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
         ])->toArray();
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Per-user input-schema rewrite. stdio (`null` user) gets the full
+     * static enum verbatim — the trusted local path. Filters happen
+     * only for HTTP callers (non-null user). An HTTP caller on a
+     * Free-edition install never sees `manage_queue` regardless of
+     * permission. An HTTP caller on Pro who lacks
+     * `utility:queue-manager` is downgraded to the Free type set.
+     * `execute()` still re-validates the resolved type for security
+     * AND blocks Pro types on Free installs.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function inputSchemaFor(?User $user = null): array
+    {
+        // `getInputSchema()` already reflects the edition (Free vs
+        // Pro). For stdio (null user) and Free installs, this is the
+        // final answer — no per-permission filtering applies.
+        $schema = static::getInputSchema();
+
+        if ($user === null || !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+            return $schema;
+        }
+
+        if ($user->admin) {
+            return $schema;
+        }
+
+        if ($user->can(self::PERMISSION_QUEUE_MANAGER)) {
+            return $schema;
+        }
+
+        $schema['properties']['type']['enum'] = self::FREE_TYPES;
+        return $schema;
     }
 
     /**
@@ -108,7 +207,13 @@ class Diagnostics extends AbstractTool
     {
         $type = $arguments['type'] ?? null;
         if (!is_string($type) || $type === '') {
-            throw new ToolException('`type` is required (logs / last_error / deprecations / queue / project_config_diff).');
+            throw new ToolException(
+                '`type` is required (logs / last_error / deprecations / queue / project_config_diff / manage_queue).'
+            );
+        }
+
+        if (in_array($type, self::PRO_TYPES, true) && !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+            throw new ToolException("system_diagnostics: type `{$type}` is unavailable on this edition.");
         }
 
         $limit = $this->_limit($arguments, self::DEFAULT_LIMIT, self::MAX_LIMIT);
@@ -119,8 +224,55 @@ class Diagnostics extends AbstractTool
             'deprecations' => $this->_deprecations($limit),
             'queue' => $this->_queue($limit),
             'project_config_diff' => $this->_projectConfigDiff(),
+            'manage_queue' => $this->_manageQueue($arguments),
             default => throw new ToolException("Unknown type: '{$type}'."),
         };
+    }
+
+    // Protected Methods
+    // =========================================================================
+
+    /**
+     * Per-`PermissionedToolTrait` contract. Only `manage_queue`
+     * consults this method — the read types never call
+     * `_assertPermission()`.
+     *
+     * @param array<string,mixed> $arguments
+     * @return string[]
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _requiredPermissions(array $arguments): array
+    {
+        $type = is_string($arguments['type'] ?? null) ? $arguments['type'] : null;
+        if (!in_array($type, self::PRO_TYPES, true)) {
+            return [];
+        }
+
+        return [self::PERMISSION_QUEUE_MANAGER];
+    }
+
+    /**
+     * Override `PermissionedToolTrait::_buildPermissionDeniedMessage()`
+     * to emit the rich tool-specific format keyed on by 8.10's
+     * `ModeErrorShapeTest`. No per-resource UID for the queue manager
+     * — it's a single global permission.
+     *
+     * @param array<string,mixed> $arguments
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
+    {
+        $type = is_string($arguments['type'] ?? null) ? $arguments['type'] : '?';
+
+        return sprintf(
+            'permission denied — type `%s` requires `%s`.',
+            $type,
+            $missingPermission,
+        );
     }
 
     // Private Methods
@@ -237,18 +389,7 @@ class Diagnostics extends AbstractTool
     {
         $queue = Craft::$app->getQueue();
 
-        // Counts: Craft's Queue exposes these. (`getTotalDone()` doesn't
-        // exist in Craft 5 — done jobs aren't kept; ttr removes them.)
-        $totals = [];
-        if ($queue instanceof Queue) {
-            $totals = [
-                'waiting' => $queue->getTotalWaiting(),
-                'delayed' => $queue->getTotalDelayed(),
-                'reserved' => $queue->getTotalReserved(),
-                'failed' => $queue->getTotalFailed(),
-                'total' => $queue->getTotalJobs(),
-            ];
-        }
+        $totals = $queue instanceof Queue ? $this->_queueTotals($queue) : [];
 
         // Use Craft's built-in API rather than touching the queue table
         // directly — abstracts over future schema changes and respects
@@ -260,6 +401,107 @@ class Diagnostics extends AbstractTool
             'totals' => $totals,
             'jobs' => $jobs,
             'count' => count($jobs),
+        ];
+    }
+
+    /**
+     * Manage-queue dispatch (Pro). Routes on the `action` sub-mode and
+     * delegates to Craft's `Queue` API. `release` IS the cancel/delete
+     * action — Craft has no `cancel()` method; the row is deleted by
+     * `release()` (see `vendor/craftcms/cms/src/queue/Queue.php`).
+     *
+     * @param array<string,mixed> $arguments
+     * @return array<string,mixed>
+     * @throws ToolException
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _manageQueue(array $arguments): array
+    {
+        $action = $arguments['action'] ?? null;
+        if (!is_string($action) || !in_array($action, self::MANAGE_QUEUE_ACTIONS, true)) {
+            throw new ToolException(
+                'system_diagnostics: `action` is required for type=manage_queue ' .
+                    '(retry / retry_all / release / release_all).',
+            );
+        }
+
+        $this->_assertPermission($arguments);
+
+        $queue = Craft::$app->getQueue();
+        if (!$queue instanceof Queue) {
+            throw new ToolException(
+                'system_diagnostics: the active queue driver does not support manage_queue ' .
+                    '— Craft\'s `craft\\queue\\Queue` is required.',
+            );
+        }
+
+        $jobId = null;
+        if (in_array($action, ['retry', 'release'], true)) {
+            $rawId = $arguments['jobId'] ?? null;
+            if (!is_string($rawId) || $rawId === '') {
+                throw new ToolException("system_diagnostics: `jobId` is required for action=`{$action}`.");
+            }
+            $jobId = $rawId;
+        }
+
+        $before = $this->_queueTotals($queue);
+
+        try {
+            match ($action) {
+                'retry' => $queue->retry((string) $jobId),
+                'retry_all' => $queue->retryAll(),
+                'release' => $queue->release((string) $jobId),
+                'release_all' => $queue->releaseAll(),
+            };
+        } catch (Throwable $e) {
+            throw new ToolException("system_diagnostics: manage_queue {$action} failed — {$e->getMessage()}");
+        }
+
+        $after = $this->_queueTotals($queue);
+
+        $affected = match ($action) {
+            'retry' => 1,
+            'release' => max(0, $before['total'] - $after['total']),
+            'retry_all' => max(0, $before['failed'] - $after['failed']),
+            'release_all' => max(0, $before['total'] - $after['total']),
+        };
+
+        $envelope = [
+            'success' => true,
+            'type' => 'manage_queue',
+            'action' => $action,
+            'affected' => $affected,
+            'queueAfter' => $after,
+        ];
+        if ($jobId !== null) {
+            $envelope['jobId'] = $jobId;
+        }
+
+        return $envelope;
+    }
+
+    /**
+     * Build the queue totals shape reused by `_queue()` for the read
+     * mode and `_manageQueue()` for the post-action confirmation
+     * envelope.
+     *
+     * @return array{waiting:int,delayed:int,reserved:int,failed:int,total:int}
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _queueTotals(Queue $queue): array
+    {
+        // `getTotalDone()` doesn't exist in Craft 5 — done jobs aren't
+        // kept; ttr removes them.
+        return [
+            'waiting' => $queue->getTotalWaiting(),
+            'delayed' => $queue->getTotalDelayed(),
+            'reserved' => $queue->getTotalReserved(),
+            'failed' => $queue->getTotalFailed(),
+            'total' => $queue->getTotalJobs(),
         ];
     }
 

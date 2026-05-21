@@ -11,8 +11,8 @@
  * @since  5.0.0
  */
 
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\AbstractTool;
 
 beforeEach(function() {
@@ -176,7 +176,7 @@ it('returns the registry as tools/list', function() {
     ]);
 
     expect($response['result'])->toHaveKey('tools');
-    expect($response['result']['tools'])->toHaveCount(Plugin::getInstance()->tools->getCount());
+    expect($response['result']['tools'])->toHaveCount(Cortex::getInstance()->tools->getCount());
 
     foreach ($response['result']['tools'] as $tool) {
         expect($tool)->toBeMcpToolListItem();
@@ -430,10 +430,10 @@ it('returns -32603 with a generic message when a tool throws an unexpected excep
 
     // Swap the plugin's `tools` service for a freshly-built one so the
     // listener fires and the dispatcher sees the fixture tool.
-    $originalTools = Plugin::getInstance()->tools;
+    $originalTools = Cortex::getInstance()->tools;
     $freshTools = new \craftpulse\cortex\services\Tools();
     $freshTools->init();
-    Plugin::getInstance()->set('tools', $freshTools);
+    Cortex::getInstance()->set('tools', $freshTools);
 
     try {
         $response = $this->server->dispatch([
@@ -452,7 +452,7 @@ it('returns -32603 with a generic message when a tool throws an unexpected excep
             ->toContain('_throwing_test_tool')
             ->not->toContain($secret);
     } finally {
-        Plugin::getInstance()->set('tools', $originalTools);
+        Cortex::getInstance()->set('tools', $originalTools);
         \yii\base\Event::off(
             \craftpulse\cortex\services\Tools::class,
             \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
@@ -480,7 +480,7 @@ it('returns the prompt registry as prompts/list', function() {
     $response = $this->server->dispatch(['jsonrpc' => '2.0', 'id' => 20, 'method' => 'prompts/list']);
 
     expect($response['result'])->toHaveKey('prompts');
-    expect($response['result']['prompts'])->toHaveCount(Plugin::getInstance()->prompts->getCount());
+    expect($response['result']['prompts'])->toHaveCount(Cortex::getInstance()->prompts->getCount());
 
     foreach ($response['result']['prompts'] as $entry) {
         expect($entry)
@@ -544,7 +544,7 @@ it('returns the resource registry as resources/list', function() {
     $response = $this->server->dispatch(['jsonrpc' => '2.0', 'id' => 30, 'method' => 'resources/list']);
 
     expect($response['result'])->toHaveKey('resources');
-    expect($response['result']['resources'])->toHaveCount(Plugin::getInstance()->resources->getCount());
+    expect($response['result']['resources'])->toHaveCount(Cortex::getInstance()->resources->getCount());
 
     foreach ($response['result']['resources'] as $entry) {
         expect($entry)
@@ -657,10 +657,10 @@ it('eagerly consumes a Generator-returning tool and surfaces the return value', 
         $listener,
     );
 
-    $originalTools = Plugin::getInstance()->tools;
+    $originalTools = Cortex::getInstance()->tools;
     $freshTools = new \craftpulse\cortex\services\Tools();
     $freshTools->init();
-    Plugin::getInstance()->set('tools', $freshTools);
+    Cortex::getInstance()->set('tools', $freshTools);
 
     try {
         // Drive the Generator path through the public dispatch() surface
@@ -681,7 +681,7 @@ it('eagerly consumes a Generator-returning tool and surfaces the return value', 
             ->toContain('"done": true')
             ->toContain('"count": 2');
     } finally {
-        Plugin::getInstance()->set('tools', $originalTools);
+        Cortex::getInstance()->set('tools', $originalTools);
         \yii\base\Event::off(
             \craftpulse\cortex\services\Tools::class,
             \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
@@ -804,10 +804,10 @@ it('tools/list over HTTP omits a tool whose filterFor returns false for the reso
         $listener,
     );
 
-    $originalTools = Plugin::getInstance()->tools;
+    $originalTools = Cortex::getInstance()->tools;
     $freshTools = new \craftpulse\cortex\services\Tools();
     $freshTools->init();
-    Plugin::getInstance()->set('tools', $freshTools);
+    Cortex::getInstance()->set('tools', $freshTools);
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -834,7 +834,7 @@ it('tools/list over HTTP omits a tool whose filterFor returns false for the reso
         $stdioNames = array_column($stdioResponse['result']['tools'], 'name');
         expect($stdioNames)->toContain('_test_/stdio-only-filter');
     } finally {
-        Plugin::getInstance()->set('tools', $originalTools);
+        Cortex::getInstance()->set('tools', $originalTools);
         \yii\base\Event::off(
             \craftpulse\cortex\services\Tools::class,
             \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
@@ -876,10 +876,10 @@ it('tools/call over HTTP rejects a tool whose filterFor returns false as Unknown
         $listener,
     );
 
-    $originalTools = Plugin::getInstance()->tools;
+    $originalTools = Cortex::getInstance()->tools;
     $freshTools = new \craftpulse\cortex\services\Tools();
     $freshTools->init();
-    Plugin::getInstance()->set('tools', $freshTools);
+    Cortex::getInstance()->set('tools', $freshTools);
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -909,7 +909,7 @@ it('tools/call over HTTP rejects a tool whose filterFor returns false as Unknown
         expect($stdioResponse)->toHaveKey('result');
         expect($stdioResponse['result'])->toHaveKey('isError', false);
     } finally {
-        Plugin::getInstance()->set('tools', $originalTools);
+        Cortex::getInstance()->set('tools', $originalTools);
         \yii\base\Event::off(
             \craftpulse\cortex\services\Tools::class,
             \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
@@ -944,10 +944,10 @@ it('falls back to the last yielded value when a Generator has no explicit return
         $listener,
     );
 
-    $originalTools = Plugin::getInstance()->tools;
+    $originalTools = Cortex::getInstance()->tools;
     $freshTools = new \craftpulse\cortex\services\Tools();
     $freshTools->init();
-    Plugin::getInstance()->set('tools', $freshTools);
+    Cortex::getInstance()->set('tools', $freshTools);
 
     try {
         $response = $this->server->dispatch([
@@ -963,7 +963,7 @@ it('falls back to the last yielded value when a Generator has no explicit return
         expect($response['result'])->toHaveKey('isError', false);
         expect($response['result']['content'][0]['text'])->toContain('"done": true');
     } finally {
-        Plugin::getInstance()->set('tools', $originalTools);
+        Cortex::getInstance()->set('tools', $originalTools);
         \yii\base\Event::off(
             \craftpulse\cortex\services\Tools::class,
             \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,

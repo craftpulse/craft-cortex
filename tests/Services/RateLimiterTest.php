@@ -27,17 +27,17 @@
  * @since  5.0.0
  */
 
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\exceptions\RateLimitExceededException;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\services\RateLimiter;
 use craftpulse\cortex\values\RateLimitStatus;
 
 beforeEach(function() {
-    $this->service = Plugin::getInstance()->rateLimiter;
+    $this->service = Cortex::getInstance()->rateLimiter;
     $this->userId = 999001;
 
     // Reset to defaults regardless of what a prior test poked.
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $this->originalBurst = $settings->rateLimitBurst;
     $this->originalRate = $settings->rateLimitPerSecond;
     $settings->rateLimitBurst = 60;
@@ -54,7 +54,7 @@ beforeEach(function() {
 });
 
 afterEach(function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $settings->rateLimitBurst = $this->originalBurst;
     $settings->rateLimitPerSecond = $this->originalRate;
     $this->service->clear($this->userId);
@@ -218,5 +218,5 @@ it('retryAfter is 0 when remaining >= 1 and positive when the bucket is exhauste
 // -----------------------------------------------------------------------------
 
 it('is registered on the plugin as the `rateLimiter` component', function() {
-    expect(Plugin::getInstance()->rateLimiter)->toBeInstanceOf(RateLimiter::class);
+    expect(Cortex::getInstance()->rateLimiter)->toBeInstanceOf(RateLimiter::class);
 });

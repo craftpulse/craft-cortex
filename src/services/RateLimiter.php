@@ -5,8 +5,8 @@ namespace craftpulse\cortex\services;
 use Carbon\Carbon;
 use Closure;
 use Craft;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\exceptions\RateLimitExceededException;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\values\RateLimitStatus;
 use DateTimeImmutable;
 use RuntimeException;
@@ -372,7 +372,7 @@ class RateLimiter extends Component
      */
     private function _burst(): int
     {
-        return Plugin::getInstance()->getSettings()->rateLimitBurst;
+        return Cortex::getInstance()->getSettings()->rateLimitBurst;
     }
 
     /**
@@ -381,6 +381,6 @@ class RateLimiter extends Component
      */
     private function _refillRate(): float
     {
-        return (float) Plugin::getInstance()->getSettings()->rateLimitPerSecond;
+        return (float) Cortex::getInstance()->getSettings()->rateLimitPerSecond;
     }
 }

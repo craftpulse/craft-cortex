@@ -3,9 +3,9 @@
 namespace craftpulse\cortex\tools\support;
 
 use Craft;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\events\LogCallEvent;
 use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\ToolException;
 use Throwable;
 use yii\base\Event;
@@ -91,7 +91,7 @@ final class InvocationLogger
      * formatted KV line.
      *
      * The Gate-7.5 audit-log writer (`services/Invocations::record()`)
-     * subscribes to this event in `Plugin::init()` to persist a row to
+     * subscribes to this event in `Cortex::init()` to persist a row to
      * `cortex_invocations` for HTTP-transport invocations. Third-party
      * plugins can subscribe to the same event to mirror the audit
      * trail elsewhere (SIEM forwarders, external observability stacks)
@@ -296,7 +296,7 @@ final class InvocationLogger
      */
     private static function _excerptResponse(string $payload): string
     {
-        $plugin = Plugin::getInstance();
+        $plugin = Cortex::getInstance();
         $bytes = $plugin !== null ? $plugin->getSettings()->auditResponseExcerptBytes : 2048;
         if (strlen($payload) <= $bytes) {
             return $payload;

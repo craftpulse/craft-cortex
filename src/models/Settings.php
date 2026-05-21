@@ -28,29 +28,90 @@ class Settings extends Model
     // =========================================================================
 
     /**
-     * @var string[] Default allowlist of command-route glob patterns the
-     *               `craft_command` tool may dispatch. Override via
-     *               project config or `config/cortex.php`.
+     * @var string[] Content-level allowlist of command-route glob
+     *               patterns the `craft_command` tool may dispatch.
+     *               Always admitted regardless of
+     *               `allowAdminChanges` — these routes touch content,
+     *               caches, queues, mail, or other non-schema state.
+     *               Override via project config or
+     *               `config/cortex.php`.
+     *
+     *               Pre-Gate-8.1 this array also carried the admin-
+     *               level patterns (`migrate/*`, `make/*`, etc.).
+     *               They moved to `$adminLevelCommands` per the
+     *               `allowAdminChanges` policy locked in
+     *               `docs/plans/gate-8.md` locked decision 14.
+     *               Pre-ship, so the shape change ships without
+     *               back-compat.
      */
     public array $allowedCommands = [
         'resave/*',
-        'project-config/*',
         'cache/*',
         'invalidate-tags/*',
-        'migrate/*',
-        'up',
         'index-assets/*',
         'gc',
-        'make/*',
-        'fixture/*',
-        'sections/*',
-        'fields/*',
         'users/create',
-        'entrify/*',
         'utils/*',
         'clear-deprecations',
         'mailer/test',
     ];
+
+    /**
+     * @var string[] Admin-level allowlist of command-route glob
+     *               patterns the `craft_command` tool may dispatch
+     *               ONLY when
+     *               `Craft::$app->getConfig()->getGeneral()->allowAdminChanges`
+     *               is `true`. These routes mutate admin-only state —
+     *               project config, schema migrations, plugin
+     *               scaffolding, section/field DDL, fixture loads.
+     *
+     *               When `allowAdminChanges` is `false`, a
+     *               `craft_command` invocation matching a pattern
+     *               here is rejected at dispatch time with JSON-RPC
+     *               code `-32002` and an error message naming
+     *               `allowAdminChanges` as the reason. The rejection
+     *               still writes a `cortex_invocations` row with
+     *               `kind=tool_error` so the audit trail captures
+     *               the boundary attempt.
+     *
+     *               Override via project config or
+     *               `config/cortex.php` to tighten the admin-level
+     *               surface per environment.
+     */
+    public array $adminLevelCommands = [
+        'project-config/*',
+        'migrate/*',
+        'up',
+        'make/*',
+        'entrify/*',
+        'sections/*',
+        'fields/*',
+        'fixture/*',
+    ];
+
+    /**
+     * @var string[] Operator-curated allowlist of custom-field
+     *               handles whose values the Pro `users` tool may
+     *               return on a user envelope. Default `[]` —
+     *               zero-trust posture: no custom-field values are
+     *               exposed until an operator explicitly enumerates
+     *               them in project config.
+     *
+     *               Rationale: Craft 5 has no native per-field-value
+     *               permission. Field-layout-designer hiding is UX-
+     *               only; values are still accessible via
+     *               `getFieldValue()` regardless of layout config.
+     *               Defense in depth requires Cortex providing its
+     *               own gate — mirrors the command-allowlist
+     *               pattern.
+     *
+     *               Consumed by `src/tools/system/Users.php` (ships
+     *               in Gate 8.5). The setting itself lands in 8.1
+     *               so operators discover the configuration surface
+     *               before the tool that consumes it is ever
+     *               registered.
+     */
+    public array $userCustomFieldAllowlist = [];
 
     /**
      * @var bool Whether the `craft_exec` tool is enabled. Defaults to
@@ -78,7 +139,7 @@ class Settings extends Model
      *          stored but no longer count toward the effective
      *          allowlist; expired rows are pruned during Craft's gc
      *          cycle (see `Allowlist::pruneExpired()` wired to
-     *          `Gc::EVENT_RUN` in `Plugin::init()`).
+     *          `Gc::EVENT_RUN` in `Cortex::init()`).
      */
     public int $runtimeOverrideTtl = 604800;
 
@@ -218,7 +279,7 @@ class Settings extends Model
         $rules[] = [['runtimeOverrideTtl', 'sessionTtl'], 'integer', 'min' => 1];
         $rules[] = [['tokenTtlDefault'], 'integer', 'min' => 1];
         $rules[] = [['execEnabled', 'execDryRunDefault', 'httpEnabled', 'dcrEnabled'], 'boolean'];
-        $rules[] = [['allowedCommands', 'allowedOrigins'], 'each', 'rule' => ['string', 'min' => 1]];
+        $rules[] = [['allowedCommands', 'adminLevelCommands', 'userCustomFieldAllowlist', 'allowedOrigins'], 'each', 'rule' => ['string', 'min' => 1]];
         $rules[] = [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl'], 'string', 'min' => 2];
         $rules[] = [['auditResponseExcerptBytes'], 'integer', 'min' => 1, 'max' => 65535];
         $rules[] = [['auditRetentionDays'], 'integer', 'min' => 1];

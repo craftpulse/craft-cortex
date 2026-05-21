@@ -5,12 +5,12 @@ namespace craftpulse\cortex\services;
 use Carbon\Carbon;
 use Craft;
 use craft\helpers\App;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\oauth\repositories\AccessTokenRepository;
 use craftpulse\cortex\oauth\repositories\AuthCodeRepository;
 use craftpulse\cortex\oauth\repositories\ClientRepository;
 use craftpulse\cortex\oauth\repositories\RefreshTokenRepository;
 use craftpulse\cortex\oauth\repositories\ScopeRepository;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\records\OauthClient as OauthClientRecord;
 use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
 use DateInterval;
@@ -215,7 +215,7 @@ class Oauth extends Component
             return $this->_authorizationServer;
         }
 
-        $settings = Plugin::getInstance()->getSettings();
+        $settings = Cortex::getInstance()->getSettings();
         $accessTtl = new DateInterval($settings->oauthAccessTokenTtl);
         $refreshTtl = new DateInterval($settings->oauthRefreshTokenTtl);
 

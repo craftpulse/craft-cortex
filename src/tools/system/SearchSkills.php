@@ -5,10 +5,11 @@ namespace craftpulse\cortex\tools\system;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\attributes\Title;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
-use Michtio\CraftCmsClaudeSkills\Skills;
+use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
 
 /**
  * =========================================================================
@@ -89,11 +90,16 @@ class SearchSkills extends AbstractTool
      */
     public static function getDescription(): string
     {
-        return 'Full-text search across the bundled craft-skills corpus — 8 skills, ' .
-            'their reference deep-dives, and 5 Claude Code agents. `mode: "search"` ' .
-            '(default) returns ranked matches with a snippet and the resource URI for ' .
-            'follow-up reads; `mode: "topics"` enumerates the corpus without scoring. ' .
-            'Filter `kind` to `skill` / `reference` / `agent` to narrow.';
+        $skillCount = count(BundledSkills::skillNames());
+        $agentCount = count(BundledSkills::agentNames());
+
+        return "Full-text search across the bundled craft-skills corpus — {$skillCount} " .
+            "skills, their reference deep-dives, and {$agentCount} Claude Code agents. " .
+            '`mode: "search"` (default) returns ranked matches with a snippet and the ' .
+            'resource URI for follow-up reads; `mode: "topics"` enumerates the corpus ' .
+            'without scoring. Filter `kind` to `skill` / `reference` / `agent` to narrow. ' .
+            'Element-stored Cortex skills override bundled ones by handle and are included ' .
+            'in the merged corpus.';
     }
 
     /**
@@ -173,6 +179,7 @@ class SearchSkills extends AbstractTool
                 'uri' => $entry['uri'],
                 'skill' => $entry['skill'],
                 'name' => $entry['name'],
+                'source' => $entry['source'],
                 'score' => round($score['total'], 4),
                 'matches' => $score['hits'],
                 'snippet' => $this->_snippet($entry['content'], $score['firstPos']),
@@ -211,6 +218,7 @@ class SearchSkills extends AbstractTool
                 'uri' => $entry['uri'],
                 'skill' => $entry['skill'],
                 'name' => $entry['name'],
+                'source' => $entry['source'],
                 'length' => mb_strlen($entry['content']),
             ],
             $index,
@@ -225,61 +233,26 @@ class SearchSkills extends AbstractTool
     }
 
     /**
-     * Build the in-memory document index. Each entry carries the URI
-     * (so search results can be resolved via `resources/read` without
-     * the LLM having to construct it), the lowercased content for
-     * scoring, and a `kind` discriminator the caller filters on.
+     * Build the in-memory document index. Delegates to
+     * `Skills::getMergedCorpus()` so bundled + element-stored skills
+     * surface in a single union with element-stored winning on handle
+     * collision (locked decision 2 of Gate 8.6). Each row carries a
+     * `source: 'bundled' | 'element'` field that propagates to the
+     * `_search` / `_topics` envelopes.
      *
-     * Reading happens lazily from the companion package's static
-     * helpers — they hit disk per call. Acceptable for cortex's
-     * single-process model; if usage explodes we add a memo cache.
+     * The service memoizes the result; reads after the first one are
+     * O(1) on the in-memory `MemoizableArray`.
      *
-     * @return list<array{kind:string,uri:string,skill:string,name:string|null,content:string}>
+     * @return list<array{kind:string,uri:string,skill:string,name:string|null,content:string,source:string}>
      *
      * @author Craftpulse
      * @since  5.0.0
      */
     private function _buildIndex(?string $kindFilter): array
     {
-        $entries = [];
-
-        foreach (Skills::skillNames() as $skill) {
-            if ($kindFilter === null || $kindFilter === self::KIND_SKILL) {
-                $entries[] = [
-                    'kind' => self::KIND_SKILL,
-                    'uri' => sprintf('craft-skills://%s', $skill),
-                    'skill' => $skill,
-                    'name' => null,
-                    'content' => Skills::content($skill),
-                ];
-            }
-
-            if ($kindFilter === null || $kindFilter === self::KIND_REFERENCE) {
-                foreach (Skills::references($skill) as $reference) {
-                    $entries[] = [
-                        'kind' => self::KIND_REFERENCE,
-                        'uri' => sprintf('craft-skills://%s/%s', $skill, $reference),
-                        'skill' => $skill,
-                        'name' => $reference,
-                        'content' => Skills::referenceContent($skill, $reference),
-                    ];
-                }
-            }
-        }
-
-        if ($kindFilter === null || $kindFilter === self::KIND_AGENT) {
-            foreach (Skills::agentNames() as $agent) {
-                $entries[] = [
-                    'kind' => self::KIND_AGENT,
-                    'uri' => sprintf('craft-skills://agents/%s', $agent),
-                    'skill' => 'agents',
-                    'name' => $agent,
-                    'content' => Skills::agentContent($agent),
-                ];
-            }
-        }
-
-        return $entries;
+        /** @var list<array{kind:string,uri:string,skill:string,name:string|null,content:string,source:string}> $rows */
+        $rows = Cortex::getInstance()->skills->getMergedCorpus($kindFilter);
+        return $rows;
     }
 
     /**

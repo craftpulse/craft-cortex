@@ -25,12 +25,12 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolInterface;
 
 it('every registered tool returns filterFor(null) === true', function() {
     $violations = [];
-    foreach (Plugin::getInstance()->tools->getAll() as $tool) {
+    foreach (Cortex::getInstance()->tools->getAll() as $tool) {
         if (!$tool->filterFor(null)) {
             $violations[] = sprintf(
                 '%s (%s) returned false for filterFor(null) — stdio invariant broken',
@@ -45,7 +45,7 @@ it('every registered tool returns filterFor(null) === true', function() {
 
 it('every registered tool returns inputSchemaFor(null) === static::getInputSchema()', function() {
     $violations = [];
-    foreach (Plugin::getInstance()->tools->getAll() as $tool) {
+    foreach (Cortex::getInstance()->tools->getAll() as $tool) {
         $perUser = $tool->inputSchemaFor(null);
         $static = $tool::getInputSchema();
 
@@ -75,7 +75,7 @@ it('every registered tool implements both filterFor and inputSchemaFor', functio
     // so a missing override is detected at the test layer rather than
     // at autoload time.
     $missing = [];
-    foreach (Plugin::getInstance()->tools->getAll() as $tool) {
+    foreach (Cortex::getInstance()->tools->getAll() as $tool) {
         $rc = new ReflectionClass($tool);
 
         if (!$rc->hasMethod('filterFor')) {
@@ -96,7 +96,7 @@ it('the count of tools surfacing for null-user matches the stdio registry size',
     // the first invariant test catches it; this test catches a future
     // bug where filterFor returns true but the tool drops out of the
     // payload for some other reason.
-    $service = Plugin::getInstance()->tools;
+    $service = Cortex::getInstance()->tools;
     $payload = $service->asListPayloadFor(null);
 
     expect($payload)->toHaveCount($service->getCount());
@@ -106,7 +106,7 @@ it('every registered tool implements ToolInterface', function() {
     // Belt-and-braces against an extension-event listener appending
     // something that isn't a ToolInterface. The registry skips those
     // during init() — this test guards that the skip-logic worked.
-    foreach (Plugin::getInstance()->tools->getAll() as $tool) {
+    foreach (Cortex::getInstance()->tools->getAll() as $tool) {
         expect($tool)->toBeInstanceOf(ToolInterface::class);
     }
 });

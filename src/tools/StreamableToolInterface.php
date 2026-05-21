@@ -26,9 +26,11 @@ use Generator;
  *      `notifications/progress` SSE frame per `stream()` yield, then
  *      one terminal JSON-RPC response frame carrying the tool result.
  *   3. Client may at any point POST a `notifications/cancelled`
- *      JSON-RPC notification referencing the original request id.
- *      The server flips the `CancellationToken` on the running
- *      generator's `InvocationContext`; cooperative tools observe
+ *      JSON-RPC notification referencing the original request id, OR
+ *      drop the underlying TCP connection (real client disconnect —
+ *      sub-gate 7.7.5). In either case the server flips the
+ *      `CancellationToken` on the running generator's
+ *      `InvocationContext`; cooperative tools observe
  *      `$ctx->getCancellationToken()->isCancelled()` between yields
  *      and short-circuit.
  *

@@ -15,12 +15,12 @@
  */
 
 use Carbon\Carbon;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\records\RuntimeOverride;
 use yii\base\Exception;
 
 beforeEach(function() {
-    $this->service = Plugin::getInstance()->allowlist;
+    $this->service = Cortex::getInstance()->allowlist;
 });
 
 afterEach(function() {
@@ -146,7 +146,7 @@ it('remove() throws when the soft-delete save fails', function() {
 it('craft_command tool resolves allowlist through the service', function() {
     $this->service->add('_test_/special-route');
 
-    $tool = Plugin::getInstance()->tools->getByName('craft_command');
+    $tool = Cortex::getInstance()->tools->getByName('craft_command');
     $result = $tool->execute(['mode' => 'list']);
 
     expect($result['patterns'])->toContain('_test_/special-route');

@@ -7,7 +7,7 @@ use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsOpenWorld;
 use craftpulse\cortex\attributes\IsStdioOnly;
 use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\support\SecretRedactor;
@@ -145,7 +145,7 @@ class CraftExec extends AbstractTool
      */
     public function execute(array $arguments): array
     {
-        $settings = Plugin::getInstance()->getSettings();
+        $settings = Cortex::getInstance()->getSettings();
         if (!$settings->execEnabled) {
             throw new ToolException(
                 'craft_exec is disabled by configuration. Enable it via ' .

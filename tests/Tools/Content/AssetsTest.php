@@ -7,11 +7,11 @@
 
 use Craft;
 use craft\elements\Asset;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('assets');
+    $this->tool = Cortex::getInstance()->tools->getByName('assets');
 });
 
 it('returns assets list with pagination metadata', function() {

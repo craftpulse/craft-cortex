@@ -2,6 +2,8 @@
 
 namespace craftpulse\cortex\tools;
 
+use Craft;
+use craft\base\Element;
 use craft\elements\User;
 
 /**
@@ -216,5 +218,117 @@ abstract class AbstractTool implements ToolInterface
             $with,
             static fn(mixed $h): bool => is_string($h) && $h !== '',
         ));
+    }
+
+    /**
+     * Resolve the target site id from `siteId` / `siteHandle`, falling
+     * back to the primary site. Pro mutation tools use this for the
+     * `create` path where a site is always required.
+     *
+     * Error messages prefix with `static::getName()` so each tool
+     * emits its own naming context.
+     *
+     * @param array<string,mixed> $arguments
+     * @throws ToolException
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _resolveSiteId(array $arguments): int
+    {
+        $siteId = $this->_resolveOptionalSiteId($arguments);
+        if ($siteId !== null) {
+            return $siteId;
+        }
+        return (int) Craft::$app->getSites()->getPrimarySite()->id;
+    }
+
+    /**
+     * Resolve the target site id from `siteId` / `siteHandle`, returning
+     * `null` when neither is supplied. Pro mutation tools use this on
+     * the `update / delete / restore` paths where Craft picks the
+     * default site when none is supplied.
+     *
+     * Error messages prefix with `static::getName()` so each tool
+     * emits its own naming context.
+     *
+     * @param array<string,mixed> $arguments
+     * @throws ToolException
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _resolveOptionalSiteId(array $arguments): ?int
+    {
+        $name = static::getName();
+
+        $siteId = $arguments['siteId'] ?? null;
+        if (is_int($siteId) || (is_string($siteId) && ctype_digit($siteId))) {
+            $site = Craft::$app->getSites()->getSiteById((int) $siteId);
+            if ($site === null) {
+                throw new ToolException("{$name}: site id={$siteId} not found.");
+            }
+            return (int) $site->id;
+        }
+
+        $siteHandle = $arguments['siteHandle'] ?? null;
+        if (is_string($siteHandle) && $siteHandle !== '') {
+            $site = Craft::$app->getSites()->getSiteByHandle($siteHandle);
+            if ($site === null) {
+                throw new ToolException("{$name}: site handle=`{$siteHandle}` not found.");
+            }
+            return (int) $site->id;
+        }
+
+        return null;
+    }
+
+    /**
+     * Forward `fields: {handle: value}` to the element's
+     * `setFieldValues()`. The contract is pass-through — Craft
+     * normalises per field type at save time. Document the
+     * "we pass through; Craft validates" contract in each consuming
+     * tool's PHPDoc.
+     *
+     * No-op when `fields` is absent, not an array, or empty.
+     *
+     * @param array<string,mixed> $arguments
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _applyFields(Element $element, array $arguments): void
+    {
+        $fields = $arguments['fields'] ?? null;
+        if (!is_array($fields) || $fields === []) {
+            return;
+        }
+        $element->setFieldValues($fields);
+    }
+
+    /**
+     * Validation envelope shape returned when
+     * `saveElement(runValidation: true)` returns false. Tools return
+     * this iterable shape rather than throwing — the LLM iterates on
+     * `errors` (keyed by field handle, listing every message a field
+     * gathered) and retries with corrected values.
+     *
+     * Not cached against the idempotency key — retries with different
+     * inputs should be free to land.
+     *
+     * @return array<string,mixed>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _validationEnvelope(Element $element, string $mode): array
+    {
+        return [
+            'success' => false,
+            'mode' => $mode,
+            'id' => $element->id !== null ? (int) $element->id : null,
+            'uid' => $element->uid,
+            'errors' => $element->getErrors(),
+        ];
     }
 }

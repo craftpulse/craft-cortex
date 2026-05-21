@@ -6,7 +6,7 @@
  * tools, prompts, and resources via class-level Yii events.
  *
  * Each test instantiates a fresh service (not the singleton on
- * Plugin::getInstance()) so the event fires in init() with the listener
+ * Cortex::getInstance()) so the event fires in init() with the listener
  * already attached. Listeners are detached in afterEach to avoid leakage
  * across tests.
  * =========================================================================
@@ -245,7 +245,7 @@ it('omits outputSchema in tools/list when a tool returns []', function() {
     // Tools/list entries should carry `outputSchema` if and only if the
     // tool's static `outputSchema()` returns a non-empty array. Iterate
     // every bundled tool and verify the presence/absence matches.
-    $tools = \craftpulse\cortex\Plugin::getInstance()->tools;
+    $tools = \craftpulse\cortex\Cortex::getInstance()->tools;
     $payload = $tools->asListPayload();
     $byName = [];
     foreach ($payload as $entry) {
@@ -314,7 +314,7 @@ it('lets a listener append a third-party resource via EVENT_REGISTER_RESOURCES',
 
 it('skips a third-party resource that collides with a bundled URI', function() {
     // Pick the first bundled resource URI to collide with.
-    $bundledUri = \craftpulse\cortex\Plugin::getInstance()->resources->getAll()[0]->getUri();
+    $bundledUri = \craftpulse\cortex\Cortex::getInstance()->resources->getAll()[0]->getUri();
 
     $listener = function(RegisterResourcesEvent $event) use ($bundledUri): void {
         $event->resources[] = new class($bundledUri) implements ResourceInterface {

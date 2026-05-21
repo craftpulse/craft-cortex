@@ -16,12 +16,12 @@
  */
 
 use Carbon\Carbon;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\mcp\Session;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\services\Sessions;
 
 beforeEach(function() {
-    $this->service = Plugin::getInstance()->sessions;
+    $this->service = Cortex::getInstance()->sessions;
 });
 
 it('create() generates a fresh id and round-trips through get()', function() {

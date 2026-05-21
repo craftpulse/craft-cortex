@@ -5,10 +5,10 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('extensibility');
+    $this->tool = Cortex::getInstance()->tools->getByName('extensibility');
 });
 
 it('returns all four sections by default', function() {

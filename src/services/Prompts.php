@@ -46,6 +46,15 @@ class Prompts extends Component
      * requires both the upstream skills package release AND an entry
      * here so we own the public surface area on cortex's side.
      *
+     * **Element-stored skills are NOT auto-promoted to prompts** (Gate
+     * 8.6, locked decision 17). An element-stored skill with a handle
+     * matching a `PROMPT_MAP` entry DOES override the bundled body
+     * when its prompt renders — see `SkillPrompt::render()` — but a
+     * new handle that is not in `PROMPT_MAP` surfaces as a resource
+     * (`resources/list`) only, not as a prompt. The whitelist stays
+     * authoritative because new prompts are a curated public surface
+     * area, not an implicit one driven by editor authoring.
+     *
      * @var array<string,array{name: string, description: string}>
      */
     private const PROMPT_MAP = [

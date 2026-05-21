@@ -13,10 +13,10 @@ namespace craftpulse\cortex\tools\support;
  * token and never call `cancel()` — the contract holds, the wire stays
  * dormant.
  *
- * The class is intentionally small: a boolean flag plus two methods.
- * Locking the shape from sub-gate 7.1 (per `docs/plans/gate-7.md`) means
- * streaming tools in later gates can opt in cooperatively without an
- * interface break here.
+ * The class is intentionally small: a boolean flag, an optional
+ * cancellation reason, and three read methods. Locking the shape from
+ * sub-gate 7.1 (per `docs/plans/gate-7.md`) means streaming tools in
+ * later gates can opt in cooperatively without an interface break here.
  *
  * Concurrency: PHP requests are single-threaded inside a worker, so a
  * plain bool is sufficient. The wire implementation in sub-gate 7.7
@@ -38,6 +38,17 @@ final class CancellationToken
      *           uncancel.
      */
     private bool $_cancelled = false;
+
+    /**
+     * @var string|null Optional reason supplied to `cancel()` — e.g.
+     *                  `'client disconnected'` when sub-gate 7.7.5's
+     *                  HTTP-transport TCP-disconnect path flips the
+     *                  token, or a structured reason when an HTTP
+     *                  `notifications/cancelled` arrival carries one.
+     *                  Stays null when `cancel()` was either never
+     *                  called or called without a reason.
+     */
+    private ?string $_reason = null;
 
     /**
      * @var (\Closure(): bool)|null Optional poll callback consulted on
@@ -107,18 +118,54 @@ final class CancellationToken
     }
 
     /**
-     * Signal cancellation. Called by the transport on receipt of MCP
-     * `notifications/cancelled` (wired in sub-gate 7.7). Tools do not
-     * call this themselves; the contract is read-only from a tool's
-     * perspective.
+     * Signal cancellation. Called by infrastructure code at the
+     * boundary where a cancellation arrives — today the HTTP/SSE
+     * transport's `notifications/cancelled` cache-slot path (sub-gate
+     * 7.7) and the streaming controller's TCP-disconnect path (sub-
+     * gate 7.7.5). Tools do not call this themselves; the contract is
+     * read-only from a tool's perspective.
      *
-     * Idempotent — calling twice is a no-op.
+     * Idempotent — calling twice is a no-op. The first non-null
+     * `$reason` wins; subsequent calls leave the stored reason
+     * unchanged so the original cancellation context survives any
+     * defensive double-cancel.
+     *
+     * @param string|null $reason Optional human-readable reason —
+     *                            captured for forensic / audit
+     *                            surfaces. `'client disconnected'`
+     *                            when the streaming controller
+     *                            observes `connection_aborted() === 1`
+     *                            mid-loop; structured reasons from a
+     *                            future `notifications/cancelled` body
+     *                            carrying `params.reason`.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public function cancel(): void
+    public function cancel(?string $reason = null): void
     {
+        if ($this->_cancelled) {
+            return;
+        }
         $this->_cancelled = true;
+        $this->_reason = $reason;
+    }
+
+    /**
+     * Reason last supplied to `cancel()`, or null when `cancel()` was
+     * never called or was called without a reason. Read by audit /
+     * envelope surfaces that want to surface why a stream stopped
+     * (e.g. `'client disconnected'` vs. an explicit
+     * `notifications/cancelled`). Forward-compatible — today the audit
+     * row's `kind=cancelled` is the sole disambiguation surface; this
+     * accessor opens the door to richer payloads without a contract
+     * bump.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getReason(): ?string
+    {
+        return $this->_reason;
     }
 }

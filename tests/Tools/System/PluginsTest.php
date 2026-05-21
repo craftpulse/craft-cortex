@@ -6,10 +6,10 @@
  */
 
 use Craft;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('plugins');
+    $this->tool = Cortex::getInstance()->tools->getByName('plugins');
 });
 
 it('returns plugins list with handle / name / version / enabled', function() {

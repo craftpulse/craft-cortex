@@ -352,10 +352,10 @@ Cortex exposes the same testing helpers it uses internally. The recommended setu
 A minimal test for a custom tool:
 
 ```php
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 it('registers and dispatches my custom tool', function () {
-    $tool = Plugin::getInstance()->tools->getByName('get_wish');
+    $tool = Cortex::getInstance()->tools->getByName('get_wish');
     expect($tool)->not->toBeNull();
 
     $result = $tool->execute(['wisher' => 'pest']);
@@ -367,7 +367,7 @@ For tools that wrap MCP-spec details (annotations, output schemas), assert again
 
 ```php
 it('appears in the registry with the right annotations', function () {
-    $payload = Plugin::getInstance()->tools->asListPayload();
+    $payload = Cortex::getInstance()->tools->asListPayload();
     $entry = collect($payload)->firstWhere('name', 'get_wish');
 
     expect($entry)

@@ -6,10 +6,10 @@
  */
 
 use Craft;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('database_schema');
+    $this->tool = Cortex::getInstance()->tools->getByName('database_schema');
 });
 
 it('returns full schema by default', function() {

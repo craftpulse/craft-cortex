@@ -87,7 +87,7 @@ class Globals extends AbstractTool
     {
         $serializer = new ElementSerializer();
         $eagerHandles = $this->_eagerHandles($arguments);
-        $siteId = $this->_resolveSiteId($arguments);
+        $siteId = $this->_resolveSiteIdForGlobals($arguments);
 
         $handle = $this->_handle($arguments);
         if (is_string($handle)) {
@@ -169,7 +169,7 @@ class Globals extends AbstractTool
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _resolveSiteId(array $arguments): int
+    private function _resolveSiteIdForGlobals(array $arguments): int
     {
         $sitesService = Craft::$app->getSites();
         $primaryId = (int) $sitesService->getPrimarySite()->id;

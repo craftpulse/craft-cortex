@@ -13,7 +13,7 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 beforeEach(function() {
     $this->tmp = sys_get_temp_dir() . '/cortex-docs-' . uniqid();
@@ -36,7 +36,7 @@ it('generates TOOLS.md with the right tool count and entries', function() {
     expect(file_exists($path))->toBeTrue();
 
     $contents = file_get_contents($path);
-    $expectedCount = Plugin::getInstance()->tools->getCount();
+    $expectedCount = Cortex::getInstance()->tools->getCount();
     expect($contents)->toContain("**Total tools:** {$expectedCount}");
     expect($contents)->toContain('## `sections`');
     expect($contents)->toContain('## `craft_exec`');
@@ -50,7 +50,7 @@ it('generates PROMPTS.md with prompt headings', function() {
     expect(file_exists($path))->toBeTrue();
 
     $contents = file_get_contents($path);
-    $expectedCount = Plugin::getInstance()->prompts->getCount();
+    $expectedCount = Cortex::getInstance()->prompts->getCount();
     expect($contents)->toContain("**Total prompts:** {$expectedCount}");
     expect($contents)->toContain('## `craftcms_extending`');
 });
@@ -62,7 +62,7 @@ it('generates RESOURCES.md with a Markdown table', function() {
     expect(file_exists($path))->toBeTrue();
 
     $contents = file_get_contents($path);
-    $expectedCount = Plugin::getInstance()->resources->getCount();
+    $expectedCount = Cortex::getInstance()->resources->getCount();
     expect($contents)->toContain("**Total resources:** {$expectedCount}");
     expect($contents)->toContain('| URI | Name | MIME | Description |');
 });

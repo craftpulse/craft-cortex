@@ -5,11 +5,11 @@ namespace craftpulse\cortex\controllers;
 use Craft;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\exceptions\RateLimitExceededException;
 use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\mcp\transport\Http;
 use craftpulse\cortex\mcp\transport\SseEmitter;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\tools\support\InvocationLogger;
 use craftpulse\cortex\values\RateLimitStatus;
 use yii\web\Response;
@@ -177,7 +177,7 @@ class McpController extends Controller
         //   7. Per-user rate limit consume (Gate 7.6).
         //   8. parent::beforeAction() — now sees an authenticated user.
 
-        $settings = Plugin::getInstance()->getSettings();
+        $settings = Cortex::getInstance()->getSettings();
 
         // Gate 1 — kill switch.
         if (!$settings->httpEnabled) {
@@ -276,7 +276,7 @@ class McpController extends Controller
         // audit row and 429 the caller with `Retry-After`.
         if ($this->_authenticatedUserId !== null) {
             try {
-                $status = Plugin::getInstance()->rateLimiter->consume($this->_authenticatedUserId);
+                $status = Cortex::getInstance()->rateLimiter->consume($this->_authenticatedUserId);
                 $this->_rateLimitRemaining = $status->remaining;
             } catch (RateLimitExceededException $e) {
                 $this->_writeRateLimitedAuditRow($e->status);
@@ -466,7 +466,7 @@ class McpController extends Controller
             return $this->_status(400, 'Missing Mcp-Session-Id header.');
         }
 
-        $sessions = Plugin::getInstance()->sessions;
+        $sessions = Cortex::getInstance()->sessions;
         if ($sessions->get($sessionId) === null) {
             return $this->_status(404, 'Session not found.');
         }
@@ -496,7 +496,7 @@ class McpController extends Controller
         $method = is_string($request['method'] ?? null) ? $request['method'] : '';
         $isInitialize = $method === 'initialize';
 
-        $sessions = Plugin::getInstance()->sessions;
+        $sessions = Cortex::getInstance()->sessions;
         $sessionIdHeader = $this->request->getHeaders()->get(Http::HEADER_SESSION_ID);
         $sessionId = is_string($sessionIdHeader) && $sessionIdHeader !== '' ? $sessionIdHeader : null;
 
@@ -649,6 +649,22 @@ class McpController extends Controller
      * branch is unreachable today. Kept for forward-compatibility with
      * a future spec revision that permits initialize-time streaming.
      *
+     * **Real TCP-disconnect cooperation (sub-gate 7.7.5).** PHP's
+     * default `ignore_user_abort` is `false`, which means the very
+     * next write to a closed socket terminates the script abruptly —
+     * the streaming dispatcher's post-loop audit-log write would never
+     * run and the `kind=cancelled` row would silently disappear. We
+     * flip `ignore_user_abort(true)` so the script survives the
+     * disconnect, then poll `connection_aborted()` after each emitted
+     * frame: on a dead socket we flip the in-flight
+     * `CancellationToken` (via `Server::getInFlightCancellationToken()`)
+     * with reason `'client disconnected'` and stop emitting further
+     * frames — but we keep draining the outer generator so the
+     * dispatcher's own cancellation body (`_logCancelled` +
+     * `_cancelledEnvelope` yield) runs to completion. Abandoning the
+     * generator here would short-circuit the audit write and leave an
+     * orphaned row.
+     *
      * @param array<string,mixed> $request
      *
      * @author Craftpulse
@@ -656,6 +672,13 @@ class McpController extends Controller
      */
     private function _streamPost(Server $server, array $request, bool $isInitialize, string $sessionId): Response
     {
+        // Survive client TCP-disconnects so the post-loop audit-log
+        // write runs even after the wire is gone. Paired with the
+        // `connection_aborted()` poll after each emit below — this
+        // flag alone keeps the script alive, the poll detects the
+        // condition and flips the token cooperatively.
+        ignore_user_abort(true);
+
         $emitter = $this->_buildSseEmitter();
 
         if ($isInitialize) {
@@ -672,8 +695,27 @@ class McpController extends Controller
 
         $emitter->start();
 
+        $clientGone = false;
         foreach ($server->dispatchStreaming($request) as $envelope) {
-            $emitter->emit(SseEmitter::EVENT_NAME, $envelope);
+            if (!$clientGone) {
+                $emitter->emit(SseEmitter::EVENT_NAME, $envelope);
+
+                // Real TCP-disconnect detection. `connection_aborted()`
+                // returns 1 once PHP has observed a write-side failure
+                // on the response socket; we flip the streaming
+                // generator's `CancellationToken` so the dispatcher's
+                // inner loop short-circuits through the cancellation
+                // path (terminal `notifications/cancelled` envelope +
+                // `kind=cancelled` audit row). We keep draining the
+                // outer generator so its `_streamToolCall` cancellation
+                // body runs to completion — abandoning the generator
+                // here would skip the audit-log write and leave an
+                // orphaned row.
+                if (connection_aborted() === 1) {
+                    $clientGone = true;
+                    $server->getInFlightCancellationToken()?->cancel('client disconnected');
+                }
+            }
         }
 
         $emitter->end();
@@ -780,7 +822,7 @@ class McpController extends Controller
         $expectedAudience = UrlHelper::siteUrl('cortex/mcp');
 
         if ($hasDots) {
-            $oauthHit = Plugin::getInstance()->oauth->lookupAccessToken($bearer);
+            $oauthHit = Cortex::getInstance()->oauth->lookupAccessToken($bearer);
             if ($oauthHit === null) {
                 return null;
             }
@@ -796,7 +838,7 @@ class McpController extends Controller
             return ['userId' => $oauthHit['userId'], 'tokenId' => null];
         }
 
-        $token = Plugin::getInstance()->tokens->lookup($bearer);
+        $token = Cortex::getInstance()->tokens->lookup($bearer);
         if ($token === null) {
             return null;
         }
@@ -900,7 +942,7 @@ class McpController extends Controller
         $sessionIdHeader = $this->request->getHeaders()->get(Http::HEADER_SESSION_ID);
         $sessionId = is_string($sessionIdHeader) && $sessionIdHeader !== '' ? $sessionIdHeader : null;
 
-        Plugin::getInstance()->invocations->record([
+        Cortex::getInstance()->invocations->record([
             'tool' => '_rate_limited',
             'kind' => InvocationLogger::KIND_RATE_LIMITED,
             'duration_ms' => 0,

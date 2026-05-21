@@ -6,11 +6,11 @@
  */
 
 use craft\elements\Tag;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('tags');
+    $this->tool = Cortex::getInstance()->tools->getByName('tags');
 });
 
 it('returns tags list with pagination metadata', function() {
