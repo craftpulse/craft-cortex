@@ -8,19 +8,21 @@ This is the implementation plan for the final pre-Plugin-Store-submission gate. 
 
 ## Executive summary
 
-**Structure: ONE unified master plan, six sub-gates.** Rejected: splitting into three separate plan files (`gate-9.1-tokens.md`, `gate-9.2-activity.md`, `gate-9.3-connection.md`). The reason: every Gate 9 surface shares the same foundation — a custom `SettingsController` extending the existing one, a tabbed parent template extending `_layouts/cp` directly (mandatory because `settingsHtml()` cannot host tabs per the craftcms skill cp.md §"Tabbed Settings Pages"), a single shared asset bundle for VueAdminTable + Garnish wiring, and a single shared CP-URL-rule block. Splitting repeats that context three times and produces three plans with hairline-thin sub-gate scope. The Gate 8 master plan with per-sub-gate sub-plans for the larger gates is the established precedent — Gate 9 follows the same pattern, with sub-plans spawned ad hoc by the builder if a single sub-gate's diff exceeds the single-session target. The pre-merge state at the end of Gate 9 ships every Pro-tier operator surface in one branch; partial merges (e.g. Tokens-only) are blocked from Plugin Store submission because the gate-acceptance criterion requires the full end-to-end flow (issue → invoke → audit → revoke).
+**Structure: ONE unified master plan, seven sub-gates.** Rejected: splitting into separate plan files per tab. The reason: every Gate 9 surface shares the same foundation — a custom `SettingsController`, a tabbed parent template extending `_layouts/cp` directly (mandatory because `settingsHtml()` cannot host tabs per the craftcms skill cp.md §"Tabbed Settings Pages"), a single shared asset bundle for VueAdminTable + Garnish wiring, and a single shared CP-URL-rule block. Splitting repeats that context per file. Sub-plans spawned ad hoc by the builder if a single sub-gate's diff exceeds the single-session target. The pre-merge state at the end of Gate 9 ships every Pro-tier operator surface in one branch; partial merges (e.g. Tokens-only) are blocked from Plugin Store submission because the gate-acceptance criterion requires the full end-to-end flow (issue → invoke → audit → revoke).
 
-**Sub-gate count: six.** 9.1 foundation (custom controller, tabbed scaffold, CP nav, asset bundle, base permission set). 9.2 Tokens. 9.3 Activity. 9.4 Connection. 9.5 Settings tab move + Skill CP authoring screens. 9.6 cross-cutting tests + manual acceptance run.
+**Sub-gate count: seven.** 9.1 foundation (custom controller, tabbed scaffold with five tabs, CP nav, asset bundle, base permission set). 9.2 Tokens. 9.3 Activity. 9.4 Connection. 9.5 Allowlist (DB-backed runtime overrides — same VueAdminTable + Garnish.Slideout pattern as Tokens). 9.6 Skill CP authoring screens. 9.7 cross-cutting tests + manual acceptance run.
+
+**Revision history.** 2026-05-21: original plan had four tabs + Settings hosting the legacy hand-rolled "Runtime overrides" table verbatim. 9.1 manual smoke surfaced the legacy surface as below Plugin-Store-submission quality. Restructured: overrides promoted to their own "Allowlist" tab (same issued-grant lifecycle as bearer tokens; project-config defaults stay on Settings); 9.1 ships five tab placeholders; 9.5 inserted between Connection and Skill authoring.
 
 ## Locked decisions
 
 These are settled. Don't relitigate without good reason.
 
-1. **The existing `settingsHtml()` path is replaced, not extended.** Per the craftcms skill `references/cp.md` §"Tabbed Settings Pages" line 432: ``settingsHtml()` returns HTML that Craft embeds inside `vendor/craftcms/cms/src/templates/settings/plugins/_settings.twig` ... no `tabs` variable you set inside `settingsHtml()` output can reach the layout.`` So Gate 9 redirects via `getSettingsResponse()` to a Cortex-owned route, registers CP URL rules, ships a template extending `_layouts/cp` directly, and owns the full save flow in `SettingsController`. The existing single-pane `src/templates/settings.twig` content moves into the Settings tab of the new tabbed page. The `settingsHtml()` method on `Cortex.php` is deleted. Rejected: a hybrid (settingsHtml hosts Settings, separate route hosts Tokens/Activity/Connection) — splits the operator's mental model and introduces two URLs the user has to learn. Rejected: anchor-based single-page tabs without per-tab routes — breaks bookmarking, breaks deep links to a specific token row, and breaks browser-back navigation.
+1. **The existing `settingsHtml()` path is replaced, not extended.** Per the craftcms skill `references/cp.md` §"Tabbed Settings Pages" line 432: ``settingsHtml()` returns HTML that Craft embeds inside `vendor/craftcms/cms/src/templates/settings/plugins/_settings.twig` ... no `tabs` variable you set inside `settingsHtml()` output can reach the layout.`` So Gate 9 redirects via `getSettingsResponse()` to a Cortex-owned route, registers CP URL rules, ships a template extending `_layouts/cp` directly, and owns the full save flow in `SettingsController`. The Settings tab hosts ONLY project-config-synced defaults (lightswitches, TTL, `editableTableField` for `allowedCommands`); the DB-backed runtime overrides surface from the pre-Gate-9 legacy template was promoted to its own Allowlist tab — they're issued-grant lifecycle, not project-config. The legacy `src/templates/settings.twig` is DELETED in 9.1. The `settingsHtml()` method on `Cortex.php` is deleted. Rejected: a hybrid (settingsHtml hosts Settings, separate route hosts Tokens/Activity/Connection) — splits the operator's mental model and introduces two URLs the user has to learn. Rejected: anchor-based single-page tabs without per-tab routes — breaks bookmarking, breaks deep links to a specific token row, and breaks browser-back navigation. Rejected: keeping the hand-rolled `<table class="data fullwidth">` + per-row delete form + below-table flexbox add-form from the legacy template — fails the Plugin-Store-submission quality bar, mixes patterns within one page, and conflates project-config settings with issued-grant lifecycle data.
 
-2. **Per-tab routes, not anchor-based single-page tabs.** Each tab gets its own URL: `settings/plugins/cortex` (Settings, default landing), `cortex/tokens`, `cortex/activity`, `cortex/connection`. Rationale: VueAdminTable's per-row click-to-expand on Activity is a slideout (Garnish.Slideout — owned by the per-tab page), not an in-page panel — so a single-page anchor tab would couple unrelated DOM state. Per-tab routes also let `tools/list` shape the nav badge counts independently and let operators deep-link to a tab from email/Slack. The `tabs` variable in each per-tab template lists ALL four tabs with absolute URLs — Craft's CP layout renders the tab strip uniformly, the page only changes the selected tab. Reference: craftcms skill `cp.md` §"Twig-level tabs" line 213.
+2. **Per-tab routes, not anchor-based single-page tabs.** Each tab gets its own URL: `settings/plugins/cortex` (Settings, default landing), `cortex/tokens`, `cortex/allowlist`, `cortex/activity`, `cortex/connection`. Rationale: VueAdminTable's per-row click-to-expand on Activity is a slideout (Garnish.Slideout — owned by the per-tab page), not an in-page panel — so a single-page anchor tab would couple unrelated DOM state. Per-tab routes also let `tools/list` shape the nav badge counts independently and let operators deep-link to a tab from email/Slack. The `tabs` variable in each per-tab template lists ALL five tabs with absolute URLs — Craft's CP layout renders the tab strip uniformly, the page only changes the selected tab. Reference: craftcms skill `cp.md` §"Twig-level tabs" line 213.
 
-3. **CP nav placement: under Settings, no top-level "Cortex" nav slot.** Per PLANNING.md line 354 ("Settings → Cortex with three tabs"), the tabbed CP UI lives at `settings/plugins/cortex`. No top-level nav entry for the tabs themselves. Rationale: Tokens, Activity, Connection, and Settings are all operator-grade screens (admin-issued tokens, audit history, copy-paste reference, plugin config) — none are content-creation surfaces, and putting them at the same nav level as Entries/Categories/Users misrepresents the operator surface as a content area. **Exception: the Skill element type DOES get a top-level nav entry** (`skills`, sibling to Entries/Categories/Users) per the standard Craft element-type pattern. Skills are content (admin-authored knowledge entries the LLM reads); Tokens/Activity/Connection are configuration. Rejected: top-level "Cortex" nav with subnav for all four — duplicates Settings → Plugin → Cortex with the same surface and clutters the main nav.
+3. **CP nav placement: under Settings, no top-level "Cortex" nav slot.** Per PLANNING.md line 354 ("Settings → Cortex with three tabs"), the tabbed CP UI lives at `settings/plugins/cortex`. No top-level nav entry for the tabs themselves. Rationale: Settings, Tokens, Allowlist, Activity, and Connection are all operator-grade screens (project-config defaults, admin-issued tokens, time-bound allowlist grants, audit history, copy-paste reference) — none are content-creation surfaces, and putting them at the same nav level as Entries/Categories/Users misrepresents the operator surface as a content area. **Exception: the Skill element type DOES get a top-level nav entry** (`skills`, sibling to Entries/Categories/Users) per the standard Craft element-type pattern. Skills are content (admin-authored knowledge entries the LLM reads); the five tabs are configuration. Rejected: top-level "Cortex" nav with subnav for all five — duplicates Settings → Plugin → Cortex with the same surface and clutters the main nav.
 
 4. **Token issuance UX: plaintext revealed exactly once via a slideout.** A "New token" button on the Tokens tab opens a Garnish.Slideout containing the issue form (name, expiry override, user picker — admin-only). On submit, the slideout swaps to a "Token issued — copy now, it won't be shown again" view with the plaintext in a `<code>` block plus a copy-to-clipboard button. Close button dismisses the slideout. Pattern matches Craft 5's GraphQL token UI (`vendor/craftcms/cms/src/templates/graphql/tokens/_edit.twig` displays the token in a one-shot reveal). The plaintext is NEVER persisted to a session flash, NEVER logged, NEVER reloadable. Rejected: store hashed with a "regenerate" button — defeats the security model. The plaintext is one-way exit only.
 
@@ -44,7 +46,7 @@ These are settled. Don't relitigate without good reason.
 
 14. **Skills element type's first-launch CP discovery.** Once 9.5 ships the Skill CP authoring screens, a fresh install with `manageCortexSkills` granted to admins (default per the permission registration) lands on `settings/plugins/cortex` first, sees the Settings tab, and discovers Skills through the dedicated top-level "Skills" nav entry registered in 9.5. The Settings tab grows a short "Authoring skills" paragraph with a link to the Skills index, so operators landing on Settings discover the authoring surface without hunting. Rejected: a "Skills" tab on the Cortex settings page — Skills are content, not configuration; collapsing them into Settings buries the authoring flow.
 
-15. **PC-write tests run sequential.** Gate 9 introduces a new Cortex permission (`cortex:viewActivity`) via `EVENT_REGISTER_PERMISSIONS`. The permission is event-registered and *not* PC-stored — `Users::saveLayout()` is only triggered when an admin assigns the permission to a group, not when the permission itself is registered. So Gate 9 sub-gates 9.1–9.4 do NOT need the `**SEQUENTIAL ONLY**` callout. The Settings-tab save action (9.5) DOES write to project config (`plugins.cortex.settings.*` via `Craft::$app->getPlugins()->savePluginSettings()`) — every test exercising that path runs sequentially with `Craft::$app->getProjectConfig()->muteEvents = true` per the locked rule in `.claude/rules/testing.md`. Mark `tests/Controllers/SettingsControllerSaveTest.php` (the new full-flow test) with the `**SEQUENTIAL ONLY**` callout in its docblock.
+15. **PC-write tests run sequential.** Gate 9 introduces a new Cortex permission (`cortex:viewActivity`) via `EVENT_REGISTER_PERMISSIONS`. The permission is event-registered and *not* PC-stored — `Users::saveLayout()` is only triggered when an admin assigns the permission to a group, not when the permission itself is registered. The Settings-tab save action (`actionSave`, shipped in 9.1) DOES write to project config (`plugins.cortex.settings.*` via `Craft::$app->getPlugins()->savePluginSettings()`) — every test exercising that path runs sequentially with `Craft::$app->getProjectConfig()->muteEvents = true` per the locked rule in `.claude/rules/testing.md`. Mark `tests/Controllers/SettingsControllerScaffoldingTest.php` (which exercises `actionSave`) with the `**SEQUENTIAL ONLY**` callout in its docblock.
 
 16. **No JS framework introduction.** Gate 9 uses vanilla JS for the small custom interactions (Garnish.Slideout wiring, copy-to-clipboard, table-row click handler) and `Craft.VueAdminTable` for the tables. No Vue.js components authored. No TypeScript. No Vite. The plugin's asset surface stays minimal — one CSS file, one JS file, one asset bundle. Future Pro features (CP-side install wizard, live streaming activity feed) may want Vue or Vite, but those are separate plans. Rejected: building the slideout content as a Vue component — Craft 5's CP is built on Garnish + a sprinkle of Vue at the table level; adding a Vue component for one slideout grows the dependency footprint and breaks the "everything is Twig + Garnish" mental model for operators reading the source.
 
@@ -52,12 +54,13 @@ These are settled. Don't relitigate without good reason.
 
 | # | Sub-gate | Complexity | Adds |
 |---|---|---|---|
-| 9.1 | CP scaffolding foundation (custom controller, tabbed parent, nav, asset bundle, permission) | Medium | `SettingsController` extended with view actions, custom CP routes, base tabbed template lineage, `cortex/settings/index` redirect target, `CortexCpAsset` bundle, `cortex:viewActivity` permission |
-| 9.2 | Tokens tab (VueAdminTable + slideout issuance + revoke) | Large | `tokens` Twig template, `actionTokens` + `actionTokensTableData` + `actionIssueToken` + `actionRevokeToken`, slideout wiring, copy-to-clipboard, Pest tests for controller + JSON-shape invariant |
+| 9.1 | CP scaffolding foundation (custom controller, tabbed parent with five tabs, nav, asset bundle, permission) | Medium | `SettingsController` extended with five view actions + `actionSave`, custom CP routes, base tabbed template lineage, `CortexCpAsset` bundle, `cortex:viewActivity` permission. Settings tab ships project-config defaults (lightswitches, TTL, `editableTableField` for `allowedCommands`); other four tabs are placeholders. Legacy `settings.twig` deleted. |
+| 9.2 | Tokens tab (VueAdminTable + slideout issuance + revoke) | Large | `tokens` Twig template, `actionTokens` + `actionTokensTableData` + `actionIssueToken` + `actionRevokeToken`, slideout wiring, copy-to-clipboard, Pest tests for controller + JSON-shape invariant. Establishes the VueAdminTable + Garnish.Slideout pattern reused in 9.5. |
 | 9.3 | Activity tab (VueAdminTable + filters + detail slideout) | Large | `activity` Twig template, `actionActivity` + `actionActivityTableData`, filter dropdowns (kind/tool/user/date-range), detail slideout with redacted-payload rendering, permission-scoped query, Pest tests |
 | 9.4 | Connection tab (static reference) | Small | `connection` Twig template, `actionConnection` view action, endpoint-URL autodetect via `UrlHelper`, per-client config blocks (Claude Desktop, ChatGPT Desktop, Cursor) with copy buttons |
-| 9.5 | Settings tab move + Skill CP authoring screens | Medium | Existing `settings.twig` body moves into a tabbed Settings template, `Cortex.php` settings boundary moves to `getSettingsResponse()`, Skill `cpEditUrl()` override + CP routes + index + edit templates, top-level Skills nav entry |
-| 9.6 | Cross-cutting tests + manual acceptance | Small | Architecture invariant: every tabbed sub-page extends `_layouts/cp` directly + sets a `tabs` variable; permission-boundary tests for every view + mutation action; non-dev tester acceptance run per PLANNING.md line 966-970 |
+| 9.5 | Allowlist tab (VueAdminTable + slideout override issuance + revoke) | Medium | `allowlist` Twig template, `actionAllowlist` + `actionAllowlistTableData`, rewires the pre-Gate-9 `actionAddOverride`/`actionRemoveOverride` mutations behind a Garnish.Slideout (issue) + VueAdminTable row-action (revoke). Reuses the 9.2 pattern. Pre-Gate-9 DB layer and service surface stay intact — only the calling UI changes. |
+| 9.6 | Skill CP authoring screens | Medium | Skill `cpEditUrl()` override + CP routes + index + edit templates following Craft's Category template, top-level "Skills" nav entry with inline placeholder SVG icon, `Skill::PERMISSION_MANAGE` registered |
+| 9.7 | Cross-cutting tests + manual acceptance | Small | Architecture invariant: every tabbed sub-page extends `_layouts/cp` directly + sets a `tabs` variable; permission-boundary tests for every view + mutation action; non-dev tester acceptance run per PLANNING.md line 966-970 |
 
 ## Sub-gate 9.1 — CP scaffolding foundation
 
@@ -202,16 +205,41 @@ These are settled. Don't relitigate without good reason.
 **Risks**:
 - Client config formats change. The hardcoded JSON blocks may drift from upstream. Each block carries a comment "Verified against <client>'s docs as of 2026-05-21" in the template — future updates are a Phase 3 polish task.
 
-## Sub-gate 9.5 — Settings tab finalization + Skill CP authoring screens
+## Sub-gate 9.5 — Allowlist tab
 
-**Goal**: complete the Settings tab move out of the deprecated `settings.twig` (deferred from 9.1 to keep 9.1 small) and ship the deferred Gate 8.6 Skill CP authoring surface.
+**Goal**: rebuild the DB-backed runtime allowlist override surface using the VueAdminTable + Garnish.Slideout pattern established in 9.2 (Tokens). Replaces the legacy hand-rolled `<table class="data fullwidth">` + per-row delete form + below-table flexbox add-form. The pre-Gate-9 `Allowlist` service, `actionAddOverride`, and `actionRemoveOverride` data layer stays intact — only the calling UI changes.
 
-**Modified (Settings tab finalization)**:
-- `src/templates/settings.twig` — DELETED. Content already moved to `src/templates/_cp/settings.twig` in 9.1.
-- `src/templates/_cp/settings.twig` — small polish: wrap the body in a `{% block content %}`; ensure form fields use the `settings[xxx]` bracket naming per the craftcms skill cp.md line 583 footgun callout; add the "Authoring skills" paragraph per locked decision 14 linking to `cpUrl('skills')`.
-- `src/controllers/SettingsController::actionSave` (already added in 9.1) — verify the body-param shape matches `settings[allowedCommands][]`, `settings[adminLevelCommands][]`, `settings[execEnabled]`, etc. The `editableTableField` macro for `allowedCommands` posts as `settings[allowedCommands][N][pattern]`; the controller flattens this back to `string[]` before calling `savePluginSettings()`. Same for `adminLevelCommands` + `userCustomFieldAllowlist`. Test specifically for this flatten step.
+**Why a tab and not a Settings section**: project-config-synced defaults (lightswitches, TTL, `allowedCommands`) and time-bound DB-backed grants (overrides) are different mental models with different lifecycles. Conflating them on one screen — as the legacy template did — fails the operator's mental model and prevents reuse of the Tokens-style VueAdminTable pattern. Per the locked decision 1 update: the legacy `settings.twig` was deleted in 9.1; this tab is the rebuild.
 
-**New (Skill CP authoring)**:
+**New**:
+- `src/templates/_cp/allowlist.twig` — extends `_cp/_layout`. Sets `selectedTab = 'allowlist'`. Content: a "+ New override" button bound to `Cortex.openAllowlistOverrideSlideout()`, a `<div id="cortex-allowlist-vue-admin-table">` container, a `{% js %}` block instantiating `new Craft.VueAdminTable({columns, tableDataEndpoint: 'cortex/allowlist/table-data', deleteAction: 'cortex/settings/remove-override', ...})`. Columns: `pattern` (monospace `<code>`), `note`, `expiresAt` (humanised or "never"; `disabled` styling when expired), `dateCreated` (humanised), `createdBy` (linked to User CP screen).
+- `src/templates/_cp/_allowlist-override-slideout.twig` — slideout body for "Issue override." Form: `pattern` (required), `note` (optional), `ttlSeconds` (optional, placeholder = `settings.runtimeOverrideTtl`). Submit posts to `cortex/settings/add-override`; on success the slideout closes and the VueAdminTable refreshes.
+- `SettingsController::actionAllowlistTableData` — `requireAcceptsJson`; `requireAdmin(requireAdminChanges: false)` (view-only). Reads pagination + sort + search params. Builds the query via `Cortex::getInstance()->allowlist->getAllOverrides(includeExpired: true)`. In-PHP pagination (low row count — admin-issued, expires automatically). Returns `{pagination: {total, totalPages, current_page, per_page}, data: [{id, pattern, note, expiresAt, dateCreated, createdBy: {id, label, cpEditUrl}, isExpired}]}` per locked decision 10.
+- `cortex.js` extends with `Cortex.openAllowlistOverrideSlideout()` mirroring `Cortex.openTokenIssuanceSlideout()`.
+
+**Modified**:
+- `src/controllers/SettingsController::actionAddOverride` (pre-Gate-9) — gain a JSON-response branch when `$this->request->getAcceptsJson()` is true: return `asJson(['model' => $serialized])` instead of `redirectToPostedUrl()`. The legacy redirect path is removed in this sub-gate (no consumer left after the rebuild).
+- `src/controllers/SettingsController::actionRemoveOverride` (pre-Gate-9) — same JSON branch (`asSuccess()` for the VueAdminTable's `deleteAction` callback).
+- `src/plugin/PluginTrait.php::_registerUrlRules()` — adds `cortex/allowlist/table-data` → `cortex/settings/allowlist-table-data`.
+
+**Tests** (`tests/Controllers/SettingsControllerAllowlistTest.php`):
+- `actionAllowlist` — admin OK, non-admin 403, anonymous redirected.
+- `actionAllowlistTableData` — admin sees all overrides; payload shape matches the `{pagination, data}` contract; expired rows carry `isExpired: true`; non-admin gets 403.
+- `actionAddOverride` (JSON branch) — admin POSTs `{pattern: 'mailer/test', note: 'ticket-123', ttlSeconds: 86400}`; response carries the serialised override; the row appears via `Allowlist::getAllOverrides()`. Pattern validation runs (empty pattern → 422).
+- `actionRemoveOverride` (JSON branch) — admin POSTs `{id: <override-id>}`; subsequent `getAllOverrides()` returns the smaller set. Unknown id → 404.
+- Architecture invariant: `actionAllowlistTableData` returns a payload whose `data[0]` keys equal `['id', 'pattern', 'note', 'expiresAt', 'dateCreated', 'createdBy', 'isExpired']` exactly. Drift = test failure.
+
+**Verification gate**: Pest filter `SettingsControllerAllowlistTest` green. Manual: log in as admin; navigate to Allowlist tab; click "+ New override"; fill in pattern + note + ttlSeconds; submit; verify the slideout closes and the VueAdminTable refreshes with the new row. Click the trash icon on the row; confirm; verify the row disappears.
+
+**Risks**:
+- The legacy redirect path (`redirectToPostedUrl()` after non-JSON POST) is the only thing pre-Gate-9 callers (operator habit, browser back-button) hit. The rebuild assumes JSON-only callers post-Gate-9. If a remaining HTML form path exists outside the deleted `settings.twig`, surface it in this sub-gate's smoke before removing the redirect branch.
+- The `Allowlist` service has no native pagination signature today; if operator usage grows past low dozens of overrides, follow up with a `getPaginated()` method. Not blocking 9.5 — same approach as the Tokens service from 9.2.
+
+## Sub-gate 9.6 — Skill CP authoring screens
+
+**Goal**: ship the deferred Gate 8.6 Skill CP authoring surface — element index, edit screen, top-level nav entry, CP routes.
+
+**New**:
 - `src/controllers/SkillsController.php` — extends `craft\web\Controller`. Actions:
   - `actionIndex(string $source = 'all')` — `requirePermission(Skill::PERMISSION_MANAGE)`; renders `cortex/skills/_index.twig`. The `$source` arg matches the only `defineSources()` key (`*` — passed in as `all` from the URL, mapped internally). Mirrors `vendor/craftcms/cms/src/controllers/CategoriesController.php::actionEditCategoryGroup` shape.
   - `actionCreate()` — `requirePermission(Skill::PERMISSION_MANAGE)`; creates a fresh `Skill` element via `Craft::$app->getElements()->createElement(['type' => Skill::class])` and redirects to its edit URL.
@@ -234,20 +262,14 @@ These are settled. Don't relitigate without good reason.
   - `actionCreate` — granted user creates a fresh element; redirect target is the edit URL.
   - `actionEdit` — granted user loads existing skill; ungranted 403.
 - `tests/Elements/SkillCpEditUrlTest.php` — `$skill->getCpEditUrl()` returns the expected `cpUrl('skills/<id>')` shape. Unsaved element returns null.
-- `tests/Controllers/SettingsControllerSaveTest.php` (`**SEQUENTIAL ONLY**` per locked decision 15):
-  - Posting `settings[allowedCommands][0][pattern]=resave/*` flattens to `$settings->allowedCommands === ['resave/*']`.
-  - Posting nothing leaves the existing setting intact.
-  - Non-admin gets 403.
-  - Read-only mode (`allowAdminChanges = false`) on save gets 403 from `requireAdmin(requireAdminChanges: true)`.
-
-**Verification gate**: Pest filters `SkillsControllerTest`, `SkillCpEditUrlTest`, `SettingsControllerSaveTest` green. Manual: log in as admin; verify a "Skills" top-level nav entry appears in the left CP nav; click it; verify the index page loads with any existing element-stored skills; click "+ New skill" (or whatever the Craft index page's create button reads); fill in handle + title + body; save; verify it round-trips. Settings tab: edit `allowedCommands` (add a row), save, verify PC sync via `ddev craft project-config/diff`.
+**Verification gate**: Pest filters `SkillsControllerTest`, `SkillCpEditUrlTest` green. Manual: log in as admin; verify a "Skills" top-level nav entry appears in the left CP nav; click it; verify the index page loads with any existing element-stored skills; click "+ New skill" (or whatever the Craft index page's create button reads); fill in handle + title + body; save; verify it round-trips.
 
 **Risks**:
 - The `elements/save` action's signature for a custom element type may require additional plumbing if the element class' `prepareEditScreen()` isn't overridden. Builder agent should attempt the Categories-template-copy approach FIRST; only fall back to a custom save action if `asCpScreen()` doesn't work for Skills.
 - The `_layouts/elementindex` template needs the element type + sources to be discoverable. The element type is already registered via `_registerSkillElementType` (Gate 8.6); the sources are already defined in `Skill::defineSources()`. Risk is minimal — the build should be straightforward.
 - The CP nav SVG icon ships as a tiny inline placeholder per locked decision 9; designed icon is a Phase 3 concern.
 
-## Sub-gate 9.6 — Cross-cutting tests + acceptance run
+## Sub-gate 9.7 — Cross-cutting tests + acceptance run
 
 **Goal**: the test invariant sweep + the non-dev tester acceptance run that proves Gate 9 ships green per PLANNING.md line 966-970.
 
@@ -256,9 +278,9 @@ These are settled. Don't relitigate without good reason.
   - Every `.twig` file under `src/templates/_cp/` either extends `_cp/_layout` OR is a partial (starts with `_`).
   - `_cp/_layout.twig` extends `_layouts/cp` directly (NOT `_layouts/basecp`, not a wrapper). Per the craftcms skill cp.md line 623.
   - Every per-tab template sets a `selectedTab` variable.
-  - The four `tabs` keys in `_layout.twig` are `['settings', 'tokens', 'activity', 'connection']` exactly.
+  - The five `tabs` keys in `_layout.twig` are `['settings', 'tokens', 'allowlist', 'activity', 'connection']` exactly.
 - `tests/Architecture/SettingsControllerPermissionInvariantTest.php`:
-  - Every view-action method in `SettingsController` (`actionIndex`, `actionTokens`, `actionActivity`, `actionConnection`) calls `requireAdmin(false)` OR `requirePermission(...)` in its body.
+  - Every view-action method in `SettingsController` (`actionIndex`, `actionTokens`, `actionAllowlist`, `actionActivity`, `actionConnection`) calls `requireAdmin(false)` OR `requirePermission(...)` in its body.
   - Every mutation-action method (`actionSave`, `actionIssueToken`, `actionRevokeToken`, `actionAddOverride`, `actionRemoveOverride`) calls both `requirePostRequest()` AND (`requireAdmin(requireAdminChanges: true)` OR `requirePermission(...)`).
   - Static check via PHP token parsing — same pattern as the existing `tests/Architecture/ConventionsTest.php`.
 - `tests/Integration/CpEndToEndTest.php`:
@@ -274,7 +296,7 @@ These are settled. Don't relitigate without good reason.
 - Activity tab: verify the invocation appears as the top row. Click the row. Verify the slideout shows redacted args + response excerpt. Close.
 - Tokens tab: revoke the token via the row's trash icon. Confirm.
 - Re-run the curl. Verify 401.
-- Settings tab: add a runtime allowlist override (e.g. `mailer/test` with 60s TTL). Save. Verify the row appears. Wait 60s. Refresh. Verify it's marked expired.
+- Allowlist tab: click "+ New override" (e.g. `mailer/test` with 60s TTL). Submit. Verify the row appears. Wait 60s. Refresh. Verify it's marked expired.
 - Connection tab: verify the endpoint URL matches the test environment. Copy the Claude Desktop config block. Paste into Claude Desktop's actual config file. Restart Claude Desktop. Issue a fresh token. Replace the placeholder. Verify Claude Desktop connects and lists tools.
 
 The non-dev tester records pass/fail on each step. Any failure blocks Plugin Store submission until fixed.
@@ -290,12 +312,13 @@ After each sub-gate, before moving on:
 
 | After | Manual check |
 |---|---|
-| 9.1 | `ddev craft up`; admin lands on `settings/plugins/cortex` and sees the tabbed page with four tab labels in the strip. Settings tab shows the existing single-pane content. Save flow on Settings still works (toggle execEnabled, save, verify PC sync via `ddev craft project-config/diff`). Anonymous user redirected to login; non-admin user gets 403 attempting `cortex/tokens`. |
+| 9.1 | `ddev craft up`; admin lands on `settings/plugins/cortex` and sees the tabbed page with five tab labels in the strip (Settings, Tokens, Allowlist, Activity, Connection). Settings tab shows only project-config defaults (lightswitches, TTL, `allowedCommands` editableTable) — overrides moved to Allowlist tab. Save flow on Settings still works (toggle execEnabled, save, verify PC sync via `ddev craft project-config/diff`). Anonymous user redirected to login; non-admin user gets 403 attempting `cortex/tokens`. |
 | 9.2 | Tokens tab loads. "+ New token" opens slideout. Issue a token. Plaintext displays in the post-issue view. Copy. Use in `curl` against `/cortex/mcp`. 200. Refresh Tokens tab. Token appears in the row. Revoke. Re-curl. 401. Non-admin → 403 on the whole tab. |
 | 9.3 | Activity tab loads. Filters render. Click a row. Slideout opens with redacted args + response excerpt + (for tool_error rows) error class + message. As a non-admin with `cortex:viewActivity` granted: only own rows visible; foreign row URL returns 404. |
-| 9.4 | Connection tab loads. Endpoint URL auto-detected. Copy a config block. Paste into Claude Desktop. Verify it works (full Claude Desktop end-to-end is the 9.6 acceptance gate). |
-| 9.5 | Skills nav entry appears in CP for admins. Index page loads. Create new skill: handle + title + body. Save. Round-trips. Existing settings move into the Settings tab cleanly — no diff vs pre-9.5 functionality. Settings save with `allowedCommands` edit syncs to PC. |
-| 9.6 | Full Pest suite green. PHPStan + ECS green. Non-dev tester acceptance run signed off. |
+| 9.4 | Connection tab loads. Endpoint URL auto-detected. Copy a config block. Paste into Claude Desktop. Verify it works (full Claude Desktop end-to-end is the 9.7 acceptance gate). |
+| 9.5 | Allowlist tab loads with VueAdminTable. Click "+ New override". Submit pattern + note + TTL. Slideout closes; new row appears. Click row trash icon; confirm; row disappears. Expired rows render with `disabled` styling. |
+| 9.6 | Skills nav entry appears in CP for admins. Index page loads. Create new skill: handle + title + body. Save. Round-trips. |
+| 9.7 | Full Pest suite green. PHPStan + ECS green. Non-dev tester acceptance run signed off. |
 
 ## Cross-cutting test strategy
 
@@ -304,7 +327,7 @@ After each sub-gate, before moving on:
 - **Architecture invariants** — `CpTemplateInvariantTest` (template lineage), `SettingsControllerPermissionInvariantTest` (every action calls `requireAdmin` or `requirePermission`). Static analysis, no runtime.
 - **VueAdminTable JSON shape** — assert the `{pagination, data}` contract on every table-data endpoint. Sort + filter + search exercised via direct param injection. The frontend Vue component is NOT tested (out of scope without Playwright/JS harness); the JSON contract IS tested as the load-bearing seam.
 - **End-to-end flow** — `CpEndToEndTest.php` simulates the full PLANNING.md line 966-970 gate in-process. Manual non-dev tester run remains the canonical acceptance gate.
-- **PC-write tests** — only `SettingsControllerSaveTest.php` writes PC. Marked `**SEQUENTIAL ONLY**` per locked decision 15.
+- **PC-write tests** — only `SettingsControllerScaffoldingTest.php` (`actionSave` case) writes PC. Marked `**SEQUENTIAL ONLY**` per locked decision 15.
 
 ## Out-of-scope clarifications
 

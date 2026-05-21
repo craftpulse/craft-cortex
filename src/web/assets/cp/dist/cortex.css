@@ -1,0 +1,61 @@
+/* =========================================================================
+   Cortex CP styles.
+
+   Status-pill colour per invocation `kind` (locked decision 6, gate-9 plan):
+     - success         — green
+     - tool_error      — red
+     - internal_error  — red
+     - rate_limited    — amber
+     - cancelled       — grey
+
+   Per docs/plans/gate-9.md sub-gate 9.1 the only cosmetic surface 9.1
+   needs is the status-pill colour palette + a monospace token-prefix
+   font + minor table-column-width tuning. Slideout-specific styles land
+   in 9.2 / 9.3 alongside their respective interaction surfaces.
+   ========================================================================= */
+
+/* Status pills (Activity tab, lands in 9.3) */
+.cortex-status {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 9999px;
+    font-size: 11px;
+    line-height: 18px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.cortex-status--success {
+    background: var(--success-color, #27ae60);
+    color: #fff;
+}
+
+.cortex-status--tool-error,
+.cortex-status--internal-error {
+    background: var(--error-color, #cf1124);
+    color: #fff;
+}
+
+.cortex-status--rate-limited {
+    background: var(--warning-color, #cb6f10);
+    color: #fff;
+}
+
+.cortex-status--cancelled {
+    background: var(--medium-text-color, #606d7b);
+    color: #fff;
+}
+
+/* Token prefix (Tokens tab, lands in 9.2) */
+.cortex-token-prefix {
+    font-family: var(--code-font, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    font-size: 12px;
+    color: var(--medium-text-color, #606d7b);
+}
+
+/* Table column width tuning — keeps narrow columns from stretching */
+.cortex-table .cortex-col-thin {
+    width: 1%;
+    white-space: nowrap;
+}

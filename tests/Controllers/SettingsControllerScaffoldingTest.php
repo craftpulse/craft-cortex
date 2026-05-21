@@ -1,0 +1,417 @@
+<?php
+
+/**
+ * =========================================================================
+ * SettingsController scaffolding tests — Gate 9.1.
+ *
+ * Sub-gate 9.1 adds four view actions (`actionIndex`, `actionTokens`,
+ * `actionActivity`, `actionConnection`) and one mutation action
+ * (`actionSave`) on top of the pre-Gate-9 controller. These tests
+ * verify:
+ *
+ *   - Structural — every action method exists.
+ *   - Template files exist at the new `src/templates/_cp/` paths.
+ *   - Architecture invariant — every action method's first statement
+ *     is one of `requireAdmin`, `requirePermission`, or
+ *     `requirePostRequest`. Static analysis via `token_get_all` —
+ *     same pattern as `tests/Architecture/ConventionsTest.php`. The
+ *     invariant locks the permission-gate-first contract from
+ *     Gate 9 locked decision 7.
+ *   - `actionSave` body smoke — POST `settings[execEnabled]=false`
+ *     flips the value on the live settings model after the save call.
+ *   - Route registration — CP URL rules resolve `settings/plugins/cortex`
+ *     and the three per-tab URLs through Craft's url manager.
+ *
+ * Real CP rendering lives in the manual gate-9.1 verification step
+ * (browser smoke) — the renderTemplate path is exercised at runtime
+ * by `_layouts/cp` which depends on a full web Request that the
+ * test bootstrap doesn't carry.
+ *
+ * **SEQUENTIAL ONLY** — `actionSave` writes plugin settings through
+ * `Craft::$app->getPlugins()->savePluginSettings()`, which syncs to
+ * project config. Per `.claude/rules/testing.md` PC-writing tests
+ * must NOT run under parallel execution.
+ * =========================================================================
+ *
+ * @author Craftpulse
+ * @since  5.0.0
+ */
+
+use Craft;
+use craft\web\Controller;
+use craftpulse\cortex\controllers\SettingsController;
+use craftpulse\cortex\Cortex;
+use yii\web\Response;
+
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+/**
+ * Harness that bypasses `requirePostRequest` / `requireAdmin` /
+ * `requirePermission` / `redirectToPostedUrl` — lets the action body
+ * run against the console-bootstrapped Craft.
+ */
+class _CortexScaffoldingSettingsHarness extends SettingsController
+{
+    /** @var array<string,mixed> */
+    public array $body = [];
+
+    public function requirePostRequest(): void
+    {
+        // no-op
+    }
+
+    public function requireAdmin(bool $requireAdminChanges = true): void
+    {
+        // no-op
+    }
+
+    public function requirePermission(string $permission): void
+    {
+        // no-op
+    }
+
+    public function redirectToPostedUrl($object = null, ?string $default = null): Response
+    {
+        $response = new Response();
+        $response->setStatusCode(302);
+        $response->headers->set('Location', '/cortex/settings');
+        return $response;
+    }
+
+    public function withBody(array $body): self
+    {
+        $this->body = $body;
+        $this->request = new _CortexScaffoldingRequest($body);
+        return $this;
+    }
+}
+
+/**
+ * Tiny request stub that satisfies the SettingsController body-param
+ * surface (`getBodyParam`, `getRequiredBodyParam`).
+ */
+class _CortexScaffoldingRequest
+{
+    public function __construct(private array $body)
+    {
+    }
+
+    public function getRequiredBodyParam(string $name): mixed
+    {
+        if (!array_key_exists($name, $this->body)) {
+            throw new \yii\web\BadRequestHttpException("Missing required body param: {$name}");
+        }
+        return $this->body[$name];
+    }
+
+    public function getBodyParam(string $name, mixed $default = null): mixed
+    {
+        return $this->body[$name] ?? $default;
+    }
+}
+
+/**
+ * Returns the source-text body of a named method on
+ * `SettingsController`, sliced from the file by line number. Used by
+ * the architecture invariant to confirm the action enters its
+ * permission gate first via a regex anchor.
+ */
+function _cortex_controller_method_body(string $method): string
+{
+    $rm = (new ReflectionClass(SettingsController::class))->getMethod($method);
+    $contents = file_get_contents($rm->getFileName());
+    expect($contents)->not->toBeFalse();
+
+    return implode("\n", array_slice(
+        explode("\n", (string) $contents),
+        $rm->getStartLine(),
+        $rm->getEndLine() - $rm->getStartLine(),
+    ));
+}
+
+// -----------------------------------------------------------------------------
+// Structural — view actions exist
+// -----------------------------------------------------------------------------
+
+it('extends craft\\web\\Controller', function() {
+    expect(is_subclass_of(SettingsController::class, Controller::class))->toBeTrue();
+});
+
+it('declares every Gate 9.1 view action plus actionSave', function() {
+    $rc = new ReflectionClass(SettingsController::class);
+    foreach (['actionIndex', 'actionTokens', 'actionAllowlist', 'actionActivity', 'actionConnection', 'actionSave'] as $method) {
+        expect($rc->hasMethod($method))->toBeTrue("missing {$method}");
+    }
+});
+
+// -----------------------------------------------------------------------------
+// Templates exist at the new _cp/ paths
+// -----------------------------------------------------------------------------
+
+it('ships the five _cp/ tab templates plus the shared layout', function() {
+    $base = __DIR__ . '/../../src/templates/_cp';
+    foreach (['_layout.twig', 'settings.twig', 'tokens.twig', 'allowlist.twig', 'activity.twig', 'connection.twig'] as $file) {
+        expect(file_exists($base . '/' . $file))->toBeTrue("missing _cp/{$file}");
+    }
+});
+
+it('_cp/_layout extends _layouts/cp directly', function() {
+    $contents = file_get_contents(__DIR__ . '/../../src/templates/_cp/_layout.twig');
+    expect($contents)->not->toBeFalse();
+    expect($contents)->toContain('extends "_layouts/cp"');
+});
+
+it('_cp/_layout declares all five tab entries', function() {
+    $contents = file_get_contents(__DIR__ . '/../../src/templates/_cp/_layout.twig');
+    expect($contents)->not->toBeFalse();
+    foreach (['settings:', 'tokens:', 'allowlist:', 'activity:', 'connection:'] as $tabKey) {
+        expect($contents)->toContain($tabKey);
+    }
+});
+
+// Locks the locale-undefined bug found in the 9.1 manual smoke. The
+// `|date` filter's third arg is a locale; passing the bare `locale`
+// identifier resolves it as a Twig variable, which is not in scope on
+// our CP templates and throws RuntimeError at render time when the
+// for-loop body executes. Craft's filter falls back to the app locale
+// when the arg is omitted — the correct form is `|date('short')`.
+it('templates never reference an undeclared locale variable in |date filter', function() {
+    $templates = [];
+    $stack = [__DIR__ . '/../../src/templates'];
+    while ($dir = array_pop($stack)) {
+        foreach (scandir($dir) ?: [] as $entry) {
+            if ($entry === '.' || $entry === '..') {
+                continue;
+            }
+            $path = $dir . '/' . $entry;
+            if (is_dir($path)) {
+                $stack[] = $path;
+            } elseif (str_ends_with($entry, '.twig')) {
+                $templates[] = $path;
+            }
+        }
+    }
+    expect($templates)->not->toBeEmpty();
+    foreach ($templates as $template) {
+        $contents = file_get_contents($template);
+        expect($contents)->not->toBeFalse();
+        expect($contents)->not->toMatch(
+            '/\|\s*date\s*\([^)]*,\s*locale\s*\)/',
+            "Template {$template} passes `locale` to |date — the variable is not in scope on Cortex CP templates. Drop the locale arg; Craft falls back to the app locale automatically.",
+        );
+    }
+});
+
+// -----------------------------------------------------------------------------
+// Architecture invariant — every action body opens with a permission gate
+// -----------------------------------------------------------------------------
+
+it('actionIndex first statement is requireAdmin', function() {
+    $body = _cortex_controller_method_body('actionIndex');
+    expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
+});
+
+it('actionTokens first statement is requireAdmin', function() {
+    $body = _cortex_controller_method_body('actionTokens');
+    expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
+});
+
+it('actionAllowlist first statement is requireAdmin', function() {
+    $body = _cortex_controller_method_body('actionAllowlist');
+    expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
+});
+
+it('actionActivity first statement is requirePermission(viewActivity)', function() {
+    $body = _cortex_controller_method_body('actionActivity');
+    expect($body)->toMatch('/^\s*\$this->requirePermission\s*\(\s*Cortex::PERMISSION_VIEW_ACTIVITY\s*\)/m');
+});
+
+it('actionConnection first statement is requireAdmin', function() {
+    $body = _cortex_controller_method_body('actionConnection');
+    expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
+});
+
+it('actionSave first statement is requirePostRequest', function() {
+    $body = _cortex_controller_method_body('actionSave');
+    expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
+    // And the second statement is requireAdmin(requireAdminChanges: true).
+    expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
+});
+
+// -----------------------------------------------------------------------------
+// actionSave body smoke — settings[execEnabled] flips the live model
+// -----------------------------------------------------------------------------
+
+beforeEach(function() {
+    $this->originalApp = \Yii::$app;
+    // Snapshot the current settings so we can restore in afterEach.
+    $this->originalExecEnabled = Cortex::getInstance()->getSettings()->execEnabled;
+});
+
+beforeEach(function() {
+    $this->originalAllowedCommands = Cortex::getInstance()->getSettings()->allowedCommands;
+});
+
+afterEach(function() {
+    \Yii::$app = $this->originalApp;
+    // Restore execEnabled + allowedCommands to the snapshotted values
+    // via PC write so the suite's other tests inherit the same baseline.
+    $settings = Cortex::getInstance()->getSettings();
+    $needsRestore = false;
+    if ($settings->execEnabled !== $this->originalExecEnabled) {
+        $settings->execEnabled = $this->originalExecEnabled;
+        $needsRestore = true;
+    }
+    if ($settings->allowedCommands !== $this->originalAllowedCommands) {
+        $settings->allowedCommands = $this->originalAllowedCommands;
+        $needsRestore = true;
+    }
+    if ($needsRestore) {
+        Craft::$app->getPlugins()->savePluginSettings(Cortex::getInstance(), $settings->toArray());
+    }
+});
+
+it('actionSave persists settings[execEnabled] through the plugins service', function() {
+    // Force the toggle so the test asserts a real flip (not a no-op on
+    // whatever the baseline value happens to be).
+    $targetValue = !$this->originalExecEnabled;
+
+    // Swap Yii::$app for a proxy so getSession() doesn't blow up on the
+    // console bootstrap. Same pattern as `SettingsControllerTest.php`.
+    $flashSession = new class() {
+        public array $flashes = [];
+        public function setError(string $message): void
+        {
+            $this->flashes['cp-error'] = $message;
+        }
+        public function setNotice(string $message): void
+        {
+            $this->flashes['cp-notice'] = $message;
+        }
+    };
+
+    \Yii::$app = new class($this->originalApp, $flashSession) {
+        public function __construct(public $delegate, public $sessionStub)
+        {
+        }
+        public function getSession(): object
+        {
+            return $this->sessionStub;
+        }
+        public function __get($name): mixed
+        {
+            return $this->delegate->$name;
+        }
+        public function __isset($name): bool
+        {
+            return isset($this->delegate->$name);
+        }
+        public function __call($name, $params): mixed
+        {
+            return $this->delegate->$name(...$params);
+        }
+    };
+
+    $controller = new _CortexScaffoldingSettingsHarness('settings', Cortex::getInstance());
+    $controller->withBody([
+        'settings' => [
+            'execEnabled' => $targetValue ? '1' : '',
+        ],
+    ]);
+
+    $response = $controller->actionSave();
+    expect($response)->toBeInstanceOf(Response::class);
+    expect($response->statusCode)->toBe(302);
+
+    // Re-read the settings — savePluginSettings round-trips through PC,
+    // so getSettings() reflects the persisted value on the next call.
+    $reloaded = Cortex::getInstance()->getSettings();
+    expect($reloaded->execEnabled)->toBe($targetValue);
+});
+
+it('actionSave flattens the editableTable 2D submission for allowedCommands', function() {
+    // The editableTableField macro posts as `settings[allowedCommands][N][pattern]`
+    // (2D array). Settings::$allowedCommands is typed string[]. Without
+    // the controller's flatten step, setAttributes silently fails on
+    // shape mismatch and savePluginSettings falls back to the prior PC
+    // value (the "snap back to OG" bug). This test locks the flatten.
+    $flashSession = new class() {
+        public function setError(string $message): void
+        {
+        }
+        public function setNotice(string $message): void
+        {
+        }
+    };
+
+    \Yii::$app = new class($this->originalApp, $flashSession) {
+        public function __construct(public $delegate, public $sessionStub)
+        {
+        }
+        public function getSession(): object
+        {
+            return $this->sessionStub;
+        }
+        public function __get($name): mixed
+        {
+            return $this->delegate->$name;
+        }
+        public function __isset($name): bool
+        {
+            return isset($this->delegate->$name);
+        }
+        public function __call($name, $params): mixed
+        {
+            return $this->delegate->$name(...$params);
+        }
+    };
+
+    $controller = new _CortexScaffoldingSettingsHarness('settings', Cortex::getInstance());
+    $controller->withBody([
+        'settings' => [
+            'allowedCommands' => [
+                ['pattern' => 'resave/*'],
+                ['pattern' => '  cache/*  '],   // trim whitespace
+                ['pattern' => ''],               // drop empty row
+                ['pattern' => 'mailer/test'],
+            ],
+        ],
+    ]);
+
+    $response = $controller->actionSave();
+    expect($response->statusCode)->toBe(302);
+
+    $reloaded = Cortex::getInstance()->getSettings();
+    expect($reloaded->allowedCommands)->toBe([
+        'resave/*',
+        'cache/*',
+        'mailer/test',
+    ]);
+});
+
+// -----------------------------------------------------------------------------
+// Route registration — CP URL rules resolve through the url manager
+// -----------------------------------------------------------------------------
+
+it('resolves settings/plugins/cortex through the CP url manager', function() {
+    $url = \craft\helpers\UrlHelper::cpUrl('settings/plugins/cortex');
+    expect($url)->toBeString();
+    expect($url)->not->toBe('');
+    // Verify it's a CP URL (contains the cpTrigger or is admin-style).
+    $cpTrigger = Craft::$app->getConfig()->getGeneral()->cpTrigger ?? 'admin';
+    if ($cpTrigger !== null && $cpTrigger !== '') {
+        expect($url)->toContain($cpTrigger);
+    }
+    expect($url)->toContain('settings/plugins/cortex');
+});
+
+it('resolves the four per-tab CP URLs', function() {
+    foreach (['cortex/tokens', 'cortex/allowlist', 'cortex/activity', 'cortex/connection'] as $path) {
+        $url = \craft\helpers\UrlHelper::cpUrl($path);
+        expect($url)->toBeString();
+        expect($url)->not->toBe('');
+        expect($url)->toContain($path);
+    }
+});

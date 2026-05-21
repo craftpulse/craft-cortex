@@ -198,17 +198,17 @@ it('declares the remove-override action', function() {
     expect($rc->hasMethod('actionRemoveOverride'))->toBeTrue();
 });
 
-it('ships a settings template file', function() {
-    // Full-render smoke happens manually in the CP — this test runs in
-    // a console context where csrfInput() / actionInput() macros
-    // dispatch to a console Response that doesn't implement
-    // setNoCacheHeaders(). Verify the file exists and is at the right
-    // path so package-shape regressions still get caught.
-    $path = __DIR__ . '/../../src/templates/settings.twig';
+it('ships the _cp/settings tab template', function() {
+    // Full-render smoke happens via the curl-based browser smoke + the
+    // SettingsControllerScaffoldingTest harness. This test only checks
+    // the file ships at the canonical Gate-9 path and carries the
+    // project-config-defaults markers. Runtime override UI lives on
+    // the Allowlist tab from Gate 9.5 onward — see `_cp/allowlist.twig`.
+    $path = __DIR__ . '/../../src/templates/_cp/settings.twig';
     expect(file_exists($path))->toBeTrue();
     $contents = file_get_contents($path);
-    expect($contents)->toContain('Runtime overrides');
     expect($contents)->toContain('Allowed commands');
+    expect($contents)->not->toContain('Runtime overrides');
 });
 
 // -----------------------------------------------------------------------------

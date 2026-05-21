@@ -1,0 +1,42 @@
+{# =========================================================================
+   Cortex CP shared layout.
+
+   Parent template for every tab in the Cortex settings screen
+   (Settings, Tokens, Allowlist, Activity, Connection). Extends
+   `_layouts/cp`
+   directly per locked decision 1 + cp.md §"Tabbed Settings Pages"
+   line 432 — `settingsHtml()` cannot host tabs, so Cortex owns the
+   full template lineage.
+
+   Subtemplates set:
+     - `selectedTab`   (one of `settings`, `tokens`, `allowlist`, `activity`, `connection`)
+     - `{% block content %}` (the per-tab body)
+
+   Per locked decision 6 the only plugin-side asset bundle Gate 9
+   ships is `CortexCpAsset` — registered here so every tab inherits
+   it without per-template duplication.
+   ========================================================================= #}
+
+{% extends "_layouts/cp" %}
+
+{% do view.registerAssetBundle("craftpulse\\cortex\\web\\assets\\cp\\CortexCpAsset") %}
+
+{% set title = 'Cortex'|t('cortex') %}
+{% set docTitle = (selectedTab|default('settings'))|capitalize ~ ' - Cortex' %}
+
+{% set crumbs = [
+    { label: 'Settings'|t('app'), url: url('settings') },
+    { label: 'Plugins'|t('app'), url: url('settings/plugins') },
+] %}
+
+{% set tabs = {
+    settings: { label: 'Settings'|t('cortex'), url: url('settings/plugins/cortex') },
+    tokens: { label: 'Tokens'|t('cortex'), url: url('cortex/tokens') },
+    allowlist: { label: 'Allowlist'|t('cortex'), url: url('cortex/allowlist') },
+    activity: { label: 'Activity'|t('cortex'), url: url('cortex/activity') },
+    connection: { label: 'Connection'|t('cortex'), url: url('cortex/connection') },
+} %}
+
+{% block content %}
+    {# Default content block — every concrete tab template overrides this. #}
+{% endblock %}

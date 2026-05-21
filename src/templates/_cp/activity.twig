@@ -1,0 +1,16 @@
+{% extends "cortex/_cp/_layout" %}
+
+{# =========================================================================
+   Cortex Activity tab — placeholder.
+
+   Real content (VueAdminTable invocation log + kind/tool/user/date-range
+   filters + Garnish.Slideout row detail) lands in Gate 9.3.
+   9.1 ships only the tab placeholder so the tabbed lineage compiles.
+   ========================================================================= #}
+
+{% set selectedTab = 'activity' %}
+
+{% block content %}
+    {# placeholder — built in 9.3 #}
+    <p class="light">{{ 'The Activity tab is coming soon.'|t('cortex') }}</p>
+{% endblock %}

@@ -1,0 +1,16 @@
+{% extends "cortex/_cp/_layout" %}
+
+{# =========================================================================
+   Cortex Tokens tab — placeholder.
+
+   Real content (VueAdminTable listing + Garnish.Slideout issuance flow
+   + copy-to-clipboard plaintext reveal + revoke) lands in Gate 9.2.
+   9.1 ships only the tab placeholder so the tabbed lineage compiles.
+   ========================================================================= #}
+
+{% set selectedTab = 'tokens' %}
+
+{% block content %}
+    {# placeholder — built in 9.2 #}
+    <p class="light">{{ 'The Tokens tab is coming soon.'|t('cortex') }}</p>
+{% endblock %}
