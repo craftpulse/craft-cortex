@@ -126,6 +126,39 @@ function cortex_with_edition(string $edition, callable $fn): mixed
 }
 
 /**
+ * Run a callable on a Pro-edition install with the tool registry
+ * rebuilt so Pro tools resolve through `Tools::getByNameFor()` /
+ * `Server::dispatch()`. Wraps `cortex_with_edition()` because flipping
+ * `$plugin->edition` alone is not enough: the registry was built at
+ * boot via `shouldRegister()` and does not auto-rebuild on edition
+ * change. Production never sees a mid-process edition flip; this
+ * helper is test-only.
+ *
+ * Use for boundary / integration tests that need the dispatcher to
+ * route to Pro tools. For per-tool tests, `cortex_with_edition()` +
+ * direct instantiation is cheaper and avoids the rebuild cost.
+ *
+ * @template T
+ * @param callable(): T $fn
+ * @return T
+ */
+function cortex_with_pro_registry(callable $fn): mixed
+{
+    return cortex_with_edition(Cortex::EDITION_PRO, function() use ($fn) {
+        $original = Cortex::getInstance()->tools;
+        $fresh = new \craftpulse\cortex\services\Tools();
+        $fresh->init();
+        Cortex::getInstance()->set('tools', $fresh);
+
+        try {
+            return $fn();
+        } finally {
+            Cortex::getInstance()->set('tools', $original);
+        }
+    });
+}
+
+/**
  * Run a callable with
  * `Craft::$app->getConfig()->getGeneral()->allowAdminChanges` set to
  * the given value, then restore the original in a `finally` block.

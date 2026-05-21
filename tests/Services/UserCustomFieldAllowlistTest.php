@@ -19,9 +19,23 @@
  *     duplicated here).
  *
  * Setup seeds a real custom field (`__cortex_allowlist_test`) on the
- * User field layout via `Fields::saveField()` + `Fields::saveLayout()`
- * with project-config muted. afterEach cleanup drops the field and
- * restores the original layout so subsequent tests aren't poisoned.
+ * User field layout via `Fields::saveField()` + `Users::saveLayout()`.
+ * The User field layout is project-config-stored — muting PC events
+ * during the save stalls the `Fields::saveLayout()` chain that
+ * `Users::saveLayout()` triggers internally, so the test writes
+ * through the live PC sync path. afterEach drops the field and
+ * restores the original layout via the same path so subsequent tests
+ * aren't poisoned.
+ *
+ * **SEQUENTIAL ONLY**: this test writes to project config (and on
+ * disk: `cms/config/project/users/fieldLayouts/*.yaml` updates during
+ * setup, reverts during teardown). Do NOT enable Paratest or any
+ * parallel test runner for this suite without first isolating the
+ * test's PC mutations — concurrent reads of the user field layout
+ * during the test's setup/teardown window would race and assert on
+ * the wrong shape. The sequential Pest default is safe; parallelism
+ * would require per-worker `project.yaml` isolation, which Craft's
+ * test harness doesn't ship.
  *
  * This is the strong companion to the weak existing
  * `UsersTest::a handle on the allowlist appears...` case at

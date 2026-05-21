@@ -26,15 +26,15 @@
  *   - **Out of scope**: tool-specific happy paths, output envelopes,
  *     per-mode validation, idempotency, multi-site, drafts/revisions.
  *     Those are per-tool test territory.
- *   - **Out of scope**: dispatcher-level dispatching through `tools/
- *     call` JSON-RPC. The playground boots with `edition=free`, so
- *     `Tools::getByNameFor()` returns null for every Pro tool. Per-
- *     tool tests sidestep the registry by direct instantiation (e.g.
- *     `new Entry()`); 8.10's boundary test mirrors that pattern and
- *     drives `execute()` directly + manual `logCall()` for the
- *     audit-row assertion. Per locked decision 11 of gate-8.10.md:
- *     "Manual logCall is acceptable as a cheaper alternative when
- *     dispatcher setup is too noisy."
+ *   - **In scope (post-8.10 follow-up)**: a single canonical wire-
+ *     envelope assertion driving one Pro tool through
+ *     `Server::dispatch()` via the `cortex_with_pro_registry()` helper
+ *     (`tests/Pest.php`). The `_toolErrorEnvelope()` shape
+ *     (`{content: [{type: 'text', text}], isError: true}` per
+ *     `src/mcp/Server.php:1327-1335`) is universal across Pro tools;
+ *     one representative case locks the contract for all. Per-tool
+ *     cases below stay on the cheaper direct `execute()` + manual
+ *     `logCall()` path per locked decision 11 of gate-8.10.md.
  *   - **Out of scope**: per-row routing semantics (BulkEntries-style
  *     `onPermissionDenied=skip/fail`). Per-tool test territory.
  *
@@ -467,5 +467,102 @@ it('stdio (null user) does not raise the permission-denial path for any Pro tool
                 expect($e->getMessage())->not->toStartWith('permission denied — ');
             }
         }
+    });
+});
+
+// -----------------------------------------------------------------------------
+// Dispatcher wire-envelope (post-8.10 follow-up)
+// -----------------------------------------------------------------------------
+//
+// One representative Pro tool driven through `Server::dispatch()` to
+// lock the `_toolErrorEnvelope()` shape end-to-end. The envelope is
+// universal across Pro tools — see `src/mcp/Server.php:739-741` — so a
+// single canonical case covers the contract. The per-tool tests above
+// continue to verify tool-specific message prefixes via direct
+// `execute()`.
+//
+// Uses `cortex_with_pro_registry()` (added to `tests/Pest.php`) which
+// flips the edition to Pro AND rebuilds the tool registry so
+// `Tools::getByNameFor()` resolves Pro tools. Production never flips
+// edition mid-process — this helper is test-only.
+
+it('Server::dispatch() wraps Pro tool permission denial in the locked {content, isError} envelope', function() {
+    // Use minorHeroes as the target (caller has no permission there)
+    // and grant saveEntries on a different section so filterFor()
+    // passes and the dispatcher routes to execute(). The per-section
+    // _assertPermission() then throws ToolException, which the
+    // dispatcher catches at Server.php:739 and wraps via
+    // _toolErrorEnvelope() before returning.
+    $target = Craft::$app->getEntries()->getSectionByHandle('minorHeroes');
+    $other = Craft::$app->getEntries()->getSectionByHandle('heroes');
+    if ($target === null || $other === null) {
+        $this->markTestSkipped('minorHeroes + heroes sections not seeded.');
+    }
+
+    $caller = _cortex_permbound_user($this->fixturePrefix, 'wire', [
+        "viewEntries:{$other->uid}",
+        "saveEntries:{$other->uid}",
+    ]);
+    if ($caller === null) {
+        $this->markTestSkipped('Could not create caller.');
+    }
+
+    cortex_with_pro_registry(function() use ($target, $caller) {
+        Craft::$app->getUser()->setIdentity($caller);
+
+        $beforeAuditIds = InvocationRecord::find()->select('id')->column();
+
+        $server = new \craftpulse\cortex\mcp\Server(\craftpulse\cortex\mcp\Server::TRANSPORT_HTTP);
+        $server->setUserId((int) $caller->id);
+        $server->setSessionId('permbound-wire-' . bin2hex(random_bytes(4)));
+
+        $response = $server->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'tools/call',
+            'params' => [
+                'name' => 'entry',
+                'arguments' => [
+                    'mode' => 'create',
+                    'sectionHandle' => $target->handle,
+                    'title' => $this->fixturePrefix . 'wire',
+                ],
+            ],
+        ]);
+
+        // JSON-RPC frame.
+        expect($response)
+            ->toHaveKey('jsonrpc', '2.0')
+            ->toHaveKey('id', 1)
+            ->toHaveKey('result');
+
+        // The locked tool-error envelope shape — no numeric `code`
+        // field, `isError: true`, message text inside `content[0].text`.
+        $result = $response['result'];
+        expect($result)
+            ->toHaveKey('isError', true)
+            ->toHaveKey('content');
+        expect($result)->not->toHaveKey('code');
+        expect($result['content'])->toBeArray()->toHaveCount(1);
+        expect($result['content'][0])
+            ->toHaveKey('type', 'text')
+            ->toHaveKey('text');
+        expect($result['content'][0]['text'])
+            ->toStartWith('permission denied — mode `create` on section `' . $target->uid . '`');
+
+        // Audit row written by the dispatcher's catch block, NOT by
+        // any manual `logCall()` — proves the EVENT_LOG_CALL listener
+        // wiring (PluginTrait::_registerAuditLogListener) is intact.
+        $afterAuditIds = InvocationRecord::find()->select('id')->column();
+        $newIds = array_diff($afterAuditIds, $beforeAuditIds);
+        $this->touchedAuditRowIds = array_merge($this->touchedAuditRowIds, $newIds);
+
+        expect($newIds)->toHaveCount(1);
+        $auditRow = InvocationRecord::findOne(['id' => array_values($newIds)[0]]);
+        expect($auditRow)->not->toBeNull();
+        expect($auditRow->toolName)->toBe('entry');
+        expect($auditRow->kind)->toBe('tool_error');
+        expect($auditRow->errorClass)->toBe(ToolException::class);
+        expect($auditRow->transport)->toBe('http');
     });
 });

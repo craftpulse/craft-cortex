@@ -308,6 +308,30 @@ After the builder reports 8.10 done:
 
 ---
 
+## Post-ship deviations + follow-ups (2026-05-21)
+
+Captured after the 8.10 builder shipped and the follow-up commit landed. The deviations are defensible — recording them so the plan reflects the shipped state.
+
+### Builder deviations (commit `13663a6`)
+
+1. **`PermissionBoundaryTest` drives every per-tool case through direct `execute()` + manual `InvocationLogger::logCall()`** instead of `Server::dispatch()`. Root cause: playground boots `edition=free`, so `Tools::getByNameFor()` returns `null` for every Pro tool on the registry consulted by `dispatch()`. Per locked decision 11 the manual path is acceptable for shape consistency; the contract is preserved piecewise across three tests (this one + `ModeErrorShapeTest` + `CraftCommandAdminChangesTest`).
+
+2. **`AllowAdminChangesBoundaryTest` sanity check asserts on Free-edition Diagnostics enum values** (`logs` / `project_config_diff`) instead of `manage_queue`. Reason: `getInputSchema()` is edition-aware (per locked decision 6 from gate-8.md), `manage_queue` is absent on Free. The predicate-walk is the real contract; the sanity test just confirms the predicate executes against a real enum.
+
+3. **`UserCustomFieldAllowlistTest` does NOT mute project config** during setup. Reason: muting PC stalls the User layout save (`Users::saveLayout()` requires the PC round-trip to complete the `Fields::saveLayout()` chain). `afterEach()` restores via the same PC path so subsequent tests aren't poisoned. The test header docblock has been updated to reflect this.
+
+4. **`Tag` boundary covered via direct `execute()` in `ModeErrorShapeTest`** rather than reflection on `_buildPermissionDeniedMessage()`. Reason: Tag opts out of `PermissionedToolTrait` (decision 3 deviation — admin-only, no per-instance ACL), so the trait's protected method doesn't apply. Direct invocation asserts the same literal-prefix uniformity contract.
+
+### Follow-up commit (post-13663a6)
+
+Two open follow-ups from the post-8.10 review were addressed in a single commit:
+
+1. **Dispatcher-path wire-envelope coverage — closed.** Added `cortex_with_pro_registry()` to `tests/Pest.php` — flips edition to Pro AND rebuilds the tool registry (`Tools::getByNameFor()` consults a registry built at boot, so the edition-only helper isn't sufficient). Added ONE representative dispatcher-driven case to `PermissionBoundaryTest` (`Server::dispatch() wraps Pro tool permission denial in the locked {content, isError} envelope`) covering Entry. The `_toolErrorEnvelope()` shape is universal across Pro tools — one case proves the contract for all. Per-tool cases stay on the cheaper direct `execute()` path per locked decision 11. ~30 LoC helper + ~75 LoC test.
+
+2. **PC-write parallelism constraint — documented.** Added `**SEQUENTIAL ONLY**` callout to the `UserCustomFieldAllowlistTest` class docblock. Added a rule entry to `.claude/rules/testing.md` noting that any test calling `Fields::saveField()` / `Users::saveLayout()` (or any service method that triggers PC sync) must NOT run under parallel execution. Pest's sequential default is safe; Paratest would require per-worker `project.yaml` isolation which Craft's test harness doesn't ship.
+
+---
+
 ## Out of scope
 
 - **Per-row routing in `bulk_entries`** — `onPermissionDenied=skip`/`fail` semantics. Per-tool test territory (`BulkEntriesTest`).
