@@ -119,10 +119,14 @@ class Resave extends AbstractTool implements StreamableToolInterface
     ];
 
     /**
-     * Field-rewrite options rejected on the streaming path. The non-
-     * streaming `execute()` path accepts them unchanged.
+     * Field-rewrite options unsupported by the tool. Rejected at the
+     * top of `stream()` before any dispatch happens — `execute()`
+     * drains `stream()` so the rejection applies to JSON callers too.
+     * Could be wired into the Fiber bridge in a future gate, but the
+     * implementation cost outweighs the LLM ergonomic value at the
+     * tier these are aimed at.
      */
-    private const STREAM_REJECTED_REWRITE_OPTIONS = [
+    private const REJECTED_REWRITE_OPTIONS = [
         'set',
         'to',
         'ifEmpty',
@@ -201,14 +205,8 @@ class Resave extends AbstractTool implements StreamableToolInterface
             'volume' => Schema::string()->description('For type=assets. Comma-separated volume handles.'),
             'status' => Schema::string()->description('Element status filter (default `any`).'),
             'limit' => Schema::integer()->minimum(1),
-            'set' => Schema::string()->description('Field handle to rewrite. Pair with `to`.'),
-            'to' => Schema::string()->description('Replacement expression. See Craft resave docs.'),
-            'ifEmpty' => Schema::boolean(),
-            'ifInvalid' => Schema::boolean(),
             'touch' => Schema::boolean(),
             'updateSearchIndex' => Schema::boolean(),
-            'propagateTo' => Schema::string(),
-            'queue' => Schema::boolean()->description('Dispatch as a background queue job instead of running in-process.'),
             'batchSize' => Schema::integer()->minimum(1),
         ])->toArray();
     }
@@ -274,20 +272,21 @@ class Resave extends AbstractTool implements StreamableToolInterface
 
         if (!empty($arguments['queue'])) {
             throw new ToolException(
-                'resave: streaming is incompatible with `queue: true` — invoke without `queue: true` for streaming, ' .
-                'or wait for the queued job out-of-band.',
+                'resave: `queue: true` is not supported — the tool runs synchronously ' .
+                'and streams progress back to the caller. Drop the option, or dispatch ' .
+                'the queue job through `craft_command` if a background run is needed.',
             );
         }
 
         $rejectedRewrites = array_intersect_key(
             $arguments,
-            array_flip(self::STREAM_REJECTED_REWRITE_OPTIONS),
+            array_flip(self::REJECTED_REWRITE_OPTIONS),
         );
         if ($rejectedRewrites !== []) {
             throw new ToolException(
-                'resave: streaming does not support field-rewrite options (' .
-                implode('/', self::STREAM_REJECTED_REWRITE_OPTIONS) .
-                ') — use non-streaming dispatch for those.',
+                'resave: field-rewrite options (' .
+                implode('/', self::REJECTED_REWRITE_OPTIONS) .
+                ') are not supported on the resave tool.',
             );
         }
 
@@ -562,15 +561,18 @@ class Resave extends AbstractTool implements StreamableToolInterface
     {
         $params = [];
 
-        // Type-specific filters (validate at the tool layer; the controller
-        // would silently ignore mismatches otherwise). The default branch
-        // is unreachable — `stream()` rejects unknown types — but keeps
-        // PHPStan happy without disabling the match-coverage check.
+        // Type-specific filters (validate at the tool layer; the
+        // controller would silently ignore mismatches otherwise). The
+        // default branch is unreachable — `stream()` rejects unknown
+        // types — but keeps PHPStan happy without disabling the
+        // match-coverage check. `set` / `to` / `ifEmpty` / `ifInvalid` /
+        // `propagateTo` / `queue` / `toDefault` / `setEnabledForSite`
+        // are rejected at the top of `stream()` and never reach here.
         $allowed = match ($type) {
-            'entries' => ['section', 'entryType', 'status', 'limit', 'propagateTo'],
-            'assets' => ['volume', 'status', 'limit', 'propagateTo'],
-            'categories' => ['group', 'status', 'limit', 'propagateTo'],
-            'tags' => ['group', 'status', 'limit', 'propagateTo'],
+            'entries' => ['section', 'entryType', 'status', 'limit'],
+            'assets' => ['volume', 'status', 'limit'],
+            'categories' => ['group', 'status', 'limit'],
+            'tags' => ['group', 'status', 'limit'],
             'users' => ['group', 'status', 'limit'],
             'addresses' => ['status', 'limit'],
             default => throw new ToolException("Unknown type '{$type}'."),
@@ -578,19 +580,20 @@ class Resave extends AbstractTool implements StreamableToolInterface
 
         $rejected = array_diff(
             array_keys(array_diff_key($arguments, ['type' => true])),
-            array_merge($allowed, ['set', 'to', 'ifEmpty', 'ifInvalid', 'touch', 'updateSearchIndex', 'queue', 'batchSize']),
+            array_merge($allowed, ['touch', 'updateSearchIndex', 'batchSize']),
         );
         if ($rejected !== []) {
             throw new ToolException(
                 "Option(s) not supported for type '{$type}': " . implode(', ', $rejected) .
-                '. Allowed: ' . implode(', ', $allowed) . ' plus set/to/ifEmpty/ifInvalid/touch/updateSearchIndex/queue/batchSize.',
+                '. Allowed: ' . implode(', ', $allowed) . ' plus touch/updateSearchIndex/batchSize.',
             );
         }
 
-        // Map common filters. ResaveController binds against public
-        // properties named exactly like these (entryType maps to `type`
-        // on the controller — Craft's CLI uses --type for entry types,
-        // which collides with our outer `type` so we rename it here).
+        // Map common filters. The streaming bridge binds against the
+        // same key set Craft's ResaveController would consume —
+        // `entryType` renames to `type` because Craft's CLI uses
+        // `--type` for entry types, which collides with our outer
+        // `type` field naming the element kind.
         if (isset($arguments['section'])) {
             $params['section'] = (string) $arguments['section'];
         }
@@ -609,20 +612,8 @@ class Resave extends AbstractTool implements StreamableToolInterface
         if (isset($arguments['limit'])) {
             $params['limit'] = (int) $arguments['limit'];
         }
-        if (isset($arguments['propagateTo'])) {
-            $params['propagateTo'] = (string) $arguments['propagateTo'];
-        }
 
-        // Field-rewrite pair.
-        if (isset($arguments['set']) || isset($arguments['to'])) {
-            if (!isset($arguments['set'], $arguments['to'])) {
-                throw new ToolException('`set` and `to` must be provided together.');
-            }
-            $params['set'] = (string) $arguments['set'];
-            $params['to'] = (string) $arguments['to'];
-        }
-
-        foreach (['ifEmpty', 'ifInvalid', 'touch', 'updateSearchIndex', 'queue'] as $flag) {
+        foreach (['touch', 'updateSearchIndex'] as $flag) {
             if (isset($arguments[$flag])) {
                 $params[$flag] = (bool) $arguments[$flag];
             }

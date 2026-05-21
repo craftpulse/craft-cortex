@@ -120,7 +120,7 @@ it('emits a single zero-row frame when no elements match', function() {
 // Rejections
 // -----------------------------------------------------------------------------
 
-it('rejects queue: true on the streaming path', function() {
+it('rejects queue: true', function() {
     $ctx = new InvocationContext();
     $gen = $this->tool->stream([
         'type' => 'entries',
@@ -129,9 +129,9 @@ it('rejects queue: true on the streaming path', function() {
     ], $ctx);
     // The generator is not started until iterated.
     iterator_to_array($gen);
-})->throws(ToolException::class, 'streaming is incompatible with `queue: true`');
+})->throws(ToolException::class, '`queue: true` is not supported');
 
-it('rejects field-rewrite options on the streaming path', function() {
+it('rejects field-rewrite options', function() {
     $ctx = new InvocationContext();
     $gen = $this->tool->stream([
         'type' => 'entries',
@@ -140,7 +140,7 @@ it('rejects field-rewrite options on the streaming path', function() {
         'to' => "''",
     ], $ctx);
     iterator_to_array($gen);
-})->throws(ToolException::class, 'streaming does not support field-rewrite options');
+})->throws(ToolException::class, 'field-rewrite options');
 
 it('rejects an unknown type on the streaming path', function() {
     $ctx = new InvocationContext();
