@@ -312,6 +312,8 @@ trait PluginTrait
                     'settings/plugins/cortex' => 'cortex/settings/index',
                     'cortex/tokens' => 'cortex/settings/tokens',
                     'cortex/allowlist' => 'cortex/settings/allowlist',
+                    'cortex/allowlist/table-data' => 'cortex/settings/allowlist-table-data',
+                    'cortex/allowlist/override-slideout' => 'cortex/settings/allowlist-override-slideout',
                     'cortex/activity' => 'cortex/settings/activity',
                     'cortex/connection' => 'cortex/settings/connection',
                 ], $event->rules);

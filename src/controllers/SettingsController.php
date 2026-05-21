@@ -3,8 +3,12 @@
 namespace craftpulse\cortex\controllers;
 
 use Craft;
+use craft\elements\User;
+use craft\helpers\AdminTable;
+use craft\helpers\DateTimeHelper;
 use craft\web\Controller;
 use craftpulse\cortex\Cortex;
+use craftpulse\cortex\records\RuntimeOverride;
 use yii\base\Exception;
 use yii\web\Response;
 
@@ -86,14 +90,17 @@ class SettingsController extends Controller
     }
 
     /**
-     * Allowlist tab — placeholder for 9.1. Real Vue admin table of
-     * admin-issued runtime overrides + Garnish.Slideout for "Issue
-     * override" + row-action revoke land in 9.5. The DB-layer surface
-     * (`Allowlist` service, `actionAddOverride`, `actionRemoveOverride`)
-     * already exists from pre-Gate-9 work and stays alive between 9.1
-     * and 9.5.
+     * Allowlist tab — VueAdminTable listing of admin-issued runtime
+     * allowlist overrides plus the "+ New override" Garnish.Slideout
+     * trigger. The DB-layer surface (`Allowlist` service,
+     * `actionAddOverride`, `actionRemoveOverride`) exists from pre-Gate-9
+     * work; 9.2 swaps the calling UI without rewiring the data layer.
+     *
+     * The settings model is passed in for the slideout's TTL placeholder
+     * (`settings.runtimeOverrideTtl`).
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
+     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
      * @author Craftpulse
@@ -103,7 +110,125 @@ class SettingsController extends Controller
     {
         $this->requireAdmin(false);
 
-        return $this->renderTemplate('cortex/_cp/allowlist');
+        return $this->renderTemplate('cortex/_cp/allowlist', [
+            'settings' => Cortex::getInstance()->getSettings(),
+        ]);
+    }
+
+    /**
+     * VueAdminTable data endpoint for the Allowlist tab. Returns the
+     * `{pagination, data}` shape Craft's Vue component consumes — see
+     * `vendor/craftcms/cms/src/helpers/AdminTable.php::paginationLinks`
+     * for the canonical pagination dict.
+     *
+     * Honours the standard VueAdminTable params:
+     *   - `page` (int, default 1)
+     *   - `per_page` (int, default 50, capped at 100)
+     *   - `search` (string, optional — substring match across `pattern` + `note`)
+     *   - `sort.0.field` / `sort.0.direction` (optional)
+     *
+     * Pagination, search, and sort are applied in-PHP — override row
+     * count is bounded by admin issuance and expires automatically, so
+     * the cost is constant. If usage scales past dozens of overrides we
+     * follow up with `Allowlist::getPaginated()` per the sub-gate-9.2
+     * risk note.
+     *
+     * The row shape is locked: `[id, pattern, note, expiresAt, createdBy, dateCreated, isExpired]`.
+     * `tests/Controllers/SettingsControllerAllowlistTest.php` asserts
+     * the tuple exactly — drift = test failure.
+     *
+     * View access only (`requireAdmin(false)`); the row trash icon
+     * routes through `actionRemoveOverride` which gates writes via
+     * `requireAdmin(requireAdminChanges: true)`.
+     *
+     * @throws \craft\errors\MissingComponentException     if the view component is unavailable.
+     * @throws \yii\base\InvalidConfigException            from `Cortex::getInstance()`.
+     * @throws \yii\web\BadRequestHttpException            from `requireAcceptsJson` on non-JSON callers.
+     * @throws \yii\web\ForbiddenHttpException             from `requireAdmin`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionAllowlistTableData(): Response
+    {
+        $this->requireAcceptsJson();
+        $this->requireAdmin(false);
+
+        $page = max(1, (int) $this->request->getParam('page', 1));
+        $perPage = (int) $this->request->getParam('per_page', 50);
+        $perPage = max(1, min($perPage, 100));
+        $search = trim((string) $this->request->getParam('search', ''));
+        $sortField = (string) $this->request->getParam('sort.0.field', '');
+        $sortDir = $this->request->getParam('sort.0.direction') === 'desc' ? SORT_DESC : SORT_ASC;
+
+        // Raw rows — already filtered to non-deleted, includes expired
+        // so operators can audit/cull expired entries until gc reaps them.
+        $rows = Cortex::getInstance()->allowlist->getAllOverrides(includeExpired: true);
+
+        if ($search !== '') {
+            $needle = mb_strtolower($search);
+            $rows = array_values(array_filter(
+                $rows,
+                static function(array $row) use ($needle): bool {
+                    $haystack = mb_strtolower((string) ($row['pattern'] ?? '') . ' ' . (string) ($row['note'] ?? ''));
+                    return str_contains($haystack, $needle);
+                },
+            ));
+        }
+
+        // Sort. Default ordering: dateCreated DESC (newest first) — most
+        // operators want the row they just issued at the top. The
+        // service already orders by `expiresAt ASC`; we override here
+        // when the caller asks, otherwise apply the newest-first default.
+        $orderColumn = match ($sortField) {
+            'pattern' => 'pattern',
+            'expiresAt' => 'expiresAt',
+            'dateCreated' => 'dateCreated',
+            default => 'dateCreated',
+        };
+        $defaultDir = $sortField === '' ? SORT_DESC : $sortDir;
+        usort($rows, static function(array $a, array $b) use ($orderColumn, $defaultDir): int {
+            $av = (string) ($a[$orderColumn] ?? '');
+            $bv = (string) ($b[$orderColumn] ?? '');
+            $cmp = strcmp($av, $bv);
+            return $defaultDir === SORT_DESC ? -$cmp : $cmp;
+        });
+
+        $total = count($rows);
+        $offset = ($page - 1) * $perPage;
+        $slice = array_slice($rows, $offset, $perPage);
+
+        return $this->asJson([
+            'pagination' => AdminTable::paginationLinks($page, $total, $perPage),
+            'data' => array_map(
+                fn(array $row): array => $this->_serializeOverrideRow($row),
+                $slice,
+            ),
+        ]);
+    }
+
+    /**
+     * Render the "+ New override" slideout body partial. Fetched by
+     * `Cortex.openAllowlistOverrideSlideout()` and passed into
+     * `new Craft.Slideout(html, {...})`.
+     *
+     * Returns a bare HTML fragment — no `<html>`/`<body>` chrome, no
+     * tab strip — the slideout container supplies that.
+     *
+     * @throws \craft\errors\MissingComponentException if the view component is unavailable.
+     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionAllowlistOverrideSlideout(): Response
+    {
+        $this->requireAdmin(false);
+
+        return $this->renderTemplate('cortex/_cp/_allowlist-override-slideout', [
+            'settings' => Cortex::getInstance()->getSettings(),
+        ]);
     }
 
     /**
@@ -213,19 +338,27 @@ class SettingsController extends Controller
     }
 
     /**
-     * Add a runtime allowlist override. Returns to the cortex settings
-     * page on success with a flash, or back with errors on failure.
+     * Add a runtime allowlist override. JSON-only callers post-Gate-9 —
+     * 9.2 stripped the legacy HTML form path along with its template.
+     * The VueAdminTable + Garnish.Slideout combo on the Allowlist tab
+     * is the only consumer.
+     *
+     * Returns `200 {model: <serialized-row>}` on success, `400 {message}`
+     * on validation failure, and lets the underlying exception bubble
+     * (caught + logged) with a generic `Could not add override.` on
+     * service-layer save failure.
      *
      * @throws \yii\base\InvalidConfigException  from `Cortex::getInstance()`.
-     * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `getRequiredBodyParam`.
+     * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public function actionAddOverride(): Response
+    public function actionAddOverride(): ?Response
     {
         $this->requirePostRequest();
+        $this->requireAcceptsJson();
         $this->requireAdmin(requireAdminChanges: true);
 
         $request = $this->request;
@@ -234,18 +367,15 @@ class SettingsController extends Controller
         $note = $request->getBodyParam('note');
         $note = is_string($note) && $note !== '' ? trim($note) : null;
         $ttl = $request->getBodyParam('ttlSeconds');
-        $ttlSeconds = is_numeric($ttl) ? (int) $ttl : null;
+        $ttlSeconds = is_numeric($ttl) && (int) $ttl > 0 ? (int) $ttl : null;
 
         if ($pattern === '') {
-            Craft::$app->getSession()->setError(
-                Craft::t('cortex', 'Pattern is required.'),
-            );
-            return $this->redirectToPostedUrl();
+            return $this->asFailure(Craft::t('cortex', 'Pattern is required.'));
         }
 
         $userId = Craft::$app->getUser()->getId();
         try {
-            Cortex::getInstance()->allowlist->add(
+            $override = Cortex::getInstance()->allowlist->add(
                 pattern: $pattern,
                 userId: is_int($userId) ? $userId : null,
                 note: $note,
@@ -253,32 +383,35 @@ class SettingsController extends Controller
             );
         } catch (Exception $e) {
             Craft::error($e->getMessage(), 'cortex');
-            Craft::$app->getSession()->setError(
-                Craft::t('cortex', 'Could not add override.'),
-            );
-            return $this->redirectToPostedUrl();
+            return $this->asFailure(Craft::t('cortex', 'Could not add override.'));
         }
 
-        Craft::$app->getSession()->setNotice(
-            Craft::t('cortex', 'Override added.'),
+        return $this->asSuccess(
+            message: Craft::t('cortex', 'Override added.'),
+            data: ['model' => $this->_serializeOverrideRow($override->toArray())],
         );
-        return $this->redirectToPostedUrl();
     }
 
     /**
-     * Soft-delete a runtime allowlist override by id. Returns to the
-     * cortex settings page.
+     * Soft-delete a runtime allowlist override by id. JSON-only — wired
+     * to `Craft.VueAdminTable`'s `deleteAction` callback.
+     *
+     * Returns `200 {message}` on a matched delete, `404 {message}` when
+     * no row matches the id (the table refreshes after every mutation
+     * so a stale row click is rare, but defense in depth), and
+     * `400 {message}` on service-layer failure.
      *
      * @throws \yii\base\InvalidConfigException  from `Cortex::getInstance()`.
-     * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `getRequiredBodyParam`.
+     * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public function actionRemoveOverride(): Response
+    public function actionRemoveOverride(): ?Response
     {
         $this->requirePostRequest();
+        $this->requireAcceptsJson();
         $this->requireAdmin(requireAdminChanges: true);
 
         $id = (int) $this->request->getRequiredBodyParam('id');
@@ -287,22 +420,74 @@ class SettingsController extends Controller
             $removed = Cortex::getInstance()->allowlist->remove($id);
         } catch (Exception $e) {
             Craft::error($e->getMessage(), 'cortex');
-            Craft::$app->getSession()->setError(
-                Craft::t('cortex', 'Could not remove override.'),
-            );
-            return $this->redirectToPostedUrl();
+            return $this->asFailure(Craft::t('cortex', 'Could not remove override.'));
         }
 
-        if ($removed) {
-            Craft::$app->getSession()->setNotice(
-                Craft::t('cortex', 'Override removed.'),
-            );
-        } else {
-            Craft::$app->getSession()->setError(
-                Craft::t('cortex', 'Override not found.'),
-            );
+        if (!$removed) {
+            $this->response->setStatusCode(404);
+            return $this->asJson(['message' => Craft::t('cortex', 'Override not found.')]);
         }
 
-        return $this->redirectToPostedUrl();
+        return $this->asSuccess(Craft::t('cortex', 'Override removed.'));
+    }
+
+    // Private Methods
+    // =========================================================================
+
+    /**
+     * Serialise a `RuntimeOverride` row into the locked VueAdminTable
+     * data tuple. Shared by `actionAllowlistTableData` and the success
+     * branch of `actionAddOverride` so the row returned by the issue
+     * flow has the same shape the table refresh would render.
+     *
+     * Row shape:
+     *   - `id`           — int primary key.
+     *   - `pattern`      — string (the fnmatch glob).
+     *   - `note`         — string|null (admin freeform).
+     *   - `expiresAt`    — string|null ISO-8601, or null = never.
+     *   - `createdBy`    — `{id, label, cpEditUrl}` or null when the
+     *                       issuing user record is missing.
+     *   - `dateCreated`  — string ISO-8601.
+     *   - `isExpired`    — bool derived against `now`; the VueAdminTable
+     *                       cell renderer styles expired rows muted.
+     *
+     * @param array<string,mixed> $row The raw DB row from `Allowlist::getAllOverrides`
+     *                                 or `RuntimeOverride::toArray()`.
+     * @return array<string,mixed>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _serializeOverrideRow(array $row): array
+    {
+        $expiresAt = $row['expiresAt'] ?? null;
+        $isExpired = false;
+        if (is_string($expiresAt) && $expiresAt !== '') {
+            $exp = DateTimeHelper::toDateTime($expiresAt);
+            $isExpired = $exp !== false && $exp < DateTimeHelper::now();
+        }
+
+        $createdBy = null;
+        $createdByUserId = $row['createdByUserId'] ?? null;
+        if (is_int($createdByUserId) || (is_string($createdByUserId) && ctype_digit($createdByUserId))) {
+            $user = User::find()->id((int) $createdByUserId)->status(null)->one();
+            if ($user instanceof User) {
+                $createdBy = [
+                    'id' => (int) $user->id,
+                    'label' => $user->getName(),
+                    'cpEditUrl' => $user->getCpEditUrl(),
+                ];
+            }
+        }
+
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'pattern' => (string) ($row['pattern'] ?? ''),
+            'note' => isset($row['note']) && $row['note'] !== '' ? (string) $row['note'] : null,
+            'expiresAt' => is_string($expiresAt) && $expiresAt !== '' ? $expiresAt : null,
+            'createdBy' => $createdBy,
+            'dateCreated' => (string) ($row['dateCreated'] ?? ''),
+            'isExpired' => $isExpired,
+        ];
     }
 }

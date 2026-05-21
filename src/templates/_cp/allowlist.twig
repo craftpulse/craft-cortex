@@ -1,22 +1,170 @@
 {% extends "cortex/_cp/_layout" %}
 
 {# =========================================================================
-   Cortex Allowlist tab — placeholder.
+   Cortex Allowlist tab — VueAdminTable of admin-issued runtime allowlist
+   overrides + Garnish.Slideout for "+ New override" issuance.
 
-   Real content (VueAdminTable listing of admin-issued runtime allowlist
-   overrides + Garnish.Slideout for "Issue override" + row-action revoke)
-   lands in Gate 9.5. Overrides are DB-backed time-bound grants — same
-   issued-grant lifecycle as bearer tokens, separate from the project-
-   config-synced defaults on the Settings tab.
+   Overrides extend the project-config-stored defaults with time-bound
+   grants that auto-expire. Sub-gate 9.2 locks the VueAdminTable +
+   Garnish.Slideout pattern reused by Tokens (9.5).
 
-   The DB-layer surface (`Allowlist` service, `actionAddOverride`,
-   `actionRemoveOverride`) already exists from pre-Gate-9 work — 9.5
-   replaces the calling UI without rewiring the data layer.
+   Data path:
+     - Table data : GET  cortex/allowlist/table-data   → JSON {pagination, data}
+     - Slideout   : GET  cortex/allowlist/override-slideout → HTML fragment
+     - Add        : POST cortex/settings/add-override  → JSON {model, message}
+     - Remove     : POST cortex/settings/remove-override (VueAdminTable
+                                                          deleteAction) → JSON {message}
+
+   The row shape is locked in `SettingsController::_serializeOverrideRow`:
+   `{id, pattern, note, expiresAt, createdBy, dateCreated, isExpired}`.
    ========================================================================= #}
 
 {% set selectedTab = 'allowlist' %}
 
+{% do view.registerTranslations('cortex', [
+    'Add override',
+    'Are you sure you want to remove the override “{name}”?',
+    'Created',
+    'Created by',
+    'Expires',
+    'Never',
+    'No overrides issued yet.',
+    'Note',
+    'Override removed.',
+    'Pattern',
+    'Search overrides',
+    'expired',
+]) %}
+
 {% block content %}
-    {# placeholder — built in 9.5 #}
-    <p class="light">{{ 'The Allowlist tab is coming soon.'|t('cortex') }}</p>
+    <p class="light">
+        {{ 'Time-bound patterns that extend the plugin defaults. Issued by an administrator; revoked manually or automatically when they expire.'|t('cortex') }}
+    </p>
+
+    <div id="cortex-allowlist-vue-admin-table"></div>
 {% endblock %}
+
+{% js %}
+    (function() {
+        var tableContainer = '#cortex-allowlist-vue-admin-table';
+
+        function renderPatternCell(value, row) {
+            var pattern = Craft.escapeHtml(value || '');
+            var muted = row.isExpired ? ' style="opacity:0.55"' : '';
+            return '<code class="cortex-token-prefix"' + muted + '>' + pattern + '</code>';
+        }
+
+        function renderNoteCell(value) {
+            if (!value) {
+                return '<span class="light">—</span>';
+            }
+            return Craft.escapeHtml(value);
+        }
+
+        function renderExpiresCell(value, row) {
+            if (!value) {
+                return '<span class="light">' + Craft.t('cortex', 'Never') + '</span>';
+            }
+
+            var expiresAt = new Date(value);
+            var formatted = Craft.formatDate(expiresAt, 'short');
+            if (row.isExpired) {
+                return (
+                    '<span style="opacity:0.55">' +
+                    Craft.escapeHtml(formatted) +
+                    ' <span class="light">(' + Craft.t('cortex', 'expired') + ')</span>' +
+                    '</span>'
+                );
+            }
+            return Craft.escapeHtml(formatted);
+        }
+
+        function renderDateCreatedCell(value) {
+            if (!value) {
+                return '';
+            }
+            var d = new Date(value);
+            return Craft.escapeHtml(Craft.formatDate(d, 'short'));
+        }
+
+        function renderCreatedByCell(value) {
+            if (!value) {
+                return '<span class="light">—</span>';
+            }
+            var label = Craft.escapeHtml(value.label || '');
+            if (value.cpEditUrl) {
+                return '<a href="' + Craft.escapeHtml(value.cpEditUrl) + '">' + label + '</a>';
+            }
+            return label;
+        }
+
+        var columns = [
+            {
+                name: 'pattern',
+                title: Craft.t('cortex', 'Pattern'),
+                sortField: 'pattern',
+                callback: renderPatternCell,
+            },
+            {
+                name: 'note',
+                title: Craft.t('cortex', 'Note'),
+                callback: renderNoteCell,
+            },
+            {
+                name: 'expiresAt',
+                title: Craft.t('cortex', 'Expires'),
+                sortField: 'expiresAt',
+                callback: renderExpiresCell,
+            },
+            {
+                name: 'createdBy',
+                title: Craft.t('cortex', 'Created by'),
+                callback: renderCreatedByCell,
+            },
+            {
+                name: 'dateCreated',
+                title: Craft.t('cortex', 'Created'),
+                sortField: 'dateCreated',
+                callback: renderDateCreatedCell,
+            },
+        ];
+
+        var adminTable = new Craft.VueAdminTable({
+            container: tableContainer,
+            columns: columns,
+            tableDataEndpoint: 'cortex/allowlist/table-data',
+            deleteAction: 'cortex/settings/remove-override',
+            deleteConfirmationMessage: Craft.t('cortex', 'Are you sure you want to remove the override “{name}”?'),
+            deleteSuccessMessage: Craft.t('cortex', 'Override removed.'),
+            emptyMessage: Craft.t('cortex', 'No overrides issued yet.'),
+            search: true,
+            searchPlaceholder: Craft.t('cortex', 'Search overrides'),
+            buttons: [
+                {
+                    label: Craft.t('cortex', 'Add override'),
+                    icon: 'plus',
+                    href: '#cortex-allowlist-add-override',
+                    enabled: function() { return true; },
+                },
+            ],
+        });
+
+        // Anchor-based trigger — the `href` attribute set on the
+        // VueAdminTable button renders as `<a href="#...">`. We listen
+        // for clicks on that exact href so the handler is locale-proof
+        // (label-text matching would break under non-English CP).
+        document.addEventListener('click', function(event) {
+            var target = event.target.closest('a[href="#cortex-allowlist-add-override"]');
+            if (!target) {
+                return;
+            }
+            event.preventDefault();
+            window.Cortex.openAllowlistOverrideSlideout(adminTable);
+        });
+
+        // Expose the table on the window so the slideout can call
+        // .reload() after a successful issuance. Per-tab scope only —
+        // 9.5 (Tokens) gets its own handle on its own tab.
+        window.cortexAllowlistTable = adminTable;
+    })();
+{% endjs %}

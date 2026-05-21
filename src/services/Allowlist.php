@@ -117,7 +117,7 @@ class Allowlist extends Component
             return $this->_activeOverridesCache;
         }
 
-        $now = Carbon::now()->toDateTimeString();
+        $now = Carbon::now('UTC')->toDateTimeString();
         /** @var array<int,array<string,mixed>> $rows */
         $rows = RuntimeOverride::find()
             ->where(['dateDeleted' => null])
@@ -140,7 +140,7 @@ class Allowlist extends Component
     {
         $query = RuntimeOverride::find()->where(['dateDeleted' => null]);
         if (!$includeExpired) {
-            $now = Carbon::now()->toDateTimeString();
+            $now = Carbon::now('UTC')->toDateTimeString();
             $query->andWhere(['or', ['expiresAt' => null], ['>', 'expiresAt', $now]]);
         }
         /** @var array<int,array<string,mixed>> $rows */
@@ -172,7 +172,7 @@ class Allowlist extends Component
         $override->pattern = $pattern;
         $override->note = $note;
         $override->createdByUserId = $userId;
-        $override->expiresAt = Carbon::now()->addSeconds($ttl)->toDateTimeString();
+        $override->expiresAt = Carbon::now('UTC')->addSeconds($ttl)->toDateTimeString();
         $this->_saveOrThrow($override, 'save', $pattern);
         $this->_activeOverridesCache = null;
 
@@ -193,7 +193,7 @@ class Allowlist extends Component
         if ($override === null) {
             return false;
         }
-        $override->dateDeleted = Carbon::now()->toDateTimeString();
+        $override->dateDeleted = Carbon::now('UTC')->toDateTimeString();
         $this->_saveOrThrow($override, 'soft-delete', "#{$id}");
         $this->_activeOverridesCache = null;
         return true;
@@ -214,7 +214,7 @@ class Allowlist extends Component
      */
     public function pruneExpired(): int
     {
-        $now = Carbon::now()->toDateTimeString();
+        $now = Carbon::now('UTC')->toDateTimeString();
 
         // `deleteAll` has no built-in LIMIT, so we select the next batch
         // of expired ids and delete by primary key. Indexed lookup +
