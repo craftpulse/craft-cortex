@@ -415,3 +415,66 @@ it('resolves the four per-tab CP URLs', function() {
         expect($url)->toContain($path);
     }
 });
+
+// -----------------------------------------------------------------------------
+// 9.2 — Allowlist endpoints
+// -----------------------------------------------------------------------------
+
+it('declares actionAllowlistTableData + actionAllowlistOverrideSlideout', function() {
+    $rc = new ReflectionClass(SettingsController::class);
+    expect($rc->hasMethod('actionAllowlistTableData'))->toBeTrue();
+    expect($rc->hasMethod('actionAllowlistOverrideSlideout'))->toBeTrue();
+});
+
+it('actionAllowlistTableData first statements are requireAcceptsJson + requireAdmin', function() {
+    $body = _cortex_controller_method_body('actionAllowlistTableData');
+    expect($body)->toMatch('/^\s*\$this->requireAcceptsJson\s*\(\s*\)/m');
+    expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*false\s*\)/');
+});
+
+it('actionAllowlistOverrideSlideout first statement is requireAdmin', function() {
+    $body = _cortex_controller_method_body('actionAllowlistOverrideSlideout');
+    expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
+});
+
+it('actionAddOverride first statements are requirePostRequest + requireAcceptsJson + requireAdmin', function() {
+    $body = _cortex_controller_method_body('actionAddOverride');
+    expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
+    expect($body)->toMatch('/\$this->requireAcceptsJson\s*\(\s*\)/');
+    expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
+});
+
+it('actionRemoveOverride first statements are requirePostRequest + requireAcceptsJson + requireAdmin', function() {
+    $body = _cortex_controller_method_body('actionRemoveOverride');
+    expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
+    expect($body)->toMatch('/\$this->requireAcceptsJson\s*\(\s*\)/');
+    expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
+});
+
+it('resolves the Allowlist data + slideout CP URLs', function() {
+    foreach (['cortex/allowlist/table-data', 'cortex/allowlist/override-slideout'] as $path) {
+        $url = \craft\helpers\UrlHelper::cpUrl($path);
+        expect($url)->toBeString();
+        expect($url)->not->toBe('');
+        expect($url)->toContain($path);
+    }
+});
+
+it('ships the allowlist-override slideout partial', function() {
+    $path = __DIR__ . '/../../src/templates/_cp/_allowlist-override-slideout.twig';
+    expect(file_exists($path))->toBeTrue();
+    $contents = file_get_contents($path);
+    expect($contents)->not->toBeFalse();
+    expect($contents)->toContain("name: 'pattern'");
+    expect($contents)->toContain("name: 'note'");
+    expect($contents)->toContain("name: 'ttlSeconds'");
+});
+
+it('allowlist tab template instantiates a Craft.VueAdminTable', function() {
+    $path = __DIR__ . '/../../src/templates/_cp/allowlist.twig';
+    $contents = file_get_contents($path);
+    expect($contents)->not->toBeFalse();
+    expect($contents)->toContain('Craft.VueAdminTable');
+    expect($contents)->toContain('cortex/allowlist/table-data');
+    expect($contents)->toContain('cortex/settings/remove-override');
+});

@@ -1,0 +1,73 @@
+{% import "_includes/forms.twig" as forms %}
+
+{# =========================================================================
+   Allowlist override slideout body partial.
+
+   Rendered by `actionAllowlistOverrideSlideout` and fetched via
+   `Craft.sendActionRequest('GET', 'cortex/allowlist/override-slideout')`
+   from `Cortex.openAllowlistOverrideSlideout()`. The returned HTML is
+   passed into `new Craft.Slideout(html, {containerElement: 'form', ...})`
+   — the slideout container provides the `<form>` shell.
+
+   No `<html>` / `<body>` chrome — pure fragment. The `data-cortex-form`
+   attribute on the body is the JS hook the slideout listener uses to
+   find the submit/cancel handlers; the CSRF token is rendered inline
+   because the slideout's form shell does not auto-inject it.
+
+   Per gate-9 locked decision 6 the only JS framework involved is vanilla
+   `Craft.sendActionRequest` + the Garnish.Slideout subclass — no Vue,
+   no Vite.
+   ========================================================================= #}
+
+<div class="so-body" data-cortex-form>
+    <header class="pane-header">
+        <h2 class="screen-title">{{ 'Issue allowlist override'|t('cortex') }}</h2>
+    </header>
+
+    <div class="so-content padded">
+        <p class="light">
+            {{ 'Grant the {tool} tool a time-bound pattern that layers on top of the project-config defaults.'|t('cortex', { tool: '<code>craft_command</code>' })|raw }}
+        </p>
+
+        {{ csrfInput() }}
+
+        {{ forms.textField({
+            label: 'Pattern'|t('cortex'),
+            instructions: 'A glob the craft_command tool may dispatch. Uses fnmatch semantics: resave/* matches any resave/<x> route; up matches the literal command.'|t('cortex'),
+            id: 'cortex-override-pattern',
+            name: 'pattern',
+            required: true,
+            autofocus: true,
+            placeholder: 'mailer/test',
+        }) }}
+
+        {{ forms.textField({
+            label: 'Note'|t('cortex'),
+            instructions: 'Optional — surfaces in the audit history alongside the row.'|t('cortex'),
+            id: 'cortex-override-note',
+            name: 'note',
+            placeholder: 'ticket-1234'|t('cortex'),
+        }) }}
+
+        {{ forms.textField({
+            label: 'Expires in (seconds)'|t('cortex'),
+            instructions: 'Leave blank to use the plugin default ({default} = {asDays}).'|t('cortex', {
+                default: settings.runtimeOverrideTtl,
+                asDays: (settings.runtimeOverrideTtl // 86400) ~ ' days',
+            }),
+            id: 'cortex-override-ttl',
+            name: 'ttlSeconds',
+            type: 'number',
+            min: 60,
+            placeholder: settings.runtimeOverrideTtl,
+        }) }}
+    </div>
+
+    <footer class="so-footer">
+        <div class="flex flex-nowrap">
+            <button type="button" class="btn" data-cortex-cancel>{{ 'Cancel'|t('app') }}</button>
+            <div class="flex-grow"></div>
+            <button type="submit" class="btn submit" data-cortex-submit>{{ 'Issue override'|t('cortex') }}</button>
+        </div>
+    </footer>
+</div>

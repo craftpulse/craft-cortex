@@ -2,19 +2,19 @@
 
 /**
  * =========================================================================
- * SettingsController tests.
+ * SettingsController tests — error paths on the JSON mutation branches.
  *
- * The structural assertions verify wiring (extends `craft\web\Controller`,
- * declares the two actions, ships the settings template). The
- * action-level assertions exercise the error path — they swap the
- * `allowlist` component on the Plugin with a throwing stub, bypass
- * the HTTP plumbing via a thin test subclass, and check that:
+ * Gate 9.2 swapped the legacy redirect-based add/remove flow for the
+ * JSON-only contract the Allowlist tab's VueAdminTable + Garnish.Slideout
+ * combo consumes. These tests verify the error-path behaviour against
+ * the new contract:
  *
- *   - the action returns a redirect Response (HTTP 302)
- *   - the session error flash is set
+ *   - the action returns a Response with `asFailure()` (HTTP 400) +
+ *     a `{message}` JSON body
  *   - the underlying exception is logged through `Craft::error()`
  *
- * Full CP roundtrip lives in manual smoke during gate verification.
+ * Happy-path coverage moved to `SettingsControllerAllowlistTest`.
+ * Full CP round-trip lives in the manual gate-9.2 verification step.
  * =========================================================================
  *
  * @author Craftpulse
@@ -49,29 +49,30 @@ class _CortexSettingsControllerHarness extends SettingsController
         // no-op
     }
 
+    public function requireAcceptsJson(): void
+    {
+        // no-op — test harness always opts into the JSON branch.
+    }
+
     public function requireAdmin(bool $requireAdminChanges = true): void
     {
         // no-op
-    }
-
-    public function redirectToPostedUrl($object = null, ?string $default = null): Response
-    {
-        $response = new Response();
-        $response->setStatusCode(302);
-        $response->headers->set('Location', '/cortex/settings');
-        return $response;
     }
 
     /**
      * Swap the inherited `$request` slot for whatever the test supplies.
      * Both action bodies call `$this->request->getRequiredBodyParam()` /
      * `getBodyParam()` — assigning a stub here is enough to bypass the
-     * console request that ships with the test bootstrap.
+     * console request that ships with the test bootstrap. The response
+     * slot is replaced with a web Response so `asJson`/`asFailure` can
+     * call `setStatusCode()` (console Response lacks the method).
      */
     public function withBody(array $body): self
     {
         $this->body = $body;
         $this->request = new _CortexSettingsControllerRequest($body);
+        $this->response = new \yii\web\Response();
+        $this->response->formatters[\yii\web\Response::FORMAT_JSON] = \yii\web\JsonResponseFormatter::class;
         return $this;
     }
 }
@@ -81,6 +82,8 @@ class _CortexSettingsControllerHarness extends SettingsController
  */
 class _CortexSettingsControllerRequest
 {
+    public bool $isCpRequest = true;
+
     public function __construct(private array $body)
     {
     }
@@ -96,6 +99,31 @@ class _CortexSettingsControllerRequest
     public function getBodyParam(string $name, mixed $default = null): mixed
     {
         return $this->body[$name] ?? $default;
+    }
+
+    public function getParam(string $name, mixed $default = null): mixed
+    {
+        return $this->body[$name] ?? $default;
+    }
+
+    public function getAcceptsJson(): bool
+    {
+        return true;
+    }
+
+    public function getIsOptions(): bool
+    {
+        return false;
+    }
+
+    public function getIsCpRequest(): bool
+    {
+        return true;
+    }
+
+    public function getCsrfToken(): string
+    {
+        return 'test-csrf-token';
     }
 }
 
@@ -254,7 +282,7 @@ function _cortexCapturedCortexLogs(int $countBefore): array
     ));
 }
 
-it('actionAddOverride catches allowlist exceptions, flashes error, redirects, and logs', function() {
+it('actionAddOverride catches allowlist exceptions, returns 400 JSON, and logs', function() {
     $controller = new _CortexSettingsControllerHarness('settings', Cortex::getInstance());
     $controller->withBody([
         'pattern' => 'foo/*',
@@ -265,9 +293,9 @@ it('actionAddOverride catches allowlist exceptions, flashes error, redirects, an
     $response = $controller->actionAddOverride();
 
     expect($response)->toBeInstanceOf(Response::class);
-    expect($response->statusCode)->toBe(302);
+    expect($response->statusCode)->toBe(400);
 
-    expect($this->flashSession->getFlash('cp-error'))->toBe('Could not add override.');
+    expect($response->data)->toBeArray()->toHaveKey('message', 'Could not add override.');
 
     $cortexEntries = _cortexCapturedCortexLogs($this->logCountBefore);
     expect($cortexEntries)->not->toBeEmpty();
@@ -275,16 +303,16 @@ it('actionAddOverride catches allowlist exceptions, flashes error, redirects, an
     expect(implode("\n", $messages))->toContain('boom: add failed');
 });
 
-it('actionRemoveOverride catches allowlist exceptions, flashes error, redirects, and logs', function() {
+it('actionRemoveOverride catches allowlist exceptions, returns 400 JSON, and logs', function() {
     $controller = new _CortexSettingsControllerHarness('settings', Cortex::getInstance());
     $controller->withBody(['id' => 123]);
 
     $response = $controller->actionRemoveOverride();
 
     expect($response)->toBeInstanceOf(Response::class);
-    expect($response->statusCode)->toBe(302);
+    expect($response->statusCode)->toBe(400);
 
-    expect($this->flashSession->getFlash('cp-error'))->toBe('Could not remove override.');
+    expect($response->data)->toBeArray()->toHaveKey('message', 'Could not remove override.');
 
     $cortexEntries = _cortexCapturedCortexLogs($this->logCountBefore);
     expect($cortexEntries)->not->toBeEmpty();
