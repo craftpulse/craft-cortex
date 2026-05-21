@@ -5,8 +5,8 @@ namespace craftpulse\cortex\controllers;
 use Craft;
 use craft\elements\User;
 use craft\web\Controller;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\oauth\entities\UserEntity;
-use craftpulse\cortex\Plugin;
 use JsonException;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\RequestTypes\AuthorizationRequestInterface;
@@ -110,7 +110,7 @@ class OauthController extends Controller
         }
         $currentUser = $identity;
 
-        $oauth = Plugin::getInstance()->oauth;
+        $oauth = Cortex::getInstance()->oauth;
         $psrRequest = $this->_buildPsrRequest();
 
         try {
@@ -158,7 +158,7 @@ class OauthController extends Controller
     {
         $this->requirePostRequest();
 
-        $oauth = Plugin::getInstance()->oauth;
+        $oauth = Cortex::getInstance()->oauth;
         $psrRequest = $this->_buildPsrRequest();
 
         // Audience stamp again — refresh + token-exchange both need
@@ -192,7 +192,7 @@ class OauthController extends Controller
     {
         $this->requirePostRequest();
 
-        if (!Plugin::getInstance()->getSettings()->dcrEnabled) {
+        if (!Cortex::getInstance()->getSettings()->dcrEnabled) {
             $this->response->setStatusCode(404);
             $this->response->format = Response::FORMAT_JSON;
             $this->response->data = ['error' => 'Dynamic Client Registration is disabled on this install.'];
@@ -211,7 +211,7 @@ class OauthController extends Controller
         }
 
         try {
-            $response = Plugin::getInstance()->oauth->registerClient($payload);
+            $response = Cortex::getInstance()->oauth->registerClient($payload);
         } catch (\InvalidArgumentException $e) {
             return $this->_dcrError(400, 'invalid_client_metadata', $e->getMessage());
         } catch (Throwable $e) {
@@ -241,7 +241,7 @@ class OauthController extends Controller
 
         $token = $this->request->getBodyParam('token');
         if (is_string($token) && $token !== '') {
-            Plugin::getInstance()->oauth->revokeToken($token);
+            Cortex::getInstance()->oauth->revokeToken($token);
         }
 
         $this->response->setStatusCode(200);
@@ -365,7 +365,7 @@ class OauthController extends Controller
 
         $psrResponse = (new Psr17Factory())->createResponse();
         try {
-            $psrResponse = Plugin::getInstance()
+            $psrResponse = Cortex::getInstance()
                 ->oauth
                 ->getAuthorizationServer()
                 ->completeAuthorizationRequest($authRequest, $psrResponse);

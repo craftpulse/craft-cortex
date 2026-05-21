@@ -17,7 +17,7 @@ use yii\base\Event;
  *
  * Subscribers MUST treat their handler as soft — a thrown exception
  * from within a listener WILL be caught by the dispatcher wrapper
- * (`Plugin::init()`'s try/catch around `Invocations::record()`), but
+ * (`Cortex::init()`'s try/catch around `Invocations::record()`), but
  * subscribers should still avoid raising on logging activity to keep
  * the dispatch hot path tight. Defense in depth, not a primary
  * defense.

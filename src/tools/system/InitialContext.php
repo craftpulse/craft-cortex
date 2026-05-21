@@ -10,7 +10,7 @@ use craft\models\Site;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\IsReadOnly;
 use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\Schema;
 
@@ -140,7 +140,7 @@ class InitialContext extends AbstractTool
         $sitesService = Craft::$app->getSites();
         $entriesService = Craft::$app->getEntries();
         $info = Craft::$app->getInfo();
-        $settings = Plugin::getInstance()->getSettings();
+        $settings = Cortex::getInstance()->getSettings();
 
         return [
             'craft' => [
@@ -175,7 +175,7 @@ class InitialContext extends AbstractTool
                 'enabled' => $settings->execEnabled,
                 'dryRunDefault' => $settings->execDryRunDefault,
             ],
-            'allowlist' => Plugin::getInstance()->allowlist->getEffective(),
+            'allowlist' => Cortex::getInstance()->allowlist->getEffective(),
             'hints' => $this->_hints(),
         ];
     }
@@ -227,7 +227,7 @@ class InitialContext extends AbstractTool
                 'name' => (string) $entry['name'],
                 'description' => (string) $entry['description'],
             ],
-            Plugin::getInstance()->prompts->asListPayload(),
+            Cortex::getInstance()->prompts->asListPayload(),
         );
     }
 

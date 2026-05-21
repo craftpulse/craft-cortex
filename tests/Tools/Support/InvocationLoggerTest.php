@@ -261,7 +261,7 @@ it('fires EVENT_LOG_CALL even for stdio invocations — listener filters by tran
     // Decision 11: stdio gets the KV log line, no DB row. The event
     // fires regardless so subscribers can route stdio differently
     // (e.g. mirror to a separate sink); the audit-log listener in
-    // Plugin::init() is the one that filters by transport.
+    // Cortex::init() is the one that filters by transport.
     $events = [];
     $handler = function(LogCallEvent $event) use (&$events): void {
         $events[] = $event->entry['transport'] ?? null;

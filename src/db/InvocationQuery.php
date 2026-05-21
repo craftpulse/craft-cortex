@@ -16,7 +16,7 @@ use DateTimeInterface;
  * execute. Single source of truth for the table name — every caller
  * routes through here so the column list stays uniform.
  *
- * Use `Plugin::getInstance()->invocations->find()` to instantiate. The
+ * Use `Cortex::getInstance()->invocations->find()` to instantiate. The
  * service is the canonical entry point; direct instantiation works but
  * misses any future memoization / scope decoration the service layer
  * may add.

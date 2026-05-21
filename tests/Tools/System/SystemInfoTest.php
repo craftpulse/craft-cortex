@@ -6,10 +6,10 @@
  */
 
 use Craft;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('system_info');
+    $this->tool = Cortex::getInstance()->tools->getByName('system_info');
 });
 
 it('returns a craft / php / db / sites / license snapshot', function() {

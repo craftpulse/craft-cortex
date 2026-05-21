@@ -15,11 +15,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('content_audit');
+    $this->tool = Cortex::getInstance()->tools->getByName('content_audit');
 });
 
 it('is registered on the tool registry', function() {
@@ -71,7 +71,7 @@ it('clamps limit to MAX_LIMIT', function() {
 });
 
 it('appears in the registry tools/list payload with annotations', function() {
-    $payload = Plugin::getInstance()->tools->asListPayload();
+    $payload = Cortex::getInstance()->tools->asListPayload();
 
     $entry = collect($payload)->firstWhere('name', 'content_audit');
     expect($entry)->not->toBeNull();

@@ -15,11 +15,11 @@
  */
 
 use craft\elements\Entry;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('drafts_and_revisions');
+    $this->tool = Cortex::getInstance()->tools->getByName('drafts_and_revisions');
 });
 
 // -----------------------------------------------------------------------------
@@ -127,7 +127,7 @@ it('compare returns zero differences when comparing an entry to itself', functio
 // -----------------------------------------------------------------------------
 
 it('appears in the registry tools/list payload with annotations', function() {
-    $payload = Plugin::getInstance()->tools->asListPayload();
+    $payload = Cortex::getInstance()->tools->asListPayload();
 
     $entry = collect($payload)->firstWhere('name', 'drafts_and_revisions');
     expect($entry)->not->toBeNull();

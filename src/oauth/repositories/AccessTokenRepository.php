@@ -3,8 +3,8 @@
 namespace craftpulse\cortex\oauth\repositories;
 
 use Carbon\Carbon;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\oauth\entities\AccessTokenEntity;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
 use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
@@ -67,7 +67,7 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
         // entity. The cortex `Oauth` service set it from the
         // controller's `resource=` parsing before invoking the grant;
         // this is where it gets baked into the JWT.
-        $entity->setAudience(Plugin::getInstance()->oauth->getPendingAudience());
+        $entity->setAudience(Cortex::getInstance()->oauth->getPendingAudience());
 
         return $entity;
     }

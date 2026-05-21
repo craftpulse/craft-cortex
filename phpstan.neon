@@ -27,13 +27,24 @@ parameters:
         - identifier: missingType.iterableValue
           path: src/tools/*
 
-        # Plugin::config() returns Yii's generic component-config array;
+        # Cortex::config() returns Yii's generic component-config array;
         # the schema isn't worth pinning down for one method.
         - identifier: missingType.iterableValue
-          path: src/Plugin.php
+          path: src/Cortex.php
 
         # Craft's element-query classes use generic templates we don't
         # need to forward in private builder helpers.
         - identifier: missingType.generics
           path: src/tools/content/*
+
+        # `Element::find()` returns its concrete element-query class —
+        # Cortex's `Skill::find()` mirrors Craft's `Tag::find()` shape
+        # (`@return TagQuery` without template parameters). Forwarding
+        # the generics on a public `find()` override leaks Element's
+        # internal `TKey/TElement` covariance constraints into Cortex
+        # callers and conflicts with Element's non-covariant template
+        # types. The query class itself does declare templates on its
+        # own docblock.
+        - identifier: missingType.generics
+          path: src/elements/Skill.php
 

@@ -9,7 +9,7 @@
  *
  * The controller pulls headers off `$this->request->getHeaders()`, the
  * raw body off `$this->request->getRawBody()`, and dispatches via
- * `Plugin::getInstance()->sessions`. The test harness subclasses the
+ * `Cortex::getInstance()->sessions`. The test harness subclasses the
  * controller and swaps `$this->request` with a stub that responds to
  * the methods the controller actually calls — no Yii web stack is
  * stood up.
@@ -23,11 +23,11 @@
  */
 
 use craftpulse\cortex\controllers\McpController;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\mcp\transport\Http;
 use craftpulse\cortex\oauth\entities\AccessTokenEntity;
 use craftpulse\cortex\oauth\entities\ClientEntity;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\records\OauthClient as OauthClientRecord;
 use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
 use craftpulse\cortex\records\Token as TokenRecord;
@@ -183,7 +183,7 @@ class _CortexMcpControllerHarness extends McpController
  */
 function _cortex_mcp_harness(string $method, array $headers, string $body = ''): _CortexMcpControllerHarness
 {
-    $controller = new _CortexMcpControllerHarness('mcp', Plugin::getInstance());
+    $controller = new _CortexMcpControllerHarness('mcp', Cortex::getInstance());
     $controller->withRequest(new _CortexMcpRequest($method, $headers, $body));
     $controller->withFreshResponse();
     return $controller;
@@ -208,7 +208,7 @@ function _cortex_decode_response(Response $response): array
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $this->originalHttpEnabled = $settings->httpEnabled;
     $this->originalAllowedOrigins = $settings->allowedOrigins;
     $this->originalRateLimitBurst = $settings->rateLimitBurst;
@@ -226,7 +226,7 @@ beforeEach(function() {
     expect($admin)->not->toBeNull();
     $this->userId = (int) $admin->id;
 
-    $issued = Plugin::getInstance()->tokens->issue($this->userId, '_test_/controller-bearer');
+    $issued = Cortex::getInstance()->tokens->issue($this->userId, '_test_/controller-bearer');
     $this->bearerToken = $issued['token'];
     $this->bearerTokenId = (int) $issued['model']->id;
     $this->bearerHeader = 'Bearer ' . $this->bearerToken;
@@ -234,16 +234,16 @@ beforeEach(function() {
     // Start every test from a known-clean bucket for the admin user
     // so a chatty sibling test doesn't deplete the bucket and trip
     // the 429 path under a happy-path assertion.
-    Plugin::getInstance()->rateLimiter->clear($this->userId);
+    Cortex::getInstance()->rateLimiter->clear($this->userId);
 });
 
 afterEach(function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $settings->httpEnabled = $this->originalHttpEnabled;
     $settings->allowedOrigins = $this->originalAllowedOrigins;
     $settings->rateLimitBurst = $this->originalRateLimitBurst;
     $settings->rateLimitPerSecond = $this->originalRateLimitPerSecond;
-    Plugin::getInstance()->rateLimiter->clear($this->userId);
+    Cortex::getInstance()->rateLimiter->clear($this->userId);
     TokenRecord::deleteAll(['like', 'name', '_test_/%', false]);
 
     // Cleanup OAuth fixtures from Gate 7.3 tests too. The clientId
@@ -264,7 +264,7 @@ afterEach(function() {
 // -----------------------------------------------------------------------------
 
 it('returns 503 when Settings::$httpEnabled is false', function() {
-    Plugin::getInstance()->getSettings()->httpEnabled = false;
+    Cortex::getInstance()->getSettings()->httpEnabled = false;
 
     $controller = _cortex_mcp_harness('POST', [
         Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
@@ -303,7 +303,7 @@ it('returns 400 when MCP-Protocol-Version is unrecognised', function() {
 // -----------------------------------------------------------------------------
 
 it('returns 403 when Origin is not in a non-empty allowlist', function() {
-    Plugin::getInstance()->getSettings()->allowedOrigins = ['https://allowed.example'];
+    Cortex::getInstance()->getSettings()->allowedOrigins = ['https://allowed.example'];
 
     $controller = _cortex_mcp_harness('POST', [
         Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
@@ -316,7 +316,7 @@ it('returns 403 when Origin is not in a non-empty allowlist', function() {
 });
 
 it('passes Origin validation when Origin matches the allowlist exactly', function() {
-    Plugin::getInstance()->getSettings()->allowedOrigins = ['https://allowed.example'];
+    Cortex::getInstance()->getSettings()->allowedOrigins = ['https://allowed.example'];
 
     $body = json_encode([
         'jsonrpc' => '2.0',
@@ -371,7 +371,7 @@ it('POST initialize returns 200 with Mcp-Session-Id response header and valid in
 
     // Cleanup: terminate the freshly-minted session so it doesn't
     // accumulate in the cache across test runs.
-    Plugin::getInstance()->sessions->terminate((string) $sessionId);
+    Cortex::getInstance()->sessions->terminate((string) $sessionId);
 });
 
 it('POST without Mcp-Session-Id on non-initialize requests returns 400', function() {
@@ -428,7 +428,7 @@ it('POST with a valid session id continues processing tools/call', function() {
     expect($envelope)->toHaveKey('result');
     expect($envelope['result'])->toHaveKey('content');
 
-    Plugin::getInstance()->sessions->terminate($sessionId);
+    Cortex::getInstance()->sessions->terminate($sessionId);
 });
 
 it('POST with an unknown Mcp-Session-Id returns 404', function() {
@@ -454,7 +454,7 @@ it('POST with an unknown Mcp-Session-Id returns 404', function() {
 // -----------------------------------------------------------------------------
 
 it('DELETE with a valid session id terminates the session and returns 204', function() {
-    $session = Plugin::getInstance()->sessions->create(Server::PROTOCOL_VERSION, 'pest');
+    $session = Cortex::getInstance()->sessions->create(Server::PROTOCOL_VERSION, 'pest');
 
     // DELETE intentionally bypasses bearer auth — see the rationale
     // on `McpController::beforeAction()`. No Authorization header
@@ -466,12 +466,12 @@ it('DELETE with a valid session id terminates the session and returns 204', func
     $response = $controller->runIndex();
 
     expect($response->statusCode)->toBe(204);
-    expect(Plugin::getInstance()->sessions->get($session->id))->toBeNull();
+    expect(Cortex::getInstance()->sessions->get($session->id))->toBeNull();
 });
 
 it('subsequent POST with a terminated session id returns 404', function() {
-    $session = Plugin::getInstance()->sessions->create(Server::PROTOCOL_VERSION, 'pest');
-    Plugin::getInstance()->sessions->terminate($session->id);
+    $session = Cortex::getInstance()->sessions->create(Server::PROTOCOL_VERSION, 'pest');
+    Cortex::getInstance()->sessions->terminate($session->id);
 
     $body = (string) json_encode([
         'jsonrpc' => '2.0',
@@ -558,7 +558,7 @@ it('tools/call for craft_exec over HTTP returns the JSON-RPC stdio-only rejectio
     expect($envelope['error']['code'])->toBe(Server::ERR_METHOD_NOT_FOUND);
     expect($envelope['error']['message'])->toContain('stdio-only');
 
-    Plugin::getInstance()->sessions->terminate($sessionId);
+    Cortex::getInstance()->sessions->terminate($sessionId);
 });
 
 // -----------------------------------------------------------------------------
@@ -591,7 +591,7 @@ it('declares the index action', function() {
 });
 
 it('disables CSRF on the JSON-RPC endpoint', function() {
-    $controller = new McpController('mcp', Plugin::getInstance());
+    $controller = new McpController('mcp', Cortex::getInstance());
     expect($controller->enableCsrfValidation)->toBeFalse();
 });
 
@@ -683,7 +683,7 @@ it('POST with valid bearer authenticates and dispatches', function() {
     expect($response->statusCode)->toBe(200);
     expect(Craft::$app->getUser()->getId())->toBe($this->userId);
 
-    Plugin::getInstance()->sessions->terminate((string) $response->headers->get(Http::HEADER_SESSION_ID));
+    Cortex::getInstance()->sessions->terminate((string) $response->headers->get(Http::HEADER_SESSION_ID));
 });
 
 it('POST with a revoked bearer returns 401 on the NEXT request', function() {
@@ -706,7 +706,7 @@ it('POST with a revoked bearer returns 401 on the NEXT request', function() {
     $sessionId = (string) $initResponse->headers->get(Http::HEADER_SESSION_ID);
 
     // Revoke the bearer token between requests.
-    Plugin::getInstance()->tokens->revoke($this->bearerTokenId);
+    Cortex::getInstance()->tokens->revoke($this->bearerTokenId);
 
     // Next call with the (now revoked) bearer must 401.
     $callBody = (string) json_encode([
@@ -724,7 +724,7 @@ it('POST with a revoked bearer returns 401 on the NEXT request', function() {
 
     expect($callResponse->statusCode)->toBe(401);
 
-    Plugin::getInstance()->sessions->terminate($sessionId);
+    Cortex::getInstance()->sessions->terminate($sessionId);
 });
 
 // -----------------------------------------------------------------------------
@@ -760,7 +760,7 @@ it('mid-session token swap with a different user terminates the session and retu
     $initResponse = $initController->runIndex();
     $sessionId = (string) $initResponse->headers->get(Http::HEADER_SESSION_ID);
 
-    $otherIssued = Plugin::getInstance()->tokens->issue((int) $otherUser->id, '_test_/swap-other-token');
+    $otherIssued = Cortex::getInstance()->tokens->issue((int) $otherUser->id, '_test_/swap-other-token');
 
     // POST tools/call with the OTHER bearer + the SAME session id.
     // `Sessions::touch()` should detect the userId mismatch,
@@ -781,7 +781,7 @@ it('mid-session token swap with a different user terminates the session and retu
     expect($callResponse->statusCode)->toBe(401);
     // The session must have been terminated as part of the
     // mismatch defense — subsequent get() returns null.
-    expect(Plugin::getInstance()->sessions->get($sessionId))->toBeNull();
+    expect(Cortex::getInstance()->sessions->get($sessionId))->toBeNull();
 });
 
 // -----------------------------------------------------------------------------
@@ -840,7 +840,7 @@ it('audit log line carries user=<id> when authenticated over HTTP', function() {
     expect($auditLine)->toContain('user=' . $this->userId);
     expect($auditLine)->not->toContain('user=-');
 
-    Plugin::getInstance()->sessions->terminate($sessionId);
+    Cortex::getInstance()->sessions->terminate($sessionId);
 });
 
 // -----------------------------------------------------------------------------
@@ -873,7 +873,7 @@ function _cortex_mint_oauth_access_token(int $userId, string $audience, int $exp
     $entity->setUserIdentifier((string) $userId);
     $entity->setExpiryDateTime(new \DateTimeImmutable('@' . (time() + $expiresIn)));
     $entity->setAudience($audience);
-    $entity->setPrivateKey(new CryptKey('file://' . Plugin::getInstance()->oauth->getPrivateKeyPath()));
+    $entity->setPrivateKey(new CryptKey('file://' . Cortex::getInstance()->oauth->getPrivateKeyPath()));
 
     $record = new OauthTokenRecord();
     $record->tokenType = 'access';
@@ -916,7 +916,7 @@ it('POST with a valid OAuth access token authenticates and dispatches', function
     expect($response->statusCode)->toBe(200);
     expect(Craft::$app->getUser()->getId())->toBe($this->userId);
 
-    Plugin::getInstance()->sessions->terminate((string) $response->headers->get(Http::HEADER_SESSION_ID));
+    Cortex::getInstance()->sessions->terminate((string) $response->headers->get(Http::HEADER_SESSION_ID));
 });
 
 it('POST with an OAuth token whose audience does not match returns 401', function() {
@@ -1060,7 +1060,7 @@ it('tools/call over HTTP writes one cortex_invocations row with the right contex
     expect($row->clientName)->toBe('pest-audit');
 
     \craftpulse\cortex\records\Invocation::deleteAll(['id' => $row->id]);
-    Plugin::getInstance()->sessions->terminate($sessionId);
+    Cortex::getInstance()->sessions->terminate($sessionId);
 });
 
 it('a failing tool over HTTP writes a tool_error row with the error class/message', function() {
@@ -1113,7 +1113,7 @@ it('a failing tool over HTTP writes a tool_error row with the error class/messag
     expect($row->errorMessage)->toBeString()->not->toBeEmpty();
 
     \craftpulse\cortex\records\Invocation::deleteAll(['id' => $row->id]);
-    Plugin::getInstance()->sessions->terminate($sessionId);
+    Cortex::getInstance()->sessions->terminate($sessionId);
 });
 
 it('a revoked bearer 401s before dispatch — no audit row written', function() {
@@ -1123,7 +1123,7 @@ it('a revoked bearer 401s before dispatch — no audit row written', function() 
         ->count();
 
     // Revoke the bearer before any call lands.
-    Plugin::getInstance()->tokens->revoke($this->bearerTokenId);
+    Cortex::getInstance()->tokens->revoke($this->bearerTokenId);
 
     $body = (string) json_encode([
         'jsonrpc' => '2.0',
@@ -1197,19 +1197,19 @@ it('a successful tools/call writes an audit row with rateLimitRemaining = burst 
     expect($row)->not->toBeNull();
     // beforeEach cleared the bucket; init + tools/call consumed two
     // tokens, so the tools/call row carries burst - 2.
-    $burst = Plugin::getInstance()->getSettings()->rateLimitBurst;
+    $burst = Cortex::getInstance()->getSettings()->rateLimitBurst;
     expect($row->rateLimitRemaining)->toBe($burst - 2);
 
     \craftpulse\cortex\records\Invocation::deleteAll(['id' => $row->id]);
-    Plugin::getInstance()->sessions->terminate($sessionId);
+    Cortex::getInstance()->sessions->terminate($sessionId);
 });
 
 it('60 rapid successful calls all succeed; the 61st returns 429 with Retry-After', function() {
     // Use a small burst here so the test doesn't have to drive 60+
     // full HTTP cycles. The behaviour is identical for any burst > 0.
-    Plugin::getInstance()->getSettings()->rateLimitBurst = 5;
-    Plugin::getInstance()->getSettings()->rateLimitPerSecond = 1;
-    Plugin::getInstance()->rateLimiter->clear($this->userId);
+    Cortex::getInstance()->getSettings()->rateLimitBurst = 5;
+    Cortex::getInstance()->getSettings()->rateLimitPerSecond = 1;
+    Cortex::getInstance()->rateLimiter->clear($this->userId);
 
     // Drive `burst` successful initialize-only calls. Initialize is
     // the cheapest endpoint that consumes a token; we don't need a
@@ -1230,7 +1230,7 @@ it('60 rapid successful calls all succeed; the 61st returns 429 with Retry-After
         ], $body);
         $response = $controller->runIndex();
         expect($response->statusCode)->toBe(200);
-        Plugin::getInstance()->sessions->terminate((string) $response->headers->get(Http::HEADER_SESSION_ID));
+        Cortex::getInstance()->sessions->terminate((string) $response->headers->get(Http::HEADER_SESSION_ID));
     }
 
     // The next one over the burst must 429 + Retry-After.
@@ -1257,9 +1257,9 @@ it('60 rapid successful calls all succeed; the 61st returns 429 with Retry-After
 
 it('a throttled call writes one cortex_invocations row with kind=rate_limited and the right context', function() {
     // Shrink the bucket so the test drains it cheaply.
-    Plugin::getInstance()->getSettings()->rateLimitBurst = 1;
-    Plugin::getInstance()->getSettings()->rateLimitPerSecond = 1;
-    Plugin::getInstance()->rateLimiter->clear($this->userId);
+    Cortex::getInstance()->getSettings()->rateLimitBurst = 1;
+    Cortex::getInstance()->getSettings()->rateLimitPerSecond = 1;
+    Cortex::getInstance()->rateLimiter->clear($this->userId);
 
     // Burn the one available token.
     $firstBody = (string) json_encode([
@@ -1323,13 +1323,13 @@ it('a throttled call writes one cortex_invocations row with kind=rate_limited an
     expect($row->toolName)->toBe('_rate_limited');
 
     \craftpulse\cortex\records\Invocation::deleteAll(['id' => $row->id]);
-    Plugin::getInstance()->sessions->terminate($firstSessionId);
+    Cortex::getInstance()->sessions->terminate($firstSessionId);
 });
 
 it('a throttled call does NOT dispatch — no tool-execution audit row, only the throttle row', function() {
-    Plugin::getInstance()->getSettings()->rateLimitBurst = 1;
-    Plugin::getInstance()->getSettings()->rateLimitPerSecond = 1;
-    Plugin::getInstance()->rateLimiter->clear($this->userId);
+    Cortex::getInstance()->getSettings()->rateLimitBurst = 1;
+    Cortex::getInstance()->getSettings()->rateLimitPerSecond = 1;
+    Cortex::getInstance()->rateLimiter->clear($this->userId);
 
     // Set up a session by initializing (consumes the only token).
     $initBody = (string) json_encode([
@@ -1380,7 +1380,7 @@ it('a throttled call does NOT dispatch — no tool-execution audit row, only the
         'userId' => $this->userId,
         'kind' => 'rate_limited',
     ]);
-    Plugin::getInstance()->sessions->terminate($sessionId);
+    Cortex::getInstance()->sessions->terminate($sessionId);
 });
 
 // -----------------------------------------------------------------------------
@@ -1402,10 +1402,10 @@ function _cortex_register_streaming_fixture(): array
         $listener,
     );
 
-    $original = Plugin::getInstance()->tools;
+    $original = Cortex::getInstance()->tools;
     $fresh = new \craftpulse\cortex\services\Tools();
     $fresh->init();
-    Plugin::getInstance()->set('tools', $fresh);
+    Cortex::getInstance()->set('tools', $fresh);
 
     return [$original, $listener];
 }
@@ -1413,7 +1413,7 @@ function _cortex_register_streaming_fixture(): array
 function _cortex_restore_streaming_fixture(array $context): void
 {
     [$original, $listener] = $context;
-    Plugin::getInstance()->set('tools', $original);
+    Cortex::getInstance()->set('tools', $original);
     \yii\base\Event::off(
         \craftpulse\cortex\services\Tools::class,
         \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
@@ -1521,7 +1521,89 @@ it('a streaming tools/call with Accept: text/event-stream returns SSE frames', f
         expect($terminal['id'])->toBe(2);
         expect($terminal['result']['isError'])->toBeFalse();
 
-        Plugin::getInstance()->sessions->terminate($sessionId);
+        Cortex::getInstance()->sessions->terminate($sessionId);
+    } finally {
+        _cortex_restore_streaming_fixture($ctx);
+    }
+});
+
+it('notifications/cancelled mid-stream over the controller writes a cancelled frame + kind=cancelled audit row', function() {
+    $ctx = _cortex_register_streaming_fixture();
+
+    try {
+        // Initialize to mint a session.
+        $initBody = (string) json_encode([
+            'jsonrpc' => '2.0',
+            'id' => 1,
+            'method' => 'initialize',
+            'params' => [
+                'protocolVersion' => Server::PROTOCOL_VERSION,
+                'clientInfo' => ['name' => 'pest-cancel', 'version' => '0'],
+            ],
+        ]);
+        $initController = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            'Authorization' => $this->bearerHeader,
+        ], $initBody);
+        $sessionId = (string) $initController->runIndex()->headers->get(Http::HEADER_SESSION_ID);
+
+        // Pre-arm the cancel cache slot for the upcoming request id so
+        // the streaming token observes the flip on its first poll. This
+        // models the wire-level race where the client has already
+        // posted `notifications/cancelled` before the streaming
+        // response sent its first progress frame — exactly the path
+        // that the controller's drain-don't-break loop has to honour.
+        $requestId = 2;
+        $cancelKey = Server::CANCEL_CACHE_KEY_PREFIX . $sessionId . ':' . $requestId;
+        Craft::$app->getCache()->set($cancelKey, true, Server::CANCEL_CACHE_TTL);
+
+        // Defense against stale audit rows from prior runs.
+        \craftpulse\cortex\records\Invocation::deleteAll(['sessionId' => $sessionId]);
+
+        $callBody = (string) json_encode([
+            'jsonrpc' => '2.0',
+            'id' => $requestId,
+            'method' => 'tools/call',
+            'params' => [
+                'name' => '_streaming_test',
+                'arguments' => [],
+                '_meta' => ['progressToken' => 'prog-cancel-controller'],
+            ],
+        ]);
+        $callController = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            Http::HEADER_SESSION_ID => $sessionId,
+            'Authorization' => $this->bearerHeader,
+            'Accept' => 'application/json, text/event-stream',
+        ], $callBody);
+
+        $callResponse = $callController->runIndex();
+
+        expect($callResponse->statusCode)->toBe(200);
+        expect($callResponse->headers->get('Content-Type'))->toContain('text/event-stream');
+
+        // Wire-level: exactly one frame — the cancellation envelope —
+        // because the token tripped before the fixture's first yield.
+        $frames = _cortex_parse_sse($callController->capturedSseBody);
+        expect($frames)->toHaveCount(1);
+        expect($frames[0]['event'])->toBe('message');
+        expect($frames[0]['data']['method'])->toBe('notifications/cancelled');
+        expect($frames[0]['data']['params']['requestId'])->toBe($requestId);
+        expect($frames[0]['data']['params']['progressToken'])->toBe('prog-cancel-controller');
+
+        // Audit row writes despite the cancellation — proves the
+        // drain-don't-break loop completed the dispatcher generator
+        // rather than orphaning the row.
+        $rows = \craftpulse\cortex\records\Invocation::find()
+            ->where(['toolName' => '_streaming_test', 'sessionId' => $sessionId])
+            ->all();
+        expect($rows)->toHaveCount(1);
+        expect($rows[0]->kind)->toBe(\craftpulse\cortex\tools\support\InvocationLogger::KIND_CANCELLED);
+        expect($rows[0]->errorClass)->toBeNull();
+
+        \craftpulse\cortex\records\Invocation::deleteAll(['id' => $rows[0]->id]);
+        Craft::$app->getCache()->delete($cancelKey);
+        Cortex::getInstance()->sessions->terminate($sessionId);
     } finally {
         _cortex_restore_streaming_fixture($ctx);
     }
@@ -1568,7 +1650,7 @@ it('a tools/call without Accept: text/event-stream keeps the JSON response path'
         expect($envelope)->toHaveKey('result');
         expect($envelope['result'])->toHaveKey('isError', false);
 
-        Plugin::getInstance()->sessions->terminate($sessionId);
+        Cortex::getInstance()->sessions->terminate($sessionId);
     } finally {
         _cortex_restore_streaming_fixture($ctx);
     }

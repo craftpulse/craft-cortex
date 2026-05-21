@@ -21,8 +21,11 @@
  *   4. Defaults from `models/Settings`
  *
  * Runtime DB overrides (admin-issued via the CP, auto-expiring) layer
- * on top of `allowedCommands` only — they don't override the toggles
- * or TTL config.
+ * on top of `allowedCommands` only — they don't override
+ * `adminLevelCommands`, the toggles, or TTL config. To grant a
+ * normally-admin-level pattern at runtime, extend `allowedCommands`
+ * directly via project config or `config/cortex.php` for the target
+ * environment.
  * =========================================================================
  *
  * @author Craftpulse
@@ -33,42 +36,102 @@ return [
     '*' => [
 
         // ---------------------------------------------------------------------
-        // Allowlist
+        // Allowlist — content level
         // ---------------------------------------------------------------------
 
         /**
-         * The set of glob patterns the `craft_command` tool may dispatch.
+         * The content-level set of glob patterns the `craft_command`
+         * tool may dispatch. Always admitted regardless of the host's
+         * `allowAdminChanges` flag — these routes touch content,
+         * caches, queues, mail, or other non-schema state.
+         *
          * Patterns use fnmatch semantics: `resave/*` matches any
-         * `resave/<x>` route; `up` matches the literal `up` command.
+         * `resave/<x>` route; `gc` matches the literal `gc` command.
          *
          * Set this to your own list to lock the allowlist down per
          * environment, or extend the defaults via the CP runtime
          * overrides UI for short-lived grants (auto-expiring).
          *
-         * Default ships ~15 patterns covering generators, migrations,
-         * project config, caches, resaves, fixtures, and a few common
-         * one-shots.
+         * Default ships nine content-level patterns covering resaves,
+         * caches, queue maintenance, asset indexing, user creation,
+         * and a few common one-shots.
          *
          * @var string[]
          */
         // 'allowedCommands' => [
         //     'resave/*',
-        //     'project-config/*',
         //     'cache/*',
         //     'invalidate-tags/*',
-        //     'migrate/*',
-        //     'up',
         //     'index-assets/*',
         //     'gc',
-        //     'make/*',
-        //     'fixture/*',
-        //     'sections/*',
-        //     'fields/*',
         //     'users/create',
-        //     'entrify/*',
         //     'utils/*',
         //     'clear-deprecations',
         //     'mailer/test',
+        // ],
+
+        // ---------------------------------------------------------------------
+        // Allowlist — admin level
+        // ---------------------------------------------------------------------
+
+        /**
+         * The admin-level set of glob patterns the `craft_command`
+         * tool may dispatch ONLY when
+         * `Craft::$app->getConfig()->getGeneral()->allowAdminChanges`
+         * is `true`. These routes mutate admin-only state — project
+         * config, schema migrations, plugin scaffolding, section/field
+         * DDL, fixture loads.
+         *
+         * When `allowAdminChanges` is `false`, a `craft_command`
+         * invocation matching a pattern here is rejected at dispatch
+         * with JSON-RPC code `-32002` and an error message naming
+         * `allowAdminChanges` as the reason. The rejection is still
+         * audit-logged so the boundary attempt survives in
+         * `cortex_invocations`.
+         *
+         * Tighten this list per environment when you want a stricter
+         * posture than the defaults provide — e.g. drop `make/*` on
+         * production where scaffolding has no place.
+         *
+         * @var string[]
+         */
+        // 'adminLevelCommands' => [
+        //     'project-config/*',
+        //     'migrate/*',
+        //     'up',
+        //     'make/*',
+        //     'entrify/*',
+        //     'sections/*',
+        //     'fields/*',
+        //     'fixture/*',
+        // ],
+
+        // ---------------------------------------------------------------------
+        // Users tool — custom-field exposure allowlist
+        // ---------------------------------------------------------------------
+
+        /**
+         * Operator-curated list of custom-field handles whose values
+         * the Pro `users` tool may return on a user envelope. Default
+         * `[]` — zero-trust posture: no custom-field values are
+         * exposed until you explicitly enumerate them here.
+         *
+         * Craft 5 has no native per-field-value permission; field-
+         * layout-designer hiding is UX-only. Defense in depth
+         * requires Cortex providing its own gate — this allowlist is
+         * the gate. Native user attributes (id, username, email,
+         * etc.) are NOT subject to this allowlist; per-permission
+         * gates handle them. Only custom-field values are gated here.
+         *
+         * Consumed by the Pro `users` tool (lands in Gate 8.5). The
+         * setting itself ships in Gate 8.1 so operators discover the
+         * configuration surface before the tool exists.
+         *
+         * @var string[]
+         */
+        // 'userCustomFieldAllowlist' => [
+        //     'phone',
+        //     'department',
         // ],
 
         // ---------------------------------------------------------------------
@@ -272,12 +335,18 @@ return [
 
     // 'production' => [
     //     'allowedCommands' => [
-    //         // Production typically wants a tighter allowlist.
+    //         // Production typically wants a tighter content-level allowlist.
     //         'cache/flush',
     //         'cache/flush-all',
     //         'invalidate-tags/*',
     //         'gc',
     //         'mailer/test',
+    //     ],
+    //     'adminLevelCommands' => [
+    //         // And usually no admin-level surface at all on production.
+    //         // Combined with `allowAdminChanges = false` in `config/general.php`,
+    //         // this is belt-and-suspenders: even an operator who flips the
+    //         // host flag back on still has nothing here to dispatch.
     //     ],
     //     'execEnabled' => false,
     // ],

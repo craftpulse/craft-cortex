@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('image_transforms');
+    $this->tool = Cortex::getInstance()->tools->getByName('image_transforms');
 });
 
 it('lists image transforms (possibly empty)', function() {

@@ -15,7 +15,7 @@
  */
 
 use craftpulse\cortex\console\controllers\OauthController;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\services\Oauth;
 
 // -----------------------------------------------------------------------------
@@ -65,7 +65,7 @@ function _cortex_init_keys_harness(): array
     $prop->setAccessible(true);
     $prop->setValue($pathSvc, $testRoot);
 
-    $controller = new _CortexOauthInitKeysHarness('oauth', Plugin::getInstance());
+    $controller = new _CortexOauthInitKeysHarness('oauth', Cortex::getInstance());
     return [$controller, $keysDir];
 }
 
@@ -152,7 +152,7 @@ it('init-keys refuses to overwrite an existing key pair without --force', functi
         expect($first)->toBe(0);
 
         // Second invocation without --force fails.
-        $controller2 = new _CortexOauthInitKeysHarness('oauth', Plugin::getInstance());
+        $controller2 = new _CortexOauthInitKeysHarness('oauth', Cortex::getInstance());
         $second = $controller2->actionInitKeys();
         expect($second)->not->toBe(0);
         expect($controller2->captured)->toContain('already exist');
@@ -175,7 +175,7 @@ it('init-keys with --force overwrites an existing key pair', function() {
         // CSPRNG-driven but defensive.
         usleep(1000);
 
-        $controller2 = new _CortexOauthInitKeysHarness('oauth', Plugin::getInstance());
+        $controller2 = new _CortexOauthInitKeysHarness('oauth', Cortex::getInstance());
         $controller2->force = true;
         $exit = $controller2->actionInitKeys();
         expect($exit)->toBe(0);

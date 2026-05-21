@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('globals');
+    $this->tool = Cortex::getInstance()->tools->getByName('globals');
 });
 
 it('returns every global set with field values when no handle is passed', function() {

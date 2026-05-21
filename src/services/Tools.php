@@ -4,10 +4,17 @@ namespace craftpulse\cortex\services;
 
 use craft\elements\User;
 use craftpulse\cortex\events\RegisterToolsEvent;
+use craftpulse\cortex\tools\content\Address;
 use craftpulse\cortex\tools\content\Assets;
+use craftpulse\cortex\tools\content\BulkEntries;
 use craftpulse\cortex\tools\content\Categories;
+use craftpulse\cortex\tools\content\Category;
 use craftpulse\cortex\tools\content\Entries;
+use craftpulse\cortex\tools\content\Entry;
 use craftpulse\cortex\tools\content\Globals;
+use craftpulse\cortex\tools\content\GlobalSet;
+use craftpulse\cortex\tools\content\ScaffoldEntries;
+use craftpulse\cortex\tools\content\Tag;
 use craftpulse\cortex\tools\content\Tags;
 use craftpulse\cortex\tools\dev\ClearCaches;
 use craftpulse\cortex\tools\dev\CraftCommand;
@@ -36,7 +43,9 @@ use craftpulse\cortex\tools\system\PermissionsAndGroups;
 use craftpulse\cortex\tools\system\Plugins;
 use craftpulse\cortex\tools\system\Routes;
 use craftpulse\cortex\tools\system\SearchSkills;
+use craftpulse\cortex\tools\system\Skill;
 use craftpulse\cortex\tools\system\SystemInfo;
+use craftpulse\cortex\tools\system\Users;
 use craftpulse\cortex\tools\ToolInterface;
 use craftpulse\cortex\tools\workflow\Audit;
 use craftpulse\cortex\tools\workflow\DraftsAndRevisions;
@@ -312,6 +321,21 @@ class Tools extends Component
             new Categories(),
             new Tags(),
             new Globals(),
+
+            // Content writing (Pro). `Entry::shouldRegister()` returns
+            // false on Free installs so the registration loop skips it
+            // before the instance is exposed to `tools/list`. Same for
+            // the Gate 8.3 siblings (`Category`, `Tag`, `GlobalSet`) and
+            // the Gate 8.4 sibling (`Address`).
+            new Entry(),
+            new Category(),
+            new Tag(),
+            new GlobalSet(),
+            new Address(),
+            new Users(), // system-namespaced but shares the Pro-write registration block
+            new Skill(), // Gate 8.6 — Cortex's first owned element type
+            new BulkEntries(), // Gate 8.7 — first streaming Pro tool
+            new ScaffoldEntries(), // Gate 8.7 — template-driven create-many sibling
 
             // System & diagnostics.
             new SystemInfo(),

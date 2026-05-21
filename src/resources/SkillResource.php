@@ -2,20 +2,25 @@
 
 namespace craftpulse\cortex\resources;
 
+use craftpulse\cortex\Cortex;
 use Michtio\CraftCmsClaudeSkills\Skills;
 
 /**
  * =========================================================================
  * Skill-backed MCP resource.
  *
- * One instance per addressable URI in the bundled-skills package:
+ * One instance per addressable URI in the merged skills corpus:
  *   - `craft-skills://<skill>`               -> SKILL.md router
+ *     (or synthesized element bytes when an element-stored skill
+ *     exists with the same handle — locked decision 17 of Gate 8.6)
  *   - `craft-skills://<skill>/<reference>`   -> references/<reference>.md
+ *     (always bundled — element override is SKILL.md only)
  *
  * Constructed with `(skill, reference?)`. When `reference` is null the
- * resource surfaces the skill's SKILL.md; otherwise it surfaces the
- * named reference document. The URI is derived from the constructor
- * arguments — never accept a URI as input here, build it.
+ * resource surfaces the skill's SKILL.md (or its element override);
+ * otherwise it surfaces the named reference document. The URI is
+ * derived from the constructor arguments — never accept a URI as
+ * input here, build it.
  * =========================================================================
  *
  * @author Craftpulse
@@ -119,9 +124,20 @@ class SkillResource extends AbstractResource
      */
     public function read(): array
     {
-        $text = $this->_reference === null
-            ? Skills::content($this->_skill)
-            : Skills::referenceContent($this->_skill, $this->_reference);
+        if ($this->_reference !== null) {
+            // References are bundled-only — locked decision 17 keeps
+            // override scope on SKILL.md.
+            $text = Skills::referenceContent($this->_skill, $this->_reference);
+        } else {
+            // SKILL.md path: consult the Skills service first. When an
+            // element-stored skill exists for this handle, synthesize
+            // the override bytestream. Otherwise fall through to the
+            // bundled filesystem reader.
+            $element = Cortex::getInstance()->skills->getByHandle($this->_skill);
+            $text = $element !== null
+                ? Cortex::getInstance()->skills->synthesizeContent($element)
+                : Skills::content($this->_skill);
+        }
 
         return [
             'uri' => $this->_uri,

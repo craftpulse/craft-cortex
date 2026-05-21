@@ -5,10 +5,10 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('routes');
+    $this->tool = Cortex::getInstance()->tools->getByName('routes');
 });
 
 it('returns the four route categories plus site count', function() {

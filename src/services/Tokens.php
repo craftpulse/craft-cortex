@@ -3,8 +3,8 @@
 namespace craftpulse\cortex\services;
 
 use Carbon\Carbon;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\models\Token;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\records\Token as TokenRecord;
 use yii\base\Component;
 use yii\base\Exception;
@@ -85,7 +85,7 @@ class Tokens extends Component
      */
     public function issue(int $userId, string $name, ?int $ttlSeconds = null): array
     {
-        $ttl = $ttlSeconds ?? Plugin::getInstance()->getSettings()->tokenTtlDefault;
+        $ttl = $ttlSeconds ?? Cortex::getInstance()->getSettings()->tokenTtlDefault;
 
         $plaintext = $this->_generatePlaintext();
         $hash = hash('sha256', $plaintext);

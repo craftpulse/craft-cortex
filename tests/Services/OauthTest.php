@@ -15,18 +15,18 @@
  * @since  5.0.0
  */
 
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\oauth\entities\AccessTokenEntity;
 use craftpulse\cortex\oauth\entities\ClientEntity;
 use craftpulse\cortex\oauth\entities\ScopeEntity;
 use craftpulse\cortex\oauth\repositories\ClientRepository;
 use craftpulse\cortex\oauth\repositories\ScopeRepository;
-use craftpulse\cortex\Plugin;
 use craftpulse\cortex\records\OauthClient as OauthClientRecord;
 use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
 use League\OAuth2\Server\CryptKey;
 
 beforeEach(function() {
-    $this->service = Plugin::getInstance()->oauth;
+    $this->service = Cortex::getInstance()->oauth;
 });
 
 afterEach(function() {
@@ -390,7 +390,7 @@ function _cortex_oauth_mint_jwt(string $clientId, string $audience, int $userId,
     $entity->setExpiryDateTime(new \DateTimeImmutable('@' . (time() + $expiresIn)));
     $entity->setAudience($audience);
     $entity->setPrivateKey(new CryptKey(
-        'file://' . Plugin::getInstance()->oauth->getPrivateKeyPath(),
+        'file://' . Cortex::getInstance()->oauth->getPrivateKeyPath(),
     ));
 
     // When a future nbf is requested, build the JWT directly via
@@ -398,7 +398,7 @@ function _cortex_oauth_mint_jwt(string $clientId, string $audience, int $userId,
     // AccessTokenEntity::toString() always stamps nbf = now, which is
     // correct at issuance — the nbf test needs a non-default nbf.
     if ($nbfOffset !== 0) {
-        $privateKeyContent = file_get_contents(Plugin::getInstance()->oauth->getPrivateKeyPath());
+        $privateKeyContent = file_get_contents(Cortex::getInstance()->oauth->getPrivateKeyPath());
         $signer = new \Lcobucci\JWT\Signer\Rsa\Sha256();
         $config = \Lcobucci\JWT\Configuration::forAsymmetricSigner(
             $signer,
@@ -439,7 +439,7 @@ function _cortex_oauth_mint_jwt(string $clientId, string $audience, int $userId,
  */
 function _cortex_oauth_mint_jwt_without_cid(string $clientId, string $audience, int $userId, int $expiresIn = 3600): string
 {
-    $privateKeyContent = file_get_contents(Plugin::getInstance()->oauth->getPrivateKeyPath());
+    $privateKeyContent = file_get_contents(Cortex::getInstance()->oauth->getPrivateKeyPath());
     $signer = new \Lcobucci\JWT\Signer\Rsa\Sha256();
     $config = \Lcobucci\JWT\Configuration::forAsymmetricSigner(
         $signer,

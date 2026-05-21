@@ -19,12 +19,12 @@
  */
 
 use Carbon\Carbon;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\records\Token as TokenRecord;
 use yii\base\Exception;
 
 beforeEach(function() {
-    $this->service = Plugin::getInstance()->tokens;
+    $this->service = Cortex::getInstance()->tokens;
     // The playground always has at least one admin user; we use it as
     // the userId binding for issued tokens. Resolving via the lookup
     // catches CI envs where the seeded user has shifted.
@@ -77,7 +77,7 @@ it('issue() with a TTL writes a future expiresAt; without TTL writes null', func
 });
 
 it('issue() defaults to Settings::$tokenTtlDefault when no TTL passed', function() {
-    $settings = Plugin::getInstance()->getSettings();
+    $settings = Cortex::getInstance()->getSettings();
     $original = $settings->tokenTtlDefault;
     $settings->tokenTtlDefault = 7200;
 

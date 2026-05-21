@@ -5,11 +5,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('clear_caches');
+    $this->tool = Cortex::getInstance()->tools->getByName('clear_caches');
 });
 
 it('lists registered cache keys when mode is `list`', function() {

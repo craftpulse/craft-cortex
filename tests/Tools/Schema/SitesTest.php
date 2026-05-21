@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Plugin;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Plugin::getInstance()->tools->getByName('sites');
+    $this->tool = Cortex::getInstance()->tools->getByName('sites');
 });
 
 it('lists sites with their groups + the primary site handle', function() {
