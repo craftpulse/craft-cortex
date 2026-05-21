@@ -4,6 +4,7 @@ namespace craftpulse\cortex;
 
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
+use craft\helpers\UrlHelper;
 use craftpulse\cortex\models\Settings;
 use craftpulse\cortex\plugin\PluginTrait;
 use craftpulse\cortex\plugin\Services as CortexServices;
@@ -80,6 +81,18 @@ class Cortex extends BasePlugin
      */
     public const EDITION_PRO = 'pro';
 
+    /**
+     * Permission handle gating the Activity tab in the Cortex CP page.
+     * Admins implicitly pass; non-admins with this permission see only
+     * their own invocations (the `SettingsController::actionActivity*`
+     * actions scope the query by `userId` when the caller is not an
+     * admin). Registered under the Cortex heading on the user-permissions
+     * screen via `PluginTrait::_registerCortexPermissions()`.
+     *
+     * @since 5.0.0
+     */
+    public const PERMISSION_VIEW_ACTIVITY = 'cortex:viewActivity';
+
     // Public Properties
     // =========================================================================
 
@@ -92,6 +105,18 @@ class Cortex extends BasePlugin
      * @inheritdoc
      */
     public bool $hasCpSettings = true;
+
+    /**
+     * @inheritdoc
+     *
+     * Required as soon as `getSettingsResponse()` is overridden — the
+     * base `Plugin::init()` only auto-flips this when the default
+     * implementation is in use. Without the explicit declaration the
+     * CP nav link to Cortex settings disappears when
+     * `allowAdminChanges = false`. Reference:
+     * `~/.claude-eng/skills/craftcms/references/cp.md` line 516.
+     */
+    public bool $hasReadOnlyCpSettings = true;
 
     /**
      * @inheritdoc
@@ -171,6 +196,36 @@ class Cortex extends BasePlugin
         $this->onPluginInit();
     }
 
+    /**
+     * @inheritdoc
+     *
+     * Redirects every settings entry-point — the CP nav link under
+     * Settings → Plugins → Cortex, the click on the plugin row in
+     * Settings → Plugins, and anything else hitting Craft's built-in
+     * settings response — to the Cortex-owned tabbed page at
+     * `settings/plugins/cortex`. The redirect target route is
+     * registered in `PluginTrait::_registerUrlRules()` under
+     * `EVENT_REGISTER_CP_URL_RULES` and resolves to
+     * `cortex/settings/index`.
+     *
+     * Per Gate 9 locked decision 1 + `cp.md` §"Tabbed Settings
+     * Pages" line 432 — `settingsHtml()` cannot host tabs because
+     * Craft's `_settings.twig` wrapper does not propagate the `tabs`
+     * variable up to `_layouts/cp`. Overriding `getSettingsResponse()`
+     * is the only path that keeps the tabbed lineage intact.
+     *
+     * @throws \yii\base\InvalidConfigException from `Craft::$app->getResponse()`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getSettingsResponse(): mixed
+    {
+        /** @var \craft\web\Response $response */
+        $response = \Craft::$app->getResponse();
+        return $response->redirect(UrlHelper::cpUrl('settings/plugins/cortex'));
+    }
+
     // Protected Methods
     // =========================================================================
 
@@ -183,20 +238,5 @@ class Cortex extends BasePlugin
     protected function createSettingsModel(): ?Model
     {
         return new Settings();
-    }
-
-    /**
-     * @inheritdoc
-     *
-     * @author Craftpulse
-     * @since  5.0.0
-     */
-    protected function settingsHtml(): ?string
-    {
-        return \Craft::$app->getView()->renderTemplate('cortex/settings', [
-            'plugin' => $this,
-            'settings' => $this->getSettings(),
-            'overrides' => $this->allowlist->getAllOverrides(includeExpired: true),
-        ]);
     }
 }

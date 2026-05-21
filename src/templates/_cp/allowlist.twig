@@ -1,0 +1,22 @@
+{% extends "cortex/_cp/_layout" %}
+
+{# =========================================================================
+   Cortex Allowlist tab — placeholder.
+
+   Real content (VueAdminTable listing of admin-issued runtime allowlist
+   overrides + Garnish.Slideout for "Issue override" + row-action revoke)
+   lands in Gate 9.5. Overrides are DB-backed time-bound grants — same
+   issued-grant lifecycle as bearer tokens, separate from the project-
+   config-synced defaults on the Settings tab.
+
+   The DB-layer surface (`Allowlist` service, `actionAddOverride`,
+   `actionRemoveOverride`) already exists from pre-Gate-9 work — 9.5
+   replaces the calling UI without rewiring the data layer.
+   ========================================================================= #}
+
+{% set selectedTab = 'allowlist' %}
+
+{% block content %}
+    {# placeholder — built in 9.5 #}
+    <p class="light">{{ 'The Allowlist tab is coming soon.'|t('cortex') }}</p>
+{% endblock %}

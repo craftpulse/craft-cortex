@@ -1,0 +1,82 @@
+{% extends "cortex/_cp/_layout" %}
+{% import "_includes/forms.twig" as forms %}
+
+{# =========================================================================
+   Cortex Settings tab.
+
+   First tab in the Cortex tabbed CP page. Hosts project-config-synced
+   plugin defaults: `craft_exec` toggle, dry-run default, runtime
+   override TTL, and the `allowedCommands` editable table.
+
+   Runtime allowlist overrides (DB-backed, time-bound grants) live on
+   their own "Allowlist" tab — they share the issued-grant lifecycle of
+   bearer tokens, not the project-config lifecycle of plugin defaults.
+
+   Form fields use `settings[xxx]` bracket naming so the controller's
+   `getBodyParam('settings', [])` collects them as one map for
+   `Craft::$app->getPlugins()->savePluginSettings()` — sidesteps the
+   split-settings footgun from `cp.md` §"Split Settings Pages".
+
+   Per locked decision 1 the save target is `cortex/settings/save`
+   (own controller action), NOT Craft's `plugins/save-plugin-settings`.
+   ========================================================================= #}
+
+{% set selectedTab = 'settings' %}
+{% set fullPageForm = true %}
+
+{% block content %}
+    {{ actionInput('cortex/settings/save') }}
+    {{ redirectInput('settings/plugins/cortex') }}
+
+    <h2>{{ 'Defaults'|t('cortex') }}</h2>
+
+    <p class="light">
+        {{ 'These options sync to project config and apply across environments.'|t('cortex') }}
+    </p>
+
+    {{ forms.lightswitchField({
+        label: 'Enable craft_exec'|t('cortex'),
+        instructions: 'Disable to remove the `craft_exec` tool from `tools/list` entirely. The tool is stdio-only and gated by six security checks regardless.'|t('cortex'),
+        id: 'execEnabled',
+        name: 'settings[execEnabled]',
+        on: settings.execEnabled,
+    }) }}
+
+    {{ forms.lightswitchField({
+        label: 'craft_exec defaults to dry-run'|t('cortex'),
+        instructions: 'When enabled, `craft_exec` returns parsed analysis instead of evaluating until the caller passes `confirm: true`. Destructive expressions still need explicit `dangerous: true` regardless.'|t('cortex'),
+        id: 'execDryRunDefault',
+        name: 'settings[execDryRunDefault]',
+        on: settings.execDryRunDefault,
+    }) }}
+
+    {{ forms.textField({
+        label: 'Runtime override TTL (seconds)'|t('cortex'),
+        instructions: 'Default expiry applied to a new runtime override when none is supplied at creation time. Default 7 days (604800).'|t('cortex'),
+        id: 'runtimeOverrideTtl',
+        name: 'settings[runtimeOverrideTtl]',
+        value: settings.runtimeOverrideTtl,
+        type: 'number',
+        min: 60,
+    }) }}
+
+    {{ forms.editableTableField({
+        label: 'Allowed commands'|t('cortex'),
+        instructions: 'Glob patterns the `craft_command` tool may dispatch. Per-row patterns use `fnmatch` semantics: `resave/*` matches any `resave/<x>` route; `up` matches the literal `up` command.'|t('cortex'),
+        id: 'allowedCommands',
+        name: 'settings[allowedCommands]',
+        cols: {
+            pattern: {
+                heading: 'Pattern'|t('cortex'),
+                type: 'singleline',
+            },
+        },
+        rows: settings.allowedCommands|map(p => { pattern: p }),
+        defaultValues: { pattern: '' },
+        addRowLabel: 'Add a pattern'|t('cortex'),
+        allowAdd: true,
+        allowDelete: true,
+        allowReorder: true,
+    }) }}
+
+{% endblock %}
