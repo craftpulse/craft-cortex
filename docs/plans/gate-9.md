@@ -10,9 +10,9 @@ This is the implementation plan for the final pre-Plugin-Store-submission gate. 
 
 **Structure: ONE unified master plan, seven sub-gates.** Rejected: splitting into separate plan files per tab. The reason: every Gate 9 surface shares the same foundation — a custom `SettingsController`, a tabbed parent template extending `_layouts/cp` directly (mandatory because `settingsHtml()` cannot host tabs per the craftcms skill cp.md §"Tabbed Settings Pages"), a single shared asset bundle for VueAdminTable + Garnish wiring, and a single shared CP-URL-rule block. Splitting repeats that context per file. Sub-plans spawned ad hoc by the builder if a single sub-gate's diff exceeds the single-session target. The pre-merge state at the end of Gate 9 ships every Pro-tier operator surface in one branch; partial merges (e.g. Tokens-only) are blocked from Plugin Store submission because the gate-acceptance criterion requires the full end-to-end flow (issue → invoke → audit → revoke).
 
-**Sub-gate count: seven.** 9.1 foundation (custom controller, tabbed scaffold with five tabs, CP nav, asset bundle, base permission set). 9.2 Tokens. 9.3 Activity. 9.4 Connection. 9.5 Allowlist (DB-backed runtime overrides — same VueAdminTable + Garnish.Slideout pattern as Tokens). 9.6 Skill CP authoring screens. 9.7 cross-cutting tests + manual acceptance run.
+**Sub-gate count: seven.** 9.1 foundation (custom controller, tabbed scaffold with five tabs, CP nav, asset bundle, base permission set). 9.2 Allowlist (VueAdminTable + Garnish.Slideout — establishes the pattern against the pre-existing Allowlist service). 9.3 Activity. 9.4 Connection. 9.5 Tokens (reuses the pattern from 9.2; has a fresh data layer). 9.6 Skill CP authoring screens. 9.7 cross-cutting tests + manual acceptance run.
 
-**Revision history.** 2026-05-21: original plan had four tabs + Settings hosting the legacy hand-rolled "Runtime overrides" table verbatim. 9.1 manual smoke surfaced the legacy surface as below Plugin-Store-submission quality. Restructured: overrides promoted to their own "Allowlist" tab (same issued-grant lifecycle as bearer tokens; project-config defaults stay on Settings); 9.1 ships five tab placeholders; 9.5 inserted between Connection and Skill authoring.
+**Revision history.** 2026-05-21 r1: original plan had four tabs + Settings hosting the legacy hand-rolled "Runtime overrides" table verbatim. 9.1 manual smoke surfaced the legacy surface as below Plugin-Store-submission quality. Restructured: overrides promoted to their own "Allowlist" tab; 9.1 ships five tab placeholders. 2026-05-21 r2: 9.1 manual smoke surfaced editableTable + Allowlist placeholder UX issues. Allowlist pulled forward to 9.2 to establish the VueAdminTable + Garnish.Slideout pattern against the pre-existing data layer; Tokens moves to 9.5 (the data layer needs both service + UI; Tokens benefits from a locked pattern).
 
 ## Locked decisions
 
@@ -55,10 +55,10 @@ These are settled. Don't relitigate without good reason.
 | # | Sub-gate | Complexity | Adds |
 |---|---|---|---|
 | 9.1 | CP scaffolding foundation (custom controller, tabbed parent with five tabs, nav, asset bundle, permission) | Medium | `SettingsController` extended with five view actions + `actionSave`, custom CP routes, base tabbed template lineage, `CortexCpAsset` bundle, `cortex:viewActivity` permission. Settings tab ships project-config defaults (lightswitches, TTL, `editableTableField` for `allowedCommands`); other four tabs are placeholders. Legacy `settings.twig` deleted. |
-| 9.2 | Tokens tab (VueAdminTable + slideout issuance + revoke) | Large | `tokens` Twig template, `actionTokens` + `actionTokensTableData` + `actionIssueToken` + `actionRevokeToken`, slideout wiring, copy-to-clipboard, Pest tests for controller + JSON-shape invariant. Establishes the VueAdminTable + Garnish.Slideout pattern reused in 9.5. |
+| 9.2 | Allowlist tab (VueAdminTable + slideout override issuance + revoke) — **establishes the pattern** | Medium | `allowlist` Twig template, `actionAllowlistTableData`, rewires the pre-Gate-9 `actionAddOverride` / `actionRemoveOverride` mutations behind a Garnish.Slideout (issue) + VueAdminTable row-action (revoke). The pre-existing `Allowlist` service + DB layer stays intact — only the calling UI changes. Locks the VueAdminTable + Garnish.Slideout pattern reused by 9.5 (Tokens). |
 | 9.3 | Activity tab (VueAdminTable + filters + detail slideout) | Large | `activity` Twig template, `actionActivity` + `actionActivityTableData`, filter dropdowns (kind/tool/user/date-range), detail slideout with redacted-payload rendering, permission-scoped query, Pest tests |
 | 9.4 | Connection tab (static reference) | Small | `connection` Twig template, `actionConnection` view action, endpoint-URL autodetect via `UrlHelper`, per-client config blocks (Claude Desktop, ChatGPT Desktop, Cursor) with copy buttons |
-| 9.5 | Allowlist tab (VueAdminTable + slideout override issuance + revoke) | Medium | `allowlist` Twig template, `actionAllowlist` + `actionAllowlistTableData`, rewires the pre-Gate-9 `actionAddOverride`/`actionRemoveOverride` mutations behind a Garnish.Slideout (issue) + VueAdminTable row-action (revoke). Reuses the 9.2 pattern. Pre-Gate-9 DB layer and service surface stay intact — only the calling UI changes. |
+| 9.5 | Tokens tab (VueAdminTable + slideout issuance + revoke) | Large | `tokens` Twig template, `actionTokens` + `actionTokensTableData` + `actionIssueToken` + `actionRevokeToken`, slideout wiring, copy-to-clipboard, Pest tests for controller + JSON-shape invariant. Reuses the locked 9.2 pattern. |
 | 9.6 | Skill CP authoring screens | Medium | Skill `cpEditUrl()` override + CP routes + index + edit templates following Craft's Category template, top-level "Skills" nav entry with inline placeholder SVG icon, `Skill::PERMISSION_MANAGE` registered |
 | 9.7 | Cross-cutting tests + manual acceptance | Small | Architecture invariant: every tabbed sub-page extends `_layouts/cp` directly + sets a `tabs` variable; permission-boundary tests for every view + mutation action; non-dev tester acceptance run per PLANNING.md line 966-970 |
 
@@ -108,7 +108,7 @@ These are settled. Don't relitigate without good reason.
 - Removing `settingsHtml()` while keeping `hasCpSettings = true` is the right pattern but a regression vector if the redirect chain is mis-wired. Test: visit `/admin/settings/plugins/cortex` (Craft's auto-route to `settingsHtml`-using plugins) and verify it lands on the new tabbed page, not 404.
 - `EVENT_REGISTER_CP_URL_RULES` vs `EVENT_REGISTER_SITE_URL_RULES`: Gate 7's MCP routes use the site rules (front-end-style endpoint). Gate 9 routes are CP routes — different event constant, different rule set. Don't merge them.
 
-## Sub-gate 9.2 — Tokens tab
+## Sub-gate 9.5 — Tokens tab
 
 **Goal**: VueAdminTable listing of live bearer tokens with admin-issued creation and revocation. Plaintext surfaces once at issuance via Garnish.Slideout and is never reloadable per locked decision 4.
 
@@ -205,11 +205,13 @@ These are settled. Don't relitigate without good reason.
 **Risks**:
 - Client config formats change. The hardcoded JSON blocks may drift from upstream. Each block carries a comment "Verified against <client>'s docs as of 2026-05-21" in the template — future updates are a Phase 3 polish task.
 
-## Sub-gate 9.5 — Allowlist tab
+## Sub-gate 9.2 — Allowlist tab (locks the VueAdminTable + Garnish.Slideout pattern)
 
-**Goal**: rebuild the DB-backed runtime allowlist override surface using the VueAdminTable + Garnish.Slideout pattern established in 9.2 (Tokens). Replaces the legacy hand-rolled `<table class="data fullwidth">` + per-row delete form + below-table flexbox add-form. The pre-Gate-9 `Allowlist` service, `actionAddOverride`, and `actionRemoveOverride` data layer stays intact — only the calling UI changes.
+**Goal**: rebuild the DB-backed runtime allowlist override surface using VueAdminTable + Garnish.Slideout. This sub-gate **establishes** the pattern reused by 9.5 (Tokens). Allowlist goes first because the data layer (`Allowlist` service, `actionAddOverride`, `actionRemoveOverride`, `RuntimeOverride` record) already exists from pre-Gate-9 work — only the calling UI changes. Replaces the legacy hand-rolled `<table class="data fullwidth">` + per-row delete form + below-table flexbox add-form that 9.1 stripped out.
 
-**Why a tab and not a Settings section**: project-config-synced defaults (lightswitches, TTL, `allowedCommands`) and time-bound DB-backed grants (overrides) are different mental models with different lifecycles. Conflating them on one screen — as the legacy template did — fails the operator's mental model and prevents reuse of the Tokens-style VueAdminTable pattern. Per the locked decision 1 update: the legacy `settings.twig` was deleted in 9.1; this tab is the rebuild.
+(Section ordering preserved from r1 plan position for diff clarity — the Tokens detailed section below now carries the 9.5 header instead of 9.2.)
+
+**Why a tab and not a Settings section**: project-config-synced defaults (lightswitches, TTL, `allowedCommands`) and time-bound DB-backed grants (overrides) are different mental models with different lifecycles. Conflating them on one screen — as the legacy template did — fails the operator's mental model and prevents reuse of the VueAdminTable + slideout pattern. Per the locked decision 1 update: the legacy `settings.twig` was deleted in 9.1; this tab is the rebuild.
 
 **New**:
 - `src/templates/_cp/allowlist.twig` — extends `_cp/_layout`. Sets `selectedTab = 'allowlist'`. Content: a "+ New override" button bound to `Cortex.openAllowlistOverrideSlideout()`, a `<div id="cortex-allowlist-vue-admin-table">` container, a `{% js %}` block instantiating `new Craft.VueAdminTable({columns, tableDataEndpoint: 'cortex/allowlist/table-data', deleteAction: 'cortex/settings/remove-override', ...})`. Columns: `pattern` (monospace `<code>`), `note`, `expiresAt` (humanised or "never"; `disabled` styling when expired), `dateCreated` (humanised), `createdBy` (linked to User CP screen).
@@ -313,10 +315,10 @@ After each sub-gate, before moving on:
 | After | Manual check |
 |---|---|
 | 9.1 | `ddev craft up`; admin lands on `settings/plugins/cortex` and sees the tabbed page with five tab labels in the strip (Settings, Tokens, Allowlist, Activity, Connection). Settings tab shows only project-config defaults (lightswitches, TTL, `allowedCommands` editableTable) — overrides moved to Allowlist tab. Save flow on Settings still works (toggle execEnabled, save, verify PC sync via `ddev craft project-config/diff`). Anonymous user redirected to login; non-admin user gets 403 attempting `cortex/tokens`. |
-| 9.2 | Tokens tab loads. "+ New token" opens slideout. Issue a token. Plaintext displays in the post-issue view. Copy. Use in `curl` against `/cortex/mcp`. 200. Refresh Tokens tab. Token appears in the row. Revoke. Re-curl. 401. Non-admin → 403 on the whole tab. |
+| 9.2 | Allowlist tab loads with VueAdminTable. Click "+ New override". Submit pattern + note + TTL. Slideout closes; new row appears. Click row trash icon; confirm; row disappears. Expired rows render with `disabled` styling. |
 | 9.3 | Activity tab loads. Filters render. Click a row. Slideout opens with redacted args + response excerpt + (for tool_error rows) error class + message. As a non-admin with `cortex:viewActivity` granted: only own rows visible; foreign row URL returns 404. |
 | 9.4 | Connection tab loads. Endpoint URL auto-detected. Copy a config block. Paste into Claude Desktop. Verify it works (full Claude Desktop end-to-end is the 9.7 acceptance gate). |
-| 9.5 | Allowlist tab loads with VueAdminTable. Click "+ New override". Submit pattern + note + TTL. Slideout closes; new row appears. Click row trash icon; confirm; row disappears. Expired rows render with `disabled` styling. |
+| 9.5 | Tokens tab loads. "+ New token" opens slideout. Issue a token. Plaintext displays in the post-issue view. Copy. Use in `curl` against `/cortex/mcp`. 200. Refresh Tokens tab. Token appears in the row. Revoke. Re-curl. 401. Non-admin → 403 on the whole tab. |
 | 9.6 | Skills nav entry appears in CP for admins. Index page loads. Create new skill: handle + title + body. Save. Round-trips. |
 | 9.7 | Full Pest suite green. PHPStan + ECS green. Non-dev tester acceptance run signed off. |
 
