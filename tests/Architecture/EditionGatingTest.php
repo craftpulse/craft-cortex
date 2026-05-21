@@ -32,9 +32,15 @@ use craftpulse\cortex\tools\content\Entry;
 use craftpulse\cortex\tools\content\GlobalSet;
 use craftpulse\cortex\tools\content\ScaffoldEntries;
 use craftpulse\cortex\tools\content\Tag;
+use craftpulse\cortex\tools\dev\Resave;
+use craftpulse\cortex\tools\dev\StreamingFixtureTool;
 use craftpulse\cortex\tools\ProToolTrait;
+use craftpulse\cortex\tools\StreamableToolInterface;
+use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\system\Skill;
 use craftpulse\cortex\tools\system\Users;
+use craftpulse\cortex\tools\workflow\Audit;
+use craftpulse\cortex\tools\workflow\ImportExport;
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -132,6 +138,148 @@ it('every Pro tool is absent from asListPayload() on Free', function() {
         $name = $class::getName();
         if (in_array($name, $listed, true)) {
             $violations[] = "{$name}: present in asListPayload() on Free";
+        }
+    }
+    expect($violations)->toBe([]);
+});
+
+// -----------------------------------------------------------------------------
+// Streaming-tool axis — Gate 8.10 invariant sweep
+// -----------------------------------------------------------------------------
+
+/**
+ * The list of streaming tool classes. Append as new streaming tools
+ * land — the invariants below iterate it and fail on a tool that
+ * drifted from the `StreamableToolInterface` contract.
+ *
+ * Mixed Free / Pro registration: `BulkEntries` and `ScaffoldEntries`
+ * are Pro (registered only on Pro installs); `Resave`, `Audit`,
+ * `ImportExport`, and the env-gated `StreamingFixtureTool` are Free-
+ * registered with optional Pro modes.
+ *
+ * @return array<class-string>
+ */
+function _cortex_streaming_tool_classes(): array
+{
+    return [
+        BulkEntries::class,
+        ScaffoldEntries::class,
+        Resave::class,
+        Audit::class,
+        ImportExport::class,
+        StreamingFixtureTool::class,
+    ];
+}
+
+it('every streaming tool implements StreamableToolInterface', function() {
+    $violations = [];
+    foreach (_cortex_streaming_tool_classes() as $class) {
+        $reflect = new ReflectionClass($class);
+        if (!$reflect->implementsInterface(StreamableToolInterface::class)) {
+            $violations[] = "{$class}: missing StreamableToolInterface";
+        }
+    }
+    expect($violations)->toBe([]);
+});
+
+it('every streaming tool declares stream(): Generator with (array, InvocationContext) parameters', function() {
+    $violations = [];
+    foreach (_cortex_streaming_tool_classes() as $class) {
+        $reflect = new ReflectionClass($class);
+        if (!$reflect->hasMethod('stream')) {
+            $violations[] = "{$class}: missing stream() method";
+            continue;
+        }
+
+        $method = $reflect->getMethod('stream');
+
+        $returnType = $method->getReturnType();
+        if (!$returnType instanceof ReflectionNamedType || $returnType->getName() !== Generator::class) {
+            $violations[] = "{$class}::stream() return type is not Generator";
+        }
+
+        $params = $method->getParameters();
+        if (count($params) !== 2) {
+            $violations[] = sprintf('%s::stream() expected 2 parameters, got %d', $class, count($params));
+            continue;
+        }
+
+        $firstType = $params[0]->getType();
+        if (!$firstType instanceof ReflectionNamedType || $firstType->getName() !== 'array') {
+            $violations[] = "{$class}::stream() first parameter is not `array`";
+        }
+
+        $secondType = $params[1]->getType();
+        if (
+            !$secondType instanceof ReflectionNamedType
+            || $secondType->getName() !== InvocationContext::class
+        ) {
+            $violations[] = "{$class}::stream() second parameter is not InvocationContext";
+        }
+    }
+    expect($violations)->toBe([]);
+});
+
+it('every streaming tool declares execute(): array', function() {
+    // The non-streaming entry point collapses `stream()` via
+    // `getReturn()` to surface a single terminal envelope on the
+    // JSON-mode dispatch path. Each streaming tool's `execute()` body
+    // implementation varies (locked decision 13 of gate-8.10.md
+    // documents the BulkEntries reference pattern), but the signature
+    // must consistently declare an array return.
+    $violations = [];
+    foreach (_cortex_streaming_tool_classes() as $class) {
+        $reflect = new ReflectionClass($class);
+        if (!$reflect->hasMethod('execute')) {
+            $violations[] = "{$class}: missing execute() method";
+            continue;
+        }
+
+        $method = $reflect->getMethod('execute');
+        $returnType = $method->getReturnType();
+        if (!$returnType instanceof ReflectionNamedType || $returnType->getName() !== 'array') {
+            $violations[] = "{$class}::execute() return type is not array";
+        }
+    }
+    expect($violations)->toBe([]);
+});
+
+it('Free-registered streaming tools remain registered on a Free install', function() {
+    // Per locked decision 13 of gate-8.10.md: `Resave`, `Audit`,
+    // `ImportExport`, `StreamingFixtureTool` (env-gated) are Free-
+    // registered with optional Pro modes; only `BulkEntries` and
+    // `ScaffoldEntries` are whole-tool Pro-gated.
+    $freeRegistered = [
+        Resave::class,
+        Audit::class,
+        ImportExport::class,
+        // StreamingFixtureTool is gated by CORTEX_STREAMING_FIXTURE
+        // env var — skip the registry check (locked decision 13).
+    ];
+
+    $tools = Cortex::getInstance()->tools;
+    $violations = [];
+    foreach ($freeRegistered as $class) {
+        $name = $class::getName();
+        if ($tools->getByName($name) === null) {
+            $violations[] = "{$name}: absent from Free registry";
+        }
+    }
+    expect($violations)->toBe([]);
+});
+
+it('Pro-gated streaming tools are absent from the Free registry', function() {
+    $proGated = [
+        BulkEntries::class,
+        ScaffoldEntries::class,
+    ];
+
+    $tools = Cortex::getInstance()->tools;
+    $violations = [];
+    foreach ($proGated as $class) {
+        $name = $class::getName();
+        if ($tools->getByName($name) !== null) {
+            $violations[] = "{$name}: present in Free registry (should be Pro-only)";
         }
     }
     expect($violations)->toBe([]);

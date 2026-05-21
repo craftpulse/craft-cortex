@@ -1,0 +1,471 @@
+<?php
+
+/**
+ * =========================================================================
+ * Cross-tool permission boundary invariants — Gate 8.10.
+ *
+ * Locks the uniform contract across the Pro write surface: when
+ * `_assertPermission()` denies a non-admin caller, every Pro tool
+ *
+ *   1. Raises `ToolException` with a message matching the canonical
+ *      prefix locked in `docs/plans/gate-8.10.md` decision 3.
+ *      `ModeErrorShapeTest` locks the precise full-message shape via
+ *      reflection over the protected message builder; this test
+ *      locks the end-to-end **dispatch-style** path: the exception
+ *      class, the audit-row shape, the kind sentinel.
+ *
+ *   2. Stdio (`null` user identity) is trusted local and the
+ *      permission check skips entirely (locked decision 3 of
+ *      `gate-7.md`).
+ *
+ * Test boundaries — what this test does and does NOT cover:
+ *
+ *   - **In scope**: cross-tool shape consistency on the denial path.
+ *     Same exception class, same audit-row `kind=tool_error`, same
+ *     `errorClass=ToolException`.
+ *   - **Out of scope**: tool-specific happy paths, output envelopes,
+ *     per-mode validation, idempotency, multi-site, drafts/revisions.
+ *     Those are per-tool test territory.
+ *   - **Out of scope**: dispatcher-level dispatching through `tools/
+ *     call` JSON-RPC. The playground boots with `edition=free`, so
+ *     `Tools::getByNameFor()` returns null for every Pro tool. Per-
+ *     tool tests sidestep the registry by direct instantiation (e.g.
+ *     `new Entry()`); 8.10's boundary test mirrors that pattern and
+ *     drives `execute()` directly + manual `logCall()` for the
+ *     audit-row assertion. Per locked decision 11 of gate-8.10.md:
+ *     "Manual logCall is acceptable as a cheaper alternative when
+ *     dispatcher setup is too noisy."
+ *   - **Out of scope**: per-row routing semantics (BulkEntries-style
+ *     `onPermissionDenied=skip/fail`). Per-tool test territory.
+ *
+ * Per locked decision 5 of `gate-8.10.md` the dataset narrows to ONE
+ * representative mode per Pro tool. Streaming-tool rows test the
+ * pre-yield throw path (locked decision 10).
+ * =========================================================================
+ *
+ * @author Craftpulse
+ * @since  5.0.0
+ */
+
+use craft\elements\User as UserElement;
+use craftpulse\cortex\Cortex;
+use craftpulse\cortex\records\Invocation as InvocationRecord;
+use craftpulse\cortex\tools\content\Address;
+use craftpulse\cortex\tools\content\BulkEntries;
+use craftpulse\cortex\tools\content\Category;
+use craftpulse\cortex\tools\content\Entry;
+use craftpulse\cortex\tools\content\GlobalSet;
+use craftpulse\cortex\tools\content\ScaffoldEntries;
+use craftpulse\cortex\tools\support\InvocationContext;
+use craftpulse\cortex\tools\support\InvocationLogger;
+use craftpulse\cortex\tools\system\Skill;
+use craftpulse\cortex\tools\system\Users;
+use craftpulse\cortex\tools\ToolException;
+use craftpulse\cortex\tools\ToolInterface;
+
+// -----------------------------------------------------------------------------
+// Setup
+// -----------------------------------------------------------------------------
+
+beforeEach(function() {
+    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
+        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    expect($admin)->not->toBeNull();
+    Craft::$app->getUser()->setIdentity($admin);
+    $this->admin = $admin;
+
+    $this->fixturePrefix = '__cortex_permbound_' . bin2hex(random_bytes(4)) . '_';
+    $this->touchedAuditRowIds = [];
+});
+
+afterEach(function() {
+    $users = UserElement::find()
+        ->status(null)
+        ->trashed(null)
+        ->site('*')
+        ->andWhere(['like', 'users.username', $this->fixturePrefix . '%', false])
+        ->all();
+    foreach ($users as $user) {
+        Craft::$app->getElements()->deleteElement($user, hardDelete: true);
+    }
+
+    if (!empty($this->touchedAuditRowIds)) {
+        InvocationRecord::deleteAll(['id' => $this->touchedAuditRowIds]);
+    }
+
+    Craft::$app->getUser()->setIdentity($this->admin);
+});
+
+// -----------------------------------------------------------------------------
+// Helpers
+// -----------------------------------------------------------------------------
+
+/**
+ * Create a non-admin user with the supplied permission strings.
+ * Returns the saved User or null on failure.
+ *
+ * @param string[] $permissions
+ */
+function _cortex_permbound_user(string $prefix, string $label, array $permissions = []): ?UserElement
+{
+    $user = new UserElement();
+    $user->username = $prefix . $label;
+    $user->email = $user->username . '@example.test';
+    $user->admin = false;
+    $user->pending = true;
+    if (!Craft::$app->getElements()->saveElement($user)) {
+        return null;
+    }
+    if ($permissions !== []) {
+        Craft::$app->getUserPermissions()->saveUserPermissions(
+            (int) $user->id,
+            array_map('strtolower', $permissions),
+        );
+    }
+    return $user;
+}
+
+/**
+ * Drive a tool's `execute()` directly + mirror the dispatcher's audit-
+ * log write by calling `InvocationLogger::logCall()` with an HTTP
+ * context. Returns the captured exception (or null on success) plus
+ * the audit-log row.
+ *
+ * Reference pattern: `tests/Tools/Dev/CraftCommandAdminChangesTest.php`
+ * lines 200-253. Per locked decision 11 of `gate-8.10.md`, this is
+ * the cheap alternative to dispatcher-path testing for cases where
+ * the dispatcher's registry would short-circuit (e.g. Pro tools on a
+ * Free-edition playground).
+ *
+ * @param array<string,mixed> $arguments
+ * @return array{exception: ToolException|null, auditRow: InvocationRecord|null}
+ */
+function _cortex_permbound_execute(
+    object $testCase,
+    ToolInterface $tool,
+    array $arguments,
+): array {
+    $caught = null;
+    try {
+        $tool->execute($arguments);
+    } catch (ToolException $e) {
+        $caught = $e;
+    }
+
+    // Mirror the dispatcher's audit-log write. HTTP transport context
+    // because that's the path that exercises DB writes — the
+    // `Invocations::record()` listener short-circuits on non-HTTP
+    // transports.
+    $beforeIds = InvocationRecord::find()->select('id')->column();
+    InvocationLogger::logCall(
+        toolName: $tool::getName(),
+        arguments: $arguments,
+        error: $caught,
+        durationMs: 1,
+        context: new InvocationContext(
+            transport: 'http',
+            requestId: 'permbound-' . bin2hex(random_bytes(4)),
+            userId: Craft::$app->getUser()->getIdentity()?->id !== null
+                ? (int) Craft::$app->getUser()->getIdentity()->id
+                : null,
+            clientName: 'pest',
+        ),
+    );
+
+    $afterIds = InvocationRecord::find()->select('id')->column();
+    $newIds = array_diff($afterIds, $beforeIds);
+    $auditRow = null;
+    if ($newIds !== []) {
+        $latestId = max($newIds);
+        $auditRow = InvocationRecord::findOne(['id' => $latestId]);
+        $testCase->touchedAuditRowIds = array_merge($testCase->touchedAuditRowIds, $newIds);
+    }
+
+    return ['exception' => $caught, 'auditRow' => $auditRow];
+}
+
+// -----------------------------------------------------------------------------
+// Permission-denial sweep — one representative mode per Pro tool
+// -----------------------------------------------------------------------------
+
+it('Entry denies a non-permitted user with ToolException + tool_error audit row', function() {
+    $section = Craft::$app->getEntries()->getSectionByHandle('heroes')
+        ?? Craft::$app->getEntries()->getSectionByHandle('minorHeroes');
+    if ($section === null) {
+        $this->markTestSkipped('No section in playground.');
+    }
+
+    $caller = _cortex_permbound_user($this->fixturePrefix, 'entry', []);
+    if ($caller === null) {
+        $this->markTestSkipped('Could not create caller.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section, $caller) {
+        Craft::$app->getUser()->setIdentity($caller);
+
+        $result = _cortex_permbound_execute($this, new Entry(), [
+            'mode' => 'create',
+            'sectionHandle' => $section->handle,
+            'title' => $this->fixturePrefix . 'denied',
+        ]);
+
+        expect($result['exception'])->toBeInstanceOf(ToolException::class);
+        expect($result['exception']->getMessage())
+            ->toStartWith('permission denied — mode `create` on section `' . $section->uid . '`');
+
+        expect($result['auditRow'])->not->toBeNull();
+        expect($result['auditRow']->toolName)->toBe('entry');
+        expect($result['auditRow']->kind)->toBe('tool_error');
+        expect($result['auditRow']->errorClass)->toBe(ToolException::class);
+        expect($result['auditRow']->transport)->toBe('http');
+    });
+});
+
+it('Category denies a non-permitted user with ToolException + tool_error audit row', function() {
+    $group = Craft::$app->getCategories()->getGroupByHandle('factions');
+    if ($group === null) {
+        $this->markTestSkipped('factions category group not seeded.');
+    }
+    $category = \craft\elements\Category::find()->groupId($group->id)->status(null)->one();
+    if ($category === null) {
+        $this->markTestSkipped('No category seeded in factions group.');
+    }
+
+    $caller = _cortex_permbound_user($this->fixturePrefix, 'cat', []);
+    if ($caller === null) {
+        $this->markTestSkipped('Could not create caller.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group, $category, $caller) {
+        Craft::$app->getUser()->setIdentity($caller);
+
+        $result = _cortex_permbound_execute($this, new Category(), [
+            'mode' => 'update',
+            'id' => $category->id,
+            'title' => $this->fixturePrefix . 'denied',
+        ]);
+
+        expect($result['exception'])->toBeInstanceOf(ToolException::class);
+        expect($result['exception']->getMessage())
+            ->toStartWith('permission denied — mode `update` on group `' . $group->uid . '`');
+
+        expect($result['auditRow'])->not->toBeNull();
+        expect($result['auditRow']->kind)->toBe('tool_error');
+        expect($result['auditRow']->errorClass)->toBe(ToolException::class);
+    });
+});
+
+it('GlobalSet denies a non-permitted user with ToolException + tool_error audit row', function() {
+    $set = Craft::$app->getGlobals()->getAllSets()[0] ?? null;
+    if ($set === null) {
+        $this->markTestSkipped('No global sets in playground.');
+    }
+
+    $caller = _cortex_permbound_user($this->fixturePrefix, 'gset', []);
+    if ($caller === null) {
+        $this->markTestSkipped('Could not create caller.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($set, $caller) {
+        Craft::$app->getUser()->setIdentity($caller);
+
+        $result = _cortex_permbound_execute($this, new GlobalSet(), [
+            'handle' => $set->handle,
+            'fields' => [],
+        ]);
+
+        expect($result['exception'])->toBeInstanceOf(ToolException::class);
+        expect($result['exception']->getMessage())
+            ->toStartWith('permission denied — global_set update on set `' . $set->uid . '`');
+
+        expect($result['auditRow'])->not->toBeNull();
+        expect($result['auditRow']->kind)->toBe('tool_error');
+        expect($result['auditRow']->errorClass)->toBe(ToolException::class);
+    });
+});
+
+it('Address denies a non-permitted user with ToolException + tool_error audit row', function() {
+    $caller = _cortex_permbound_user($this->fixturePrefix, 'addr', []);
+    if ($caller === null) {
+        $this->markTestSkipped('Could not create caller.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        Craft::$app->getUser()->setIdentity($caller);
+
+        $result = _cortex_permbound_execute($this, new Address(), [
+            'mode' => 'create',
+            'ownerId' => (int) $this->admin->id,
+        ]);
+
+        expect($result['exception'])->toBeInstanceOf(ToolException::class);
+        expect($result['exception']->getMessage())
+            ->toStartWith('permission denied — mode `create` requires `editUsers`');
+
+        expect($result['auditRow'])->not->toBeNull();
+        expect($result['auditRow']->kind)->toBe('tool_error');
+        expect($result['auditRow']->errorClass)->toBe(ToolException::class);
+    });
+});
+
+it('Users denies a non-permitted user with ToolException + tool_error audit row', function() {
+    $caller = _cortex_permbound_user($this->fixturePrefix, 'usr', []);
+    if ($caller === null) {
+        $this->markTestSkipped('Could not create caller.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        Craft::$app->getUser()->setIdentity($caller);
+
+        $result = _cortex_permbound_execute($this, new Users(), [
+            'mode' => 'update',
+            'id' => (int) $this->admin->id,
+            'username' => 'tampered',
+        ]);
+
+        expect($result['exception'])->toBeInstanceOf(ToolException::class);
+        expect($result['exception']->getMessage())
+            ->toStartWith('permission denied — mode `update` requires `');
+
+        expect($result['auditRow'])->not->toBeNull();
+        expect($result['auditRow']->kind)->toBe('tool_error');
+        expect($result['auditRow']->errorClass)->toBe(ToolException::class);
+    });
+});
+
+it('Skill denies a non-permitted user with ToolException + tool_error audit row', function() {
+    $caller = _cortex_permbound_user($this->fixturePrefix, 'skl', []);
+    if ($caller === null) {
+        $this->markTestSkipped('Could not create caller.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        Craft::$app->getUser()->setIdentity($caller);
+
+        $result = _cortex_permbound_execute($this, new Skill(), [
+            'mode' => 'create',
+            'name' => $this->fixturePrefix . 'skill',
+            'handle' => 'permboundSkill',
+            'kind' => 'skill',
+        ]);
+
+        expect($result['exception'])->toBeInstanceOf(ToolException::class);
+        expect($result['exception']->getMessage())
+            ->toStartWith('permission denied — mode `create` requires `manageCortexSkills`');
+
+        expect($result['auditRow'])->not->toBeNull();
+        expect($result['auditRow']->kind)->toBe('tool_error');
+        expect($result['auditRow']->errorClass)->toBe(ToolException::class);
+    });
+});
+
+it('ScaffoldEntries denies a non-permitted user with ToolException + tool_error audit row', function() {
+    $section = Craft::$app->getEntries()->getSectionByHandle('minorHeroes')
+        ?? Craft::$app->getEntries()->getSectionByHandle('heroes');
+    if ($section === null) {
+        $this->markTestSkipped('No section in playground.');
+    }
+    $entryType = $section->getEntryTypes()[0] ?? null;
+    if ($entryType === null) {
+        $this->markTestSkipped('No entry type on section.');
+    }
+
+    $caller = _cortex_permbound_user($this->fixturePrefix, 'scf', []);
+    if ($caller === null) {
+        $this->markTestSkipped('Could not create caller.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section, $entryType, $caller) {
+        Craft::$app->getUser()->setIdentity($caller);
+
+        $result = _cortex_permbound_execute($this, new ScaffoldEntries(), [
+            'sectionUid' => $section->uid,
+            'entryTypeUid' => $entryType->uid,
+            'count' => 1,
+            'template' => ['title' => $this->fixturePrefix . 'scaffold'],
+        ]);
+
+        expect($result['exception'])->toBeInstanceOf(ToolException::class);
+        expect($result['exception']->getMessage())
+            ->toStartWith('permission denied — scaffold_entries requires `saveEntries:' . $section->uid);
+
+        expect($result['auditRow'])->not->toBeNull();
+        expect($result['auditRow']->kind)->toBe('tool_error');
+        expect($result['auditRow']->errorClass)->toBe(ToolException::class);
+    });
+});
+
+it('BulkEntries (streaming) denies a non-permitted user with ToolException + tool_error audit row', function() {
+    // Streaming-tool boundary: denial fires inside `stream()` (or its
+    // `execute()` collapse) BEFORE the first yield. Per locked
+    // decision 10 of `gate-8.10.md` the boundary contract is
+    // identical to the non-streaming surface.
+    $section = Craft::$app->getEntries()->getSectionByHandle('minorHeroes');
+    if ($section === null) {
+        $this->markTestSkipped('minorHeroes section not seeded.');
+    }
+
+    $caller = _cortex_permbound_user($this->fixturePrefix, 'blk', []);
+    if ($caller === null) {
+        $this->markTestSkipped('Could not create caller.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section, $caller) {
+        Craft::$app->getUser()->setIdentity($caller);
+
+        $result = _cortex_permbound_execute($this, new BulkEntries(), [
+            'mode' => 'set_status',
+            'status' => 'disabled',
+            'query' => ['section' => $section->handle],
+        ]);
+
+        expect($result['exception'])->toBeInstanceOf(ToolException::class);
+        expect($result['exception']->getMessage())
+            ->toStartWith('permission denied — mode `set_status` requires `saveEntries:' . $section->uid . '`');
+
+        expect($result['auditRow'])->not->toBeNull();
+        expect($result['auditRow']->kind)->toBe('tool_error');
+        expect($result['auditRow']->errorClass)->toBe(ToolException::class);
+    });
+});
+
+// -----------------------------------------------------------------------------
+// Stdio (null user) — trusted local, permission check skips
+// -----------------------------------------------------------------------------
+
+it('stdio (null user) does not raise the permission-denial path for any Pro tool', function() {
+    // Single sweep across the same Pro tools the denial-shape sweep
+    // exercises. The contract is: when identity is null, every
+    // `_assertPermission()` returns early without throwing. The
+    // boundary check is the absence of the denial path — the tool
+    // may still throw for other reasons (no section, validation, etc.)
+    // but NOT with the `permission denied — ` prefix.
+    cortex_with_edition(Cortex::EDITION_PRO, function() {
+        Craft::$app->getUser()->setIdentity(null);
+
+        $tools = [
+            new Entry(),
+            new Category(),
+            new GlobalSet(),
+            new Address(),
+            new Users(),
+            new Skill(),
+            new ScaffoldEntries(),
+            new BulkEntries(),
+        ];
+
+        foreach ($tools as $tool) {
+            try {
+                // Empty args trigger non-permission errors (missing
+                // mode, missing required fields, etc.). The contract
+                // we assert is that the error is NOT a permission-
+                // denial.
+                $tool->execute([]);
+            } catch (ToolException $e) {
+                // Non-permission ToolException is OK; what we don't
+                // want to see is the denial prefix.
+                expect($e->getMessage())->not->toStartWith('permission denied — ');
+            }
+        }
+    });
+});
