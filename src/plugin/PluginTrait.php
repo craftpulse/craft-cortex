@@ -255,10 +255,14 @@ trait PluginTrait
      * `.well-known/*`): MCP clients hit a stable public URL that
      * doesn't move with cpTrigger reconfiguration. POST is the
      * JSON-RPC entry point; GET is reserved for SSE upgrade; DELETE
-     * terminates the session. The controller refuses every request
-     * when `Settings::$httpEnabled` is false, so registering
-     * unconditionally is safe — feature gating happens at the
-     * controller layer, not at the route layer. OAuth endpoints sit
+     * terminates the session. All three controllers — `McpController`,
+     * `OauthController`, and `WellKnownController` — refuse every
+     * request with 503 when `Settings::$httpEnabled` is false (the MCP
+     * controller in its own `beforeAction()`, the OAuth + well-known
+     * controllers via the shared `AbstractOauthController` base), so
+     * registering these routes unconditionally is safe — feature
+     * gating happens at the controller layer, not at the route layer.
+     * OAuth endpoints sit
      * at `/oauth/*` (not under `/cortex/`) for client compatibility;
      * the `.well-known/*` discovery endpoints land at the site root
      * per RFC 8414 §3 and RFC 9728 §3 — both RFCs explicitly require

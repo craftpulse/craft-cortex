@@ -16,10 +16,77 @@
 
 use craftpulse\cortex\controllers\WellKnownController;
 use craftpulse\cortex\Cortex;
+use yii\web\HeaderCollection;
+use yii\web\Response;
+
+// -----------------------------------------------------------------------------
+// Harness
+// -----------------------------------------------------------------------------
+
+class _CortexWellKnownRequest
+{
+    public HeaderCollection $headers;
+
+    public function __construct(private readonly string $method = 'GET')
+    {
+        $this->headers = new HeaderCollection();
+    }
+
+    public function getMethod(): string
+    {
+        return $this->method;
+    }
+
+    public function getHeaders(): HeaderCollection
+    {
+        return $this->headers;
+    }
+
+    public function getIsLivePreview(): bool
+    {
+        return false;
+    }
+
+    public function getIsCpRequest(): bool
+    {
+        return false;
+    }
+
+    public function hasValidSiteToken(): bool
+    {
+        return false;
+    }
+}
+
+class _CortexWellKnownHarness extends WellKnownController
+{
+    /**
+     * Drive `beforeAction()` against a synthetic action so the
+     * `httpEnabled` kill switch on `AbstractOauthController` fires in
+     * tests. Returns the gate's boolean; the response slot carries the
+     * populated 503 when it short-circuits.
+     */
+    public function runBeforeAction(): bool
+    {
+        $this->request = new _CortexWellKnownRequest('GET');
+        return $this->beforeAction(new \yii\base\Action('authorization-server', $this));
+    }
+}
 
 beforeEach(function() {
     $this->controller = new WellKnownController('well-known', Cortex::getInstance());
     $this->controller->response = new \yii\web\Response();
+
+    $settings = Cortex::getInstance()->getSettings();
+    $this->originalHttpEnabled = $settings->httpEnabled;
+    // The discovery actions are read directly in most tests, bypassing
+    // `beforeAction()`; the kill-switch tests drive `beforeAction()`
+    // explicitly.
+    $settings->httpEnabled = true;
+});
+
+afterEach(function() {
+    Cortex::getInstance()->getSettings()->httpEnabled = $this->originalHttpEnabled;
 });
 
 // -----------------------------------------------------------------------------
@@ -126,4 +193,30 @@ it('protected-resource resource URL points at the cortex MCP endpoint', function
 it('protected-resource lists the Phase 1 scope vocabulary', function() {
     $response = $this->controller->actionProtectedResource();
     expect($response->data['scopes_supported'])->toBe(['read', 'write']);
+});
+
+// -----------------------------------------------------------------------------
+// httpEnabled kill switch — both metadata documents 503 when off
+// -----------------------------------------------------------------------------
+
+it('returns 503 from beforeAction when httpEnabled is false', function() {
+    Cortex::getInstance()->getSettings()->httpEnabled = false;
+
+    $controller = new _CortexWellKnownHarness('well-known', Cortex::getInstance());
+    $controller->response = new Response();
+    $proceeded = $controller->runBeforeAction();
+
+    expect($proceeded)->toBeFalse();
+    expect($controller->response->statusCode)->toBe(503);
+    expect($controller->response->data)->toHaveKey('error');
+});
+
+it('does not fire the 503 gate in beforeAction when httpEnabled is true', function() {
+    Cortex::getInstance()->getSettings()->httpEnabled = true;
+
+    $controller = new _CortexWellKnownHarness('well-known', Cortex::getInstance());
+    $controller->response = new Response();
+    $controller->runBeforeAction();
+
+    expect($controller->response->statusCode)->not->toBe(503);
 });

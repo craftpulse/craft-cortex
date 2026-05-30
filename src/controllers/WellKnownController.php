@@ -3,7 +3,6 @@
 namespace craftpulse\cortex\controllers;
 
 use craft\helpers\UrlHelper;
-use craft\web\Controller;
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\oauth\repositories\ScopeRepository;
 use yii\web\Response;
@@ -23,12 +22,16 @@ use yii\web\Response;
  * the root of the issuer URL — under `/.well-known/...`, not under
  * any path prefix. The plugin URL rules register them at site root
  * accordingly (`Cortex::init()`).
+ *
+ * Extends `AbstractOauthController` for the shared `httpEnabled` kill
+ * switch — both metadata documents return 503 when the HTTP transport
+ * is disabled, so a default install exposes no discovery surface.
  * =========================================================================
  *
  * @author Craftpulse
  * @since  5.0.0
  */
-class WellKnownController extends Controller
+class WellKnownController extends AbstractOauthController
 {
     // Protected Properties
     // =========================================================================
