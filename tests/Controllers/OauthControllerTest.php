@@ -139,6 +139,17 @@ class _CortexOauthControllerHarness extends OauthController
         $this->response = new Response();
         return $this;
     }
+
+    /**
+     * Drive `beforeAction()` against a synthetic action so the
+     * `httpEnabled` kill switch on `AbstractOauthController` fires in
+     * tests. Returns the gate's boolean; the response slot carries the
+     * populated 503 when it short-circuits.
+     */
+    public function runBeforeAction(): bool
+    {
+        return $this->beforeAction(new \yii\base\Action('authorize', $this));
+    }
 }
 
 /**
@@ -188,9 +199,18 @@ beforeEach(function() {
     expect($admin)->not->toBeNull();
     $this->admin = $admin;
     $this->userId = (int) $admin->id;
+
+    $settings = Cortex::getInstance()->getSettings();
+    $this->originalHttpEnabled = $settings->httpEnabled;
+    // The OAuth surface is gated behind `httpEnabled` on
+    // `AbstractOauthController`. Enable it for the action-level tests
+    // that exercise the flow; the kill-switch tests flip it off
+    // explicitly and drive `beforeAction()` directly.
+    $settings->httpEnabled = true;
 });
 
 afterEach(function() {
+    Cortex::getInstance()->getSettings()->httpEnabled = $this->originalHttpEnabled;
     OauthClientRecord::deleteAll(['like', 'clientName', '_test_/%', false]);
     OauthCodeRecord::deleteAll(['like', 'clientId', '%', false]);
     OauthTokenRecord::deleteAll(['like', 'clientId', '%', false]);
@@ -549,4 +569,38 @@ it('POST /oauth/revoke flips the dateRevoked on a known refresh token', function
 
     $fresh = OauthTokenRecord::findOne($record->id);
     expect($fresh->dateRevoked)->not->toBeNull();
+});
+
+// -----------------------------------------------------------------------------
+// httpEnabled kill switch — every OAuth action returns 503 when off
+// -----------------------------------------------------------------------------
+
+dataset('oauth endpoints', [
+    'authorize' => ['GET', 'https://test.invalid/oauth/authorize'],
+    'token' => ['POST', 'https://test.invalid/oauth/token'],
+    'register' => ['POST', 'https://test.invalid/oauth/register'],
+    'revoke' => ['POST', 'https://test.invalid/oauth/revoke'],
+]);
+
+it('returns 503 from beforeAction when httpEnabled is false', function(string $method, string $url) {
+    Cortex::getInstance()->getSettings()->httpEnabled = false;
+
+    $controller = _cortex_oauth_request(method: $method, url: $url);
+    $proceeded = $controller->runBeforeAction();
+
+    expect($proceeded)->toBeFalse();
+    expect($controller->response->statusCode)->toBe(503);
+    expect($controller->response->data)->toHaveKey('error');
+})->with('oauth endpoints');
+
+it('does not fire the 503 gate in beforeAction when httpEnabled is true', function() {
+    Craft::$app->getUser()->setIdentity($this->admin);
+    Cortex::getInstance()->getSettings()->httpEnabled = true;
+
+    $controller = _cortex_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/token');
+    $controller->runBeforeAction();
+
+    // The kill switch did not populate a 503 — parent::beforeAction()
+    // owns whatever status follows.
+    expect($controller->response->statusCode)->not->toBe(503);
 });

@@ -4,7 +4,6 @@ namespace craftpulse\cortex\controllers;
 
 use Craft;
 use craft\elements\User;
-use craft\web\Controller;
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\oauth\entities\UserEntity;
 use JsonException;
@@ -53,12 +52,16 @@ use yii\web\Response;
  * `$enableCsrfValidation = false` because every endpoint is either
  * PSR-7-bridged (auth handled by league) or revocation-style (token
  * is the proof).
+ *
+ * Extends `AbstractOauthController` for the shared `httpEnabled` kill
+ * switch — every action returns 503 before any DB work or DCR insert
+ * when `Settings::$httpEnabled` is false.
  * =========================================================================
  *
  * @author Craftpulse
  * @since  5.0.0
  */
-class OauthController extends Controller
+class OauthController extends AbstractOauthController
 {
     // Protected Properties
     // =========================================================================
