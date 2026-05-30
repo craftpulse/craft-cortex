@@ -157,6 +157,54 @@ it('requires a non-empty handle', function() {
     expect($skill->getErrors('handle'))->not->toBeEmpty();
 });
 
+it('rejects recreating a soft-deleted handle with a clean validation error — no IntegrityException, no orphaned element row', function() {
+    // BLOCKER (Gate 9 hardening): the DB UNIQUE index on
+    // cortex_skills.handle holds the trashed row, so a default
+    // (trashed=false) uniqueness probe used to pass, saveElement()
+    // persisted the element + elements_sites rows, then afterSave()'s
+    // raw SkillRecord save threw an IntegrityException — leaving a
+    // half-saved element. validateHandleUnique() must probe the trashed
+    // slot and fail closed.
+    $handle = $this->fixturePrefix . 'trashedhandle';
+    $original = _cortex_skill_save($handle, 'Original');
+
+    // Soft-delete it. The cortex_skills row (and the UNIQUE index entry)
+    // survive a soft delete.
+    Craft::$app->getElements()->deleteElement($original, hardDelete: false);
+    expect(Skill::find()->status(null)->handle($handle)->one())->toBeNull();
+
+    $elementRowsBefore = (new \craft\db\Query())
+        ->from(\craft\db\Table::ELEMENTS)
+        ->where(['type' => Skill::class])
+        ->count();
+
+    // Attempt the colliding create. Must fail closed at validation —
+    // no exception, no new element row.
+    $clash = new Skill();
+    $clash->handle = $handle;
+    $clash->title = 'Clash';
+
+    $saved = null;
+    try {
+        $saved = Craft::$app->getElements()->saveElement($clash);
+    } catch (\Throwable $e) {
+        $this->fail('Expected a clean validation failure, got ' . $e::class . ': ' . $e->getMessage());
+    }
+
+    expect($saved)->toBeFalse();
+    expect($clash->getErrors('handle'))->not->toBeEmpty();
+    expect($clash->getFirstError('handle'))->toContain('trashed');
+
+    // No orphaned element row: the failed create must not have persisted
+    // an `elements` row (the id stays null on a validation-rejected save).
+    expect($clash->id)->toBeNull();
+    $elementRowsAfter = (new \craft\db\Query())
+        ->from(\craft\db\Table::ELEMENTS)
+        ->where(['type' => Skill::class])
+        ->count();
+    expect($elementRowsAfter)->toBe($elementRowsBefore);
+});
+
 // -----------------------------------------------------------------------------
 // Permission resolution — canView / canSave / canDelete / canDuplicate
 // -----------------------------------------------------------------------------

@@ -402,11 +402,15 @@ class Skill extends Element
 
     /**
      * Validates that the handle is not already in use by another
-     * (non-trashed, non-self) skill element. The DB UNIQUE index
-     * catches duplicates at save time; this validator surfaces the
-     * collision in the Yii errors-array shape so tool consumers see a
-     * structured validation envelope rather than a database
-     * integrity-violation exception.
+     * skill element — including a soft-deleted (trashed) one. The DB
+     * UNIQUE index on `cortex_skills.handle` holds the trashed row, so
+     * a default (`trashed=false`) probe would let a colliding-with-
+     * trashed handle pass model validation and then explode with a raw
+     * `IntegrityException` inside `afterSave()`, leaving a half-saved
+     * element. Probing the trashed slot too makes the create fail
+     * closed with a structured validation error pointing the operator
+     * at restore-or-hard-delete — mirroring the UPDATE-path hint in
+     * `tools\system\Skill::_resolveSkillElement()`.
      *
      * @param string $attribute The attribute under validation.
      *
@@ -432,6 +436,30 @@ class Skill extends Element
             $this->addError(
                 $attribute,
                 Craft::t('cortex', 'Handle “{value}” is already in use by another skill.', [
+                    'value' => $this->handle,
+                ]),
+            );
+            return;
+        }
+
+        // The live slot is clear, but the DB UNIQUE index still holds any
+        // soft-deleted row with this handle. Catch it here so the save
+        // fails closed with a clean validation error instead of throwing
+        // an IntegrityException mid-`afterSave()`.
+        $trashedQuery = static::find()
+            ->status(null)
+            ->site('*')
+            ->trashed(true)
+            ->handle($this->handle);
+
+        if ($this->id !== null) {
+            $trashedQuery->andWhere(['not', ['elements.id' => $this->id]]);
+        }
+
+        if ($trashedQuery->exists()) {
+            $this->addError(
+                $attribute,
+                Craft::t('cortex', 'Handle “{value}” is in use by a trashed skill. Restore it via the Craft CP, or hard-delete the trashed skill (mode=delete with hardDelete=true) to free the handle.', [
                     'value' => $this->handle,
                 ]),
             );
