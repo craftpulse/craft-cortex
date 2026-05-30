@@ -11,6 +11,7 @@ use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\support\CancellationToken;
 use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\support\InvocationLogger;
+use craftpulse\cortex\tools\support\SecretRedactor;
 use craftpulse\cortex\tools\ToolException;
 use craftpulse\cortex\tools\ToolInterface;
 use Generator;
@@ -747,8 +748,11 @@ class Server
         // Serialize the tool result for the audit log's response excerpt.
         // The wire payload to the MCP client is built separately by
         // `_toolResultEnvelope()` and is unaffected by this — the
-        // excerpt is for forensics only.
-        $responsePayload = (string) json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        // excerpt is for forensics only. Belt-and-suspenders redaction
+        // of secret-keyed result fields before they land in the
+        // persisted excerpt, so any future HTTP-reachable tool that
+        // doesn't redact its own result is still covered.
+        $responsePayload = (string) json_encode(SecretRedactor::redactArray($result), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         InvocationLogger::logCall($name, $arguments, null, $this->_elapsedMs($startNs), $context, $responsePayload);
 
         return $this->_successResponse($id, $this->_toolResultEnvelope($tool, $result));
@@ -941,7 +945,11 @@ class Server
             // return their terminal payload.
             $finalResult = ['mode' => 'streamed', 'note' => 'Streamable tool generator finished without an explicit return.'];
         }
-        $responsePayload = (string) json_encode($finalResult, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        // Redact secret-keyed fields in the persisted excerpt only — the
+        // wire envelope below is built separately from the unredacted
+        // `$finalResult`, preserving the locked "execute() drains stream()
+        // for identical terminal envelope" invariant.
+        $responsePayload = (string) json_encode(SecretRedactor::redactArray($finalResult), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         InvocationLogger::logCall($name, $arguments, null, $this->_elapsedMs($startNs), $context, $responsePayload);
 
         yield $this->_successResponse($id, $this->_toolResultEnvelope($tool, $finalResult));

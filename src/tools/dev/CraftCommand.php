@@ -11,6 +11,7 @@ use craftpulse\cortex\Cortex;
 use craftpulse\cortex\tools\AbstractTool;
 use craftpulse\cortex\tools\support\ConsoleRunner;
 use craftpulse\cortex\tools\support\Schema;
+use craftpulse\cortex\tools\support\SecretRedactor;
 use craftpulse\cortex\tools\ToolException;
 
 /**
@@ -180,14 +181,19 @@ class CraftCommand extends AbstractTool
 
         $result = ConsoleRunner::run($command, $options);
 
+        // Redact `KEY=value` / `KEY: value` secrets in captured stdout/stderr
+        // before they reach the wire OR the persisted audit excerpt — default
+        // allowlist routes (`mailer/test`, `utils/*`) can echo transport and
+        // config secrets to stdout. Mirrors `CraftExec`'s treatment of its own
+        // captured output.
         return [
             'mode' => 'run',
             'command' => $command,
             'matchedPattern' => $matched,
             'options' => $options,
             'exitCode' => $result['exitCode'],
-            'output' => $result['output'],
-            'error' => $result['error'],
+            'output' => SecretRedactor::redactString($result['output']),
+            'error' => $result['error'] !== null ? SecretRedactor::redactString($result['error']) : null,
         ];
     }
 
