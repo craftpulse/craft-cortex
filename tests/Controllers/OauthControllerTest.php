@@ -53,11 +53,17 @@ class _CortexOauthRequest
         private readonly string $rawBody = '',
         array $headers = [],
         private readonly string $absoluteUrl = 'https://test.invalid/oauth/authorize',
+        private readonly string $userIp = '203.0.113.7',
     ) {
         $this->headers = new HeaderCollection();
         foreach ($headers as $name => $value) {
             $this->headers->set($name, $value);
         }
+    }
+
+    public function getUserIP(): string
+    {
+        return $this->userIp;
     }
 
     public function getMethod(): string
@@ -142,13 +148,14 @@ class _CortexOauthControllerHarness extends OauthController
 
     /**
      * Drive `beforeAction()` against a synthetic action so the
-     * `httpEnabled` kill switch on `AbstractOauthController` fires in
-     * tests. Returns the gate's boolean; the response slot carries the
-     * populated 503 when it short-circuits.
+     * `httpEnabled` kill switch and IP throttle on
+     * `AbstractOauthController` fire in tests. Returns the gate's
+     * boolean; the response slot carries the populated 503 / 429 when
+     * it short-circuits.
      */
-    public function runBeforeAction(): bool
+    public function runBeforeAction(string $actionId = 'authorize'): bool
     {
-        return $this->beforeAction(new \yii\base\Action('authorize', $this));
+        return $this->beforeAction(new \yii\base\Action($actionId, $this));
     }
 }
 
@@ -166,6 +173,7 @@ function _cortex_oauth_request(
     string $rawBody = '',
     array $headers = [],
     string $url = 'https://test.invalid/oauth/authorize',
+    string $userIp = '203.0.113.7',
 ): _CortexOauthControllerHarness {
     $controller = new _CortexOauthControllerHarness('oauth', Cortex::getInstance());
     $controller->withRequest(new _CortexOauthRequest(
@@ -175,6 +183,7 @@ function _cortex_oauth_request(
         rawBody: $rawBody,
         headers: $headers,
         absoluteUrl: $url,
+        userIp: $userIp,
     ));
     $controller->withFreshResponse();
     return $controller;
@@ -603,4 +612,74 @@ it('does not fire the 503 gate in beforeAction when httpEnabled is true', functi
     // The kill switch did not populate a 503 — parent::beforeAction()
     // owns whatever status follows.
     expect($controller->response->statusCode)->not->toBe(503);
+});
+
+// -----------------------------------------------------------------------------
+// IP throttle — anonymous /oauth/register, /token, /revoke are 429'd
+// -----------------------------------------------------------------------------
+
+it('429s anonymous /oauth/register from the same IP after the burst is exhausted', function() {
+    $settings = Cortex::getInstance()->getSettings();
+    $settings->httpEnabled = true;
+    // Tight burst so the loop trips fast; refill 1/sec so a single
+    // tight loop can't be saved by an accrued refill.
+    $originalBurst = $settings->rateLimitBurst;
+    $originalRate = $settings->rateLimitPerSecond;
+    $settings->rateLimitBurst = 3;
+    $settings->rateLimitPerSecond = 1;
+
+    $ip = '198.51.100.42';
+    Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ip);
+
+    try {
+        $blocked = false;
+        // Burst is 3; the 4th request inside the same wall-clock second
+        // must trip the throttle.
+        for ($i = 0; $i < 5; $i++) {
+            $controller = _cortex_oauth_request(
+                method: 'POST',
+                url: 'https://test.invalid/oauth/register',
+                userIp: $ip,
+            );
+            $proceeded = $controller->runBeforeAction('register');
+            if (!$proceeded && $controller->response->statusCode === 429) {
+                $blocked = true;
+                expect($controller->response->headers->get('Retry-After'))->not->toBeNull();
+                break;
+            }
+        }
+        expect($blocked)->toBeTrue();
+    } finally {
+        Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ip);
+        $settings->rateLimitBurst = $originalBurst;
+        $settings->rateLimitPerSecond = $originalRate;
+    }
+});
+
+it('does not throttle a different IP sharing the same window', function() {
+    $settings = Cortex::getInstance()->getSettings();
+    $settings->httpEnabled = true;
+    $originalBurst = $settings->rateLimitBurst;
+    $settings->rateLimitBurst = 1;
+
+    $ipA = '198.51.100.10';
+    $ipB = '198.51.100.11';
+    Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipA);
+    Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipB);
+
+    try {
+        // Drain IP A's single-token bucket.
+        $a = _cortex_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/register', userIp: $ipA);
+        expect($a->runBeforeAction('register'))->toBeTrue();
+        $a2 = _cortex_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/register', userIp: $ipA);
+        expect($a2->runBeforeAction('register'))->toBeFalse();
+
+        // IP B still has its own full bucket.
+        $b = _cortex_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/register', userIp: $ipB);
+        expect($b->runBeforeAction('register'))->toBeTrue();
+    } finally {
+        Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipA);
+        Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipB);
+        $settings->rateLimitBurst = $originalBurst;
+    }
 });

@@ -214,6 +214,62 @@ it('retryAfter is 0 when remaining >= 1 and positive when the bucket is exhauste
 });
 
 // -----------------------------------------------------------------------------
+// consumeKey() — arbitrary string-keyed bucket (IP throttle)
+// -----------------------------------------------------------------------------
+
+it('consumeKey() shares the bucket math with consume() on a fresh string key', function() {
+    $this->service->clearKey('oauth:ip:test');
+
+    $status = $this->service->consumeKey('oauth:ip:test');
+
+    expect($status)->toBeInstanceOf(RateLimitStatus::class);
+    expect($status->remaining)->toBe(59);
+
+    $this->service->clearKey('oauth:ip:test');
+});
+
+it('consumeKey() throws once the string-keyed bucket is exhausted', function() {
+    $settings = Cortex::getInstance()->getSettings();
+    $settings->rateLimitBurst = 2;
+    $settings->rateLimitPerSecond = 1;
+    $this->service->clearKey('oauth:ip:exhaust');
+
+    $this->service->consumeKey('oauth:ip:exhaust');
+    $this->service->consumeKey('oauth:ip:exhaust');
+
+    $caught = null;
+    try {
+        $this->service->consumeKey('oauth:ip:exhaust');
+    } catch (RateLimitExceededException $e) {
+        $caught = $e;
+    }
+
+    expect($caught)->toBeInstanceOf(RateLimitExceededException::class);
+    expect($caught->status->retryAfter)->toBeGreaterThanOrEqual(1);
+
+    $this->service->clearKey('oauth:ip:exhaust');
+});
+
+it('an oauth:ip-keyed bucket is independent from the same-numbered user bucket', function() {
+    // The OAuth throttle namespaces its key as `oauth:ip:<ip>`, so it
+    // never collides with a bare-int user bucket. Drain the IP bucket
+    // and confirm the user-id 42 bucket still has its full token.
+    $settings = Cortex::getInstance()->getSettings();
+    $settings->rateLimitBurst = 1;
+
+    $this->service->clear(42);
+    $this->service->clearKey('oauth:ip:42');
+
+    $this->service->consumeKey('oauth:ip:42');
+
+    $userStatus = $this->service->consume(42);
+    expect($userStatus->remaining)->toBe(0);
+
+    $this->service->clear(42);
+    $this->service->clearKey('oauth:ip:42');
+});
+
+// -----------------------------------------------------------------------------
 // Structural
 // -----------------------------------------------------------------------------
 

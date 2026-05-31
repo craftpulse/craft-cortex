@@ -4,6 +4,9 @@ namespace craftpulse\cortex\controllers;
 
 use craft\web\Controller;
 use craftpulse\cortex\Cortex;
+use craftpulse\cortex\exceptions\RateLimitExceededException;
+use craftpulse\cortex\values\RateLimitStatus;
+use yii\base\Action;
 use yii\web\Response;
 
 /**
@@ -25,6 +28,15 @@ use yii\web\Response;
  * posture; this base only adds the transport gate. A subclass that
  * overrides `beforeAction()` for its own auth/consent flow MUST call
  * `parent::beforeAction()` so the kill switch still runs.
+ *
+ * The base also carries an IP-keyed throttle for the unauthenticated
+ * OAuth endpoints. `OauthController` overrides `_throttledActionIds()`
+ * to name `register` / `token` / `revoke` — actions that precede
+ * authentication and so cannot key by Craft user id. Each remote IP
+ * gets its own token bucket (burst / refill shared with the per-user
+ * HTTP limiter) and is 429'd with `Retry-After` once exhausted. The
+ * default `_throttledActionIds()` is empty, so `WellKnownController`'s
+ * cheap static reads stay unthrottled.
  * =========================================================================
  *
  * @author Craftpulse
@@ -38,10 +50,11 @@ abstract class AbstractOauthController extends Controller
     /**
      * @inheritdoc
      *
-     * Runs the `httpEnabled` kill switch before delegating to Craft's
-     * standard pipeline. Returns false (with a 503 populated on the
-     * response) when the HTTP transport is disabled; otherwise hands
-     * off to `parent::beforeAction()`.
+     * Runs the `httpEnabled` kill switch, then the IP-keyed throttle
+     * for the actions named by `_throttledActionIds()`, before
+     * delegating to Craft's standard pipeline. Returns false (with a
+     * 503 or 429 populated on the response) when a gate trips;
+     * otherwise hands off to `parent::beforeAction()`.
      *
      * @throws \yii\web\BadRequestHttpException From `parent::beforeAction()`.
      *
@@ -55,11 +68,84 @@ abstract class AbstractOauthController extends Controller
             return false;
         }
 
+        if (!$this->_passesIpThrottle($action)) {
+            return false;
+        }
+
         return parent::beforeAction($action);
+    }
+
+    // Protected Methods
+    // =========================================================================
+
+    /**
+     * Action ids that get the IP-keyed throttle. Empty on the base —
+     * `OauthController` overrides this to name its unauthenticated
+     * endpoints. The authenticated `authorize` action is excluded:
+     * it's gated by a live Craft session, not throttled by IP.
+     *
+     * @return string[]
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _throttledActionIds(): array
+    {
+        return [];
     }
 
     // Private Methods
     // =========================================================================
+
+    /**
+     * Throttle the request by remote IP when the action is in
+     * `_throttledActionIds()`. Consumes one token from the IP's bucket
+     * (keyed `oauth:ip:<ip>`); on exhaustion populates a 429 with
+     * `Retry-After` and returns false. Actions outside the throttle
+     * list, and requests without a resolvable IP, pass through
+     * untouched.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _passesIpThrottle(Action $action): bool
+    {
+        if (!in_array($action->id, $this->_throttledActionIds(), true)) {
+            return true;
+        }
+
+        $ip = $this->request->getUserIP();
+        if (!is_string($ip) || $ip === '') {
+            return true;
+        }
+
+        try {
+            Cortex::getInstance()->rateLimiter->consumeKey('oauth:ip:' . $ip);
+        } catch (RateLimitExceededException $e) {
+            $this->_rateLimited($e->status);
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Populate a 429 response with the canonical `Retry-After: <seconds>`
+     * header and a JSON body. Mirrors `McpController::_rateLimited()`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _rateLimited(RateLimitStatus $status): Response
+    {
+        $this->response->headers->set('Retry-After', (string) $status->retryAfter);
+        $this->response->format = Response::FORMAT_JSON;
+        $this->response->setStatusCode(429);
+        $this->response->data = [
+            'error' => sprintf('Rate limit exceeded; retry after %ds.', $status->retryAfter),
+        ];
+        return $this->response;
+    }
 
     /**
      * Populate the shared 503 response used when the HTTP transport is
