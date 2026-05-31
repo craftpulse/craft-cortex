@@ -98,12 +98,15 @@ trait PluginTrait
     }
 
     /**
-     * Prunes expired runtime-override rows and (when audit retention
-     * is configured) old `cortex_invocations` rows during Craft's
-     * gc sweep. Both deletes are single indexed `deleteAll` calls,
-     * cheaper than the overhead of a queue job. Audit retention
-     * defaults to forever (`Settings::$auditRetentionDays = null`);
-     * when null the prune call is a no-op.
+     * Prunes expired runtime-override rows, old `cortex_invocations`
+     * rows (when audit retention is configured), and dead OAuth codes /
+     * tokens during Craft's gc sweep. Every delete is a single indexed
+     * `deleteAll`, cheaper than the overhead of a queue job. Audit
+     * retention defaults to forever (`Settings::$auditRetentionDays =
+     * null`); when null that prune call is a no-op. The OAuth prune
+     * only drops already-expired authorization codes and expired /
+     * revoked tokens — fail-closed-safe per `Oauth::pruneExpired()`,
+     * and never severs an active refresh-rotation chain.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -117,6 +120,7 @@ trait PluginTrait
                 $plugin = Cortex::getInstance();
                 $plugin->allowlist->pruneExpired();
                 $plugin->invocations->prune();
+                $plugin->oauth->pruneExpired();
             },
         );
     }
