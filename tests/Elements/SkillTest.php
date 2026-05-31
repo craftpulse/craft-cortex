@@ -17,9 +17,10 @@
  *   - `SkillQuery::handle()` filter returns the saved row.
  *
  * Fixture strategy: prefix every handle with
- * `__cortex_skilltest_<hex>_` so `afterEach` can `LIKE`-hard-delete
- * the entire test run. No global state — element overrides land in
- * the DB and are gone by next test.
+ * `cortex-skilltest-<hex>-` (slug-shaped to satisfy
+ * `Skill::HANDLE_PATTERN`) so `afterEach` can `LIKE`-hard-delete the
+ * entire test run. No global state — element overrides land in the DB
+ * and are gone by next test.
  * =========================================================================
  *
  * @author Craftpulse
@@ -140,6 +141,34 @@ it('persists a row in the cortex_skills table after save', function() {
 // -----------------------------------------------------------------------------
 // Handle uniqueness
 // -----------------------------------------------------------------------------
+
+it('rejects a handle change on an existing skill at the element layer', function() {
+    $handle = $this->fixturePrefix . 'immutable';
+    $skill = _cortex_skill_save($handle, 'Immutable');
+
+    // Reload and rename the handle, then save via the canonical
+    // elements/save path (what the Gate 9.6 CP authoring screen uses).
+    $reloaded = Skill::find()->status(null)->site('*')->id($skill->id)->one();
+    expect($reloaded)->toBeInstanceOf(Skill::class);
+    $reloaded->handle = $this->fixturePrefix . 'renamed';
+
+    expect(Craft::$app->getElements()->saveElement($reloaded))->toBeFalse();
+    expect($reloaded->getErrors('handle'))->not->toBeEmpty();
+
+    // The persisted handle is untouched.
+    $fresh = Skill::find()->status(null)->site('*')->id($skill->id)->one();
+    expect($fresh->handle)->toBe($handle);
+});
+
+it('allows re-saving an existing skill with an unchanged handle', function() {
+    $handle = $this->fixturePrefix . 'unchanged';
+    $skill = _cortex_skill_save($handle, 'Unchanged');
+
+    $reloaded = Skill::find()->status(null)->site('*')->id($skill->id)->one();
+    $reloaded->title = 'Unchanged — edited';
+    // Handle left as-is.
+    expect(Craft::$app->getElements()->saveElement($reloaded))->toBeTrue();
+});
 
 it('rejects duplicate handles via validateHandleUnique', function() {
     $handle = $this->fixturePrefix . 'dup';
