@@ -66,6 +66,21 @@ class Skill extends Element
      */
     public const PERMISSION_MANAGE = 'manageCortexSkills';
 
+    /**
+     * Slug-format constraint on the handle (the skill's natural key).
+     * Lowercase letters, digits, and single internal hyphens only — the
+     * handle is interpolated into `craft-skills://<handle>` resource
+     * URIs and `name:` frontmatter, and must stay URI-safe and match the
+     * bundled `michtio/craftcms-claude-skills` lowercase-dash convention
+     * (e.g. `craft-php-guidelines`, `ddev`). Craft's `HandleValidator`
+     * is deliberately NOT reused: it permits camelCase and underscores,
+     * which would break URI addressability and the bundled-override
+     * contract.
+     *
+     * @since 5.0.0
+     */
+    public const HANDLE_PATTERN = '/^[a-z0-9]+(-[a-z0-9]+)*$/';
+
     // Public Properties
     // =========================================================================
 
@@ -395,6 +410,12 @@ class Skill extends Element
         $rules = parent::defineRules();
         $rules[] = [['handle'], 'required'];
         $rules[] = [['handle'], 'string', 'max' => 255];
+        $rules[] = [
+            ['handle'],
+            'match',
+            'pattern' => self::HANDLE_PATTERN,
+            'message' => Craft::t('cortex', 'Handle must be a lowercase slug: letters, digits, and single hyphens (e.g. “my-skill”).'),
+        ];
         $rules[] = [['handle'], 'validateHandleUnique'];
         $rules[] = [['description'], 'string', 'max' => 4096];
         return $rules;

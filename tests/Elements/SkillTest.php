@@ -35,7 +35,9 @@ use craftpulse\cortex\elements\Skill;
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_skilltest_' . bin2hex(random_bytes(4)) . '_';
+    // Slug-shaped so handles satisfy Skill::HANDLE_PATTERN
+    // (lowercase letters, digits, single hyphens).
+    $this->fixturePrefix = 'cortex-skilltest-' . bin2hex(random_bytes(4)) . '-';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -156,6 +158,38 @@ it('requires a non-empty handle', function() {
     expect(Craft::$app->getElements()->saveElement($skill))->toBeFalse();
     expect($skill->getErrors('handle'))->not->toBeEmpty();
 });
+
+it('rejects a malformed handle that is not a lowercase slug', function(string $handle) {
+    $skill = new Skill();
+    $skill->handle = $handle;
+    $skill->title = 'Malformed';
+    expect(Craft::$app->getElements()->saveElement($skill))->toBeFalse();
+    expect($skill->getErrors('handle'))->not->toBeEmpty();
+})->with([
+    'spaces' => 'Foo Bar',
+    'slash' => 'a/b',
+    'uppercase' => 'FooBar',
+    'underscore' => 'foo_bar',
+    'leading hyphen' => '-foo',
+    'trailing hyphen' => 'foo-',
+    'double hyphen' => 'foo--bar',
+    'dot' => 'foo.bar',
+]);
+
+it('accepts a valid lowercase-slug handle', function(string $handle) {
+    $skill = new Skill();
+    $skill->handle = $handle;
+    $skill->title = 'Valid';
+    expect(Craft::$app->getElements()->saveElement($skill))->toBeTrue();
+    // Clean up directly — these bypass the fixturePrefix cleanup filter.
+    Craft::$app->getElements()->deleteElement($skill, hardDelete: true);
+})->with([
+    'single word' => 'myskill',
+    'dashed' => 'my-skill',
+    'with digits' => 'craft-5-guidelines',
+    'bundled-style' => 'craft-php-guidelines',
+    'short' => 'ddev',
+]);
 
 it('rejects recreating a soft-deleted handle with a clean validation error — no IntegrityException, no orphaned element row', function() {
     // BLOCKER (Gate 9 hardening): the DB UNIQUE index on
