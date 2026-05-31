@@ -79,6 +79,28 @@ class OauthController extends AbstractOauthController
      */
     public $enableCsrfValidation = false;
 
+    // Protected Methods
+    // =========================================================================
+
+    /**
+     * @inheritdoc
+     *
+     * The three unauthenticated OAuth endpoints get the IP-keyed
+     * throttle — `register` first (an unauthenticated bcrypt-per-call
+     * plus a row insert), `token` and `revoke` alongside. `authorize`
+     * is excluded: it requires a live Craft session, so the per-user
+     * surface already covers it.
+     *
+     * @return string[]
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _throttledActionIds(): array
+    {
+        return ['register', 'token', 'revoke'];
+    }
+
     // Public Methods
     // =========================================================================
 
