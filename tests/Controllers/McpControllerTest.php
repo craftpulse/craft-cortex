@@ -338,6 +338,56 @@ it('passes Origin validation when Origin matches the allowlist exactly', functio
     expect($response->statusCode)->toBe(200);
 });
 
+it('returns 403 on an empty Origin allowlist when devMode is off', function() {
+    Cortex::getInstance()->getSettings()->allowedOrigins = [];
+    $general = Craft::$app->getConfig()->getGeneral();
+    $originalDevMode = $general->devMode;
+    $general->devMode = false;
+
+    try {
+        $controller = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            Http::HEADER_ORIGIN => 'https://anything.example',
+            'Authorization' => $this->bearerHeader,
+        ]);
+        $response = $controller->runIndex();
+
+        expect($response->statusCode)->toBe(403);
+    } finally {
+        $general->devMode = $originalDevMode;
+    }
+});
+
+it('allows an empty Origin allowlist when devMode is on (warn-and-allow)', function() {
+    Cortex::getInstance()->getSettings()->allowedOrigins = [];
+    $general = Craft::$app->getConfig()->getGeneral();
+    $originalDevMode = $general->devMode;
+    $general->devMode = true;
+
+    $body = json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+
+    try {
+        $controller = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            Http::HEADER_ORIGIN => 'https://anything.example',
+            'Authorization' => $this->bearerHeader,
+        ], (string) $body);
+        $response = $controller->runIndex();
+
+        expect($response->statusCode)->toBe(200);
+    } finally {
+        $general->devMode = $originalDevMode;
+    }
+});
+
 // -----------------------------------------------------------------------------
 // initialize → session minted; subsequent POST requires session id
 // -----------------------------------------------------------------------------
