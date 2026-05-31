@@ -54,11 +54,24 @@ class _CortexOauthRequest
         array $headers = [],
         private readonly string $absoluteUrl = 'https://test.invalid/oauth/authorize',
         private readonly string $userIp = '203.0.113.7',
+        private readonly bool $csrfValid = true,
     ) {
         $this->headers = new HeaderCollection();
         foreach ($headers as $name => $value) {
             $this->headers->set($name, $value);
         }
+    }
+
+    /**
+     * Mirror `craft\web\Request::validateCsrfToken()` — safe methods
+     * always pass; unsafe methods return the harness's `csrfValid` flag.
+     */
+    public function validateCsrfToken(): bool
+    {
+        if (in_array(strtoupper($this->method), ['GET', 'HEAD', 'OPTIONS'], true)) {
+            return true;
+        }
+        return $this->csrfValid;
     }
 
     public function getUserIP(): string
@@ -174,6 +187,7 @@ function _cortex_oauth_request(
     array $headers = [],
     string $url = 'https://test.invalid/oauth/authorize',
     string $userIp = '203.0.113.7',
+    bool $csrfValid = true,
 ): _CortexOauthControllerHarness {
     $controller = new _CortexOauthControllerHarness('oauth', Cortex::getInstance());
     $controller->withRequest(new _CortexOauthRequest(
@@ -184,6 +198,7 @@ function _cortex_oauth_request(
         headers: $headers,
         absoluteUrl: $url,
         userIp: $userIp,
+        csrfValid: $csrfValid,
     ));
     $controller->withFreshResponse();
     return $controller;
@@ -355,6 +370,50 @@ it('POST /oauth/authorize with approve=0 surfaces an access_denied error', funct
     $location = $response->headers->get('Location');
     expect($location)->toContain('error=access_denied');
 });
+
+// -----------------------------------------------------------------------------
+// /oauth/authorize — CSRF on the consent POST
+// -----------------------------------------------------------------------------
+
+it('rejects the authorize consent POST when the CSRF token is invalid', function() {
+    Craft::$app->getUser()->setIdentity($this->admin);
+
+    $controller = _cortex_oauth_request(
+        method: 'POST',
+        bodyParams: ['approve' => '1'],
+        url: 'https://test.invalid/oauth/authorize',
+        csrfValid: false,
+    );
+
+    expect(fn() => $controller->runBeforeAction('authorize'))
+        ->toThrow(\yii\web\BadRequestHttpException::class);
+});
+
+it('allows the authorize consent POST through beforeAction with a valid CSRF token', function() {
+    Craft::$app->getUser()->setIdentity($this->admin);
+
+    $controller = _cortex_oauth_request(
+        method: 'POST',
+        bodyParams: ['approve' => '1'],
+        url: 'https://test.invalid/oauth/authorize',
+        csrfValid: true,
+    );
+
+    expect($controller->runBeforeAction('authorize'))->toBeTrue();
+});
+
+it('leaves token / register / revoke CSRF-exempt in beforeAction', function(string $actionId) {
+    // No CSRF token, POST — these anonymous token-proof endpoints must
+    // still pass beforeAction (the consent POST is the only CSRF-gated
+    // action). httpEnabled is true via beforeEach.
+    $controller = _cortex_oauth_request(
+        method: 'POST',
+        url: "https://test.invalid/oauth/{$actionId}",
+        csrfValid: false,
+    );
+
+    expect($controller->runBeforeAction($actionId))->toBeTrue();
+})->with(['token', 'register', 'revoke']);
 
 // -----------------------------------------------------------------------------
 // /oauth/token + full PKCE round-trip
