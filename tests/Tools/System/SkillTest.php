@@ -21,8 +21,9 @@
  *     succeeds; deleting the override re-surfaces the bundled row.
  *     (This is one of the four highest-value regression gates.)
  *
- * Fixture strategy: handle prefix `__cortex_skilltest_<hex>_`; afterEach
- * hard-deletes by handle LIKE.
+ * Fixture strategy: handle prefix `cortex-skilltest-<hex>-` (slug-shaped
+ * to satisfy `Skill::HANDLE_PATTERN`); afterEach hard-deletes by handle
+ * LIKE.
  * =========================================================================
  *
  * @author Craftpulse
@@ -40,7 +41,9 @@ use craftpulse\cortex\tools\ToolException;
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_skilltest_' . bin2hex(random_bytes(4)) . '_';
+    // Slug-shaped so handles satisfy Skill::HANDLE_PATTERN
+    // (lowercase letters, digits, single hyphens).
+    $this->fixturePrefix = 'cortex-skilltest-' . bin2hex(random_bytes(4)) . '-';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -298,7 +301,7 @@ it('get mode throws on a non-existent handle', function() {
     cortex_with_edition(Cortex::EDITION_PRO, function() {
         _cortex_skill_tool()->execute([
             'mode' => 'get',
-            'handle' => '__cortex_skilltest_nonexistent_zzz',
+            'handle' => 'cortex-skilltest-nonexistent-zzz',
         ]);
     });
 })->throws(ToolException::class);
