@@ -354,9 +354,13 @@ class McpController extends Controller
 
     /**
      * Validate the `Origin` header against the configured allowlist.
-     * Empty allowlist is permissive in dev — log a warning so
-     * operators that flip `httpEnabled=true` without configuring
-     * `allowedOrigins` see the soft-landing diagnostic in the log.
+     *
+     * An empty allowlist fails CLOSED outside `devMode` — flipping
+     * `httpEnabled=true` in production without naming any origin is a
+     * DNS-rebinding hole, so a 403 forces the operator to configure
+     * `Settings::$allowedOrigins` first. In `devMode` the empty list
+     * keeps the warn-and-allow soft-landing so local development isn't
+     * blocked.
      *
      * Returns true to continue, false (with the response populated)
      * to short-circuit.
@@ -371,6 +375,17 @@ class McpController extends Controller
         $origin = $this->request->getHeaders()->get(Http::HEADER_ORIGIN);
 
         if ($allowedOrigins === []) {
+            /** @var \craft\web\Application $app */
+            $app = Craft::$app;
+            if (!$app->getConfig()->getGeneral()->devMode) {
+                $this->_status(
+                    403,
+                    'HTTP transport refused: configure Settings::$allowedOrigins before enabling '
+                    . 'the HTTP transport in production. An empty Origin allowlist is rejected outside devMode.',
+                );
+                return false;
+            }
+
             Craft::warning(
                 'cortex HTTP transport: Origin allowlist is empty and httpEnabled is true. '
                 . 'Configure Settings::$allowedOrigins for any non-dev environment.',
