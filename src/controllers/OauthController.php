@@ -49,9 +49,16 @@ use yii\web\Response;
  *     callers revoke tokens with no further auth — the token itself
  *     is the proof.
  *
- * `$enableCsrfValidation = false` because every endpoint is either
- * PSR-7-bridged (auth handled by league) or revocation-style (token
- * is the proof).
+ * `$enableCsrfValidation = false` by default because `token`,
+ * `register`, and `revoke` are anonymous PSR-7 / token-proof endpoints
+ * with no Craft session — a CSRF token would be meaningless there.
+ * `authorize` is the exception: its consent POST is a session-backed
+ * "approve this client for *your* Craft account" form, so it IS
+ * CSRF-vulnerable (PKCE protects the code→token exchange, not the
+ * consent grant). `beforeAction()` re-enables CSRF validation for that
+ * one action; league's `validateAuthorizationRequest()` reads the OAuth
+ * parameters from the query string (not the body), so the consent
+ * GET→POST round-trip still resolves with CSRF on.
  *
  * Extends `AbstractOauthController` for the shared `httpEnabled` kill
  * switch — every action returns 503 before any DB work or DCR insert
@@ -103,6 +110,36 @@ class OauthController extends AbstractOauthController
 
     // Public Methods
     // =========================================================================
+
+    /**
+     * @inheritdoc
+     *
+     * Re-enables CSRF validation for the `authorize` action only. The
+     * consent POST is session-backed, so it must carry a valid CSRF
+     * token — the template at `oauth/authorize.twig` already embeds one.
+     * `token` / `register` / `revoke` keep `$enableCsrfValidation =
+     * false`: they're anonymous token-proof endpoints with no session.
+     *
+     * The toggle is set before delegating to
+     * `AbstractOauthController::beforeAction()`, which runs the
+     * `httpEnabled` kill switch and IP throttle and then hands off to
+     * Craft's pipeline — where Yii performs the CSRF check on unsafe
+     * methods.
+     *
+     * @throws \yii\web\BadRequestHttpException When the `authorize`
+     *         consent POST is missing or carries an invalid CSRF token.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function beforeAction($action): bool
+    {
+        if ($action->id === 'authorize') {
+            $this->enableCsrfValidation = true;
+        }
+
+        return parent::beforeAction($action);
+    }
 
     /**
      * GET / POST authorize. GET validates the authorization request
