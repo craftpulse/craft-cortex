@@ -22,6 +22,7 @@ use craftpulse\cortex\oauth\entities\ScopeEntity;
 use craftpulse\cortex\oauth\repositories\ClientRepository;
 use craftpulse\cortex\oauth\repositories\ScopeRepository;
 use craftpulse\cortex\records\OauthClient as OauthClientRecord;
+use craftpulse\cortex\records\OauthCode as OauthCodeRecord;
 use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
 use League\OAuth2\Server\CryptKey;
 
@@ -344,6 +345,75 @@ it('revokeToken() flips dateRevoked for a known refresh token', function() {
 
 it('revokeToken() returns false for an unknown token', function() {
     expect($this->service->revokeToken('totally-bogus-token'))->toBeFalse();
+});
+
+// -----------------------------------------------------------------------------
+// pruneExpired() — gc sweep drops dead codes / tokens, keeps live ones
+// -----------------------------------------------------------------------------
+
+it('pruneExpired() deletes expired codes and expired/revoked tokens but keeps live rows', function() {
+    // A real client row satisfies the FK on codes / tokens (clientId).
+    $client = $this->service->registerClient([
+        'client_name' => '_test_/prune-client',
+        'redirect_uris' => ['https://example.com/cb'],
+        'token_endpoint_auth_method' => 'none',
+    ]);
+    $clientId = $client['client_id'];
+
+    // Expired authorization code — must be deleted.
+    $expiredCode = new OauthCodeRecord();
+    $expiredCode->code = 'prune_' . bin2hex(random_bytes(16));
+    $expiredCode->clientId = $clientId;
+    $expiredCode->isRevoked = false;
+    $expiredCode->expiresAt = date('Y-m-d H:i:s', time() - 600);
+    $expiredCode->save(false);
+
+    // Live authorization code — must survive.
+    $liveCode = new OauthCodeRecord();
+    $liveCode->code = 'prune_' . bin2hex(random_bytes(16));
+    $liveCode->clientId = $clientId;
+    $liveCode->isRevoked = false;
+    $liveCode->expiresAt = date('Y-m-d H:i:s', time() + 600);
+    $liveCode->save(false);
+
+    // Expired access token — must be deleted.
+    $expiredToken = new OauthTokenRecord();
+    $expiredToken->tokenType = 'access';
+    $expiredToken->tokenHash = hash('sha256', 'prune-expired-' . bin2hex(random_bytes(8)));
+    $expiredToken->clientId = $clientId;
+    $expiredToken->expiresAt = date('Y-m-d H:i:s', time() - 600);
+    $expiredToken->save(false);
+
+    // Revoked but not-yet-expired refresh token — must be deleted.
+    $revokedToken = new OauthTokenRecord();
+    $revokedToken->tokenType = 'refresh';
+    $revokedToken->tokenHash = hash('sha256', 'prune-revoked-' . bin2hex(random_bytes(8)));
+    $revokedToken->clientId = $clientId;
+    $revokedToken->expiresAt = date('Y-m-d H:i:s', time() + 86400);
+    $revokedToken->dateRevoked = date('Y-m-d H:i:s', time() - 60);
+    $revokedToken->save(false);
+
+    // Live, non-expired, non-revoked refresh token — must survive so an
+    // active rotation chain is never severed.
+    $liveToken = new OauthTokenRecord();
+    $liveToken->tokenType = 'refresh';
+    $liveToken->tokenHash = hash('sha256', 'prune-live-' . bin2hex(random_bytes(8)));
+    $liveToken->clientId = $clientId;
+    $liveToken->expiresAt = date('Y-m-d H:i:s', time() + 86400);
+    $liveToken->save(false);
+
+    $deleted = $this->service->pruneExpired();
+
+    // At least our three dead rows were dropped (sibling fixtures may
+    // add to the count, so assert >= 3 rather than == 3).
+    expect($deleted)->toBeGreaterThanOrEqual(3);
+
+    expect(OauthCodeRecord::findOne(['code' => $expiredCode->code]))->toBeNull();
+    expect(OauthCodeRecord::findOne(['code' => $liveCode->code]))->not->toBeNull();
+
+    expect(OauthTokenRecord::findOne($expiredToken->id))->toBeNull();
+    expect(OauthTokenRecord::findOne($revokedToken->id))->toBeNull();
+    expect(OauthTokenRecord::findOne($liveToken->id))->not->toBeNull();
 });
 
 // -----------------------------------------------------------------------------
