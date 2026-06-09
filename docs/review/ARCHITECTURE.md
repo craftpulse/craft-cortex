@@ -163,4 +163,16 @@ The deep dives escalate and extend `REVIEW.md`'s original counts (`0 blocker / 8
 
 Implementation notes: the IP throttle was added as a parallel `RateLimiter::consumeKey(string)` (user-keyed `consume(int)` untouched); the kill switch is now enforced via a shared `AbstractOauthController` base; the gc prune deletes only already-dead rows (`expiresAt < now` OR `dateRevoked` set), so active refresh-rotation chains are never severed, and all OAuth repositories were confirmed fail-closed before pruning.
 
-The **majors above remain open** and are the next workstream. One nit confirmed during remediation: the `m260514` OAuth migration docblock still calls `clientId` a "logical FK," though the DB carries a hard `ON DELETE CASCADE` (added by `m260515_080000`) — folded into the doc-drift majors.
+**Update (2026-06-09): the majors are now also fixed and verified** on `gate-9-hardening` (`pest` 1077 passed / 0 skipped, PHPStan L8 + ECS clean):
+
+| Major | Commit(s) |
+|---|---|
+| OAuth consent POST CSRF | `8b60310` |
+| Origin allowlist fails closed outside devMode | `9b0299d` |
+| Skill handle format validation + post-create immutability | `ca5ef99`, `09a48ea` |
+| Elevated-session: refuse password/email/admin over HTTP (real-transport context seam) | `939773b`, `59253cb` |
+| stdio hardening (bounded read, testable framing, fatal-handler envelope, SIGTERM/SIGINT + broken-pipe, stdout-log redirect, capture re-entrancy) | `f0aa1ea`, `1da3d13`, `4899a94`, `74c00ec`, `5524694` |
+| `FiberProgressBridge` cancel-drain (listener-leak fix) | `bf13a33` |
+| Doc majors: EXTENDING interface contract, CONFIGURATION shipped-state + `stdioMaxMessageBytes`, tool-count reconcile (33 Free), doc-drift comments | `3cb5dce`, `43c7f1d`, `fabfb94`, `09f0e4d` |
+
+The doc-drift nit (the `m260514` "logical FK" comment vs the hard `ON DELETE CASCADE` from `m260515_080000`) was fixed in `09f0e4d`. **Remaining: the minor/nit tail only** (session enumeration → documented out-of-scope; sliding-TTL touch-on-stream; `Invocations::prune()` param bind; `RateLimiter::check()` docblock; the deferred `inputSchemaFor` HTTP field-hiding).
