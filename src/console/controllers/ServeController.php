@@ -3,9 +3,12 @@
 namespace craftpulse\cortex\console\controllers;
 
 use craft\console\Controller;
+use craft\log\MonologTarget;
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\mcp\Server;
+use Monolog\Handler\StreamHandler;
 use Throwable;
+use Yii;
 use yii\console\ExitCode;
 
 /**
@@ -57,6 +60,8 @@ class ServeController extends Controller
      */
     public function actionIndex(): int
     {
+        $this->_redirectStdoutLogHandlers();
+
         $server = new Server(Server::TRANSPORT_STDIO);
 
         $stdin = STDIN;
@@ -209,5 +214,87 @@ class ServeController extends Controller
 
         fwrite($stdout, $payload . "\n");
         fflush($stdout);
+    }
+
+    /**
+     * Keep Craft / Yii log output off the JSON-RPC channel.
+     *
+     * The stdio transport owns STDOUT — every byte on it must be a
+     * JSON-RPC frame. When `CRAFT_STREAM_LOG` is on (common in
+     * containerized / Cloud deployments), Craft's `MonologTarget` pushes
+     * a `StreamHandler` writing to `php://stdout`
+     * (`MonologTarget::_createDefaultLogger()`), so any error / warning
+     * log record emitted mid-dispatch would corrupt the channel.
+     *
+     * We walk each `MonologTarget`'s Monolog logger and, for every
+     * handler whose stream URL resolves to stdout, swap in an equivalent
+     * `StreamHandler` pointed at `php://stderr` — preserving the level
+     * and bubble of the original. Uses only Monolog's public handler API
+     * (`getHandlers()` / `setHandlers()`); `MonologTarget::setLogger()`
+     * throws by design, so the logger itself is never re-assigned.
+     *
+     * No-op in the default file-logging mode — handlers are
+     * `RotatingFileHandler`, never stdout streams, so nothing matches.
+     * One-way for the process lifetime: the serve process is dedicated
+     * and exits when STDIN closes, so there is no meaningful "restore".
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _redirectStdoutLogHandlers(): void
+    {
+        if (!isset(Yii::$app->log)) {
+            return;
+        }
+
+        foreach (Yii::$app->log->targets as $target) {
+            if (!$target instanceof MonologTarget) {
+                continue;
+            }
+
+            $logger = $target->getLogger();
+            $handlers = $logger->getHandlers();
+            $changed = false;
+
+            foreach ($handlers as $i => $handler) {
+                if (!$handler instanceof StreamHandler) {
+                    continue;
+                }
+                if (!$this->_isStdoutUrl($handler->getUrl())) {
+                    continue;
+                }
+
+                $replacement = new StreamHandler(
+                    'php://stderr',
+                    $handler->getLevel(),
+                    $handler->getBubble(),
+                );
+                $replacement->setFormatter($handler->getFormatter());
+                $handlers[$i] = $replacement;
+                $changed = true;
+            }
+
+            if ($changed) {
+                $logger->setHandlers(array_values($handlers));
+            }
+        }
+    }
+
+    /**
+     * Whether a Monolog stream URL points at the process's stdout. Both
+     * the `php://stdout` wrapper and the bare `php://output` alias count;
+     * the file-descriptor form `php://fd/1` is matched too for the rare
+     * config that uses it.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _isStdoutUrl(?string $url): bool
+    {
+        if ($url === null) {
+            return false;
+        }
+        $url = strtolower($url);
+        return in_array($url, ['php://stdout', 'php://output', 'php://fd/1'], true);
     }
 }
