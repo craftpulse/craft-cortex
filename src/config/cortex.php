@@ -221,6 +221,32 @@ return [
         // 'sessionTtl' => 3600,
 
         // ---------------------------------------------------------------------
+        // stdio transport
+        // ---------------------------------------------------------------------
+
+        /**
+         * Maximum size (in bytes) of a single newline-delimited JSON-RPC
+         * message the stdio transport will buffer before rejecting it
+         * with a JSON-RPC `-32600` Invalid Request. The reader
+         * reassembles each line in bounded chunks; if one line's
+         * accumulated bytes exceed this cap before a newline arrives,
+         * the reader drains the rest of the line, emits the error
+         * envelope, and continues with the next message rather than
+         * buffering an unbounded payload into memory.
+         *
+         * Default 4 MiB (4194304) — comfortably larger than any
+         * legitimate `tools/call` argument blob, small enough that a
+         * hostile client streaming one giant line can't OOM the long-
+         * running serve process. stdio is a trusted-local transport, but
+         * a trusted local *user* is not the same as a trusted client
+         * *implementation* (cf. the `craft_exec` threat model), so the
+         * cap holds regardless. Minimum 1024.
+         *
+         * @var int
+         */
+        // 'stdioMaxMessageBytes' => 4194304,
+
+        // ---------------------------------------------------------------------
         // OAuth 2.1
         // ---------------------------------------------------------------------
 

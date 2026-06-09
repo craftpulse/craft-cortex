@@ -14,11 +14,13 @@ This document covers each setting in detail, then explains how to use the CP UI 
   - [`execEnabled`](#execenabled)
   - [`execDryRunDefault`](#execdryrundefault)
   - [`runtimeOverrideTtl`](#runtimeoverridettl)
+  - [`stdioMaxMessageBytes`](#stdiomaxmessagebytes)
   - [`httpEnabled`](#httpenabled)
   - [`allowedOrigins`](#allowedorigins)
   - [`sessionTtl`](#sessionttl)
 - [HTTP transport](#http-transport)
 - [The CP settings page](#the-cp-settings-page)
+- [Audit log](#audit-log)
 - [`config/cortex.php`](#configcortexphp)
 - [Logging](#logging)
 
@@ -50,7 +52,7 @@ These cover the dev / ops surface most teams need without exposing dangerous com
 
 Whether the `craft_exec` tool is registered at all. The tool is stdio-only and runs through six security gates ([see security docs](SECURITY.md#craft_exec-six-security-gates)) — but if your team doesn't want it on the menu, set this to `false` and Cortex removes it from `tools/list` entirely.
 
-The recommended posture for production is `execEnabled = false`, since `craft_exec` is intentionally a development tool and the HTTP transport (Phase 2) rejects it regardless.
+The recommended posture for production is `execEnabled = false`, since `craft_exec` is intentionally a development tool and the HTTP transport rejects it regardless.
 
 ### `execDryRunDefault`
 
@@ -68,11 +70,19 @@ The default TTL applied to a new runtime override when no expiry is supplied at 
 
 Runtime overrides are admin-issued through the CP and stored in the `cortex_runtime_overrides` DB table. Expired overrides remain in the table (soft-delete) but no longer count toward the effective allowlist. Expired non-deleted overrides are hard-deleted inline during Craft's regular garbage-collection sweep.
 
+### `stdioMaxMessageBytes`
+
+**Type:** `int` (bytes) &nbsp;&nbsp; **Default:** `4194304` (4 MiB) &nbsp;&nbsp; **Minimum:** `1024`
+
+Maximum size of a single newline-delimited JSON-RPC message the stdio transport will buffer before rejecting it with a JSON-RPC `-32600` Invalid Request. The reader reassembles each line in bounded chunks; if one line's accumulated bytes exceed the cap before a newline arrives, the reader drains the rest of the line, emits the error envelope, and continues with the next message rather than buffering an unbounded payload into memory.
+
+The 4 MiB default is comfortably larger than any legitimate `tools/call` argument blob, but small enough that a hostile client streaming one giant line can't OOM the long-running `cortex/serve` process. stdio is a trusted-local transport, but a trusted local *user* is not the same as a trusted client *implementation* (cf. the `craft_exec` threat model), so the cap holds regardless.
+
 ### `httpEnabled`
 
 **Type:** `bool` &nbsp;&nbsp; **Default:** `false`
 
-Whether the HTTP transport (`POST/GET/DELETE /cortex/mcp`) accepts requests. **Defaults to off in 5.0 — the HTTP transport ships as scaffolding in this release; auth, per-user filtering, audit, and rate limiting land across sub-gates 7.2–7.6 before it is production-ready.** Flip to `true` only in local-dev environments to experiment with the endpoint.
+Whether the HTTP transport (`POST/GET/DELETE /cortex/mcp`) accepts requests. Defaults to off — the transport is opt-in, not because it is unfinished but because most installs only need stdio. When you do enable it, it enforces full authentication on every request (bearer token or OAuth 2.1 — see [HTTP transport](#http-transport) and [SECURITY.md](SECURITY.md)); it is **not** an anonymous endpoint.
 
 When this flag is `false`, every request to `/cortex/mcp` returns `503 Service Unavailable` regardless of headers or credentials.
 
@@ -96,42 +106,62 @@ Sessions are keyed by an opaque `Mcp-Session-Id` returned in the response header
 
 ## HTTP transport
 
-The Streamable HTTP transport at `/cortex/mcp` is dev-mode-only in 5.0. Setting `httpEnabled = true` exposes the JSON-RPC dispatcher to HTTP clients with no authentication in front — the transport currently allows anonymous access so the skeleton can be exercised. Bearer-token auth lands in sub-gate 7.2; do not expose the endpoint to the public internet until at least that release.
+The Streamable HTTP transport at `/cortex/mcp` is **authenticated on every request** — there is no anonymous access. Setting `httpEnabled = true` opens the endpoint; the controller's `beforeAction` pipeline then enforces, in order: method allowlist, `MCP-Protocol-Version` validation, **bearer-token / OAuth 2.1 authentication**, and per-user rate limiting before the JSON-RPC dispatcher ever sees the request. An unauthenticated request gets `401 Unauthorized` with `WWW-Authenticate: Bearer realm="cortex"` per RFC 6750. See [INSTALL.md](INSTALL.md) for issuing tokens and [SECURITY.md](SECURITY.md) for the full auth model.
+
+Two credential shapes are accepted, disambiguated by format:
+
+- **Opaque bearer tokens** — 64-char hex, no dots; issued via `cortex/token/issue`, stored hashed, bound to a Craft user.
+- **OAuth 2.1 access tokens** — JWTs (contain dots); audience-bound to the canonical `/cortex/mcp` URL (RFC 8707 confused-deputy defense), minted through the Dynamic Client Registration + authorization-code flow.
 
 The endpoint supports three methods:
 
-- **`POST`** — single JSON-RPC message per request. Headers required:
+- **`POST`** — single JSON-RPC message per request (or an SSE stream when the client sends `Accept: text/event-stream`). Headers required:
+  - `Authorization: Bearer <token>` (missing/malformed → 401; invalid/revoked → 401).
   - `MCP-Protocol-Version: 2025-06-18` (missing/wrong → 400).
   - `Origin: …` (must match `allowedOrigins` when the list is non-empty → 403).
   - `Mcp-Session-Id: …` (required on every request except `initialize` → 400; unknown id → 404).
-- **`GET`** — reserved for SSE upgrade (sub-gate 7.7). Currently returns 405.
+- **`GET`** — reserved for SSE upgrade. Returns 405 today.
 - **`DELETE`** — terminates the session identified by the `Mcp-Session-Id` header. Returns 204 on success, 404 if the session is unknown.
 
 `craft_exec` is stdio-only and rejected at the dispatcher when called over HTTP regardless of caller permissions. The rejection comes back as a JSON-RPC error envelope (HTTP 200, JSON-RPC code -32601) so spec-compliant clients can render the message correctly.
 
 ## The CP settings page
 
-Cortex registers a settings page at **Settings → Cortex** in the Control Panel. It has two sections:
+Cortex registers a tabbed Control Panel page at **Settings → Cortex**. Saving the **Settings** tab writes to project config so changes sync across environments via your normal `project-config/apply` flow; the other tabs read and mutate runtime DB state. The page has five tabs:
 
-### Defaults
+### Settings
 
-Editable form fields backed by Craft's standard `plugins/save-plugin-settings` action. Saving here writes to project config so changes sync across environments via your normal `project-config/apply` flow.
+Editable form fields for the project-config-synced plugin defaults.
 
 - **Allowed commands** — text-area editor for the `allowedCommands` array, one pattern per line.
 - **`craft_exec` enabled** — toggle for `execEnabled`.
 - **`craft_exec` dry-run by default** — toggle for `execDryRunDefault`.
 - **Runtime override TTL (seconds)** — integer input for `runtimeOverrideTtl`.
 
-### Runtime overrides
+The Settings tab renders in read-only mode when `allowAdminChanges` is off; the save action gates on `requireAdmin(requireAdminChanges: true)`.
 
-A live editor for short-lived allowlist additions. Useful when you need to grant the LLM a one-off command (`db/restore` after a debugging session, `index-assets/all` while diagnosing a missing thumbnail) without committing the change to project config.
+### Allowlist
 
-- **Add an override** — pattern (e.g. `db/restore`), optional note, optional custom expiry.
-- **Active overrides** — list view with expiry status. Clicking *Cancel* soft-deletes immediately; expired overrides surface in greyed-out form until the cleanup job removes them.
+A live editor for short-lived `craft_command` allowlist additions (DB-backed runtime overrides). Useful when you need to grant the LLM a one-off command (`db/restore` after a debugging session, `index-assets/all` while diagnosing a missing thumbnail) without committing the change to project config.
+
+- **Add an override** — pattern (e.g. `db/restore`), optional note, optional custom expiry, edited through a Garnish slideout.
+- **Active overrides** — table view with expiry status. Cancelling soft-deletes immediately; expired overrides surface until Craft's `gc` sweep removes them.
 
 Override mutations require `requireAdmin(requireAdminChanges: true)` — they're a security boundary, so non-admin CP users can't grant themselves new commands.
 
 The effective allowlist `craft_command` consults at dispatch time is the **union** of `Settings::$allowedCommands` and the active runtime overrides. Both are checked; either grants permission.
+
+### Tokens
+
+Issue, list, and revoke long-lived HTTP-transport bearer tokens. Each token is bound to a Craft user, stored hashed, and shown in plaintext exactly once at issue time. Admin-gated.
+
+### Activity
+
+Browse the `cortex_invocations` audit log — one row per tool invocation, with tool name, transport, user, duration, outcome, and a redacted argument / response excerpt. Gated on the `cortex:viewActivity` permission (`Cortex::PERMISSION_VIEW_ACTIVITY`) rather than admin, so you can grant audit visibility without granting settings access.
+
+### Connection
+
+Read-only connection helper — the stdio command and the HTTP endpoint URL, ready to paste into a client config.
 
 ## `config/cortex.php`
 
@@ -182,7 +212,7 @@ Runtime DB overrides layer **on top of** `allowedCommands` only. They don't over
 
 ## Logging
 
-Cortex emits one structured audit-log line per tool invocation under the `cortex` log channel. The line shape is locked across Phase 1 and Phase 2:
+Cortex emits one structured audit-log line per tool invocation under the `cortex` log channel. The line shape is locked across both transports:
 
 ```
 tool=<name> kind=<success|tool_error|internal_error> duration_ms=<int>
@@ -190,7 +220,7 @@ tool=<name> kind=<success|tool_error|internal_error> duration_ms=<int>
   client=<name|-> args=<redacted-json>
 ```
 
-Unknown / not-yet-populated fields emit `-` (Apache common-log convention). Phase 1 stdio always emits `transport=stdio`, populates `request_id` from the JSON-RPC envelope, captures `client` from the MCP `initialize` handshake's `clientInfo.name`, and leaves `user` as `-`. Phase 2's HTTP transport will fill `user` once OAuth resolves the bearer token to a Craft user.
+Unknown / not-yet-populated fields emit `-` (Apache common-log convention). stdio emits `transport=stdio`, populates `request_id` from the JSON-RPC envelope, captures `client` from the MCP `initialize` handshake's `clientInfo.name`, and leaves `user` as `-` (no per-request identity on the trusted local transport). The HTTP transport emits `transport=http` and fills `user` from the Craft user the bearer/OAuth token resolves to.
 
 Arguments are passed through `tools/support/SecretRedactor` before serialisation. The redactor catches keys named like secrets (`password`, `token`, `apiKey`, `secret`, `accessKey`, `privateKey`, `salt`, `cookieValidationKey`, `webhookSecret`, `jwt`, `oauth`, `bearer`) and replaces values with `[REDACTED]`. Inline `KEY=value` / `KEY: value` patterns in flat strings are also redacted.
 
@@ -213,4 +243,13 @@ return [
 ];
 ```
 
-Phase 2 adds a DB-backed `cortex_invocations` audit table and a CP UI to browse it. The line format above is the same shape that table will consume, so external SIEM forwarders pinned against the Phase 1 lines will keep working unchanged through the upgrade.
+## Audit log
+
+Alongside the log-channel line above, Cortex persists every tool invocation to the DB-backed `cortex_invocations` table and surfaces it on the [Activity tab](#activity) of the CP settings page. Each row carries the tool name, transport, resolving user (HTTP), JSON-RPC request id, client name, duration, outcome (`success` / `tool_error` / `internal_error` / `rate_limited`), and a redacted argument / response excerpt.
+
+Two settings tune the table:
+
+- **`auditResponseExcerptBytes`** (`int`, default `2048`, max `65535`) — bytes of the post-redaction JSON-encoded tool response stored in `cortex_invocations.responseExcerpt`. The full response still goes over the wire to the client; the excerpt is for the audit dashboard only.
+- **`auditRetentionDays`** (`int|null`, default `null`) — retention window. `null` keeps audit history forever (the compliance-friendly default); set e.g. `90` to prune rows older than 90 days during Craft's `gc` sweep.
+
+The log-channel line and the table share the same field shape, so external SIEM forwarders pinned against the log lines and dashboards reading the table see a consistent record.
