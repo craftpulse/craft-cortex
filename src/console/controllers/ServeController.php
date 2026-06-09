@@ -77,6 +77,15 @@ class ServeController extends Controller
      */
     private bool $_shutdownEmitted = false;
 
+    /**
+     * @var bool Set by a SIGTERM / SIGINT handler so the read loop
+     *           breaks cleanly at the next iteration boundary. MCP
+     *           clients tear the server down with SIGTERM rather than
+     *           closing STDIN, so without this the loop would only exit
+     *           on EOF.
+     */
+    private bool $_shouldStop = false;
+
     // Public Methods
     // =========================================================================
 
@@ -98,23 +107,26 @@ class ServeController extends Controller
         $stdout = STDOUT;
 
         $this->_registerFatalHandler($stdout);
+        $this->_registerSignalHandlers();
 
         stream_set_blocking($stdin, true);
 
         $maxBytes = Cortex::getInstance()->getSettings()->stdioMaxMessageBytes;
 
-        while (($read = $this->_readMessage($stdin, $maxBytes)) !== null) {
+        while (!$this->_shouldStop && ($read = $this->_readMessage($stdin, $maxBytes)) !== null) {
             [$line, $oversized] = $read;
 
             if ($oversized) {
-                $this->_writeResponse($stdout, [
+                if (!$this->_writeResponse($stdout, [
                     'jsonrpc' => '2.0',
                     'id' => null,
                     'error' => [
                         'code' => Server::ERR_INVALID_REQUEST,
                         'message' => sprintf('Invalid Request: message exceeds the %d-byte limit.', $maxBytes),
                     ],
-                ]);
+                ])) {
+                    break;
+                }
                 continue;
             }
 
@@ -123,7 +135,11 @@ class ServeController extends Controller
                 continue;
             }
 
-            $this->_writeResponse($stdout, $response);
+            // A failed write means the client closed the read end of the
+            // pipe — stop rather than spin on a broken descriptor.
+            if (!$this->_writeResponse($stdout, $response)) {
+                break;
+            }
         }
 
         return ExitCode::OK;
@@ -193,7 +209,7 @@ class ServeController extends Controller
      * If the accumulated bytes for one line exceed `$maxBytes` before a
      * newline arrives, the rest of the line is drained off the stream
      * (still bounded — only one chunk is held in memory at a time) and
-     * `[null, true]` is returned so the caller can emit a single
+     * `['', true]` is returned so the caller can emit a single
      * `-32600` and continue with the next message. Returns `null` on
      * EOF (clean STDIN close).
      *
@@ -239,7 +255,12 @@ class ServeController extends Controller
     }
 
     /**
-     * Write one JSON-RPC response as a single line on stdout.
+     * Write one JSON-RPC response as a single line on stdout. Returns
+     * `false` when the write fails — `fwrite()` returns `false` once the
+     * client closes the read end of the pipe, and the caller breaks the
+     * loop rather than spinning on a broken descriptor. A response that
+     * can't even be JSON-encoded is treated as a successful no-op (there
+     * is no envelope to send), so `true` is returned.
      *
      * @param resource $stdout
      * @param array<string,mixed> $response
@@ -247,15 +268,18 @@ class ServeController extends Controller
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _writeResponse($stdout, array $response): void
+    private function _writeResponse($stdout, array $response): bool
     {
         $payload = json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         if ($payload === false) {
-            return;
+            return true;
         }
 
-        fwrite($stdout, $payload . "\n");
+        if (fwrite($stdout, $payload . "\n") === false) {
+            return false;
+        }
         fflush($stdout);
+        return true;
     }
 
     /**
@@ -281,6 +305,34 @@ class ServeController extends Controller
         register_shutdown_function(function() use ($stdout): void {
             $this->_handleFatalShutdown($stdout, error_get_last());
         });
+    }
+
+    /**
+     * Install SIGTERM / SIGINT handlers that flip `$_shouldStop` so the
+     * read loop exits cleanly at the next boundary. MCP clients tear the
+     * server down with SIGTERM rather than closing STDIN, so without this
+     * the process would only exit on EOF.
+     *
+     * Guarded behind `pcntl_async_signals()` — non-pcntl SAPIs (the
+     * `pcntl` extension is CLI-only and may be absent) degrade
+     * gracefully: the server still exits on EOF and on a broken pipe,
+     * just not on a signal.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _registerSignalHandlers(): void
+    {
+        if (!function_exists('pcntl_async_signals') || !function_exists('pcntl_signal')) {
+            return;
+        }
+
+        pcntl_async_signals(true);
+        $handler = function(): void {
+            $this->_shouldStop = true;
+        };
+        pcntl_signal(SIGTERM, $handler);
+        pcntl_signal(SIGINT, $handler);
     }
 
     /**
