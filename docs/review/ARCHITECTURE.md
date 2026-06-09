@@ -175,4 +175,17 @@ Implementation notes: the IP throttle was added as a parallel `RateLimiter::cons
 | `FiberProgressBridge` cancel-drain (listener-leak fix) | `bf13a33` |
 | Doc majors: EXTENDING interface contract, CONFIGURATION shipped-state + `stdioMaxMessageBytes`, tool-count reconcile (33 Free), doc-drift comments | `3cb5dce`, `43c7f1d`, `fabfb94`, `09f0e4d` |
 
-The doc-drift nit (the `m260514` "logical FK" comment vs the hard `ON DELETE CASCADE` from `m260515_080000`) was fixed in `09f0e4d`. **Remaining: the minor/nit tail only** (session enumeration → documented out-of-scope; sliding-TTL touch-on-stream; `Invocations::prune()` param bind; `RateLimiter::check()` docblock; the deferred `inputSchemaFor` HTTP field-hiding).
+The doc-drift nit (the `m260514` "logical FK" comment vs the hard `ON DELETE CASCADE` from `m260515_080000`) was fixed in `09f0e4d`.
+
+**The minor/nit tail is also closed** (`28b8850`, `922bf1c`, `fb894c2`):
+
+| Item | Resolution |
+|---|---|
+| `Invocations::prune()` redundant param bind | Fixed — let Yii bind the cutoff (`28b8850`) |
+| `RateLimiter::check()` docblock overstates use | Fixed — docblock now says introspection-only, never a gate (`922bf1c`) |
+| Session enumeration / operator-disconnect | Documented out-of-scope — no enumerable surface by design; revocation = next-request block (`fb894c2`) |
+| Sliding-TTL vs long streams | Verified safe — `sessionTtl` 3600s ≫ the minutes-bounded max stream; invariant documented (`fb894c2`) |
+| Skill `afterSave` not transactional | **False positive** — verified against `craftcms/cms`: `afterSave()` already runs inside `Elements::_saveElementInternal()`'s transaction. No change. |
+| `inputSchemaFor` HTTP field-hiding | **Deferred by design** — needs transport in the `tools/list` path; the execute-level refusal is already the security boundary. |
+
+**Status: the full review set (blockers + majors + minor/nit tail) is remediated on `gate-9-hardening`.**
