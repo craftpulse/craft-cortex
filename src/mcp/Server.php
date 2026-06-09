@@ -6,6 +6,7 @@ use Craft;
 use craft\elements\User;
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\events\LogCallEvent;
+use craftpulse\cortex\tools\ContextAwareToolInterface;
 use craftpulse\cortex\tools\StreamableToolInterface;
 use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\support\CancellationToken;
@@ -730,6 +731,15 @@ class Server
         assert($tool !== null);
 
         $context = $this->_invocationContext($id);
+
+        // Hand the dispatch context to non-streaming tools that need it
+        // inside `execute()` (transport-dependent gating, etc.). The
+        // context carries the real `$_transport` — never inferred from
+        // a proxy. Streaming tools receive their context via `stream()`
+        // instead, so this opt-in covers only the `execute()` path.
+        if ($tool instanceof ContextAwareToolInterface) {
+            $tool->setInvocationContext($context);
+        }
 
         $startNs = hrtime(true);
         try {
