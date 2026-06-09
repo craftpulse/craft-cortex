@@ -29,8 +29,12 @@ use craftpulse\cortex\db\Table;
  *
  * All three tables get `userId` FK CASCADE on Craft's users table; a
  * user disappearing takes their consents with them. `clientId` on the
- * tokens / codes table FKs CASCADE on `cortex_oauth_clients` so
- * deleting a client revokes its in-flight credentials.
+ * tokens / codes tables is tracked here as a logical FK only (a string
+ * id, no hard DB constraint, to allow out-of-band client seeding). The
+ * hard `ON DELETE CASCADE` FKs from `clientId` to
+ * `cortex_oauth_clients` were added later in the Gate 7 review fix
+ * `m260515_080000_cortex_oauth_client_fks`, so deleting a client now
+ * atomically revokes its in-flight codes and tokens.
  *
  * Idempotent: each `createTable` is guarded by `tableExists`.
  * `safeDown()` drops in reverse FK order.
