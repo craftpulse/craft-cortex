@@ -174,17 +174,22 @@ class RateLimiter extends Component
     }
 
     /**
-     * Non-consuming read of what `consume()` WOULD return without
-     * mutating the bucket. Useful for pre-flight checks in tests; the
-     * controller uses `consume()` (atomic) in production. The bucket
-     * is still walked forward to `now` for refill accuracy, but the
-     * walk is not persisted — successive `check()` calls return the
-     * same shape until something actually consumes.
+     * Non-persisting introspection / pre-flight ONLY. Walks the bucket
+     * forward to `now` for refill accuracy but never writes the result
+     * back, so successive `check()` calls each re-walk the refill arc
+     * from the last persisted `lastRefillAt` and report progressively
+     * more available tokens than a real `consume()` would.
+     *
+     * Never use `check()` as an admission gate: because it doesn't
+     * persist, a `check()`-then-act flow double-counts refill against
+     * the subsequent `consume()` and lets more requests through than
+     * the bucket should permit. The atomic admission path is
+     * `consume()` — which refills, deducts, and persists in one step.
+     * `check()` exists for read-only headroom inspection and test
+     * pre-flight assertions, nothing more.
      *
      * Returns a `RateLimitStatus` with the bucket's available tokens
-     * floor'd to int. Throws if the bucket lacks enough for `$cost`
-     * — same contract as `consume()` so callers can use `check()` as
-     * a dry-run gate before deciding whether to consume.
+     * floor'd to int. Throws if the bucket lacks enough for `$cost`.
      *
      * @author Craftpulse
      * @since  5.0.0
