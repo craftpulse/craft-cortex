@@ -241,6 +241,25 @@ class Settings extends Model
     public ?int $auditRetentionDays = null;
 
     /**
+     * @var int Maximum size (in bytes) of a single newline-delimited
+     *          JSON-RPC message the stdio transport will buffer before
+     *          rejecting it with a JSON-RPC `-32600` Invalid Request.
+     *          The stdio reader reassembles a line in bounded chunks; if
+     *          the accumulated bytes for one line exceed this cap before
+     *          a newline arrives, the reader drains the rest of the line,
+     *          emits the error envelope, and continues with the next
+     *          message rather than buffering an unbounded payload into
+     *          memory. Default 4 MiB — comfortably larger than any
+     *          legitimate `tools/call` argument blob, small enough that a
+     *          hostile client streaming one giant line can't OOM the
+     *          long-running serve process. stdio is a trusted-local
+     *          transport, but a trusted local *user* is not the same as a
+     *          trusted client *implementation* (cf. the `craft_exec`
+     *          threat model), so the cap holds regardless.
+     */
+    public int $stdioMaxMessageBytes = 4194304;
+
+    /**
      * @var int Burst capacity for the per-user HTTP rate limiter — the
      *          maximum tokens a single Craft user's bucket can hold at
      *          any one time. Each authenticated POST to
@@ -277,6 +296,7 @@ class Settings extends Model
     {
         $rules = parent::defineRules();
         $rules[] = [['runtimeOverrideTtl', 'sessionTtl'], 'integer', 'min' => 1];
+        $rules[] = [['stdioMaxMessageBytes'], 'integer', 'min' => 1024];
         $rules[] = [['tokenTtlDefault'], 'integer', 'min' => 1];
         $rules[] = [['execEnabled', 'execDryRunDefault', 'httpEnabled', 'dcrEnabled'], 'boolean'];
         $rules[] = [['allowedCommands', 'adminLevelCommands', 'userCustomFieldAllowlist', 'allowedOrigins'], 'each', 'rule' => ['string', 'min' => 1]];
