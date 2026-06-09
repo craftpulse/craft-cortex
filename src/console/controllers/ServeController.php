@@ -47,6 +47,36 @@ class ServeController extends Controller
      */
     private const READ_CHUNK_BYTES = 8192;
 
+    // Private Properties
+    // =========================================================================
+
+    /**
+     * @var int|string|null JSON-RPC id of the request currently being
+     *                      dispatched, or null when the loop is idle
+     *                      (between messages) or handling a request with
+     *                      no id. Set immediately before
+     *                      `Server::dispatch()` and cleared immediately
+     *                      after, so the fatal-error shutdown handler can
+     *                      correlate a `-32603` envelope back to the call
+     *                      that crashed the process.
+     */
+    private int|string|null $_inFlightRequestId = null;
+
+    /**
+     * @var bool Whether a request is currently mid-dispatch. The
+     *           shutdown handler only emits an error envelope when this
+     *           is `true` — a fatal raised between messages (or after
+     *           clean EOF) leaves it `false` and the handler is a no-op.
+     */
+    private bool $_inFlight = false;
+
+    /**
+     * @var bool Whether the shutdown handler has already written its
+     *           terminal envelope. Guards against any double-emit if the
+     *           handler runs more than once.
+     */
+    private bool $_shutdownEmitted = false;
+
     // Public Methods
     // =========================================================================
 
@@ -66,6 +96,8 @@ class ServeController extends Controller
 
         $stdin = STDIN;
         $stdout = STDOUT;
+
+        $this->_registerFatalHandler($stdout);
 
         stream_set_blocking($stdin, true);
 
@@ -140,7 +172,17 @@ class ServeController extends Controller
             ];
         }
 
-        return $server->dispatch($request);
+        // Mark the request in-flight so the fatal-error shutdown handler
+        // can emit a -32603 carrying this id if PHP dies inside dispatch.
+        $rawId = $request['id'] ?? null;
+        $this->_inFlightRequestId = (is_int($rawId) || is_string($rawId)) ? $rawId : null;
+        $this->_inFlight = true;
+        try {
+            return $server->dispatch($request);
+        } finally {
+            $this->_inFlight = false;
+            $this->_inFlightRequestId = null;
+        }
     }
 
     /**
@@ -214,6 +256,80 @@ class ServeController extends Controller
 
         fwrite($stdout, $payload . "\n");
         fflush($stdout);
+    }
+
+    /**
+     * Register a `register_shutdown_function` that, on a true PHP fatal
+     * (`E_ERROR` and friends) raised while a request was mid-dispatch,
+     * writes one final JSON-RPC `-32603` envelope to stdout so the
+     * client gets a terminal response instead of hanging on a dead
+     * pipe. Clean shutdowns (no fatal, or no in-flight request) are a
+     * no-op, and the `$_shutdownEmitted` guard prevents a double-emit.
+     *
+     * The shutdown function bypasses every try/catch in the dispatch
+     * loop — that's the whole point: a memory-exhaustion or other true
+     * fatal never reaches `_internalError()` in the `Server`, so this is
+     * the only place a terminal envelope can still be produced.
+     *
+     * @param resource $stdout
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _registerFatalHandler($stdout): void
+    {
+        register_shutdown_function(function() use ($stdout): void {
+            $this->_handleFatalShutdown($stdout, error_get_last());
+        });
+    }
+
+    /**
+     * Shutdown-time body, split out so the fatal-envelope decision is
+     * unit-testable without actually crashing PHP. Emits a `-32603`
+     * (carrying the in-flight request id) only when (a) the last error
+     * is a fatal type, (b) a request was in flight, and (c) nothing was
+     * emitted yet.
+     *
+     * @param resource $stdout
+     * @param array{type:int,message:string,file:string,line:int}|null $lastError
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _handleFatalShutdown($stdout, ?array $lastError): void
+    {
+        if ($this->_shutdownEmitted || !$this->_inFlight) {
+            return;
+        }
+        if ($lastError === null || !$this->_isFatalErrorType($lastError['type'])) {
+            return;
+        }
+
+        $this->_shutdownEmitted = true;
+        $this->_writeResponse($stdout, [
+            'jsonrpc' => '2.0',
+            'id' => $this->_inFlightRequestId,
+            'error' => [
+                'code' => Server::ERR_INTERNAL,
+                'message' => 'Internal error: the server terminated while handling this request.',
+            ],
+        ]);
+    }
+
+    /**
+     * Whether a PHP error type is one of the unrecoverable fatals that
+     * bypass userland try/catch and trigger the shutdown function.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _isFatalErrorType(int $type): bool
+    {
+        return in_array(
+            $type,
+            [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR, E_USER_ERROR],
+            true,
+        );
     }
 
     /**
