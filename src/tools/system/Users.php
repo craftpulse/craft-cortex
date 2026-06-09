@@ -12,10 +12,13 @@ use craftpulse\cortex\attributes\IsDestructive;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\Cortex;
+use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\ContextAwareToolInterface;
 use craftpulse\cortex\tools\IdempotencyTrait;
 use craftpulse\cortex\tools\PermissionedToolTrait;
 use craftpulse\cortex\tools\ProToolTrait;
+use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\support\Schema;
 use craftpulse\cortex\tools\ToolException;
 use DateTimeInterface;
@@ -135,7 +138,7 @@ use Throwable;
 #[IsDestructive]
 #[IsIdempotent(false)]
 #[Title('Users — list / get / create / update / delete with PII gating')]
-class Users extends AbstractTool
+class Users extends AbstractTool implements ContextAwareToolInterface
 {
     use IdempotencyTrait;
     use PermissionedToolTrait;
@@ -201,8 +204,47 @@ class Users extends AbstractTool
      */
     public const LIST_STATUSES = ['active', 'pending', 'suspended', 'locked', 'inactive'];
 
+    /**
+     * Credential / privilege fields refused over the HTTP transport.
+     *
+     * Changing a password (`newPassword`), changing the email
+     * (`email`), or granting / modifying admin status (`admin`) are
+     * exactly the operations Craft's own CP gates behind an elevated
+     * (re-authenticated) session. The MCP HTTP transport has no
+     * elevated-session layer yet, so until one ships these operations
+     * are refused over HTTP and remain available only over the trusted
+     * local stdio transport. See `docs/SECURITY.md`.
+     *
+     * @since 5.0.0
+     */
+    public const HTTP_REFUSED_FIELDS = ['newPassword', 'email', 'admin'];
+
+    // Private Properties
+    // =========================================================================
+
+    /**
+     * @var InvocationContext|null Per-invocation context injected by the
+     *                             dispatcher via `setInvocationContext()`
+     *                             immediately before `execute()`. Null on
+     *                             call paths that bypass the dispatcher
+     *                             injection — those are treated as HTTP
+     *                             (fail closed) by the transport gate.
+     */
+    private ?InvocationContext $_invocationContext = null;
+
     // Public Methods
     // =========================================================================
+
+    /**
+     * @inheritdoc
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function setInvocationContext(InvocationContext $ctx): void
+    {
+        $this->_invocationContext = $ctx;
+    }
 
     /**
      * @inheritdoc
@@ -376,6 +418,10 @@ class Users extends AbstractTool
             throw new ToolException('users: `mode` is required.');
         }
 
+        if ($mode === 'create' || $mode === 'update') {
+            $this->_assertTransportAllowsCredentialMutations($arguments);
+        }
+
         return match ($mode) {
             'list' => $this->_list($arguments),
             'get' => $this->_get($arguments),
@@ -432,6 +478,56 @@ class Users extends AbstractTool
 
     // Private Methods
     // =========================================================================
+
+    /**
+     * Refuse credential / privilege mutations over the HTTP transport.
+     *
+     * Setting a new password (`newPassword`), changing the email
+     * (`email`), or granting / modifying admin status (`admin`) are the
+     * operations Craft's CP guards behind an elevated (re-authenticated)
+     * session. The MCP HTTP transport has no elevated-session layer yet,
+     * so these are refused over HTTP and remain available only over the
+     * trusted local stdio transport.
+     *
+     * Keys on the real `InvocationContext::$transport` threaded from the
+     * dispatcher — never inferred from a proxy such as a resolved-user
+     * check. Fails closed: when no context was injected (transport
+     * indeterminate) the request is treated as HTTP and refused.
+     *
+     * No-op when none of the guarded fields are present in the payload,
+     * so non-sensitive create / update operations (custom fields, name
+     * attributes, group assignment, etc.) keep working over HTTP.
+     *
+     * @param array<string,mixed> $arguments
+     * @throws ToolException When a guarded field is present and the
+     *                       resolved transport is not stdio.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _assertTransportAllowsCredentialMutations(array $arguments): void
+    {
+        $guarded = array_values(array_filter(
+            self::HTTP_REFUSED_FIELDS,
+            static fn(string $field): bool => array_key_exists($field, $arguments),
+        ));
+        if ($guarded === []) {
+            return;
+        }
+
+        // Fail closed — only an explicit stdio transport is exempt.
+        $isStdio = $this->_invocationContext !== null
+            && $this->_invocationContext->transport === Server::TRANSPORT_STDIO;
+        if ($isStdio) {
+            return;
+        }
+
+        throw new ToolException(
+            'users: changing password/email/admin status is not permitted over the HTTP ' .
+                'transport; use the stdio transport (elevated-session support over HTTP is ' .
+                'not yet available).'
+        );
+    }
 
     /**
      * List-mode dispatch. Paginated query with filters, each result

@@ -28,6 +28,11 @@
  * for list / get / PII assertions. Mutation tests create throwaway
  * users with prefix `__cortex_userstest_<hex>_`; afterEach hard-
  * deletes them by username LIKE.
+ *
+ * **SEQUENTIAL ONLY** — create / update modes call
+ * `Elements::saveElement()` on a `User`, which syncs the user field
+ * layout to project config. Running these under Paratest would race
+ * concurrent reads of the same PC surface.
  * =========================================================================
  *
  * @author Craftpulse
@@ -36,6 +41,8 @@
 
 use craft\elements\User;
 use craftpulse\cortex\Cortex;
+use craftpulse\cortex\mcp\Server;
+use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\system\Users;
 use craftpulse\cortex\tools\ToolException;
 
@@ -78,11 +85,19 @@ afterEach(function() {
 // -----------------------------------------------------------------------------
 
 /**
- * Direct instantiation sidesteps the boot-time registry gate.
+ * Direct instantiation sidesteps the boot-time registry gate. The
+ * invocation context defaults to a stdio transport so the credential-
+ * mutation gate (HTTP-only refusal) treats these direct calls as the
+ * trusted local path — matching how stdio dispatch behaves. HTTP-
+ * transport tests pass `Server::TRANSPORT_HTTP` to exercise the
+ * refusal.
  */
-function _cortex_users_tool(): Users
+function _cortex_users_tool(string $transport = Server::TRANSPORT_STDIO): Users
 {
-    return new Users();
+    $tool = new Users();
+    $tool->setInvocationContext(new InvocationContext(transport: $transport));
+
+    return $tool;
 }
 
 /**
@@ -1046,4 +1061,182 @@ it('delete refuses a caller without deleteUsers', function() {
     } finally {
         Craft::$app->getUser()->setIdentity($this->admin);
     }
+});
+
+// -----------------------------------------------------------------------------
+// HTTP transport — credential / privilege mutation refusal
+// -----------------------------------------------------------------------------
+
+it('refuses newPassword on update over the HTTP transport', function() {
+    $target = _cortex_users_user($this->fixturePrefix, 'httppw');
+    if ($target === null) {
+        $this->markTestSkipped('Could not seed target.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
+        $caught = null;
+        try {
+            _cortex_users_tool(Server::TRANSPORT_HTTP)->execute([
+                'mode' => 'update',
+                'id' => $target->id,
+                'newPassword' => 'RefusedOverHttp!42',
+            ]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->not->toBeNull();
+        expect($caught->getMessage())
+            ->toContain('not permitted over the HTTP transport')
+            ->toContain('use the stdio transport');
+    });
+});
+
+it('refuses email change on update over the HTTP transport', function() {
+    $target = _cortex_users_user($this->fixturePrefix, 'httpemail');
+    if ($target === null) {
+        $this->markTestSkipped('Could not seed target.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
+        $caught = null;
+        try {
+            _cortex_users_tool(Server::TRANSPORT_HTTP)->execute([
+                'mode' => 'update',
+                'id' => $target->id,
+                'email' => $this->fixturePrefix . 'changed@example.test',
+            ]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->not->toBeNull();
+        expect($caught->getMessage())->toContain('not permitted over the HTTP transport');
+    });
+});
+
+it('refuses admin grant on create over the HTTP transport', function() {
+    cortex_with_edition(Cortex::EDITION_PRO, function() {
+        $caught = null;
+        try {
+            _cortex_users_tool(Server::TRANSPORT_HTTP)->execute([
+                'mode' => 'create',
+                'email' => $this->fixturePrefix . 'httpadmin@example.test',
+                'username' => $this->fixturePrefix . 'httpadmin',
+                'admin' => true,
+            ]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->not->toBeNull();
+        expect($caught->getMessage())->toContain('not permitted over the HTTP transport');
+    });
+});
+
+it('fails closed and refuses a credential mutation when no transport context was injected', function() {
+    $target = _cortex_users_user($this->fixturePrefix, 'noctx');
+    if ($target === null) {
+        $this->markTestSkipped('Could not seed target.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
+        // No setInvocationContext() call — transport indeterminate.
+        $tool = new Users();
+
+        $caught = null;
+        try {
+            $tool->execute([
+                'mode' => 'update',
+                'id' => $target->id,
+                'newPassword' => 'NoContextSoRefused!42',
+            ]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->not->toBeNull();
+        expect($caught->getMessage())->toContain('not permitted over the HTTP transport');
+    });
+});
+
+it('allows the same newPassword mutation over the stdio transport', function() {
+    $target = _cortex_users_user($this->fixturePrefix, 'stdiopw');
+    if ($target === null) {
+        $this->markTestSkipped('Could not seed target.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
+        $result = _cortex_users_tool(Server::TRANSPORT_STDIO)->execute([
+            'mode' => 'update',
+            'id' => $target->id,
+            'newPassword' => 'AllowedOverStdio!42',
+        ]);
+
+        expect($result['success'])->toBeTrue();
+        expect($result['mode'])->toBe('update');
+        expect($result['user']['id'])->toBe((int) $target->id);
+    });
+});
+
+it('allows an admin grant on update over the stdio transport', function() {
+    $target = _cortex_users_user($this->fixturePrefix, 'stdioadmin');
+    if ($target === null) {
+        $this->markTestSkipped('Could not seed target.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
+        $result = _cortex_users_tool(Server::TRANSPORT_STDIO)->execute([
+            'mode' => 'update',
+            'id' => $target->id,
+            'admin' => true,
+        ]);
+
+        expect($result['success'])->toBeTrue();
+        expect($result['user']['admin'])->toBeTrue();
+    });
+});
+
+it('still allows a non-sensitive update over the HTTP transport', function() {
+    $target = _cortex_users_user($this->fixturePrefix, 'httpsafe');
+    if ($target === null) {
+        $this->markTestSkipped('Could not seed target.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
+        $result = _cortex_users_tool(Server::TRANSPORT_HTTP)->execute([
+            'mode' => 'update',
+            'id' => $target->id,
+            'firstName' => 'Renamed',
+            'lastName' => 'OverHttp',
+        ]);
+
+        expect($result['success'])->toBeTrue();
+        expect($result['mode'])->toBe('update');
+        expect($result['user']['id'])->toBe((int) $target->id);
+    });
+});
+
+it('does not refuse a non-sensitive create over the HTTP transport', function() {
+    // A create carrying no guarded field (no email / admin) must pass
+    // the transport gate. It may still come back as a validation
+    // envelope (Craft requires an email), but it must NOT be the
+    // transport-refusal message — that is the contract under test.
+    cortex_with_edition(Cortex::EDITION_PRO, function() {
+        $caught = null;
+        try {
+            _cortex_users_tool(Server::TRANSPORT_HTTP)->execute([
+                'mode' => 'create',
+                'username' => $this->fixturePrefix . 'httpcreate',
+                'firstName' => 'Http',
+                'lastName' => 'Create',
+            ]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        if ($caught !== null) {
+            expect($caught->getMessage())->not->toContain('not permitted over the HTTP transport');
+        }
+    });
 });
