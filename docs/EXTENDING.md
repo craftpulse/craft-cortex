@@ -73,18 +73,41 @@ It writes a stub class extending `AbstractTool` with the right attributes (`#[Is
 A tool is a class implementing `craftpulse\cortex\tools\ToolInterface`. The interface:
 
 ```php
+use craft\elements\User;
+
 interface ToolInterface
 {
+    // Static metadata + boot-time gating.
     public static function getName(): string;
     public static function getDescription(): string;
     public static function getInputSchema(): array;
     public static function outputSchema(): array;
-    public function shouldRegister(): bool;
+    public static function shouldRegister(): bool;
+
+    // Per-request, per-user gating (HTTP transport).
+    public function filterFor(?User $user = null): bool;
+    public function inputSchemaFor(?User $user = null): array;
+
+    // Invocation.
     public function execute(array $arguments): array|\Generator;
 }
 ```
 
-`AbstractTool` provides defaults for `getInputSchema` (object with no properties), `outputSchema` (`[]` — no schema declared), and `shouldRegister` (`true`). Subclassing it leaves you to implement `getName`, `getDescription`, and `execute`.
+`AbstractTool` provides defaults for `getInputSchema` (object with no properties), `outputSchema` (`[]` — no schema declared), `shouldRegister` (`true`), `filterFor` (`true` — visible to everyone), and `inputSchemaFor` (delegates to the static `getInputSchema()`). Subclassing it leaves you to implement `getName`, `getDescription`, and `execute`; override the three gating methods only when your tool needs edition or permission gating.
+
+### The three-method gating contract
+
+`shouldRegister`, `filterFor`, and `inputSchemaFor` form the locked tool-visibility contract. Each runs at a different point in the request lifecycle:
+
+| Method | When | Scope | Purpose |
+|--------|------|-------|---------|
+| `shouldRegister(): bool` (static) | Once at boot | Whole install | Edition / license / settings gating. Returns `false` to remove the tool from the registry entirely — no user ever sees it. A Free install returns `false` for Pro tools; `craft_exec` registers but rejects at `execute()` when `execEnabled` is off. |
+| `filterFor(?User $user): bool` | Every `tools/list` and `tools/call` | Per request, per user | Whether this user sees / can resolve the tool. Default `true`. Pro tools override to consult Craft permissions. |
+| `inputSchemaFor(?User $user): array` | Every `tools/list` | Per request, per user | The schema this user sees. Default delegates to `getInputSchema()`. Mode-gated tools override to filter the `mode` enum by permission. |
+
+**stdio vs HTTP.** stdio is a single trusted local process with no per-request identity, so the dispatcher passes `null` to `filterFor()` / `inputSchemaFor()` and the default-true / static-schema path applies — `asListPayloadFor(null)` is identical to `asListPayload()`. The HTTP transport resolves the bearer/OAuth user and passes it through, so per-user filtering and schema rewriting fire.
+
+**`execute()` re-checks regardless.** `filterFor()` filtering exists for the LLM's tool-selection UX; it is *not* the security boundary. `execute()` performs its own permission check on every call (defense in depth) — both layers fail closed. A tool that is hidden from a user's `tools/list` and also rejected on direct `tools/call` is the correct, redundant outcome.
 
 Minimal example:
 
@@ -308,22 +331,91 @@ Defaults are `true` because the common case is "this tool IS read-only" / "this 
 
 ## Edition gating and conditional registration
 
-`shouldRegister(): bool` lets a tool opt out of the registry per-request. Phase 1 always returns `true` from `AbstractTool`. Pro tools (Phase 2) override to gate visibility on Craft permissions:
+`shouldRegister(): bool` is a **static** method that runs once at boot. It gates whole-tool registration on edition / license / settings — *not* on the current user (there is no user at boot). A Pro-only tool returns `false` on Free and never enters the registry; `AbstractTool` returns `true` so the default is "always register".
+
+The bundled Pro tools never hand-write the edition check — they `use ProToolTrait`, which supplies a Pro-gated `shouldRegister()`:
 
 ```php
-public function shouldRegister(): bool
+trait ProToolTrait
 {
-    $user = Craft::$app->getUser()->getIdentity();
-    if ($user === null) {
-        return false;
+    public static function shouldRegister(): bool
+    {
+        return Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=');
     }
-    return $user->can('saveEntries:' . $this->_section->uid);
 }
 ```
 
-A user without `saveEntries:{section}` doesn't see the corresponding mode surfaces in `tools/list`, and `tools/call` rejects with -32602 if they try to invoke directly.
+Per-user visibility is a *separate* concern, handled per-request by `filterFor()` (and schema-rewriting by `inputSchemaFor()`) — see [the three-method gating contract](#the-three-method-gating-contract) above. The bundled `PermissionedToolTrait` carries the in-`execute()` permission re-check.
 
-This is the right place to gate Pro / Free tier visibility too — a Pro-only tool returns `false` on Free and never appears in the bundled registry.
+A real Pro tool composes both traits. Abridged from `craftpulse\cortex\tools\content\Category`:
+
+```php
+use craft\elements\User;
+use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\PermissionedToolTrait;
+use craftpulse\cortex\tools\ProToolTrait;
+use craftpulse\cortex\tools\ToolException;
+
+class Category extends AbstractTool
+{
+    use PermissionedToolTrait; // _assertPermission() — in-execute() re-check.
+    use ProToolTrait;          // shouldRegister() — Pro-only registration.
+
+    // Per-user visibility: hide the tool from users with no
+    // save/delete permission on any category group. stdio (null) and
+    // admins always see it.
+    public function filterFor(?User $user = null): bool
+    {
+        if ($user === null || $user->admin) {
+            return true;
+        }
+        foreach (Craft::$app->getCategories()->getAllGroups() as $group) {
+            if ($user->can("saveCategories:{$group->uid}")
+                || $user->can("deleteCategories:{$group->uid}")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // The permissions the resolved arguments imply. PermissionedToolTrait
+    // walks this list in _assertPermission() and throws ToolException on a
+    // miss. The wildcard sentinel (e.g. `saveCategories:*`) is used by
+    // filterFor()-style probing only and must be resolved to a concrete
+    // group UID before execute().
+    protected function _requiredPermissions(array $arguments): array
+    {
+        $groupUid = $this->_resolveGroupUid($arguments);
+        return $groupUid === null
+            ? ['saveCategories:*']
+            : ["saveCategories:{$groupUid}"];
+    }
+
+    public function execute(array $arguments): array
+    {
+        // Re-check after resolving the per-resource UID — defense in
+        // depth, independent of filterFor()'s tools/list filtering.
+        $this->_assertPermission($arguments);
+        // … resolve, mutate, save.
+    }
+}
+```
+
+### Error contract
+
+Cortex distinguishes **protocol errors** from **tool errors**, and they take different wire shapes:
+
+- **Protocol errors** — unknown tool name, missing `name`, malformed params — come back as a JSON-RPC error response. The code is `-32602` (Invalid params) for an unknown / hidden tool, `-32601` for an unknown method, `-32600` for a malformed envelope, `-32603` for an internal error. A tool that `filterFor()` hides is indistinguishable from a missing one: `tools/call` against it returns `-32602`, failing closed.
+- **Tool errors** — a `ToolException` thrown from `execute()` (permission denial, bad arguments, not-found) — come back as a **successful** JSON-RPC response carrying the MCP tool-error envelope:
+
+  ```json
+  {
+    "content": [{ "type": "text", "text": "permission denied — …" }],
+    "isError": true
+  }
+  ```
+
+  There is **no** `-32002` code anywhere in this path — the locked decision routes every tool-level failure through the `isError: true` envelope so the LLM can read the message and self-correct rather than treating it as a transport fault. Throw `ToolException` for anything the caller could fix; let other exceptions propagate (the dispatcher converts them to a `-32603` internal error and logs the real cause).
 
 ## Naming conventions
 
