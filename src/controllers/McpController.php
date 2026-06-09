@@ -236,10 +236,14 @@ class McpController extends Controller
         //   1. OAuth access tokens (short-lived, audience-bound).
         //   2. Long-lived bearer tokens (cortex_tokens).
         //
-        // Disambiguation: JWTs contain dots, bearer tokens are 64-char
-        // hex without dots. Probe OAuth first when dots present;
-        // fall back to bearer when the OAuth lookup misses. Either
-        // path resolving wins; both missing → 401.
+        // Disambiguation: OAuth JWTs contain dots; opaque bearer tokens
+        // are 64-char hex with no dots (`bin2hex(random_bytes(32))` —
+        // see `Tokens::issue()`). The shapes are disjoint, so the token
+        // format selects exactly one lookup path: a dotted token is
+        // treated as an OAuth JWT and is NOT retried as an opaque
+        // bearer when the OAuth lookup misses; a dotless token goes
+        // straight to the bearer table. Whichever path matches wins;
+        // a miss on the selected path → 401.
         $bearer = $this->_extractBearer();
         if ($bearer === null) {
             $this->_unauthorized('Missing or malformed Authorization header. Expected: Authorization: Bearer <token>.');
