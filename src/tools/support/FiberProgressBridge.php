@@ -34,15 +34,27 @@ use yii\base\Event;
  * Cancellation rides on `$shouldCancel`, a callable consulted by the
  * parent generator BEFORE each `$fiber->resume()`. When it returns
  * true the bridge calls `$fiber->throw($cancelException)` to engage
- * the host service's clean-exit path.
+ * the host service's clean-exit path, then **drains the Fiber to
+ * termination** — resuming (and discarding) any further suspended
+ * frames the catch path produces — so the Fiber's
+ * `finally { Event::off() }` ALWAYS runs. Post-cancel frames are NOT
+ * yielded onward; the drain exists solely to let the wrapped service
+ * unwind fully and detach the listener. This makes the listener safe
+ * to leave even for a wrapped service whose catch block fires another
+ * event (and thus suspends again) before returning.
  *
- * **The exception type matters.** For `Elements::resaveElements()`
- * Craft catches `craft\db\QueryAbortedException` at
+ * **The exception type still matters for a CLEAN exit.** For
+ * `Elements::resaveElements()` Craft catches
+ * `craft\db\QueryAbortedException` at
  * `vendor/craftcms/cms/src/services/Elements.php:1677` ("fail
- * silently") and unwinds cleanly. Throwing any other `Throwable`
- * propagates out of `resaveElements()` and breaks the contract.
- * Callers MUST pass the exception type the wrapped service's
- * catch-block recognises; the bridge does not police the choice.
+ * silently") and unwinds cleanly, letting the Fiber terminate and its
+ * return value surface via `getReturn()`. Passing an exception type
+ * the wrapped service does NOT catch no longer leaks the listener (the
+ * Fiber still unwinds through its `finally`), but the uncaught
+ * throwable bubbles out of `run()` to the caller instead of producing
+ * a clean return. Callers SHOULD pass the exception type the wrapped
+ * service's catch-block recognises; the bridge does not police the
+ * choice.
  *
  * # Event listener placement
  *
@@ -152,10 +164,13 @@ final class FiberProgressBridge
      * Cancellation: `$shouldCancel` is polled BEFORE every
      * `$fiber->resume()` (i.e. between rows). On a truthy return the
      * bridge throws `$cancelException` into the Fiber, which lets the
-     * wrapped service unwind via its existing catch path. The Fiber
-     * may still terminate normally (its return value is captured) or
-     * by an uncaught exception (re-thrown out of the bridge to the
-     * caller).
+     * wrapped service unwind via its existing catch path, then resumes
+     * the Fiber repeatedly — discarding any further suspended frames —
+     * until `isTerminated()`. Draining to termination guarantees the
+     * Fiber's `finally { Event::off() }` runs even when the catch path
+     * suspends again, so the class-level listener never leaks. The
+     * Fiber may terminate normally (its return value is captured) or by
+     * an uncaught exception (re-thrown out of the bridge to the caller).
      *
      * @param Closure(): bool $shouldCancel Polled before each resume.
      * @return Generator<int,array<string,mixed>,mixed,mixed>
@@ -199,12 +214,31 @@ final class FiberProgressBridge
         while (!$fiber->isTerminated()) {
             if ($shouldCancel()) {
                 // Throw the cancellation exception INTO the Fiber's
-                // suspended frame. The wrapped service's catch-block
-                // engages and the call unwinds. `$fiber->throw()`
-                // returns the next value the Fiber suspends on (or
-                // null on terminated), but we don't yield further
-                // frames after cancellation.
-                $fiber->throw($this->_cancelException);
+                // suspended frame, then drain the Fiber to termination.
+                //
+                // The wrapped service's catch-block engages and the
+                // call unwinds. `$fiber->throw()` returns the next value
+                // the Fiber suspends on (or null on terminated). We do
+                // NOT yield post-cancel frames onward, but we MUST keep
+                // resuming until `isTerminated()` so the Fiber's
+                // `finally { Event::off() }` runs — otherwise a wrapped
+                // service whose catch path fires another event (and thus
+                // suspends again) would leave the Fiber suspended and the
+                // class-level listener leaked for the rest of the process.
+                //
+                // `throw()`/`resume()` return the value the Fiber next
+                // suspends on, or null once it terminates (returns). The
+                // handler only suspends with a NON-null frame array (it
+                // guards `if ($frame !== null)`), so a null return here
+                // unambiguously means "the Fiber returned" — i.e. its
+                // `finally` ran and the listener is detached. Looping on
+                // that signal needs no explicit iteration cap: every
+                // resume advances the wrapped service toward its return,
+                // and a well-behaved `finally` guarantees termination.
+                $next = $fiber->throw($this->_cancelException);
+                while ($next !== null) {
+                    $next = $fiber->resume();
+                }
                 break;
             }
 
