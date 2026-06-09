@@ -173,6 +173,17 @@ class Settings extends Model
      *          clients evict naturally. Default: 1 hour. Override
      *          higher for long-running coding sessions, lower for
      *          tighter session-affinity rotation.
+     *
+     *          Invariant: `touch()` fires once per request before the
+     *          (possibly streaming) `tools/call` runs, not mid-stream,
+     *          so this TTL MUST exceed the longest single stream's
+     *          wall-clock — otherwise a stream that outlives its one
+     *          touch could evict the session while a sibling request is
+     *          in flight. The 3600s default clears the realistic
+     *          ceiling (streams are bounded by `max_execution_time` and
+     *          cooperative client-disconnect cancel) by two orders of
+     *          magnitude. Do not lower it below your longest expected
+     *          stream.
      */
     public int $sessionTtl = 3600;
 
