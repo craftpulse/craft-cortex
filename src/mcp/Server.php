@@ -28,7 +28,8 @@ use yii\base\Event;
  * null for notifications). Transports adapt I/O (line-delimited JSON
  * for stdio, request/response bodies for HTTP) and call `dispatch()`.
  *
- * Spec target: 2025-06-18.
+ * Spec target: MCP 2025-11-25 (latest), negotiating 2025-06-18 for
+ * older clients — see `SUPPORTED_PROTOCOL_VERSIONS`.
  * =========================================================================
  *
  * @author Craftpulse
@@ -39,7 +40,41 @@ class Server
     // Constants
     // =========================================================================
 
-    public const PROTOCOL_VERSION = '2025-06-18';
+    /**
+     * Latest MCP protocol revision this server speaks. Advertised in
+     * the `initialize` response when the client requests this version
+     * or a version we don't recognise (per the spec's "respond with
+     * the latest version supported by the server" rule).
+     *
+     * @since 5.0.0
+     */
+    public const PROTOCOL_VERSION = '2025-11-25';
+
+    /**
+     * Every MCP protocol revision this server can negotiate, newest
+     * first. The dispatcher echoes the client's requested version when
+     * it appears here (spec: "if the server supports the requested
+     * protocol version, it MUST respond with the same version") and
+     * falls back to `PROTOCOL_VERSION` otherwise. The HTTP transport's
+     * `MCP-Protocol-Version` header is validated against this same set.
+     *
+     * 2025-11-25 and 2025-06-18 are wire-compatible for cortex's
+     * surface — the 2025-11-25 deltas that touch a server are version
+     * negotiation (handled here), the HTTP-403-on-bad-Origin rule
+     * (already enforced in `McpController::_passesOrigin`), and
+     * SEP-1303 "input-validation errors are tool-execution errors, not
+     * protocol errors" (already cortex's behaviour: tool-level failures
+     * return `isError: true` envelopes, never JSON-RPC error codes).
+     * The remaining 2025-11-25 additions (icons, OIDC discovery, CIMD,
+     * tasks, elicitation) are optional capabilities cortex does not
+     * advertise, so honouring them is not required to speak the
+     * revision.
+     *
+     * @var string[]
+     *
+     * @since 5.0.0
+     */
+    public const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18'];
 
     public const SERVER_NAME = 'cortex';
 
@@ -554,7 +589,7 @@ class Server
         }
 
         return [
-            'protocolVersion' => self::PROTOCOL_VERSION,
+            'protocolVersion' => $this->_negotiateProtocolVersion($params['protocolVersion'] ?? null),
             'capabilities' => [
                 'tools' => new \stdClass(),
                 'resources' => new \stdClass(),
@@ -565,6 +600,28 @@ class Server
                 'version' => self::SERVER_VERSION,
             ],
         ];
+    }
+
+    /**
+     * Resolve the protocol version to advertise in the `initialize`
+     * response. Per MCP lifecycle version negotiation: echo the
+     * client's requested version when this server supports it, else
+     * respond with the latest version this server supports.
+     *
+     * A missing or non-string request value falls back to the latest —
+     * a malformed handshake still gets a usable version rather than an
+     * error, matching the lenient posture the rest of the dispatcher
+     * takes toward client input.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _negotiateProtocolVersion(mixed $requested): string
+    {
+        if (is_string($requested) && in_array($requested, self::SUPPORTED_PROTOCOL_VERSIONS, true)) {
+            return $requested;
+        }
+        return self::PROTOCOL_VERSION;
     }
 
     /**
