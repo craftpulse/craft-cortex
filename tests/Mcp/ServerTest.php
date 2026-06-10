@@ -23,13 +23,13 @@ beforeEach(function() {
 // initialize
 // -----------------------------------------------------------------------------
 
-it('responds to initialize with the pinned protocol version + serverInfo', function() {
+it('responds to initialize with the latest protocol version + serverInfo', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 1,
         'method' => 'initialize',
         'params' => [
-            'protocolVersion' => '2025-06-18',
+            'protocolVersion' => Server::PROTOCOL_VERSION,
             'capabilities' => new stdClass(),
             'clientInfo' => ['name' => 'pest', 'version' => '0'],
         ],
@@ -43,6 +43,41 @@ it('responds to initialize with the pinned protocol version + serverInfo', funct
         ->and($response['result']['serverInfo']['name'])->toBe(Server::SERVER_NAME)
         ->and($response['result']['serverInfo']['version'])->toBe(Server::SERVER_VERSION)
         ->and($response['result']['capabilities'])->toHaveKeys(['tools', 'resources', 'prompts']);
+});
+
+it('echoes a supported older protocol version back to the client verbatim', function() {
+    // Spec: "if the server supports the requested protocol version, it
+    // MUST respond with the same version." 2025-06-18 stays negotiable
+    // so existing clients keep working after the 2025-11-25 bump.
+    $response = $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => new stdClass(),
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+
+    expect($response['result']['protocolVersion'])->toBe('2025-06-18');
+});
+
+it('falls back to the latest protocol version when the client requests an unsupported one', function() {
+    // Spec: "otherwise, the server MUST respond with another protocol
+    // version it supports" — the latest, here.
+    $response = $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2024-01-01',
+            'capabilities' => new stdClass(),
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+
+    expect($response['result']['protocolVersion'])->toBe(Server::PROTOCOL_VERSION);
 });
 
 /**

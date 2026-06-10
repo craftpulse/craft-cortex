@@ -425,11 +425,11 @@ class McpController extends Controller
             $this->_status(400, 'Missing MCP-Protocol-Version header.');
             return false;
         }
-        if ($version !== Server::PROTOCOL_VERSION) {
+        if (!in_array($version, Server::SUPPORTED_PROTOCOL_VERSIONS, true)) {
             $this->_status(400, sprintf(
-                'Unsupported MCP-Protocol-Version: "%s". This server supports "%s".',
+                'Unsupported MCP-Protocol-Version: "%s". This server supports: %s.',
                 $version,
-                Server::PROTOCOL_VERSION,
+                implode(', ', Server::SUPPORTED_PROTOCOL_VERSIONS),
             ));
             return false;
         }

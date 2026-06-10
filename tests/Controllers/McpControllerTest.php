@@ -298,6 +298,29 @@ it('returns 400 when MCP-Protocol-Version is unrecognised', function() {
     expect($response->statusCode)->toBe(400);
 });
 
+it('accepts a supported older MCP-Protocol-Version header', function() {
+    // 2025-06-18 remains negotiable alongside the 2025-11-25 default,
+    // so a client pinned to the older revision is not locked out at
+    // the header gate.
+    $body = json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => '2025-06-18',
+        'Authorization' => $this->bearerHeader,
+    ], body: (string) $body);
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(200);
+});
+
 // -----------------------------------------------------------------------------
 // Origin allowlist
 // -----------------------------------------------------------------------------
