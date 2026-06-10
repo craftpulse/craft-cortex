@@ -3,11 +3,24 @@
 Auto-generated reference for the cortex MCP resource surface. Run
 `ddev craft cortex/docs/resources` to refresh.
 
-- **Total resources:** 77
-- **Generated:** 2026-05-07T10:46:39-07:00
+- **Total resources:** 98
+- **Generated:** 2026-06-10T08:12:17-07:00
 
 | URI | Name | MIME | Description |
 | --- | ---- | ---- | ----------- |
+| `craft-skills://craft-cloud` | craft-cloud | `text/markdown` | Top-level router for the craft-cloud skill (SKILL.md). Lists when to load each reference document and the cross-cutting pitfalls that apply across them. |
+| `craft-skills://craft-cloud/assets-and-transforms` | craft-cloud / assets-and-transforms | `text/markdown` | Deep-dive reference document `assets-and-transforms` from the craft-cloud skill. |
+| `craft-skills://craft-cloud/caching-and-edge` | craft-cloud / caching-and-edge | `text/markdown` | Deep-dive reference document `caching-and-edge` from the craft-cloud skill. |
+| `craft-skills://craft-cloud/commands-and-cron` | craft-cloud / commands-and-cron | `text/markdown` | Deep-dive reference document `commands-and-cron` from the craft-cloud skill. |
+| `craft-skills://craft-cloud/config-file` | craft-cloud / config-file | `text/markdown` | Deep-dive reference document `config-file` from the craft-cloud skill. |
+| `craft-skills://craft-cloud/database` | craft-cloud / database | `text/markdown` | Deep-dive reference document `database` from the craft-cloud skill. |
+| `craft-skills://craft-cloud/deploy-pipeline` | craft-cloud / deploy-pipeline | `text/markdown` | Deep-dive reference document `deploy-pipeline` from the craft-cloud skill. |
+| `craft-skills://craft-cloud/domains` | craft-cloud / domains | `text/markdown` | Deep-dive reference document `domains` from the craft-cloud skill. |
+| `craft-skills://craft-cloud/extension` | craft-cloud / extension | `text/markdown` | Deep-dive reference document `extension` from the craft-cloud skill. |
+| `craft-skills://craft-cloud/limitations` | craft-cloud / limitations | `text/markdown` | Deep-dive reference document `limitations` from the craft-cloud skill. |
+| `craft-skills://craft-cloud/local-dev` | craft-cloud / local-dev | `text/markdown` | Deep-dive reference document `local-dev` from the craft-cloud skill. |
+| `craft-skills://craft-cloud/migration` | craft-cloud / migration | `text/markdown` | Deep-dive reference document `migration` from the craft-cloud skill. |
+| `craft-skills://craft-cloud/plugin-development` | craft-cloud / plugin-development | `text/markdown` | Deep-dive reference document `plugin-development` from the craft-cloud skill. |
 | `craft-skills://craft-content-modeling` | craft-content-modeling | `text/markdown` | Top-level router for the craft-content-modeling skill (SKILL.md). Lists when to load each reference document and the cross-cutting pitfalls that apply across them. |
 | `craft-skills://craft-content-modeling/content-patterns` | craft-content-modeling / content-patterns | `text/markdown` | Deep-dive reference document `content-patterns` from the craft-content-modeling skill. |
 | `craft-skills://craft-content-modeling/field-types` | craft-content-modeling / field-types | `text/markdown` | Deep-dive reference document `field-types` from the craft-content-modeling skill. |
@@ -80,7 +93,15 @@ Auto-generated reference for the cortex MCP resource surface. Run
 | `craft-skills://craftcms/sessions-and-auth` | craftcms / sessions-and-auth | `text/markdown` | Deep-dive reference document `sessions-and-auth` from the craftcms skill. |
 | `craft-skills://craftcms/testing` | craftcms / testing | `text/markdown` | Deep-dive reference document `testing` from the craftcms skill. |
 | `craft-skills://ddev` | ddev | `text/markdown` | Top-level router for the ddev skill (SKILL.md). Lists when to load each reference document and the cross-cutting pitfalls that apply across them. |
+| `craft-skills://servd` | servd | `text/markdown` | Top-level router for the servd skill (SKILL.md). Lists when to load each reference document and the cross-cutting pitfalls that apply across them. |
+| `craft-skills://servd/asset-storage` | servd / asset-storage | `text/markdown` | Deep-dive reference document `asset-storage` from the servd skill. |
+| `craft-skills://servd/caching` | servd / caching | `text/markdown` | Deep-dive reference document `caching` from the servd skill. |
+| `craft-skills://servd/database-and-queue` | servd / database-and-queue | `text/markdown` | Deep-dive reference document `database-and-queue` from the servd skill. |
+| `craft-skills://servd/deploy-and-environments` | servd / deploy-and-environments | `text/markdown` | Deep-dive reference document `deploy-and-environments` from the servd skill. |
+| `craft-skills://servd/limitations` | servd / limitations | `text/markdown` | Deep-dive reference document `limitations` from the servd skill. |
+| `craft-skills://servd/local-dev` | servd / local-dev | `text/markdown` | Deep-dive reference document `local-dev` from the servd skill. |
 | `craft-skills://agents/craft-code-reviewer` | agents / craft-code-reviewer | `text/markdown` | Claude Code agent definition `craft-code-reviewer` — markdown with YAML frontmatter declaring the agent's name and one-line description, plus the systemic prompt body. |
+| `craft-skills://agents/craft-code-reviewer-deep` | agents / craft-code-reviewer-deep | `text/markdown` | Claude Code agent definition `craft-code-reviewer-deep` — markdown with YAML frontmatter declaring the agent's name and one-line description, plus the systemic prompt body. |
 | `craft-skills://agents/craft-debugger` | agents / craft-debugger | `text/markdown` | Claude Code agent definition `craft-debugger` — markdown with YAML frontmatter declaring the agent's name and one-line description, plus the systemic prompt body. |
 | `craft-skills://agents/craft-feature-builder` | agents / craft-feature-builder | `text/markdown` | Claude Code agent definition `craft-feature-builder` — markdown with YAML frontmatter declaring the agent's name and one-line description, plus the systemic prompt body. |
 | `craft-skills://agents/craft-planner` | agents / craft-planner | `text/markdown` | Claude Code agent definition `craft-planner` — markdown with YAML frontmatter declaring the agent's name and one-line description, plus the systemic prompt body. |

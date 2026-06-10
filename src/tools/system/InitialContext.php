@@ -27,7 +27,7 @@ use craftpulse\cortex\tools\support\Schema;
  *
  * This tool returns one consolidated payload covering exactly that
  * orientation surface — Craft version + edition + environment, the
- * primary site, a thin sites/sections/element-types index, the eight
+ * primary site, a thin sites/sections/element-types index, the
  * bundled skill prompts so the model knows the moat-content exists,
  * the `craft_exec` posture (enabled / dry-run-default), and the
  * effective command allowlist. It is the tool a fresh model should

@@ -16,9 +16,10 @@ use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
  * `search_skills` tool — in-memory full-text search across the bundled
  * skills corpus.
  *
- * Cortex ships ~27,000 lines of authored Craft expertise across 8
- * skills (each with a `SKILL.md` router plus N reference documents)
- * and 5 Claude Code agents. The MCP prompt + resource registry exposes
+ * Cortex ships tens of thousands of lines of authored Craft expertise
+ * across the bundled skills (each a `SKILL.md` router plus N reference
+ * documents) and Claude Code agents — the tool description below
+ * computes the live counts. The MCP prompt + resource registry exposes
  * each addressable unit by URI, but the LLM has no way to ask "where
  * is this concept covered?" without listing every resource and
  * fetching them in turn.
