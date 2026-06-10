@@ -147,8 +147,8 @@ class CraftCommand extends AbstractTool
 
         // Content-level patterns admit regardless of `allowAdminChanges`;
         // admin-level patterns admit only when the host flag is true.
-        // Distinguishing the two paths lets us return a precise
-        // `-32002` rejection that names `allowAdminChanges` as the
+        // Distinguishing the two paths lets us throw a precise
+        // `ToolException` that names `allowAdminChanges` as the
         // reason when the only matching pattern is admin-level and the
         // flag is off.
         $matched = $this->_matchPattern($command, $this->_contentPatterns());
@@ -229,7 +229,7 @@ class CraftCommand extends AbstractTool
      * host's `allowAdminChanges` flag. Separating this from
      * `_allowlist()` lets `execute()` distinguish "admin-level pattern
      * blocked by `allowAdminChanges = false`" from "no matching
-     * pattern at all" so the `-32002` rejection message can name the
+     * pattern at all" so the `ToolException` message can name the
      * exact cause.
      *
      * @return string[]
