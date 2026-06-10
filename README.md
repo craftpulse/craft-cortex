@@ -63,7 +63,7 @@ Cortex supports seven clients today — Claude Desktop, Claude Code, Cursor, Con
 
 **Defense in depth, not naive blocklisting.** `craft_exec` runs PHP `eval` behind six layered security gates — dry-run-by-default, structured output, secret redaction, destructive-op guard, hard HTTP-transport rejection (stdio only), and the MCP `destructiveHint` annotation so spec-aware clients warn before invoking. Nothing else in the source uses `eval` / `shell_exec` / `proc_open` / `passthru` / `popen` / backticks, enforced by a tokenising architecture test. No raw SQL tool. No PII in Free. The threat model isn't sandbox escape — it's an LLM choosing destructive operations because it misread context, and the gates are designed around that.
 
-**MCP 2025-06-18 spec compliance.** Five tools declare `outputSchema`; the dispatcher dual-emits `structuredContent` alongside the legacy text block per §6.2. PHP 8 attributes (`#[IsReadOnly]`, `#[IsDestructive]`, `#[IsIdempotent]`, `#[IsOpenWorld]`, `#[IsStdioOnly]`, `#[Title]`) carry the MCP `ToolAnnotations`. JSON-RPC 2.0 dispatcher uses correct error codes (-32600 / -32601 / -32602 / -32603) and returns tool-execution errors as `isError: true` envelopes (not protocol errors) so the LLM can self-correct.
+**MCP 2025-11-25 spec compliance.** Cortex advertises the current 2025-11-25 revision and negotiates 2025-06-18 for older clients. Five tools declare `outputSchema`; the dispatcher dual-emits `structuredContent` alongside the legacy text block. PHP 8 attributes (`#[IsReadOnly]`, `#[IsDestructive]`, `#[IsIdempotent]`, `#[IsOpenWorld]`, `#[IsStdioOnly]`, `#[Title]`) carry the MCP `ToolAnnotations`. JSON-RPC 2.0 dispatcher uses correct error codes (-32600 / -32601 / -32602 / -32603) and returns tool-execution errors as `isError: true` envelopes (not protocol errors) so the LLM can self-correct.
 
 ## What the AI gets
 
@@ -174,13 +174,13 @@ In the Inspector UI, point at:
 - **Command:** `docker`
 - **Arguments:** `exec -i ddev-<project>-web php /var/www/html/craft cortex/serve`
 
-The `initialize` handshake should succeed (`cortex 5.0.0`, protocol `2025-06-18`), and every tool / prompt / resource shows up in the lists.
+The `initialize` handshake should succeed (`cortex 5.0.0`, protocol `2025-11-25` — or `2025-06-18` if your client requests it), and every tool / prompt / resource shows up in the lists.
 
 ## Roadmap
 
-- **Phase 1 — Free. Shipping.** 33 tools, 10 prompts, 98 resources, stdio transport, allowlist UI, full install toolkit (snippet printer + per-client auto-apply + auto-detect + interactive auto-apply across detected clients), MCP `outputSchema` / `structuredContent` dual-emit per MCP 2025-06-18, docs generators, extension events for third-party tools / prompts / resources, full Pest + PHPStan level 8 + ECS green.
+- **Phase 1 — Free. Shipping.** 33 tools, 10 prompts, 98 resources, stdio transport, allowlist UI, full install toolkit (snippet printer + per-client auto-apply + auto-detect + interactive auto-apply across detected clients), MCP `outputSchema` / `structuredContent` dual-emit per MCP 2025-11-25 (negotiating 2025-06-18), docs generators, extension events for third-party tools / prompts / resources, full Pest + PHPStan level 8 + ECS green.
 - **Phase 2 — Pro.** Streamable HTTP transport with OAuth 2.1, per-user permission filtering on `tools/list` (architecture locked: static `shouldRegister()` + instance `filterFor($user)` + instance `inputSchemaFor($user)`), DB-backed audit log, 7 net-new write tools (`entry`, `category`, `tag`, `address`, `global_set`, `users`, `bulk_entries`), mode unlocks on Free tools (`drafts_and_revisions apply/discard`, `content_audit` fix modes, `import_export` import, `system_diagnostics manage_queue`), Pro-exclusive custom-skills element type, minimal CP UI for tokens / activity / connection.
-- **Phase 3 — Polish.** CP-side install wizard (GUI affordance on top of the Phase 1 console actions, not a re-implementation), formal real-LLM E2E harness, vectorised docs search complementary to the authored skills corpus, third-party tool registration battle-tested across the ecosystem, skill remote-fetch.
+- **Phase 3 — Polish.** CP-side install wizard (GUI affordance on top of the Phase 1 console actions, not a re-implementation), formal real-LLM E2E harness, vectorised docs search complementary to the authored skills corpus, third-party tool registration battle-tested across the ecosystem, skill remote-fetch, OAuth Client ID Metadata Documents (CIMD — the registration mechanism the MCP spec now recommends over DCR), and the planned migration to the stateless MCP 2026-07-28 revision.
 
 ## Support
 
