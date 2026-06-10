@@ -327,6 +327,8 @@ trait PluginTrait
                     'cortex/allowlist/table-data' => 'cortex/settings/allowlist-table-data',
                     'cortex/allowlist/override-slideout' => 'cortex/settings/allowlist-override-slideout',
                     'cortex/activity' => 'cortex/settings/activity',
+                    'cortex/activity/table-data' => 'cortex/settings/activity-table-data',
+                    'cortex/activity/row' => 'cortex/settings/activity-row',
                     'cortex/connection' => 'cortex/settings/connection',
                 ], $event->rules);
             },

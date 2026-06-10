@@ -254,6 +254,50 @@
         },
 
         /**
+         * Open the read-only detail slideout for an Activity-log row.
+         *
+         * Fetches the server-rendered detail HTML for the given invocation
+         * id and hands it to `Craft.Slideout`. The slideout body carries
+         * ONLY already-redacted columns (decision 11) — there is no
+         * pre-redaction surface anywhere in the data path.
+         *
+         * Foreign-row / missing-id requests resolve to a 404 server-side
+         * (fail-closed, decision 7 / 11); the catch surfaces a generic
+         * error so a non-admin cannot use the response to enumerate other
+         * users' rows.
+         *
+         * Garnish.Slideout supplies the focus trap + ESC dismissal; the
+         * "Done" button closes it.
+         *
+         * @param {number} id - The `cortex_invocations` row id.
+         */
+        openActivityDetailSlideout: function(id) {
+            Craft.sendActionRequest('GET', 'cortex/activity/row', {
+                params: { id: id },
+            })
+                .then(function(response) {
+                    var html = response && response.data ? response.data.html : '';
+
+                    var slideout = new Craft.Slideout(html, {
+                        containerAttributes: {
+                            class: 'cortex-slideout cortex-activity-slideout',
+                        },
+                    });
+
+                    slideout.$container.on('click', '[data-cortex-done]', function(event) {
+                        event.preventDefault();
+                        slideout.close();
+                    });
+                })
+                .catch(function(error) {
+                    Craft.cp.displayError(Craft.t('cortex', 'Could not open the activity detail.'));
+                    if (window.console && console.error) {
+                        console.error('Cortex activity detail load failed:', error);
+                    }
+                });
+        },
+
+        /**
          * Copy a string to the clipboard, invoking `onSuccess` when the
          * write resolves. Prefers the async Clipboard API; falls back to
          * a hidden-textarea + `execCommand('copy')` on older browsers or

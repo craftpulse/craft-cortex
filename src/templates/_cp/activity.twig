@@ -1,16 +1,268 @@
 {% extends "cortex/_cp/_layout" %}
+{% import "_includes/forms.twig" as forms %}
 
 {# =========================================================================
-   Cortex Activity tab — placeholder.
+   Cortex Activity tab — VueAdminTable of the HTTP-transport invocation
+   audit log + filter bar + row-click Garnish.Slideout detail.
 
-   Real content (VueAdminTable invocation log + kind/tool/user/date-range
-   filters + Garnish.Slideout row detail) lands in Gate 9.3.
-   9.1 ships only the tab placeholder so the tabbed lineage compiles.
+   The log records one row per authenticated Streamable-HTTP `tools/call`.
+   Admins audit every row; non-admins granted `cortex:viewActivity` see
+   ONLY their own rows — the scope is enforced server-side in
+   `SettingsController::actionActivityTableData` and cannot be widened by
+   the `filters[userId]` param (fail-closed, decision 7).
+
+   Data path:
+     - Table data : GET cortex/activity/table-data → JSON {pagination, data}
+     - Row detail : GET cortex/activity/row?id=<id> → JSON {html}
+
+   The row shape is locked in `SettingsController::_serializeActivityRow`:
+   `{id, tool, mode, kind, user, durationMs, dateCreated}`.
+
+   Filter values are passed in from the controller:
+     - `kinds`     : the five audit-kind enum values.
+     - `toolNames` : distinct tool names across the table.
+     - `isAdmin`   : gates the user-id filter (non-admins are self-scoped).
+
+   The detail slideout never displays anything beyond the already-redacted
+   `argsRedacted` / `responseExcerpt` columns (decision 11) — there is no
+   pre-redaction surface anywhere in the data path.
    ========================================================================= #}
 
 {% set selectedTab = 'activity' %}
 
+{% do view.registerTranslations('cortex', [
+    'All kinds',
+    'All tools',
+    'Anonymous',
+    'Could not open the activity detail.',
+    'Duration',
+    'From',
+    'Kind',
+    'No activity recorded yet.',
+    'Search activity',
+    'Tool',
+    'To',
+    'User',
+    'When',
+    'cancelled',
+    'internal_error',
+    'rate_limited',
+    'success',
+    'tool_error',
+]) %}
+
 {% block content %}
-    {# placeholder — built in 9.3 #}
-    <p class="light">{{ 'The Activity tab is coming soon.'|t('cortex') }}</p>
+    <p class="light">
+        {{ 'Audit log of authenticated Streamable HTTP tool calls. Click a row to inspect the redacted request and response payloads.'|t('cortex') }}
+    </p>
+
+    <div id="cortex-activity-filters" class="flex flex-nowrap" style="margin-bottom: 14px; gap: 10px; flex-wrap: wrap;">
+        <div class="field">
+            <div class="heading">
+                <label for="cortex-activity-filter-kind">{{ 'Kind'|t('cortex') }}</label>
+            </div>
+            <div class="input">
+                {{ forms.select({
+                    id: 'cortex-activity-filter-kind',
+                    name: 'kind',
+                    options: [{ label: 'All kinds'|t('cortex'), value: '' }]|merge(
+                        kinds|map(k => { label: k|t('cortex'), value: k })
+                    ),
+                }) }}
+            </div>
+        </div>
+
+        <div class="field">
+            <div class="heading">
+                <label for="cortex-activity-filter-tool">{{ 'Tool'|t('cortex') }}</label>
+            </div>
+            <div class="input">
+                {{ forms.select({
+                    id: 'cortex-activity-filter-tool',
+                    name: 'toolName',
+                    options: [{ label: 'All tools'|t('cortex'), value: '' }]|merge(
+                        toolNames|map(t => { label: t, value: t })
+                    ),
+                }) }}
+            </div>
+        </div>
+
+        {% if isAdmin %}
+            <div class="field">
+                <div class="heading">
+                    <label for="cortex-activity-filter-user">{{ 'User'|t('cortex') }}</label>
+                </div>
+                <div class="input">
+                    {{ forms.elementSelect({
+                        id: 'cortex-activity-filter-user',
+                        name: 'userId',
+                        elementType: 'craft\\elements\\User',
+                        limit: 1,
+                        selectionLabel: 'Choose a user'|t('cortex'),
+                    }) }}
+                </div>
+            </div>
+        {% endif %}
+
+        <div class="field">
+            <div class="heading">
+                <label for="cortex-activity-filter-from">{{ 'From'|t('cortex') }}</label>
+            </div>
+            <div class="input">
+                {{ forms.date({
+                    id: 'cortex-activity-filter-from',
+                    name: 'from',
+                }) }}
+            </div>
+        </div>
+
+        <div class="field">
+            <div class="heading">
+                <label for="cortex-activity-filter-to">{{ 'To'|t('cortex') }}</label>
+            </div>
+            <div class="input">
+                {{ forms.date({
+                    id: 'cortex-activity-filter-to',
+                    name: 'to',
+                }) }}
+            </div>
+        </div>
+    </div>
+
+    <div id="cortex-activity-vue-admin-table"></div>
 {% endblock %}
+
+{% js %}
+    (function() {
+        var tableContainer = '#cortex-activity-vue-admin-table';
+
+        // Collect the current filter values into the `criteria` object the
+        // VueAdminTable forwards as query params. Reads the live DOM each
+        // call so a filter change + reload always sends fresh values.
+        function currentFilters() {
+            function val(selector) {
+                var el = document.querySelector(selector);
+                return el ? el.value : '';
+            }
+            // The user element-select posts its id under `fields[...][]` —
+            // read the hidden input the Garnish element-select maintains.
+            var userId = '';
+            var userInput = document.querySelector('#cortex-activity-filter-user input[name="userId[]"]');
+            if (userInput) {
+                userId = userInput.value;
+            }
+            return {
+                kind: val('#cortex-activity-filter-kind'),
+                toolName: val('#cortex-activity-filter-tool'),
+                userId: userId,
+                from: val('#cortex-activity-filter-from'),
+                to: val('#cortex-activity-filter-to'),
+            };
+        }
+
+        function renderToolCell(value, row) {
+            var tool = value ? Craft.escapeHtml(value) : Craft.t('cortex', 'tool call');
+            if (row.mode) {
+                tool += ' <span class="light">/ ' + Craft.escapeHtml(row.mode) + '</span>';
+            }
+            // The tool cell is the row's detail trigger — a real <button>
+            // so it is reachable and operable by keyboard (Space/Enter)
+            // without depending on VueAdminTable row internals.
+            return (
+                '<button type="button" class="cortex-activity-row-trigger" ' +
+                'data-cortex-activity-id="' + parseInt(row.id, 10) + '">' +
+                tool +
+                '</button>'
+            );
+        }
+
+        function renderKindCell(value) {
+            if (!value) {
+                return '';
+            }
+            var cls = 'cortex-status cortex-status--' + value.replace(/_/g, '-');
+            return '<span class="' + cls + '">' + Craft.escapeHtml(value) + '</span>';
+        }
+
+        function renderUserCell(value) {
+            if (!value) {
+                return '<span class="light">' + Craft.t('cortex', 'Anonymous') + '</span>';
+            }
+            var label = Craft.escapeHtml(value.label || '');
+            if (value.cpEditUrl) {
+                return '<a href="' + Craft.escapeHtml(value.cpEditUrl) + '">' + label + '</a>';
+            }
+            return label;
+        }
+
+        function renderDurationCell(value) {
+            var ms = parseInt(value, 10) || 0;
+            if (ms < 1000) {
+                return Craft.escapeHtml(ms + 'ms');
+            }
+            return Craft.escapeHtml((ms / 1000).toFixed(1) + 's');
+        }
+
+        function renderWhenCell(value) {
+            if (!value) {
+                return '';
+            }
+            var d = new Date(value);
+            return Craft.escapeHtml(Craft.formatDate(d, 'short'));
+        }
+
+        var columns = [
+            { name: 'tool', title: Craft.t('cortex', 'Tool'), sortField: 'tool', callback: renderToolCell },
+            { name: 'kind', title: Craft.t('cortex', 'Kind'), sortField: 'kind', callback: renderKindCell },
+            { name: 'user', title: Craft.t('cortex', 'User'), callback: renderUserCell },
+            { name: 'durationMs', title: Craft.t('cortex', 'Duration'), sortField: 'durationMs', callback: renderDurationCell },
+            { name: 'dateCreated', title: Craft.t('cortex', 'When'), sortField: 'dateCreated', callback: renderWhenCell },
+        ];
+
+        // Shared, mutated-in-place criteria object. VueAdminTable reads
+        // `this.criteria` at every fetch and forwards it as query params,
+        // so mutating these keys + calling `.reload()` re-issues the
+        // query with the current filter values.
+        var criteria = currentFilters();
+
+        var adminTable = new Craft.VueAdminTable({
+            container: tableContainer,
+            columns: columns,
+            tableDataEndpoint: 'cortex/activity/table-data',
+            criteria: criteria,
+            search: true,
+            searchPlaceholder: Craft.t('cortex', 'Search activity'),
+            emptyMessage: Craft.t('cortex', 'No activity recorded yet.'),
+        });
+
+        // Filter changes copy the live DOM values onto the shared criteria
+        // object (in place — VueAdminTable holds the same reference) then
+        // reload.
+        document.querySelectorAll('#cortex-activity-filters select, #cortex-activity-filters input').forEach(function(el) {
+            el.addEventListener('change', function() {
+                var fresh = currentFilters();
+                Object.keys(fresh).forEach(function(key) {
+                    criteria[key] = fresh[key];
+                });
+                adminTable.reload();
+            });
+        });
+
+        // Row-detail trigger — delegate at the document level so it
+        // survives table re-renders (VueAdminTable replaces the row DOM on
+        // every fetch). Locale-proof: matches the data attribute, not text.
+        document.addEventListener('click', function(event) {
+            var trigger = event.target.closest('.cortex-activity-row-trigger[data-cortex-activity-id]');
+            if (!trigger) {
+                return;
+            }
+            event.preventDefault();
+            var id = parseInt(trigger.getAttribute('data-cortex-activity-id'), 10);
+            if (id > 0) {
+                Cortex.openActivityDetailSlideout(id);
+            }
+        });
+
+        window.cortexActivityTable = adminTable;
+    })();
+{% endjs %}
