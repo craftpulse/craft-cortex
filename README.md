@@ -1,8 +1,8 @@
 # Cortex plugin for Craft CMS 5.x
 
-Cortex is a [Model Context Protocol](https://modelcontextprotocol.io/) server that gives your AI assistant a direct line into your Craft 5 project. Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf — they all connect over a single stdio transport and immediately have read access to your content model, your content, and a bundled ~27,000-line corpus of authored Craft expertise. Stop pasting Craft docs into your chat window.
+Cortex is a [Model Context Protocol](https://modelcontextprotocol.io/) server that gives your AI assistant a direct line into your Craft 5 project. Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf — they all connect over a single stdio transport and immediately have read access to your content model, your content, and a bundled ~30,000-line corpus of authored Craft expertise. Stop pasting Craft docs into your chat window.
 
-The free tier ships **33 tools**, **8 prompts**, and **77 resources**. The upcoming Pro tier (Phase 2) adds an authenticated HTTP transport with content-write capabilities for non-developer operators — agencies hand it to their clients without handing over shell access.
+The free tier ships **33 tools**, **10 prompts**, and **98 resources**. The upcoming Pro tier (Phase 2) adds an authenticated HTTP transport with content-write capabilities for non-developer operators — agencies hand it to their clients without handing over shell access.
 
 ## Requirements
 
@@ -57,7 +57,7 @@ Cortex supports seven clients today — Claude Desktop, Claude Code, Cursor, Con
 
 ## What makes Cortex different
 
-**The bundled skills are the moat.** Cortex ships [`craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) — eight skills, ~27,000 lines of authored Craft expertise — as MCP prompts that your assistant picks up automatically when the conversation touches Craft architecture, content modelling, Twig templating, PHP standards, DDEV, or Garnish. This isn't a vectorised docs lookup. It's reverse-engineered internals — the 15-step element save lifecycle, the four-layer authorization model, the dual-layer session architecture — that don't exist in the public docs.
+**The bundled skills are the moat.** Cortex ships [`craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) — ten skills, ~30,000 lines of authored Craft expertise — as MCP prompts that your assistant picks up automatically when the conversation touches Craft architecture, content modelling, Twig templating, PHP standards, DDEV, Garnish, or hosting on Servd / Craft Cloud. This isn't a vectorised docs lookup. It's reverse-engineered internals — the 15-step element save lifecycle, the four-layer authorization model, the dual-layer session architecture — that don't exist in the public docs.
 
 **Lean tool surface, parameter-rich.** 33 thick tools cover broader ground than a 50-tool catalogue would by collapsing `list_*`/`get_*` pairs into single tools with optional `handle`/`id` parameters, exposing a `count: true` mode on every list-capable tool, and offering the full element-query surface (`relatedTo`, `with: [...]` eager loading, structure params, site filter) on the content tools. Smaller `tools/list` = faster LLM tool selection + fewer tokens consumed by the system prompt every turn.
 
@@ -74,7 +74,7 @@ After Cortex is connected, your assistant can:
 - **Read your content safely.** `entries`, `assets`, `categories`, `tags`, `globals` expose the full element-query surface (filters, eager loading, pagination, count mode). Relational fields stub to `{type: "relation", loaded: false}` by default — pass `with: [...]` to materialise them, so the LLM never accidentally triggers an N+1 walk.
 - **Run safe dev actions.** `clear_caches`, `resave`, `craft_command` (allowlisted), `craft_exec` (six security gates including dry-run-default and stdio-only).
 - **Audit workflow state.** `drafts_and_revisions` (list and compare drafts / revisions), `content_audit` (broken relations / unused assets / propagation gaps), `import_export` (structured-JSON export in Free; round-trippable import in Pro). Fix-mode unlocks in Pro.
-- **Search 27,000+ lines of Craft expertise.** `search_skills` does keyword search across the bundled `michtio/craftcms-claude-skills` corpus — eight skills covering Craft internals, templating, content modelling, PHP/Twig standards, DDEV, project setup, and Garnish. The matching skill content is also exposed as MCP **prompts** so the LLM picks them up automatically when relevant. **Resources** expose the per-skill reference deep-dives and the five bundled Claude Code agents.
+- **Search 30,000+ lines of Craft expertise.** `search_skills` does keyword search across the bundled `michtio/craftcms-claude-skills` corpus — ten skills covering Craft internals, templating, content modelling, PHP/Twig standards, DDEV, project setup, Garnish, and Servd / Craft Cloud hosting. The matching skill content is also exposed as MCP **prompts** so the LLM picks them up automatically when relevant. **Resources** expose the per-skill reference deep-dives and the six bundled Claude Code agents.
 
 For the full reference (per-tool argument schemas, annotations, and prompt / resource catalogue), see:
 
@@ -178,7 +178,7 @@ The `initialize` handshake should succeed (`cortex 5.0.0`, protocol `2025-06-18`
 
 ## Roadmap
 
-- **Phase 1 — Free. Shipping.** 33 tools, 8 prompts, 77 resources, stdio transport, allowlist UI, full install toolkit (snippet printer + per-client auto-apply + auto-detect + interactive auto-apply across detected clients), MCP `outputSchema` / `structuredContent` dual-emit per MCP 2025-06-18, docs generators, extension events for third-party tools / prompts / resources, full Pest + PHPStan level 8 + ECS green.
+- **Phase 1 — Free. Shipping.** 33 tools, 10 prompts, 98 resources, stdio transport, allowlist UI, full install toolkit (snippet printer + per-client auto-apply + auto-detect + interactive auto-apply across detected clients), MCP `outputSchema` / `structuredContent` dual-emit per MCP 2025-06-18, docs generators, extension events for third-party tools / prompts / resources, full Pest + PHPStan level 8 + ECS green.
 - **Phase 2 — Pro.** Streamable HTTP transport with OAuth 2.1, per-user permission filtering on `tools/list` (architecture locked: static `shouldRegister()` + instance `filterFor($user)` + instance `inputSchemaFor($user)`), DB-backed audit log, 7 net-new write tools (`entry`, `category`, `tag`, `address`, `global_set`, `users`, `bulk_entries`), mode unlocks on Free tools (`drafts_and_revisions apply/discard`, `content_audit` fix modes, `import_export` import, `system_diagnostics manage_queue`), Pro-exclusive custom-skills element type, minimal CP UI for tokens / activity / connection.
 - **Phase 3 — Polish.** CP-side install wizard (GUI affordance on top of the Phase 1 console actions, not a re-implementation), formal real-LLM E2E harness, vectorised docs search complementary to the authored skills corpus, third-party tool registration battle-tested across the ecosystem, skill remote-fetch.
 
@@ -189,7 +189,7 @@ The `initialize` handshake should succeed (`cortex 5.0.0`, protocol `2025-06-18`
 
 ## License
 
-Free tier: MIT. Pro tier: proprietary, license-gated through the Craft Plugin Store (Phase 2).
+Cortex is a proprietary, commercially-licensed Craft plugin distributed under the [Craft License](https://craftcms.github.io/license/) through the Craft Plugin Store. The Free edition is free of charge; the Pro edition is paid and license-gated through the Plugin Store. (The bundled [`michtio/craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) corpus package is separately MIT-licensed.)
 
 ## Credits
 
