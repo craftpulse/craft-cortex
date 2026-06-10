@@ -478,3 +478,73 @@ it('allowlist tab template instantiates a Craft.VueAdminTable', function() {
     expect($contents)->toContain('cortex/allowlist/table-data');
     expect($contents)->toContain('cortex/settings/remove-override');
 });
+
+// -----------------------------------------------------------------------------
+// 9.5 — Tokens endpoints
+// -----------------------------------------------------------------------------
+
+it('declares the Tokens data + slideout + mutation actions', function() {
+    $rc = new ReflectionClass(SettingsController::class);
+    foreach (['actionTokensTableData', 'actionTokenIssueSlideout', 'actionIssueToken', 'actionRevokeToken'] as $method) {
+        expect($rc->hasMethod($method))->toBeTrue("missing {$method}");
+    }
+});
+
+it('actionTokensTableData first statements are requireAcceptsJson + requireAdmin', function() {
+    $body = _cortex_controller_method_body('actionTokensTableData');
+    expect($body)->toMatch('/^\s*\$this->requireAcceptsJson\s*\(\s*\)/m');
+    expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*false\s*\)/');
+});
+
+it('actionTokenIssueSlideout first statement is requireAdmin', function() {
+    $body = _cortex_controller_method_body('actionTokenIssueSlideout');
+    expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
+});
+
+it('actionIssueToken first statements are requirePostRequest + requireAcceptsJson + requireAdmin', function() {
+    $body = _cortex_controller_method_body('actionIssueToken');
+    expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
+    expect($body)->toMatch('/\$this->requireAcceptsJson\s*\(\s*\)/');
+    expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
+});
+
+it('actionRevokeToken first statements are requirePostRequest + requireAcceptsJson + requireAdmin', function() {
+    $body = _cortex_controller_method_body('actionRevokeToken');
+    expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
+    expect($body)->toMatch('/\$this->requireAcceptsJson\s*\(\s*\)/');
+    expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
+});
+
+it('resolves the Tokens data + slideout + mutation CP URLs', function() {
+    foreach (['cortex/tokens/table-data', 'cortex/tokens/issue-slideout', 'cortex/tokens/issue', 'cortex/tokens/revoke'] as $path) {
+        $url = \craft\helpers\UrlHelper::cpUrl($path);
+        expect($url)->toBeString();
+        expect($url)->not->toBe('');
+        expect($url)->toContain($path);
+    }
+});
+
+it('ships the token-issue slideout partial with form fields + one-time reveal', function() {
+    $path = __DIR__ . '/../../src/templates/_cp/_token-issue-slideout.twig';
+    expect(file_exists($path))->toBeTrue();
+    $contents = file_get_contents($path);
+    expect($contents)->not->toBeFalse();
+    expect($contents)->toContain("name: 'name'");
+    expect($contents)->toContain("name: 'userId'");
+    expect($contents)->toContain("name: 'ttlSeconds'");
+    // The one-time reveal panel + copy control + polite live region.
+    expect($contents)->toContain('data-cortex-reveal');
+    expect($contents)->toContain('data-cortex-token');
+    expect($contents)->toContain('data-cortex-copy');
+    expect($contents)->toContain('aria-live="polite"');
+});
+
+it('tokens tab template instantiates a Craft.VueAdminTable wired to the token endpoints', function() {
+    $path = __DIR__ . '/../../src/templates/_cp/tokens.twig';
+    $contents = file_get_contents($path);
+    expect($contents)->not->toBeFalse();
+    expect($contents)->toContain('Craft.VueAdminTable');
+    expect($contents)->toContain('cortex/tokens/table-data');
+    expect($contents)->toContain('cortex/tokens/revoke');
+    expect($contents)->toContain('openTokenIssuanceSlideout');
+});

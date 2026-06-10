@@ -8,6 +8,7 @@ use craft\helpers\AdminTable;
 use craft\helpers\DateTimeHelper;
 use craft\web\Controller;
 use craftpulse\cortex\Cortex;
+use craftpulse\cortex\models\Token;
 use craftpulse\cortex\records\RuntimeOverride;
 use yii\base\Exception;
 use yii\web\Response;
@@ -73,10 +74,21 @@ class SettingsController extends Controller
     }
 
     /**
-     * Tokens tab — placeholder for 9.1. Real Vue admin table +
-     * token-issuance slideout land in 9.2.
+     * Tokens tab — VueAdminTable listing of live bearer tokens plus the
+     * "+ New token" Garnish.Slideout trigger. The data layer
+     * (`Tokens` service) ships from Gate 7.2; 9.5 wires the CP surface
+     * onto it without touching the service.
+     *
+     * Admin-only per locked decision 6 — token issuance/revocation is an
+     * admin authority. View accessible in read-only mode
+     * (`requireAdmin(false)`); `actionIssueToken` / `actionRevokeToken`
+     * strictly gate writes.
+     *
+     * The settings model is passed in for the slideout's TTL placeholder
+     * (`settings.tokenTtlDefault`).
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
+     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
      * @author Craftpulse
@@ -86,7 +98,239 @@ class SettingsController extends Controller
     {
         $this->requireAdmin(false);
 
-        return $this->renderTemplate('cortex/_cp/tokens');
+        return $this->renderTemplate('cortex/_cp/tokens', [
+            'settings' => Cortex::getInstance()->getSettings(),
+        ]);
+    }
+
+    /**
+     * VueAdminTable data endpoint for the Tokens tab. Returns the
+     * `{pagination, data}` shape Craft's Vue component consumes — see
+     * `vendor/craftcms/cms/src/helpers/AdminTable.php::paginationLinks`
+     * for the canonical pagination dict. Mirrors
+     * `actionAllowlistTableData` (the pattern locked in 9.2).
+     *
+     * Honours the standard VueAdminTable params:
+     *   - `page` (int, default 1)
+     *   - `per_page` (int, default 50, capped at 100)
+     *   - `search` (string, optional — substring match across `name` + `tokenPrefix`)
+     *   - `sort.0.field` / `sort.0.direction` (optional)
+     *
+     * Pagination, search, and sort are applied in-PHP — token count is
+     * bounded by admin issuance (low dozens at most), so the cost is
+     * constant. If usage scales we follow up with `Tokens::getPaginated()`
+     * per the sub-gate-9.5 risk note.
+     *
+     * The row shape is locked: `[id, name, tokenPrefix, user, expiresAt, lastUsedAt, dateCreated]`.
+     * `tests/Controllers/SettingsControllerTokensTest.php` asserts the
+     * tuple exactly — drift = test failure.
+     *
+     * View access only (`requireAdmin(false)`); the row trash icon
+     * routes through `actionRevokeToken` which gates writes via
+     * `requireAdmin(requireAdminChanges: true)`.
+     *
+     * @throws \craft\errors\MissingComponentException if the view component is unavailable.
+     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\web\BadRequestHttpException        from `requireAcceptsJson` on non-JSON callers.
+     * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionTokensTableData(): Response
+    {
+        $this->requireAcceptsJson();
+        $this->requireAdmin(false);
+
+        $page = max(1, (int) $this->request->getParam('page', 1));
+        $perPage = (int) $this->request->getParam('per_page', 50);
+        $perPage = max(1, min($perPage, 100));
+        $search = trim((string) $this->request->getParam('search', ''));
+        $sortField = (string) $this->request->getParam('sort.0.field', '');
+        $sortDir = $this->request->getParam('sort.0.direction') === 'desc' ? SORT_DESC : SORT_ASC;
+
+        // `getAll()` returns non-deleted tokens, newest first. Map to the
+        // serialised row tuple up front so search / sort operate on the
+        // shape the table consumes.
+        $rows = array_map(
+            fn(Token $token): array => $this->_serializeTokenRow($token),
+            Cortex::getInstance()->tokens->getAll(),
+        );
+
+        if ($search !== '') {
+            $needle = mb_strtolower($search);
+            $rows = array_values(array_filter(
+                $rows,
+                static function(array $row) use ($needle): bool {
+                    $haystack = mb_strtolower((string) $row['name'] . ' ' . (string) $row['tokenPrefix']);
+                    return str_contains($haystack, $needle);
+                },
+            ));
+        }
+
+        // Sort. Default ordering: dateCreated DESC (newest first) — most
+        // operators want the row they just issued at the top.
+        $orderColumn = match ($sortField) {
+            'name' => 'name',
+            'expiresAt' => 'expiresAt',
+            'lastUsedAt' => 'lastUsedAt',
+            'dateCreated' => 'dateCreated',
+            default => 'dateCreated',
+        };
+        $defaultDir = $sortField === '' ? SORT_DESC : $sortDir;
+        usort($rows, static function(array $a, array $b) use ($orderColumn, $defaultDir): int {
+            $av = (string) ($a[$orderColumn] ?? '');
+            $bv = (string) ($b[$orderColumn] ?? '');
+            $cmp = strcmp($av, $bv);
+            return $defaultDir === SORT_DESC ? -$cmp : $cmp;
+        });
+
+        $total = count($rows);
+        $offset = ($page - 1) * $perPage;
+        $slice = array_slice($rows, $offset, $perPage);
+
+        return $this->asJson([
+            'pagination' => AdminTable::paginationLinks($page, $total, $perPage),
+            'data' => array_values($slice),
+        ]);
+    }
+
+    /**
+     * Render the "+ New token" slideout body partial. Fetched by
+     * `Cortex.openTokenIssuanceSlideout()` and passed into
+     * `new Craft.Slideout(html, {...})`. Returns a bare HTML fragment —
+     * the slideout container supplies the `<form>` chrome.
+     *
+     * @throws \craft\errors\MissingComponentException if the view component is unavailable.
+     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionTokenIssueSlideout(): Response
+    {
+        $this->requireAdmin(false);
+
+        return $this->renderTemplate('cortex/_cp/_token-issue-slideout', [
+            'settings' => Cortex::getInstance()->getSettings(),
+        ]);
+    }
+
+    /**
+     * Issue a new bearer token. JSON-only — wired to the Garnish.Slideout
+     * issue form on the Tokens tab.
+     *
+     * On success returns `200 {token: <plaintext>, model: <row>}`. The
+     * plaintext is surfaced exactly once here — the slideout swaps to a
+     * copy-now-it-won't-be-shown-again view from this response. It is
+     * never persisted to a session flash, never logged, never reloadable
+     * (locked decision 4). The CP issue path is NOT an MCP tool call, so
+     * it never reaches the audit pipeline — the plaintext touches the
+     * controller response and nothing else.
+     *
+     * Body shape:
+     *   - `userId`     (required int)    — Craft user the token authenticates as.
+     *   - `name`       (optional string) — defaults to `cli-{timestamp}`.
+     *   - `ttlSeconds` (optional int)    — falls back to `Settings::$tokenTtlDefault`.
+     *
+     * Validation failure → `400 {message}` via `asFailure`; service-layer
+     * save failure → the exception is caught + logged with a generic
+     * `Could not issue token.` returned to the caller.
+     *
+     * @throws \yii\base\InvalidConfigException  from `Cortex::getInstance()`.
+     * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson`.
+     * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionIssueToken(): ?Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+        $this->requireAdmin(requireAdminChanges: true);
+
+        $request = $this->request;
+
+        // Craft's `elementSelectField` macro posts the selection as an
+        // array of element ids (`userId[]`); a plain numeric field posts
+        // a scalar. Accept both — take the first id from an array.
+        $userIdParam = $request->getBodyParam('userId');
+        if (is_array($userIdParam)) {
+            $userIdParam = reset($userIdParam);
+        }
+        $userId = (int) $userIdParam;
+        if ($userId <= 0) {
+            return $this->asFailure(Craft::t('cortex', 'A user is required.'));
+        }
+
+        $user = User::find()->id($userId)->status(null)->one();
+        if (!$user instanceof User) {
+            return $this->asFailure(Craft::t('cortex', 'A user is required.'));
+        }
+
+        $name = $request->getBodyParam('name');
+        $name = is_string($name) && trim($name) !== ''
+            ? trim($name)
+            : 'cli-' . DateTimeHelper::now()->getTimestamp();
+
+        $ttl = $request->getBodyParam('ttlSeconds');
+        $ttlSeconds = is_numeric($ttl) && (int) $ttl > 0 ? (int) $ttl : null;
+
+        try {
+            $issued = Cortex::getInstance()->tokens->issue($userId, $name, $ttlSeconds);
+        } catch (Exception $e) {
+            Craft::error($e->getMessage(), 'cortex');
+            return $this->asFailure(Craft::t('cortex', 'Could not issue token.'));
+        }
+
+        return $this->asSuccess(
+            message: Craft::t('cortex', 'Token issued.'),
+            data: [
+                'token' => $issued['token'],
+                'model' => $this->_serializeTokenRow($issued['model']),
+            ],
+        );
+    }
+
+    /**
+     * Soft-delete (revoke) a bearer token by id. JSON-only — wired to
+     * `Craft.VueAdminTable`'s `deleteAction` callback.
+     *
+     * Returns `200 {message}` on a matched revoke, `404 {message}` when
+     * no row matches the id, and `400 {message}` on service-layer
+     * failure. After revocation a subsequent `Tokens::lookup()` of the
+     * matching plaintext fails (the row's `dateDeleted` is non-null).
+     *
+     * @throws \yii\base\InvalidConfigException  from `Cortex::getInstance()`.
+     * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
+     * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionRevokeToken(): ?Response
+    {
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+        $this->requireAdmin(requireAdminChanges: true);
+
+        $id = (int) $this->request->getRequiredBodyParam('id');
+
+        try {
+            $revoked = Cortex::getInstance()->tokens->revoke($id);
+        } catch (Exception $e) {
+            Craft::error($e->getMessage(), 'cortex');
+            return $this->asFailure(Craft::t('cortex', 'Could not revoke token.'));
+        }
+
+        if (!$revoked) {
+            $this->response->setStatusCode(404);
+            return $this->asJson(['message' => Craft::t('cortex', 'Token not found.')]);
+        }
+
+        return $this->asSuccess(Craft::t('cortex', 'Token revoked.'));
     }
 
     /**
@@ -488,6 +732,54 @@ class SettingsController extends Controller
             'createdBy' => $createdBy,
             'dateCreated' => (string) ($row['dateCreated'] ?? ''),
             'isExpired' => $isExpired,
+        ];
+    }
+
+    /**
+     * Serialise a `Token` model into the locked VueAdminTable data tuple.
+     * Shared by `actionTokensTableData` and the success branch of
+     * `actionIssueToken` so the row returned by the issue flow has the
+     * same shape the table refresh would render.
+     *
+     * The plaintext is NEVER part of this tuple — only the operator-safe
+     * `tokenPrefix` hint surfaces. The plaintext exists exactly once, in
+     * `actionIssueToken`'s separate `token` response key.
+     *
+     * Row shape:
+     *   - `id`          — int primary key.
+     *   - `name`        — string operator label.
+     *   - `tokenPrefix` — string (first 8 chars of the plaintext, a hint).
+     *   - `user`        — `{id, label, cpEditUrl}` or null when the bound
+     *                      user record is missing.
+     *   - `expiresAt`   — string|null ISO-8601, or null = never.
+     *   - `lastUsedAt`  — string|null ISO-8601, or null = never used.
+     *   - `dateCreated` — string ISO-8601.
+     *
+     * @return array<string,mixed>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _serializeTokenRow(Token $token): array
+    {
+        $user = null;
+        $boundUser = $token->getUser();
+        if ($boundUser instanceof User) {
+            $user = [
+                'id' => (int) $boundUser->id,
+                'label' => $boundUser->getName(),
+                'cpEditUrl' => $boundUser->getCpEditUrl(),
+            ];
+        }
+
+        return [
+            'id' => (int) $token->id,
+            'name' => $token->name,
+            'tokenPrefix' => $token->tokenPrefix,
+            'user' => $user,
+            'expiresAt' => $token->expiresAt,
+            'lastUsedAt' => $token->lastUsedAt,
+            'dateCreated' => (string) $token->dateCreated,
         ];
     }
 }
