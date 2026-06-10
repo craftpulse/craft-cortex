@@ -319,6 +319,10 @@ trait PluginTrait
                 $event->rules = array_merge([
                     'settings/plugins/cortex' => 'cortex/settings/index',
                     'cortex/tokens' => 'cortex/settings/tokens',
+                    'cortex/tokens/table-data' => 'cortex/settings/tokens-table-data',
+                    'cortex/tokens/issue-slideout' => 'cortex/settings/token-issue-slideout',
+                    'cortex/tokens/issue' => 'cortex/settings/issue-token',
+                    'cortex/tokens/revoke' => 'cortex/settings/revoke-token',
                     'cortex/allowlist' => 'cortex/settings/allowlist',
                     'cortex/allowlist/table-data' => 'cortex/settings/allowlist-table-data',
                     'cortex/allowlist/override-slideout' => 'cortex/settings/allowlist-override-slideout',

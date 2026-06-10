@@ -47,11 +47,29 @@
     color: #fff;
 }
 
-/* Token prefix (Tokens tab, lands in 9.2) */
+/* Token prefix (Tokens tab) */
 .cortex-token-prefix {
     font-family: var(--code-font, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
     font-size: 12px;
     color: var(--medium-text-color, #606d7b);
+}
+
+/* One-time plaintext reveal (Tokens tab issuance slideout) */
+.cortex-token-reveal {
+    align-items: stretch;
+    gap: 8px;
+}
+
+.cortex-token-plaintext {
+    flex: 1 1 auto;
+    padding: 7px 10px;
+    border: 1px solid var(--hairline-color, rgba(31, 41, 51, 0.1));
+    border-radius: var(--small-border-radius, 3px);
+    background: var(--gray-050, #f3f7fc);
+    font-family: var(--code-font, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    font-size: 13px;
+    word-break: break-all;
+    user-select: all;
 }
 
 /* Table column width tuning — keeps narrow columns from stretching */
