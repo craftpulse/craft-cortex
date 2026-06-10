@@ -6,11 +6,15 @@ use Craft;
 use craft\elements\User;
 use craft\helpers\AdminTable;
 use craft\helpers\DateTimeHelper;
+use craft\helpers\Db;
 use craft\web\Controller;
 use craftpulse\cortex\Cortex;
+use craftpulse\cortex\db\InvocationQuery;
 use craftpulse\cortex\models\Token;
 use craftpulse\cortex\records\RuntimeOverride;
+use craftpulse\cortex\tools\support\InvocationLogger;
 use yii\base\Exception;
+use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
 /**
@@ -22,15 +26,16 @@ use yii\web\Response;
  * `plugins/save-plugin-settings` action onto `actionSave` here so the
  * controller can own the full tabbed-CP flow.
  *
- * 9.1 ships the view-action skeleton for the four tabs (Settings,
- * Tokens, Activity, Connection) plus `actionSave` for persisting
- * Settings-tab edits. Tokens, Activity, and Connection tabs render
- * placeholder templates — their real content + table-data /
- * mutation actions land in 9.2 / 9.3 / 9.4 respectively.
+ * Tabs shipped: Settings (project-config defaults + save), Tokens
+ * (9.5), Allowlist (9.2), Activity (9.3 — audit-log VueAdminTable +
+ * filters + redacted-detail slideout). Connection (9.4) is the
+ * remaining placeholder.
  *
  * Permission posture per locked decision 7:
  *   - Settings / Tokens / Connection view actions    — `requireAdmin(false)`.
- *   - Activity view action                            — `requirePermission(Cortex::PERMISSION_VIEW_ACTIVITY)`.
+ *   - Activity view + table-data + row actions        — `requirePermission(Cortex::PERMISSION_VIEW_ACTIVITY)`.
+ *     Non-admins are scoped server-side to their own
+ *     rows (fail-closed) — see `actionActivityTableData`.
  *   - All mutation actions (`actionSave` + the
  *     pre-existing `actionAddOverride` /
  *     `actionRemoveOverride`)                         — `requirePostRequest`
@@ -476,13 +481,20 @@ class SettingsController extends Controller
     }
 
     /**
-     * Activity tab — placeholder for 9.1. Real Vue admin table +
-     * filter bar + detail slideout land in 9.3. Permission-gated by
-     * `Cortex::PERMISSION_VIEW_ACTIVITY`; non-admins with the
-     * permission see only their own rows once 9.3 builds the
-     * scoping.
+     * Activity tab — VueAdminTable of the HTTP-transport invocation audit
+     * log plus a filter bar (kind / tool / user / date-range) and a
+     * row-click Garnish.Slideout showing the already-redacted detail.
+     *
+     * Permission-gated by `Cortex::PERMISSION_VIEW_ACTIVITY` per locked
+     * decision 7 — admins and granted non-admins both reach the tab.
+     * The view passes the filter-option lists: the five `kind` enum
+     * values from `InvocationLogger`, and the distinct tool names from
+     * the DB. The `userId` filter dropdown is rendered only for admins
+     * (non-admins are server-side scoped to their own rows, so a user
+     * filter would be meaningless and is omitted client-side).
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
+     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requirePermission`.
      *
      * @author Craftpulse
@@ -492,7 +504,215 @@ class SettingsController extends Controller
     {
         $this->requirePermission(Cortex::PERMISSION_VIEW_ACTIVITY);
 
-        return $this->renderTemplate('cortex/_cp/activity');
+        $identity = Craft::$app->getUser()->getIdentity();
+        $isAdmin = $identity instanceof User && $identity->admin;
+
+        return $this->renderTemplate('cortex/_cp/activity', [
+            'isAdmin' => $isAdmin,
+            'kinds' => [
+                InvocationLogger::KIND_SUCCESS,
+                InvocationLogger::KIND_TOOL_ERROR,
+                InvocationLogger::KIND_INTERNAL_ERROR,
+                InvocationLogger::KIND_RATE_LIMITED,
+                InvocationLogger::KIND_CANCELLED,
+            ],
+            'toolNames' => Cortex::getInstance()->invocations->find()->distinctToolNames(),
+        ]);
+    }
+
+    /**
+     * VueAdminTable data endpoint for the Activity tab. Returns the
+     * `{pagination, data}` shape Craft's Vue component consumes — see
+     * `vendor/craftcms/cms/src/helpers/AdminTable.php::paginationLinks`
+     * for the canonical pagination dict.
+     *
+     * Honours the standard VueAdminTable params (`page`, `per_page`,
+     * `search`, `sort.0.field`, `sort.0.direction`) plus the Activity
+     * filters: `filters[kind]`, `filters[toolName]`, `filters[userId]`,
+     * `filters[from]`, `filters[to]` (a `dateCreated` bracket).
+     *
+     * **Permission scoping — fail closed.** An admin sees every row; a
+     * non-admin (granted `cortex:viewActivity` but not admin) sees ONLY
+     * rows whose `userId` equals their own. The scope is applied
+     * unconditionally on the query before any caller-supplied filter, so
+     * a non-admin cannot widen it by posting `filters[userId]=<other>` —
+     * the forced clause still narrows the result to the caller's own
+     * rows. All user input flows through `Db::parseParam` /
+     * `Db::parseDateParam` — no raw interpolation.
+     *
+     * The row shape is locked:
+     * `[id, tool, mode, kind, user, durationMs, dateCreated]`.
+     * `tests/Controllers/SettingsControllerActivityTest.php` asserts the
+     * tuple exactly — drift = test failure.
+     *
+     * @throws \craft\errors\MissingComponentException if the view component is unavailable.
+     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\web\BadRequestHttpException        from `requireAcceptsJson` on non-JSON callers.
+     * @throws \yii\web\ForbiddenHttpException         from `requirePermission`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionActivityTableData(): Response
+    {
+        $this->requireAcceptsJson();
+        $this->requirePermission(Cortex::PERMISSION_VIEW_ACTIVITY);
+
+        $page = max(1, (int) $this->request->getParam('page', 1));
+        $perPage = (int) $this->request->getParam('per_page', 50);
+        $perPage = max(1, min($perPage, 100));
+        $search = trim((string) $this->request->getParam('search', ''));
+        $sortField = (string) $this->request->getParam('sort.0.field', '');
+        $sortDir = $this->request->getParam('sort.0.direction') === 'asc' ? SORT_ASC : SORT_DESC;
+
+        $filters = $this->request->getParam('filters', []);
+        if (!is_array($filters)) {
+            $filters = [];
+        }
+
+        $query = Cortex::getInstance()->invocations->find();
+
+        // Fail-closed scope FIRST — a non-admin is pinned to their own
+        // userId before any caller filter is applied. `filters[userId]`
+        // from a non-admin is ignored: the forced `andWhere` cannot be
+        // widened by a second `andWhere` (both must hold).
+        $this->_scopeActivityQueryToUser($query);
+
+        $kind = $this->_filterValue($filters, 'kind');
+        if ($kind !== null) {
+            $query->kind($kind);
+        }
+
+        $toolName = $this->_filterValue($filters, 'toolName');
+        if ($toolName !== null) {
+            $query->toolName($toolName);
+        }
+
+        // Admin-only user filter — a non-admin is already pinned above, so
+        // skip applying their (ignored) value entirely.
+        if ($this->_callerIsAdmin()) {
+            $userId = $this->_filterValue($filters, 'userId');
+            if ($userId !== null && ctype_digit((string) $userId)) {
+                $query->userId((int) $userId);
+            }
+        }
+
+        $from = $this->_filterValue($filters, 'from');
+        if ($from !== null) {
+            $fromClause = Db::parseDateParam('dateCreated', $from, '>=');
+            if ($fromClause !== null) {
+                $query->andWhere($fromClause);
+            }
+        }
+
+        $to = $this->_filterValue($filters, 'to');
+        if ($to !== null) {
+            $toClause = Db::parseDateParam('dateCreated', $to, '<=');
+            if ($toClause !== null) {
+                $query->andWhere($toClause);
+            }
+        }
+
+        if ($search !== '') {
+            $query->andWhere([
+                'or',
+                Db::parseParam('toolName', '*' . $search . '*'),
+                Db::parseParam('clientName', '*' . $search . '*'),
+                Db::parseParam('errorMessage', '*' . $search . '*'),
+            ]);
+        }
+
+        $orderColumn = match ($sortField) {
+            'tool' => 'toolName',
+            'kind' => 'kind',
+            'durationMs' => 'durationMs',
+            'dateCreated' => 'dateCreated',
+            default => 'dateCreated',
+        };
+
+        $total = (int) (clone $query)->count();
+        $offset = ($page - 1) * $perPage;
+
+        $rows = $query
+            ->orderBy([$orderColumn => $sortDir])
+            ->offset($offset)
+            ->limit($perPage)
+            ->all();
+
+        return $this->asJson([
+            'pagination' => AdminTable::paginationLinks($page, $total, $perPage),
+            'data' => array_map(
+                fn(array $row): array => $this->_serializeActivityRow($row),
+                $rows,
+            ),
+        ]);
+    }
+
+    /**
+     * Detail endpoint for a single invocation — feeds the row-click
+     * Garnish.Slideout on the Activity tab. Returns the slideout HTML
+     * (rendered server-side from `_activity-detail-slideout`) wrapped in
+     * `asJson(['html' => ...])`.
+     *
+     * The payload is the ALREADY-REDACTED `argsRedacted` +
+     * `responseExcerpt` columns plus error/cancellation context and
+     * metadata (transport, session, client, duration, rate-limit
+     * remaining). Per locked decision 11 there is no pre-redaction
+     * surface — that data was never persisted.
+     *
+     * **Permission scoping — fail closed.** A non-admin requesting a row
+     * that is not theirs gets a 404 (NOT 403 — a 403 would confirm the
+     * row exists and leak enumeration signal). Missing ids also 404.
+     *
+     * @throws \craft\errors\MissingComponentException if the view component is unavailable.
+     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\web\BadRequestHttpException        from `requireAcceptsJson` on non-JSON callers.
+     * @throws \yii\web\ForbiddenHttpException         from `requirePermission`.
+     * @throws NotFoundHttpException                   when the row is missing or out of the caller's scope.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionActivityRow(): Response
+    {
+        $this->requireAcceptsJson();
+        $this->requirePermission(Cortex::PERMISSION_VIEW_ACTIVITY);
+
+        $id = (int) $this->request->getParam('id');
+        if ($id <= 0) {
+            throw new NotFoundHttpException('Invocation not found.');
+        }
+
+        $query = Cortex::getInstance()->invocations->find()->andWhere(['id' => $id]);
+        $this->_scopeActivityQueryToUser($query);
+
+        $row = $query->one();
+        if (!is_array($row)) {
+            // 404, never 403 — a foreign-row request is indistinguishable
+            // from a missing-row request, which kills the enumeration
+            // oracle a non-admin could otherwise probe with.
+            throw new NotFoundHttpException('Invocation not found.');
+        }
+
+        $user = null;
+        $userId = $row['userId'] ?? null;
+        if (is_int($userId) || (is_string($userId) && ctype_digit($userId))) {
+            $boundUser = User::find()->id((int) $userId)->status(null)->one();
+            if ($boundUser instanceof User) {
+                $user = [
+                    'id' => (int) $boundUser->id,
+                    'label' => $boundUser->getName(),
+                    'cpEditUrl' => $boundUser->getCpEditUrl(),
+                ];
+            }
+        }
+
+        $html = $this->getView()->renderTemplate('cortex/_cp/_activity-detail-slideout', [
+            'row' => $row,
+            'user' => $user,
+        ]);
+
+        return $this->asJson(['html' => $html]);
     }
 
     /**
@@ -677,6 +897,136 @@ class SettingsController extends Controller
 
     // Private Methods
     // =========================================================================
+
+    /**
+     * Whether the current CP user is an admin. Centralised so the
+     * Activity scoping logic reads the identity in exactly one place.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _callerIsAdmin(): bool
+    {
+        $identity = Craft::$app->getUser()->getIdentity();
+        return $identity instanceof User && $identity->admin;
+    }
+
+    /**
+     * Apply the fail-closed Activity-log scope to a query. Admins are
+     * unscoped (they audit everyone); a non-admin is pinned to their own
+     * `userId`. A non-admin with no resolvable identity is pinned to a
+     * sentinel `userId` of 0 so the result is empty rather than
+     * accidentally global — defense in depth, the permission gate already
+     * rejected the anonymous case upstream.
+     *
+     * The pin is an `andWhere` so it composes with (and cannot be widened
+     * by) any caller-supplied `filters[userId]`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _scopeActivityQueryToUser(InvocationQuery $query): void
+    {
+        if ($this->_callerIsAdmin()) {
+            return;
+        }
+
+        $identity = Craft::$app->getUser()->getIdentity();
+        $ownId = $identity instanceof User ? (int) $identity->id : 0;
+        $query->userId($ownId);
+    }
+
+    /**
+     * Read a single Activity filter value from the `filters` map,
+     * normalising the empty string + missing key to null so the query
+     * builder treats them as "no filter requested".
+     *
+     * @param array<string,mixed> $filters
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _filterValue(array $filters, string $key): ?string
+    {
+        $value = $filters[$key] ?? null;
+        if ($value === null || $value === '') {
+            return null;
+        }
+        return (string) $value;
+    }
+
+    /**
+     * Serialise a `cortex_invocations` row into the locked Activity
+     * VueAdminTable data tuple. Shared by `actionActivityTableData` so the
+     * table shape is asserted in exactly one place.
+     *
+     * Row shape:
+     *   - `id`          — int primary key.
+     *   - `tool`        — string tool name (column `toolName`).
+     *   - `mode`        — string|null tool mode, extracted from the
+     *                      redacted args' `mode` key when present.
+     *   - `kind`        — string audit kind (status pill colour).
+     *   - `user`        — `{id, label, cpEditUrl}` or null (anonymous /
+     *                      deleted user).
+     *   - `durationMs`  — int wall-clock duration.
+     *   - `dateCreated` — string ISO-8601.
+     *
+     * Never surfaces `argsRedacted` / `responseExcerpt` / error payloads —
+     * those live only in the detail slideout (locked decision 11).
+     *
+     * @param array<string,mixed> $row The raw DB row from `InvocationQuery::all`.
+     * @return array<string,mixed>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _serializeActivityRow(array $row): array
+    {
+        $user = null;
+        $userId = $row['userId'] ?? null;
+        if (is_int($userId) || (is_string($userId) && ctype_digit($userId))) {
+            $boundUser = User::find()->id((int) $userId)->status(null)->one();
+            if ($boundUser instanceof User) {
+                $user = [
+                    'id' => (int) $boundUser->id,
+                    'label' => $boundUser->getName(),
+                    'cpEditUrl' => $boundUser->getCpEditUrl(),
+                ];
+            }
+        }
+
+        return [
+            'id' => (int) ($row['id'] ?? 0),
+            'tool' => (string) ($row['toolName'] ?? ''),
+            'mode' => $this->_extractMode($row['argsRedacted'] ?? null),
+            'kind' => (string) ($row['kind'] ?? ''),
+            'user' => $user,
+            'durationMs' => (int) ($row['durationMs'] ?? 0),
+            'dateCreated' => (string) ($row['dateCreated'] ?? ''),
+        ];
+    }
+
+    /**
+     * Best-effort extraction of the `mode` key from a redacted-args JSON
+     * column. Returns null when the column is absent, not JSON, or carries
+     * no `mode`. The args are already redacted in the DB — this only reads
+     * the (non-sensitive) routing discriminator most Cortex tools carry.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _extractMode(mixed $argsRedacted): ?string
+    {
+        if (!is_string($argsRedacted) || $argsRedacted === '') {
+            return null;
+        }
+        $decoded = json_decode($argsRedacted, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+        $mode = $decoded['mode'] ?? null;
+        return is_string($mode) && $mode !== '' ? $mode : null;
+    }
 
     /**
      * Serialise a `RuntimeOverride` row into the locked VueAdminTable

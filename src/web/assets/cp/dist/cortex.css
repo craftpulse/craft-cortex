@@ -77,3 +77,53 @@
     width: 1%;
     white-space: nowrap;
 }
+
+/* Activity tab — row detail trigger. A real <button> styled as a link so
+   it stays keyboard-operable while reading like the cell value. */
+.cortex-activity-row-trigger {
+    padding: 0;
+    border: none;
+    background: none;
+    color: var(--link-color, #3f4d5a);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.cortex-activity-row-trigger:hover,
+.cortex-activity-row-trigger:focus-visible {
+    text-decoration: underline;
+}
+
+/* Activity detail slideout — metadata grid */
+.cortex-meta-grid dl {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: 6px 18px;
+    margin: 0 0 18px;
+}
+
+.cortex-meta-grid dt {
+    color: var(--medium-text-color, #606d7b);
+    font-weight: 600;
+}
+
+.cortex-meta-grid dd {
+    margin: 0;
+    word-break: break-word;
+}
+
+/* Activity detail slideout — redacted payload dump */
+.cortex-payload {
+    max-height: 320px;
+    overflow: auto;
+    padding: 10px 12px;
+    border: 1px solid var(--hairline-color, rgba(31, 41, 51, 0.1));
+    border-radius: var(--small-border-radius, 3px);
+    background: var(--gray-050, #f3f7fc);
+    font-family: var(--code-font, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre;
+    tab-size: 2;
+}
