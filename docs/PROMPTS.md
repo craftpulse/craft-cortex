@@ -3,8 +3,12 @@
 Auto-generated reference for the cortex MCP prompt surface. Run
 `ddev craft cortex/docs/prompts` to refresh.
 
-- **Total prompts:** 8
-- **Generated:** 2026-05-07T10:46:39-07:00
+- **Total prompts:** 10
+- **Generated:** 2026-06-10T08:12:17-07:00
+
+## `craftcms_cloud`
+
+Craft Cloud, Pixel & Tonic's serverless hosting for Craft CMS — craft-cloud.yaml configuration, the Build → Migrate → Release deploy pipeline, edge image transforms and static caching, the ephemeral Cloud filesystem, plugin Cloud-compatibility requirements, and self-hosted → Cloud migration.
 
 ## `craftcms_content_modeling`
 
@@ -37,4 +41,8 @@ Reverse-engineered Craft CMS internals: 15-step element save lifecycle, four-lay
 ## `craftcms_ddev`
 
 DDEV usage and troubleshooting for Craft CMS development — local environment setup, container management, common commands, and integration with composer/npm/craft tooling.
+
+## `craftcms_servd`
+
+Servd managed hosting for Craft CMS — git push-to-deploy with servd.yaml, the asset-storage plugin and CDN, static caching alongside Blitz, the local → staging → production workflow with uni-directional project config sync, and how Servd differs from Craft Cloud.
 

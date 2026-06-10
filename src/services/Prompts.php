@@ -93,6 +93,14 @@ class Prompts extends Component
             'name' => 'craftcms_setup',
             'description' => 'Standard project setup playbook for new Craft CMS sites — DDEV bootstrap, plugin selection, project config conventions, and getting from zero to a working dev environment.',
         ],
+        'servd' => [
+            'name' => 'craftcms_servd',
+            'description' => 'Servd managed hosting for Craft CMS — git push-to-deploy with servd.yaml, the asset-storage plugin and CDN, static caching alongside Blitz, the local → staging → production workflow with uni-directional project config sync, and how Servd differs from Craft Cloud.',
+        ],
+        'craft-cloud' => [
+            'name' => 'craftcms_cloud',
+            'description' => 'Craft Cloud, Pixel & Tonic\'s serverless hosting for Craft CMS — craft-cloud.yaml configuration, the Build → Migrate → Release deploy pipeline, edge image transforms and static caching, the ephemeral Cloud filesystem, plugin Cloud-compatibility requirements, and self-hosted → Cloud migration.',
+        ],
     ];
 
     /**

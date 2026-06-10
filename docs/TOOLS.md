@@ -4,7 +4,7 @@ Auto-generated reference for the cortex MCP tool surface. Run
 `ddev craft cortex/docs/tools` to refresh.
 
 - **Total tools:** 33
-- **Generated:** 2026-06-09T13:36:28-07:00
+- **Generated:** 2026-06-10T08:12:17-07:00
 
 ## `get_initial_context`
 
