@@ -339,6 +339,45 @@ it('GET /oauth/authorize rejects plain PKCE with an OAuth error redirect', funct
     expect($response->statusCode)->not->toBe(200);
 });
 
+it('HTML-escapes a script payload in the consent-screen client name', function() {
+    // Regression: a DCR-registered `client_name` is rendered into the
+    // consent screen. The lead paragraph interpolates it inside a
+    // `<span>` and pipes the result through `|raw`, so the client name
+    // MUST be HTML-escaped at that boundary or an attacker who can
+    // register a client (anonymous when DCR is enabled) lands stored
+    // XSS in any logged-in CP user's session on GET, before approval.
+    //
+    // The full consent GET cannot be driven through the Pest harness —
+    // the template's `craft.app.request.csrfToken` needs a web request,
+    // and the bootstrap leaves a console request bound (same constraint
+    // documented for the login-redirect path above). So this renders
+    // the actual vulnerable line lifted verbatim from the template file
+    // through Craft's Twig view: if the `|e` escape is ever dropped, the
+    // raw payload reappears and this fails.
+    $template = file_get_contents(
+        dirname(__DIR__, 2) . '/src/templates/oauth/authorize.twig',
+    );
+    expect($template)->toBeString();
+
+    $line = null;
+    foreach (explode("\n", (string) $template) as $candidate) {
+        if (str_contains($candidate, 'is requesting access to your Craft account')) {
+            $line = trim($candidate);
+            break;
+        }
+    }
+    expect($line)->not->toBeNull();
+
+    $rendered = Craft::$app->getView()->renderString(
+        (string) $line,
+        ['clientName' => '<script>alert(1)</script>'],
+    );
+
+    expect($rendered)
+        ->not->toContain('<script>alert(1)</script>')
+        ->toContain('&lt;script&gt;');
+});
+
 it('POST /oauth/authorize with approve=0 surfaces an access_denied error', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
