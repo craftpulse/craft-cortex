@@ -22,7 +22,9 @@ The deep, `src/`-cited version of this section is **[`CAPABILITIES.md`](CAPABILI
 
 Quality bar: **1,120 Pest tests / 0 skipped, PHPStan level 8 clean, ECS clean**, plus two adversarial in-repo reviews with every finding tracked to its fixing commit.
 
-The honest gaps are also stated up front: Cortex is **unreleased** against shipped incumbents; its knowledge retrieval is **keyword search today** (vectorized retrieval is Phase-3 roadmap, and several rivals ship semantic search now); and it hand-rolls its MCP dispatcher rather than inheriting an SDK's spec maintenance — a real trade-off examined in §5.
+The honest gaps are also stated up front: Cortex is **unreleased** against shipped incumbents; its knowledge retrieval is **keyword search today** (vectorized retrieval is Phase-3 roadmap, and several rivals ship semantic search now); and it hand-rolls its MCP dispatcher rather than inheriting an SDK's spec maintenance — which is no longer hypothetical: the spec's current revision is **2025-11-25**, Cortex targets 2025-06-18, and the SDK-based rivals already moved. The trade-off, both sides, is examined in §5.
+
+> **Verification note.** Every per-competitor claim in this document was re-verified against current primary sources (official docs, repos at source level, registries) on **2026-06-10** by independent per-competitor research passes. Claims found stale or wrong in the earlier draft were corrected, including in Cortex's disfavor where warranted — see the §5 dispatcher discussion and the per-competitor sections.
 
 ---
 
@@ -88,23 +90,23 @@ Legend: ✓ yes · ✗ no · ~ partial/qualified · **!** security-negative. "?"
 | MCP-native | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | stdio transport | ✓ | ✓ (only) | ✓ | ~ proxy fallback | ✓ (local) | ✓ (CLI) | ✓ (default) | ✗ | ✓ | ✓ (only) |
 | HTTP / remote transport | ✓ (Pro) | ✗ | ✓ | ✓ (primary) | ✓ (remote Beta) | ✓ (default) | ~ (off by default) | ✓ (only) | ✓ | ✗ |
-| Auth model | OAuth 2.1 + bound bearer | **none** | OAuth 2.1 / API key | OAuth / bearer | API key / OAuth 2.1 | OAuth 2.1 (custom) + bearer | bearer / JWT (no PKCE/DCR) | bearer API key only | OAuth 2.0 / bearer | none (local) |
+| Auth model | OAuth 2.1 + bound bearer | **none** | OAuth 2.1 (Simple OAuth, per-tool scopes) | OAuth / bearer | API key / OAuth 2.1 | OAuth 2.1 (custom) + bearer; **! unscoped Basic-Auth fallback** | bearer / JWT + built-in OAuth (DCR, PKCE S256+`plain`; off by default) | bearer API key only | OAuth 2.1 in v12 (PKCE S256, RFC 8707, DCR/CIMD); v11 bearer-only | none (local) |
 | Per-user ACL | ✓ native Craft perms | ✗ | ~ RBAC (delegated) | ~ token-scoped | ~ (remote, delegated) | ✓ token→CP user | ✗ (scope only) | ✓ (delegated) | ✓ (delegated) | ✗ |
-| Per-tool / per-mode gating | ✓ 3-method + mode-enum rewrite | **! defined, not enforced** | ✓ (scopes/toolsets) | ~ | ~ (per-env, not per-user) | ✓ (21 scopes) | ~ (scope only) | ✓ (per-key) | ✓ (toolsets, whole-tool) | ~ |
+| Per-tool / per-mode gating | ✓ 3-method + mode-enum rewrite | **! defined, not enforced** | ✓ (scopes/toolsets) | ~ | ~ (per-env, not per-user) | ✓ (21 scopes) | ~ (scope only) | ✓ (per-key; 4.0-beta flips collections to opt-OUT) | ~ (settings toggles + default-off delete gate; no schema rewriting) | ~ |
 | Write-capable | ✓ (Pro, perm-gated) | ✓ (unauthorized) | ✓ | ✓ | ✓ | ✓ (all free) | ✓ (free) | ✓ | ✓ | ✓ (Tinker/Artisan) |
-| Raw-SQL tool | ✗ (by design) | **! `run_query`** | ✗ | ✗ (~GROQ read) | ✗ (~broad CMA) | ✗ | ✗ (flat-file) | ✗ | ✗ | **! Database Query** |
-| Secret redaction | ✓ everywhere incl. audit | ✗ | ? | ? | ? | ~ (PII in logs only) | ~ (dump logs only) | ~ DIY hook | ? | ? |
-| Audit log | ✓ DB, redacted | ✗ | ~ (mcp_tools only) | ~ (revision history) | ? | ✓ (pluggable) | ✗ | ~ DIY hook | ~ (activity log) | ? |
-| Streaming progress | ✓ SSE | ✗ | ? | ? | ? | ? | ✗ | ? | ? | ? |
+| Raw-SQL tool | ✗ (by design) | **! `run_query`** | ✗ | ✗ (~GROQ read) | ✗ (~broad CMA) | ✗ | ✗ (flat-file) | ✗ | ✗ | ~ Database Query (code-enforced read-only); **! Tinker** |
+| Secret redaction | ✓ everywhere incl. audit | ✗ | ? | ? | ? | ✓ audit args (secret keys + PII patterns) | ~ (dump logs only) | ~ DIY hook | ? | ? |
+| Audit log | ✓ DB, redacted | ✗ | ~ (mcp_tools only) | ~ (revision history; Enterprise-only audit trail) | ? | ✓ (pluggable) | ✗ | ~ DIY hook (removed in 4.0-beta) | ~ (activity log) | ? |
+| Streaming progress | ✓ SSE | ✗ | ? | ? | ? | ? | ✗ | ? | ✗ (core rejects SSE) | ? |
 | Cooperative cancellation | ✓ (Fiber bridge) | ✗ | ? | ? | ? | ? | ✗ | ? | ? | ? |
 | TCP-disconnect handling | ✓ (Fiber bridge) | ✗ | ? | ? | ? | ? | ✗ | ? | ? | ? |
-| Bundled knowledge corpus | ✓ ~30k lines | ✗ | ✗ | ~ product docs | ✗ | ✗ (discovery tools) | ✓ 216 KB + 15 skills | ✗ | ✗ | ✓ guidelines + skills |
+| Bundled knowledge corpus | ✓ ~30k lines | ✗ | ✗ | ~ product docs | ✗ | ✗ (discovery tools) | ✓ 216 articles (~480 KB) + 15 skills | ✗ | ✗ | ✓ guidelines + skills |
 | Vectorized retrieval | ✗ (keyword; Phase 3) | ✗ | ✓ (in AI module, not MCP) | ✓ semantic_search | ✓ semantic_search | ✗ | ✗ (keyword) | ~ (Enterprise RAG, separate) | ✗ | ✓ (17k+ doc chunks) |
 | CP / admin UI | ✓ tabbed (Settings/Allowlist/Tokens/Activity) | ✗ | ✓ | ✓ (Studio) | ✓ | ✓ (Vue 3) | ✗ (CLI only) | ✓ | ✓ | ✗ |
 | Editions / commercial | Free + paid Pro | single free | all GPL free | Free/Growth/Enterprise + AI credits | free MCP + paid AI Actions | single free | single free | free MCP + Enterprise RAG | core free + paid tiers | single free |
 | Self-hosted | ✓ | ✓ | ✓ | ✗ (remote SaaS) | ~ (local server → SaaS) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | License | **proprietary (Craft)** | MIT | GPL-2.0 | MIT (Studio) / proprietary SaaS | MIT (local) / proprietary SaaS | MIT | MIT | MIT | MSCL / MIT (local pkg) | MIT |
-| Maturity / adoption | **unreleased, 0 installs** | v1.2.2, single-author | AI ~15k sites; MCP server **pre-stable (~2–327 installs)** | GA Dec 2025, mature | repo young; vendor large | v2.6.0, ~29 releases, mature | v1.8.0, ~2,985 installs | v3.85.1, huge parent | GA v11.12+, marketed | v2.4.10, ~3.5k stars, bundled-by-default |
+| Maturity / adoption | **unreleased, 0 installs** | v1.2.2, single-author, ~1.5k installs, idle since 2026-03 | AI ~15k sites; legacy `mcp` stable (327); successor `mcp_server` pre-stable (2, Acquia-sponsored) | GA Dec 2025, ~2-week release cadence | repo young; vendor large | v2.6.0, 29 releases, mature | v1.8.0, ~3k installs | v3.85.1 stable; 4.0-beta refactor in flight | v11.17.4 stable; v12 RC | v2.4.10, ~3.5k stars, installer default-yes prompt |
 
 ---
 
@@ -112,16 +114,16 @@ Legend: ✓ yes · ✗ no · ~ partial/qualified · **!** security-negative. "?"
 
 | Product | Deployment model | Server / tool architecture | Transport + spec | Security boundary / permission enforcement | Extensibility | Streaming impl | Knowledge delivery |
 |---|---|---|---|---|---|---|---|
-| **Cortex** | Self-hosted Craft plugin (in-process) | Class-per-tool registry, boot-once, transport-agnostic JSON-RPC dispatcher | stdio + Streamable HTTP, MCP 2025-06-18, `structuredContent` dual-emit | **Transport = boundary**; native Craft per-user perms at tool+mode, fail-closed, `execute()` re-check; craft_exec stdio-only | Register events + generator + Schema DSL | SSE progress + cooperative cancel + TCP-disconnect via PHP Fiber bridge | ~30k hand-authored lines as MCP prompts/resources + Pro Skill element; keyword search |
+| **Cortex** | Self-hosted Craft plugin (in-process) | Class-per-tool registry, boot-once, transport-agnostic JSON-RPC dispatcher | stdio + Streamable HTTP, MCP 2025-06-18 (current revision is 2025-11-25 — see §5), `structuredContent` dual-emit | **Transport = boundary**; native Craft per-user perms at tool+mode, fail-closed, `execute()` re-check; craft_exec stdio-only | Register events + generator + Schema DSL | SSE progress + cooperative cancel + TCP-disconnect via PHP Fiber bridge | ~30k hand-authored lines as MCP prompts/resources + Pro Skill element; keyword search |
 | **craft-mcp** | Self-hosted; `bin/mcp-server` boots Craft console | Attribute discovery, SDK auto-registers all tools | stdio only | **None** — stdio fully trusted, no identity, no perm checks | Typed register events, ConditionalToolProvider | Partial progress calls; no cancel/disconnect | Thin prompt/resource generators; no corpus |
-| **Drupal MCP** | Self-hosted Drupal; fragmented modules | Official PHP MCP SDK + Tool API plugins + config entities | stdio (Drush) + HTTP `/_mcp`; Streamable-HTTP inferred | Per-key/RBAC scopes; OAuth 2.1 (Simple OAuth) | Tool API plugins via CP UI | ? | None in MCP modules (AI Search vectors live in the AI module) |
+| **Drupal MCP** | Self-hosted Drupal; fragmented modules (consolidating under Acquia-sponsored `mcp_server`) | Official PHP MCP SDK + Tool API plugins + config entities | stdio (Drush) + Streamable HTTP `/_mcp` (documented); spec revision unstated | OAuth 2.1 (Simple OAuth, per-tool scopes); Drupal creds on the stdio binary | Tool API plugins via CP UI | ? | None in MCP modules (AI Search vectors live in the AI module) |
 | **Sanity** | Managed remote SaaS (Content Lake) | Hosted gateway brokering to Content Lake; thin API wrappers | HTTP (primary); stdio via `mcp-remote` proxy | Hosted proxy; token's Content Lake RBAC role; OAuth-default | n/a (managed) | Context pagination; progress ? | Product docs (search_docs) + semantic_search over embeddings |
-| **Contentful** | Two servers: local OSS (in-env) + remote hosted SaaS | SDK + mcp-handler; ~52 tools; all funnel through CMA | stdio (local) + HTTP (remote Beta) | PAT perms + `PROTECTED_ENVIRONMENTS` (local); user role + per-env allow-list + read/write toggle (remote) | Custom tools/prompts via config | ? | None; `get_initial_context` = runtime context; semantic_search over content |
-| **Statamic MCP** | Self-hosted Statamic 6 / Laravel addon | `BaseStatamicTool` action-routed domain routers (~11) | Streamable HTTP (default) + stdio CLI | HTTP token guard, 21 scopes, custom OAuth 2.1 server; **CLI bypasses auth** | Tool classes w/ attributes | ? | Runtime discovery/schema tools; no corpus |
-| **Kirby MCP** | Self-hosted Kirby 5 Composer pkg / CLI binary | Official PHP MCP SDK; boots Kirby runtime; **shells out via symfony/process** | stdio (default) + optional Streamable HTTP `/mcp` | Token-scope only, **not wired to Panel perms**; bearer/JWT, no PKCE/DCR | resource templates | resources/updated notifications only | 216 KB KB + 15 skills; keyword search |
-| **Payload** | Self-hosted Next.js app (in-process `/api/mcp`) | Official TS SDK + Vercel mcp-handler; tools auto-derived from collections | HTTP only (no stdio) | **Delegated** to Payload access rules/hooks/multi-tenant per API key | Per-key toggles + custom tools | mcp-handler supports it; undocumented in Payload | None (DIY); Enterprise RAG separate, not MCP-wired |
-| **Directus** | Self-hosted/Cloud; built-in core + standalone npm | Coarse "toolsets" → features; single items tool for CRUD | Streamable HTTP `/mcp` + stdio (local npm) | **Delegated** to Directus user RBAC; OAuth 2.0 (DCR/CIMD) or bearer; UI toolset toggles | Tool API / user prompts collection | ? | Generic system-prompt tool + user prompts; no corpus |
-| **Laravel Boost** | Local dev-dependency (workstation only) | `laravel/mcp` tool classes; ~15 inspection tools | stdio only (HTTP+OAuth lives in sibling `laravel/mcp`) | **Local trust only** — env-gated to local/testing, no auth | Agent contracts (SupportsGuidelines/Mcp/Skills) | ? | Guidelines + Agent Skills + hosted Documentation API (semantic) |
+| **Contentful** | Two servers: local OSS (in-env) + remote hosted SaaS | Shared `@contentful/mcp-tools` lib + thin stdio host; ~70 tools; all funnel through CMA | stdio (local) + HTTP (remote Beta) | PAT perms + `PROTECTED_ENVIRONMENTS` (local); user role + per-env allow-list + read/write toggle (remote) | Custom tools/prompts via config | ? | None; `get_initial_context` = runtime context; semantic_search over content |
+| **Statamic MCP** | Self-hosted Statamic 6 / Laravel addon | `BaseStatamicTool` action-routed domain routers (9 + 2 discovery/schema tools) | Streamable HTTP (default) + stdio CLI | HTTP token guard, 21 scopes, custom OAuth 2.1 server (AS + protected-resource metadata published); **CLI bypasses auth by default** (opt-in token enforcement); **! unscoped Basic-Auth fallback** | Tool classes w/ attributes | ? | Runtime discovery/schema tools; no corpus |
+| **Kirby MCP** | Self-hosted Kirby 5 Composer pkg / CLI binary | Official PHP MCP SDK; boots Kirby runtime; **shells out via symfony/process** | stdio (default) + optional Streamable HTTP `/mcp` | Token-scope only, **not wired to Panel perms**; bearer/JWT + built-in OAuth provider (DCR, PKCE S256+`plain`, Kirby-user-backed consent; off by default) | resource templates | resources/updated notifications only | 216 KB KB + 15 skills; keyword search |
+| **Payload** | Self-hosted Next.js app (in-process `/api/mcp`) | Official TS SDK + Vercel mcp-handler; tools auto-derived from opted-in collections (4.0-beta: drops mcp-handler for SDK v2-alpha; collections flip to opt-OUT) | HTTP only (no stdio; 4.0-beta adds a full-access ungated stdio bin) | **Delegated** to Payload access rules/hooks/multi-tenant per API key; dev-mode requests without auth run `overrideAccess: true` | Per-key toggles + custom tools | mcp-handler supports it; undocumented in Payload (4.0-beta: explicitly no SSE path) | None (DIY); Enterprise RAG separate, not MCP-wired |
+| **Directus** | Self-hosted/Cloud; built-in core + standalone npm | Flat ~13-tool registry; single items tool for CRUD; default-off Allow-Deletes call-time gate | Streamable HTTP `/mcp` + stdio (local npm) | **Delegated** to Directus user RBAC; v12 OAuth 2.1 AS (PKCE S256, RFC 8707, RFC 8414/9728 metadata, DCR/CIMD opt-in) or bearer (v11 bearer-only); settings toggles | Tool API / user prompts collection | ✗ (core `/mcp` rejects `text/event-stream`) | Generic system-prompt tool + user prompts; no corpus |
+| **Laravel Boost** | Local dev-dependency (workstation only) | `laravel/mcp` tool classes; 10 tools (trimmed from ~15 in v2.3.0; Artisan wrappers removed in favor of direct CLI) | stdio only (HTTP+OAuth lives in sibling `laravel/mcp`) | **Local trust only** — env-gated to `local` OR `app.debug=true`, no auth | Agent contracts (SupportsGuidelines/Mcp/Skills) | ? | Guidelines + Agent Skills + hosted Documentation API (semantic) |
 
 ---
 
@@ -134,7 +136,7 @@ Legend: ✓ yes · ✗ no · ~ partial/qualified · **!** security-negative. "?"
 Covered in depth in §1 — the direct competitor and the centerpiece of this analysis. Summary below for matrix-parity.
 
 **Where craft-mcp is ahead of Cortex**
-- Shipped, MIT-licensed, and adoptable today; Cortex is unreleased and proprietary.
+- Shipped, MIT-licensed, and adoptable today (~1.5k Packagist installs as of 2026-06, though idle since the 2026-03 release); Cortex is unreleased and proprietary.
 - Cleaner *code-craft* tooling story in places (Rector, Pint, sanmai PHPStan rules) and a polished installer.
 - Honest, candid security docstrings.
 
@@ -145,17 +147,17 @@ Covered in depth in §1 — the direct competitor and the centerpiece of this an
 
 ### Direct framework ancestor — Laravel Boost
 
-[`laravel/boost`](https://github.com/laravel/boost) (MIT, v2.4.10) is the conceptual ancestor of Cortex's design: a tool registry, stdio local-trust, bundled guidelines/skills, and vectorized docs. But it is a **developer-workstation coding aid** installed `--dev` and gated to `local`/`testing`, not an authenticated content-ops server. Its standout is a hosted Documentation API doing **embedding-based semantic search over 17,000+ versioned ecosystem chunks** — a capability Cortex does not yet have.
+[`laravel/boost`](https://github.com/laravel/boost) (MIT, v2.4.10) is the conceptual ancestor of Cortex's design: a tool registry, stdio local-trust, bundled guidelines/skills, and vectorized docs. But it is a **developer-workstation coding aid** installed `--dev` and gated to `local` or `app.debug=true` (debug mode lets it run in non-local environments — a softer gate than it sounds), not an authenticated content-ops server. v2.3.0 deliberately trimmed the tool roster from ~15 to **10** by deleting the Artisan-wrapper tools in favor of guidelines telling agents to use the CLI directly. Its standout is a hosted Documentation API doing **embedding-based semantic search over 17,000+ versioned ecosystem chunks** — a capability Cortex does not yet have.
 
 **Where Boost is ahead of Cortex**
 - **Vectorized/semantic retrieval today** over 17k+ always-current doc chunks; Cortex's `search_skills` is keyword-only (Phase-3 roadmap).
-- First-party, Laravel-team-maintained, and **bundled by default in new Laravel apps** — instant reach; ~3.5k stars, broad multi-agent IDE support.
+- First-party, Laravel-team-maintained, and offered as a **default-yes prompt in the `laravel new` installer** (not in the skeleton's composer.json — `create-project` doesn't get it) — near-instant reach; ~3.5k stars, broad multi-agent IDE support.
 - MIT-licensed, frictionless to adopt.
 - `Tinker`/`Artisan` as first-class tools give an agent broad live-introspection-and-execution power on the dev box.
 
 **Where Cortex is ahead**
 - A real security model vs **local-trust only** — Boost has no auth, no per-user ACL, no audit, no documented secret redaction.
-- **No raw-SQL/`eval` escape hatch** — Boost ships a `Database Query` tool and arbitrary-PHP `Tinker` where read-only is convention, not an enforced gate.
+- **No `eval` escape hatch** — Boost's `Tinker` runs arbitrary PHP in full app context with advisory-text-only restrictions. (Fair credit: Boost's `Database Query` is no longer convention-gated — since early 2026 it enforces read-only in code via a first-token allowlist plus CTE-body inspection. The remaining escape hatch is Tinker, and it is wide open; Cortex's `craft_exec` equivalent sits behind six gates, stdio-only.)
 - A genuine remote HTTP content-ops transport (Boost is stdio/local only; its HTTP+OAuth story lives in the separate `laravel/mcp` package).
 - A CP operator UI; permission-gated content-write tooling; SSE progress + cancellation + disconnect handling; a persisted redacted audit trail and an arch-test against shell-exec.
 - Deeper hand-authored Craft expertise (~30k lines) vs Boost's broad-but-shallower guideline files — though Boost's *retrieval* is semantic and Cortex's is keyword.
@@ -164,7 +166,7 @@ Covered in depth in §1 — the direct competitor and the centerpiece of this an
 
 #### Sanity (AI Assist + Agent Actions + remote MCP)
 
-Sanity's [remote MCP server](https://www.sanity.io/docs/ai/mcp-server) went GA on 2025-12-15: a fully managed endpoint at `mcp.sanity.io` with 40+ tools, OAuth-default auth, and genuine `semantic_search` over embeddings. The local npm server is now deprecated. AI features are paid-plan-gated and metered in AI credits.
+Sanity's [remote MCP server](https://www.sanity.io/docs/ai/mcp-server) went GA on 2025-12-11 (announced 2025-12-15): a fully managed endpoint at `mcp.sanity.io` with 40+ tools, OAuth-default auth, genuine `semantic_search` over embeddings, and a ~2-week release cadence since (v2.21.0 as of 2026-06-10, listed in the official MCP Registry). The local npm server is deprecated and archived. Only three tools meter AI credits (`generate_image`, `transform_image`, instruction-driven `create_version`) — and every plan, including Free, carries a monthly credit allowance (1,000 Free/Growth, 5,000 Enterprise); the rest of the surface is unmetered API calls.
 
 **Where Sanity is ahead**
 - Shipping and GA with real adoption; Cortex is unreleased.
@@ -175,10 +177,10 @@ Sanity's [remote MCP server](https://www.sanity.io/docs/ai/mcp-server) went GA o
 **Where Cortex is ahead**
 - **Transport-as-security-boundary** with a stdio-local-trust concept; Cortex keeps `craft_exec`/admin mutations stdio-only and refuses dangerous ops over HTTP. Sanity is remote-only.
 - A formal per-tool/per-mode gating contract + `execute()` re-check vs RBAC-on-the-token only.
-- A dedicated, secret-redacted **invocation audit log** (Sanity relies on document revision history).
+- A dedicated, secret-redacted **invocation audit log on every edition** (Sanity relies on document revision history; a generic audit trail + request-log export exists but is Enterprise-only).
 - **Self-hostable** — data never leaves the customer's infra; Sanity is remote-only and its self-host path is deprecated.
 - Full OAuth 2.1 spec depth (DCR/PKCE/audience binding/AS metadata) documented; Sanity documents OAuth-default but not this surface.
-- A broad read surface free-of-charge with no per-call metering; SSE progress + cooperative cancellation; a 30k-line hand-authored corpus vs product-docs search.
+- SSE progress + cooperative cancellation (Sanity documents neither); a 30k-line hand-authored corpus vs product-docs search. (Sanity's read surface is also effectively unmetered — the metering contrast is limited to its three AI tools, so it is not a differentiator.)
 - A deliberate **no arbitrary-query primitive** — Sanity's arbitrary-GROQ tool is a broad read surface bounded only by token role; Cortex excludes PII from Free.
 
 #### Contentful (MCP server + AI Actions)
@@ -195,14 +197,14 @@ Contentful ships [two MCP servers](https://www.contentful.com/developers/docs/to
 - Local server's only model is "whatever the PAT can do" — no per-user/per-tool/per-mode gating. Cortex enforces a 3-method contract + `execute()` re-check even on its trusted stdio path.
 - Remote server's read/write gating is **per-environment, applied uniformly to all users** — not per-user mode gating. Cortex gates the tool *and* the mode enum per individual user.
 - No documented audit log, secret redaction, streaming progress, cancellation, disconnect handling, or MCP-layer rate limiting; Cortex ships all of these.
-- `PROTECTED_ENVIRONMENTS` runs only inside the MCP server and is bypassed by any other client — advisory vs Cortex's transport-as-boundary model.
+- `PROTECTED_ENVIRONMENTS` runs only inside the MCP server and is bypassed by any other client — advisory vs Cortex's transport-as-boundary model. (Their own README is candid about this; note also that org-scoped taxonomy writes and `invoke_ai_action` are unguarded even *inside* the server.)
 - A curated thick-tool design with explicit gates vs a very broad CMA write surface governed mainly by token scope; a bundled domain corpus; a published quality bar.
 
 ### Other self-hosted
 
 #### Drupal AI + MCP modules (`mcp` / `mcp_server` / `mcp_tools` / `mcp_client`)
 
-Drupal's surface is a **fragmented constellation of GPL contrib modules**, not one product. The flagship AI module is mature (~15,200 sites) but is an *in-Drupal AI layer, not an MCP server*. The actual MCP servers are early-stage: `mcp_server` (~2 installs, no stable release, no security coverage), `mcp` (~327 installs, merging away), the third-party `mcp_tools` (beta7, ~73 installs, **explicitly outside Drupal's security advisory policy**, 222 tools), and `mcp_client` (alpha).
+Drupal's surface is a **fragmented constellation of GPL contrib modules**, not one product — though the consolidation is now actively progressing: `mcp_server` is Acquia-sponsored and "back on active development," so this framing will age. The flagship AI module is mature (~15,200 sites, stable 1.4.2) but is an *in-Drupal AI layer, not an MCP server*. The actual MCP servers are early-stage: `mcp_server` (~2 installs, no stable release, no covered release for security advisories), the outgoing `mcp` (~327 installs, stable and security-covered but merging away), the third-party `mcp_tools` (beta7, ~73 installs, **explicitly outside Drupal's security advisory policy**, 222 tools), and `mcp_client` (1.0.0-alpha1, ~13 installs — built on the third-party SWIS client library, not the official PHP SDK).
 
 **Where Drupal is ahead**
 - Massive ecosystem gravity and a 48+ provider AI integration with an AI Agents framework.
@@ -217,42 +219,42 @@ Drupal's surface is a **fragmented constellation of GPL contrib modules**, not o
 - A stronger security-boundary model (transport-as-boundary; OAuth 2.1 with DCR/PKCE/audience binding; refuses password/email/admin over HTTP) vs per-key/RBAC scopes.
 - Uniform secret redaction and a uniform redacted DB audit log vs uneven/undocumented logging.
 - SSE progress + cooperative cancellation + TCP-disconnect; a fenced six-gate stdio-only `craft_exec` with no `Process`/`exec`/`shell` anywhere, vs `mcp_dev_tools`' controlled-Drush broad surface.
-- A bundled hand-authored corpus; explicit PII-to-Pro gating; explicit Streamable-HTTP 2025-06-18 with dual-emit (only inferred on the Drupal side).
+- A bundled hand-authored corpus; explicit PII-to-Pro gating; an explicit spec revision (2025-06-18) with `structuredContent` dual-emit — Drupal now documents Streamable HTTP first-party but states no spec revision.
 
 #### Statamic MCP (`cboxdk/statamic-mcp`)
 
-[`cboxdk/statamic-mcp`](https://github.com/cboxdk/statamic-mcp) (MIT, v2.6.0, ~29 releases) is the **most operationally complete CMS MCP server in the public ecosystem** — a Vue 3 CP dashboard (Connect/Tokens/Activity/Settings), 21 RBAC scopes, audit logging with PII redaction, dry-run on all writes, confirmation gating on destructive ops, and a deliberate collapse from 140+ tools to ~11 action-routed domain routers. This is the closest peer to Cortex on operational maturity.
+[`cboxdk/statamic-mcp`](https://github.com/cboxdk/statamic-mcp) (MIT, v2.6.0, 29 releases) is the **most operationally complete CMS MCP server in the public ecosystem** — a Vue 3 CP dashboard (Connect/Tokens/Activity/Settings), 21 RBAC scopes, audit logging with secret-key *and* PII-pattern redaction on persisted arguments, two-phase confirmation gating on destructive ops, and a deliberate collapse from 140+ tools to 11 (9 action-routed domain routers + 2 discovery/schema tools). This is the closest peer to Cortex on operational maturity. (One prior claim is withdrawn on source inspection: "universal dry-run-with-diff on every write" appears only in their internal `CLAUDE.md` agent instructions — no `dryRun` parameter exists anywhere in the shipped code or docs.)
 
 **Where Statamic is ahead**
-- **Shipped and mature** (~29 releases, real adoption); Cortex is unreleased.
+- **Shipped and mature** (29 releases, real adoption); Cortex is unreleased.
 - MIT, fully free; **full CRUD available to everyone in the single free edition** (Cortex gates every write behind paid Pro).
-- **Uniform dry-run-with-diff/patch on every write** + confirmation gating on destructive ops — a first-class universal safety pattern; Cortex relies on per-tool design rather than a documented universal dry-run/confirm contract.
+- **Two-phase confirmation-token gating on destructive ops** — per-domain configurable, production-default on deletes and revision-restore actions — a first-class universal safety pattern; Cortex relies on per-tool design (`craft_exec`'s confirm/dangerous gates, the delete-pattern guard) rather than one documented cross-tool confirm contract.
 - Native CP dashboard parity already in production (all four tabs shipped) — Cortex's Connection + Skill-authoring slipped to a point release.
-- Respects the CMS editorial/revision workflow on writes; OAuth DCR + CIMD resolution.
+- Respects the CMS editorial/revision workflow on writes; OAuth DCR + CIMD resolution; RFC 8414 AS + RFC 9728 protected-resource metadata published.
 
 **Where Cortex is ahead**
-- Custom hand-rolled OAuth 2.1 server vs Cortex's **`league/oauth2-server`** foundation, plus documented RFC 8707 audience binding, full AS + protected-resource metadata, and IP-throttled anonymous endpoints — a more standards-complete, auditable surface.
+- A vetted **`league/oauth2-server`** crypto foundation vs Statamic's fully hand-rolled OAuth server, plus documented RFC 8707 audience binding and IP-throttled anonymous endpoints (Statamic publishes AS + protected-resource metadata too, so that specific surface is parity). Statamic also ships an **unscoped Basic-Auth fallback that grants access to all tools** — a documented fail-open path Cortex has no equivalent of.
 - **Streaming** (SSE progress + cooperative cancellation + real TCP-disconnect via the Fiber bridge); Statamic documents none.
 - A **30k-line bundled knowledge corpus** (Statamic offers only runtime discovery/schema tools).
-- Transport-as-boundary discipline + the 3-method gating contract + `execute()` re-check + **refusing password/email/admin mutations over HTTP entirely**; Statamic's gating is scope-token-based and its **CLI path bypasses auth wholesale**.
-- Secret redaction *everywhere incl. persisted audit excerpts* (Statamic documents PII-in-logs redaction only); PII gated to paid tier; an arch-test against shell-exec; a published test/static-analysis quality bar (Statamic publishes none).
+- Transport-as-boundary discipline + the 3-method gating contract + `execute()` re-check + **refusing password/email/admin mutations over HTTP entirely**; Statamic's gating is scope-token-based — its enforcement layer matches scopes and config patterns, not the bound user's native CMS permissions — and its **CLI path bypasses auth by default** (token enforcement is opt-in config) with confirmation gates also skipped in CLI.
+- Redaction is closer to parity than previously credited — both redact persisted audit arguments; Cortex's remaining edge is *uniformity* (one `SecretRedactor` across tool output, `craft_exec` stdout, and both dispatcher audit sites, plus PII excluded from Free by design). On quality bar: Statamic publishes PHPStan L8 / Pest / Pint (no test count); Cortex publishes the full count (1,120/0) plus the tokenizer arch-test.
 
 #### Kirby MCP (`bnomei/kirby-mcp`)
 
-[`bnomei/kirby-mcp`](https://github.com/bnomei/kirby-mcp) (MIT, v1.8.0, ~2,985 Packagist installs, ~54 stars) is a CLI-first MCP server for Kirby 5, built on the official PHP MCP SDK. It bundles a 216 KB knowledge base + 15 skills, ships `kirby_eval` (off by default) and shells out via `symfony/process` for CLI commands — a deliberate architectural opposite to Cortex's no-shell rule.
+[`bnomei/kirby-mcp`](https://github.com/bnomei/kirby-mcp) (MIT, v1.8.0, ~3k Packagist installs, ~55 stars) is a CLI-first MCP server for Kirby 5, built on the official PHP MCP SDK. It bundles a 216-article (~480 KB) knowledge base + 15 skills, ships `kirby_eval` (off by default) and shells out via `symfony/process` for CLI commands — a deliberate architectural opposite to Cortex's no-shell rule.
 
 **Where Kirby is ahead**
-- **Released and adopted** (~2,985 installs, active monthly releases); Cortex has 0.
+- **Released and adopted** (~3k installs, active monthly releases); Cortex has 0.
 - MIT, freely forkable; all write tools and the full HTTP transport are in the single free package (Cortex gates writes/HTTP behind Pro).
-- Built-in OAuth authorization-server provider with a configurable consent UI — turnkey for Claude.ai/Desktop custom connectors; IDE-helper generation and a "next tool" recommender; first-mover in its ecosystem.
+- Built-in OAuth authorization-server provider (since v1.7.0: metadata discovery, **DCR, PKCE, refresh tokens, JWKS**, Kirby-login-resumed consent with a configurable UI) — turnkey for Claude.ai/Desktop custom connectors; IDE-helper generation and a "next tool" recommender; first-mover in its ecosystem.
 
 **Where Cortex is ahead**
-- Authorization is **token-scope only and explicitly NOT wired to CMS user permissions**; Cortex enforces native per-user perms at tool+mode with an `execute()` re-check.
-- Weaker HTTP auth — **no PKCE, no DCR**; Cortex ships the full OAuth 2.1 profile.
+- Authorization is **token-scope only and explicitly NOT wired to CMS user permissions**; Cortex enforces native per-user perms at tool+mode with an `execute()` re-check. (The v1.7.0 OAuth *consent* step is Kirby-user-backed, but the resulting token still authorizes by scope, not the user's Panel permissions.)
+- A stricter OAuth 2.1 profile — Kirby's provider **accepts the `plain` PKCE method** (OAuth 2.1 mandates S256-only; Cortex rejects `plain`), requires PKCE only for public clients, and ships disabled by default; Cortex additionally documents RFC 8707 audience binding, which Kirby does not.
 - **No persisted invocation audit log** (Kirby's redaction covers only `mcp_dump()` debug logs); Cortex persists redacted `cortex_invocations`.
 - No streaming progress/cancellation, no CP/admin UI (CLI-only); Cortex has both plus a tabbed CP surface.
 - Ships `kirby_eval` and **shells out via `symfony/process`**; Cortex forbids all `Process`/`exec`/`shell` and confines `craft_exec` behind six gates, stdio-only.
-- Per-user + anonymous-IP rate limiting; PII edition gating; a far larger corpus (~30k lines vs 216 KB — both keyword); a published automated-quality posture.
+- Per-user + anonymous-IP rate limiting; PII edition gating; a far larger corpus (~30k lines vs ~480 KB — both keyword); a published automated-quality posture.
 
 #### Payload (`@payloadcms/plugin-mcp`)
 
@@ -262,19 +264,20 @@ Drupal's surface is a **fragmented constellation of GPL contrib modules**, not o
 - Shipped, MIT, inside a huge-install-base parent project.
 - Write tools are first-class and **trivially symmetric** — any opted-in collection auto-generates CRUD from the content model; Cortex's writes are hand-built and Pro-gated.
 - ACL delegated to the framework's battle-tested access-control/hooks/multi-tenant system — zero duplication, native multi-tenant.
-- Built on the official TS SDK + maintained `mcp-handler` (tracks upstream for free); ships a production Enterprise RAG/auto-embedding capability (separate from MCP) — Cortex's vectorized search is only roadmapped.
+- Built on the official TS SDK + maintained `mcp-handler` (tracks upstream for free — though the 4.0-beta drops `mcp-handler` for the SDK v2 alpha, so this is in flux); ships a production Enterprise RAG/auto-embedding capability (separate from MCP) — Cortex's vectorized search is only roadmapped.
 
 **Where Cortex is ahead**
 - Auth is **static user-bound bearer API keys only** — no OAuth 2.1, no DCR, no PKCE, no audience binding; Cortex ships all of these (the direction the MCP spec is moving for remote servers).
 - **No transport-as-security-boundary distinction** — Payload has no stdio mode at all; Cortex separates trusted stdio from untrusted HTTP and forces dangerous ops stdio-only.
-- Redaction and audit are **DIY hooks** (`overrideResponse`, `onEvent`) with nothing built in; Cortex redacts by default and ships a real redacted DB audit log.
-- No documented rate limiting, streaming progress, or cancellation; Cortex ships per-user + anonymous-IP limiting, SSE progress, cancellation, and disconnect handling.
+- Redaction and audit are **DIY hooks** (`overrideResponse`, `onEvent`) with nothing built in — and the 4.0-beta **removes `onEvent` entirely** with no replacement; Cortex redacts by default and ships a real redacted DB audit log.
+- No documented rate limiting, streaming progress, or cancellation (the 4.0-beta makes streaming explicitly absent — no SSE path); Cortex ships per-user + anonymous-IP limiting, SSE progress, cancellation, and disconnect handling.
 - No bundled domain corpus; a stronger, explicitly-tested gating + fail-closed re-check posture with an arch-test against shell-exec.
 - Payload's RAG and MCP are **unconnected**; Cortex's knowledge is delivered *through* the MCP surface (keyword today).
+- **Fail-closed vs fail-open defaults, sharpening at 4.0**: the unreleased 4.0-beta flips collection exposure to **opt-OUT** (install the plugin and every collection gets full CRUD by default — their own PR warns "collections you never listed before are reachable over MCP"), adds a **full-access stdio bin with no API key and no per-tool filtering**, and dev-mode requests without an `Authorization` header already run `overrideAccess: true`. Cortex's posture is the inverse: nothing registers without `shouldRegister()`, nothing executes without the permission re-check.
 
 #### Directus (native MCP)
 
-[Directus](https://directus.com/docs/guides/ai/mcp) ships two MCP surfaces — a built-in HTTP server in core (v11.12+, OAuth 2.0 w/ DCR + CIMD or bearer) and a standalone MIT npm server over stdio. Both **delegate all authorization to the connecting Directus user's RBAC**; coarse "toolsets" toggle whole tool groups. Core is now MSCL (source-available); the npm package is MIT.
+[Directus](https://directus.com/docs/guides/ai/mcp) ships two MCP surfaces — a built-in HTTP server in core (v11.12+; bearer-only on v11, and **v12 — currently RC — adds a full OAuth 2.1 authorization server**: mandatory PKCE S256, RFC 8707 resource indicators, RFC 8414/9728 metadata, opt-in DCR and CIMD) and a standalone MIT npm server over stdio. Both **delegate all authorization to the connecting Directus user's RBAC**; gating is CP settings toggles plus a default-off "Allow Deletes" call-time gate (the npm server adds per-tool `DISABLE_TOOLS`). Core is MSCL-1.0-GPL as of v12 (source-available, GPLv3 after four years; ≤v11 stays BSL 1.1); the npm package is MIT.
 
 **Where Directus is ahead**
 - Shipping and GA in production today, two transports, broad client compatibility.
@@ -282,11 +285,11 @@ Drupal's surface is a **fragmented constellation of GPL contrib modules**, not o
 - Source-available core with a genuinely free tier + MIT standalone package; database-agnostic, multi-framework reach.
 
 **Where Cortex is ahead**
-- **No defense-in-depth gating model** in Directus — authorization is wholly delegated to RBAC with only coarse UI toolset toggles; Cortex adds the 3-method contract + `execute()` re-check.
-- No documented OAuth hardening beyond DCR/CIMD — no PKCE/audience-binding/AS metadata documented; Cortex implements the full 2025-06-18 profile.
+- **No defense-in-depth gating model** in Directus — authorization is wholly delegated to RBAC with settings toggles and the delete gate; Cortex adds the 3-method contract + `execute()` re-check.
+- OAuth: on the **shipping stable line (v11) Directus is bearer-only**. The v12 RC's OAuth 2.1 server matches Cortex's profile nearly point-for-point (PKCE S256, RFC 8707, RFC 8414/9728, DCR) and adds CIMD — once v12 GAs this ceases to be a Cortex differentiator and becomes parity. Cortex's remaining edges there: the vetted `league/oauth2-server` foundation and IP-throttled anonymous endpoints.
 - No documented secret redaction and **no MCP-specific redacted audit table** (relies on the generic activity log); Cortex persists a dedicated redacted audit.
-- No bundled domain corpus (only a generic system-prompt tool + user prompt templates); no documented streaming/cancellation/disconnect handling.
-- Weaker explicit security model around destructive/host actions — no-shell-exec, six-gate stdio-only `craft_exec`, per-user + anonymous-IP rate limiting are all Cortex-side and undocumented for Directus; write/schema/delete tools are on by default subject only to RBAC + manual toggles.
+- No bundled domain corpus (only a generic system-prompt tool + user prompt templates); **no streaming at all** — core's `/mcp` actively rejects `text/event-stream`, and no cancellation/disconnect handling exists.
+- Weaker explicit security model around destructive/host actions — no-shell-exec, six-gate stdio-only `craft_exec`, per-user + anonymous-IP rate limiting are all Cortex-side and undocumented for Directus; write and schema tools are on by default subject only to RBAC + toggles (fair credit: deletes specifically are gated off by default).
 - No per-request input-schema rewriting (mode-enum filtering); Directus only enables/disables whole tools.
 
 ---
@@ -297,16 +300,16 @@ Drupal's surface is a **fragmented constellation of GPL contrib modules**, not o
 
 - It is the **only** server that combines transport-as-security-boundary, native per-user permission enforcement at *both* the tool and the mode-enum layer, a fail-closed `execute()` re-check, secret redaction *everywhere including persisted audit excerpts*, a dedicated redacted DB audit log, **and** a no-raw-SQL / no-`eval` / no-shell-exec design enforced by an architecture test.
 - It is the **only** one with documented genuine streaming end-to-end: SSE progress + cooperative cancellation + real TCP-disconnect handling (the PHP Fiber bridge).
-- Its OAuth 2.1 surface is among the most standards-complete in the field — `league/oauth2-server` foundation, DCR/RFC 7591, PKCE S256, audience binding/RFC 8707, AS + protected-resource metadata, IP-throttled anonymous endpoints — matched in spirit only by Statamic (custom server) and partially by Directus/Sanity/Contentful.
+- Its OAuth 2.1 surface is among the most standards-complete in the field — `league/oauth2-server` foundation, DCR/RFC 7591, **S256-only** PKCE, audience binding/RFC 8707, AS + protected-resource metadata, IP-throttled anonymous endpoints. The field is catching up here, and this document says so: Statamic publishes AS + protected-resource metadata (custom server), Kirby's v1.7.0 provider ships DCR + PKCE (but accepts `plain`), and **Directus v12's RC matches the profile nearly point-for-point and adds CIMD**. Cortex's durable edges are the vetted crypto foundation, S256-only strictness, RFC 8707 enforcement at the resource, and the throttled anonymous endpoints — not the existence of the checklist.
 - Its bundled **~30,000-line hand-authored Craft corpus** is the deepest domain-expertise payload of any server here (Kirby's 216 KB and Boost's guideline files are the only other bundled corpora; the SaaS players surface product docs, not authored expertise).
 
 **Where each rival wins.**
 
 - **craft-mcp, Statamic, Kirby, Payload, Directus, Boost** — *shipped and adopted*; Cortex is not. **MIT/GPL/source-available** vs Cortex's proprietary license — lower adoption friction and forkability.
-- **Statamic** — most operationally mature CMS MCP server; full free CRUD; universal dry-run/confirm pattern; all CP tabs shipped.
+- **Statamic** — most operationally mature CMS MCP server; full free CRUD; two-phase confirmation gating on destructive ops; all CP tabs shipped.
 - **Boost, Sanity, Contentful, Drupal (AI module), Payload (Enterprise)** — **vectorized/semantic retrieval today**; Cortex is keyword-only.
 - **Sanity, Contentful, Directus** — managed/hosted remote infra and broad enterprise distribution; first-party AI authoring and (Sanity/Contentful) multi-provider BYOM automation.
-- **Drupal, Payload** — built on the official MCP SDK (upstream spec maintenance for free); Drupal also ships an MCP *client*.
+- **Drupal, Kirby, Payload** — built on official MCP SDKs (upstream spec maintenance for free — all three already target the 2025-11-25 revision Cortex hasn't adopted yet); Drupal also ships an MCP *client*.
 - **Payload, Directus** — auto-generated symmetric write tools / schema-write surface with near-zero authoring cost.
 
 **The honest gaps — framed correctly.**
@@ -316,7 +319,7 @@ Drupal's surface is a **fragmented constellation of GPL contrib modules**, not o
 3. **Proprietary license — a posture, not a flaw.** Cortex is a **supported commercial Craft plugin**, the same model as Pixel & Tonic's first-party plugins and every paid Craft plugin vendor. The Free edition is free-of-charge; Pro is paid. This buys maintenance, support, and a coherent single-product roadmap — the opposite of Drupal's four-module fragmentation. It does mean higher adoption friction than an MIT package and no forking, which is a real trade-off for OSS-only shops. It is **not** an "openness liability," and Cortex is not MIT.
 4. **Write-tier gating.** Every write tool (and HTTP transport) is behind paid Pro. Statamic/Kirby/Payload/Directus give writes away free. Cortex's deliberate choice is to keep the **free read surface PII-free and ungated**, and to put governed mutation + the untrusted HTTP boundary behind the paid, supported tier — consistent with the commercial-product posture.
 
-**The hand-rolled dispatcher — a real trade-off, both sides.** Cortex implements its own MCP dispatcher (`src/mcp/Server.php`, ~1,400 lines) and both transports; its runtime dependencies are exactly `craftcms/cms`, `league/oauth2-server`, and the skills package — **no MCP SDK**. Drupal and Kirby build on the official PHP MCP SDK (maintained with the PHP Foundation and Symfony); Payload builds on the official TypeScript SDK plus `mcp-handler`. What the SDK route buys them is genuine and should not be minimised: when the MCP spec revs, they bump a dependency and inherit conformance work done upstream; Cortex pays an engineering sprint per revision and owns its own conformance testing forever. What hand-rolling buys Cortex is equally concrete: a dispatcher that is genuinely transport-agnostic (the official PHP SDK's server couples to its own transport bindings; Cortex's core receives transport context through narrow setters and serves stdio and HTTP unchanged), zero third-party code in the security-critical dispatch path, spec-version control (Cortex targets 2025-06-18 with `structuredContent` dual-emit today, ahead of several SDK consumers), and dispatcher behaviour that is directly covered by its own test suite rather than trusted upstream. Two mitigating facts keep this from being a structural liability: the protocol surface Cortex implements is small and frozen per spec revision (eight methods), and the official PHP SDK is itself **experimental pre-1.0** (v0.6.0 at the time of writing, "experimental until the first major release" per its own README) — so "free upstream maintenance" today also means inheriting an unstable API. Because the dispatcher is isolated behind one class with transport adapters on either side, migrating onto the SDK after it stabilises would be a contained refactor, and remains an explicit option.
+**The hand-rolled dispatcher — a real trade-off, both sides.** Cortex implements its own MCP dispatcher (`src/mcp/Server.php`, ~1,400 lines) and both transports; its runtime dependencies are exactly `craftcms/cms`, `league/oauth2-server`, and the skills package — **no MCP SDK**. Drupal and Kirby build on the official PHP MCP SDK (maintained with the PHP Foundation and Symfony); Payload builds on the official TypeScript SDK. What the SDK route buys them is genuine and currently visible: **the spec has revved to 2025-11-25, every cited SDK consumer already targets it, and Cortex — targeting 2025-06-18 — is one revision behind today.** That is the cost side of hand-rolling stated plainly: when the spec revs, SDK consumers bump a dependency; Cortex pays an engineering sprint per revision and owns its own conformance testing forever. (Adopting 2025-11-25 is sprint-scale: version negotiation, the SEP-1303 error-mapping change, optional CIMD registration. The larger event is the **2026-07-28 revision**, finalizing ~July 2026 — a stateless-protocol rework that removes sessions and the `initialize` handshake, adds required methods, and deprecates DCR in favor of CIMD. That one changes the method set itself and needs a real migration gate, not a sprint. No urgency is forced meanwhile: revisions coexist via version negotiation, 2025-06-18 has no removal date, and current clients still negotiate it.) What hand-rolling buys Cortex is equally concrete: zero third-party code in the security-critical dispatch path; adoption timing under its own control rather than its dependency's; a dispatcher whose behaviour is directly covered by its own test suite; and capabilities the PHP SDK still lacks — notably **server-side OAuth, which the SDK has not shipped at all** (Cortex's entire Pro auth surface has no SDK equivalent to inherit). The SDK is itself **experimental pre-1.0** (v0.6.0, "experimental until the first major release" per its own README), so "free upstream maintenance" today also means inheriting an unstable API. Its server does now accept pluggable transports (`Server::run(TransportInterface)`), so transport coupling is no longer an argument against it; isolation is the durable one. Because Cortex's dispatcher is one class with transport adapters on either side, migrating onto the SDK after it stabilises would be a contained refactor, and remains an explicit option.
 
 **MCP client — assessed and deliberately deferred.** Drupal ships `mcp_client`, letting Drupal *consume* external MCP servers, and it is fair to ask whether Cortex should match it. The assessment (2026-06): no — not in Phase 3. Drupal's client only has a consumer because Drupal ships an in-CMS AI/agents framework that auto-exposes discovered MCP tools as function-call plugins; even there, adoption is nascent (1.0.0-alpha1, ~13 reported installs as of this writing). Craft has no in-CP agent host, so a Craft-side MCP client would have nothing to feed — the agents that talk to Cortex (Claude, Cursor, etc.) already connect to other MCP servers themselves. The one differentiated future shape is **governed egress**: Cortex brokering external MCP servers' tools through its own gating, redaction, and audit so an agency's clients get a single governed surface — but that is a large build (client transports, OAuth *client* flows, credential storage, per-tool permission mapping) on top of an experimental upstream client SDK, for a pattern with single-digit adoption in the ecosystem that pioneered it. Decision: **revisit if/when an in-CP assistant ships or the official PHP SDK client reaches 1.0; not before.** Until then "Drupal also ships an MCP client" stands in the rival-wins column above, with this context.
 
@@ -330,9 +333,11 @@ Drupal's surface is a **fragmented constellation of GPL contrib modules**, not o
 - `README.md`, `composer.json`, `docs/CAPABILITIES.md` (the `src/`-cited capability deep-dive this document digests), `docs/REVIEW.md`, `docs/review/ARCHITECTURE.md` (engineering/architecture review with `file:line` evidence and remediation status on `gate-9-hardening`).
 - Bundled knowledge corpus: https://github.com/michtio/craftcms-claude-skills (counts verified against the packaged corpus: 10 skills, 82 references, 6 agents — 98 addressable documents, ~30,300 lines)
 
-**MCP SDKs and clients (dispatcher trade-off + client assessment)**
-- Official PHP MCP SDK: https://github.com/modelcontextprotocol/php-sdk (v0.6.0, experimental pre-1.0; PHP Foundation + Symfony)
-- Drupal MCP Client: https://www.drupal.org/project/mcp_client (1.0.0-alpha1, ~13 reported installs; requires the AI + AI Agents modules)
+**MCP spec, SDKs and clients (dispatcher trade-off + client assessment)**
+- MCP specification: https://modelcontextprotocol.io/ — current revision **2025-11-25** (changelog: https://modelcontextprotocol.io/specification/2025-11-25/changelog); the 2026-07-28 revision is in RC (draft changelog: https://modelcontextprotocol.io/specification/draft/changelog · RC announcement: https://blog.modelcontextprotocol.io/posts/2026-07-28-release-candidate/)
+- Official PHP MCP SDK: https://github.com/modelcontextprotocol/php-sdk (v0.6.0, experimental pre-1.0; PHP Foundation + Symfony; targets 2025-11-25; pluggable `TransportInterface`; server-side OAuth not yet shipped)
+- Official TypeScript SDK: https://github.com/modelcontextprotocol/typescript-sdk (stable 1.x targets 2025-11-25) · mcp-handler: https://github.com/vercel/mcp-handler
+- Drupal MCP Client: https://www.drupal.org/project/mcp_client (1.0.0-alpha1, ~13 reported installs; requires the AI + AI Agents modules; built on the SWIS client library)
 
 **craft-mcp (direct competitor — source audit)**
 - Repo: https://github.com/stimmtdigital/craft-mcp (tag v1.2.2, commit `c1f49ee`)
