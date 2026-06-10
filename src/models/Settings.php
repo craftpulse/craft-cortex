@@ -67,12 +67,12 @@ class Settings extends Model
      *
      *               When `allowAdminChanges` is `false`, a
      *               `craft_command` invocation matching a pattern
-     *               here is rejected at dispatch time with JSON-RPC
-     *               code `-32002` and an error message naming
-     *               `allowAdminChanges` as the reason. The rejection
-     *               still writes a `cortex_invocations` row with
-     *               `kind=tool_error` so the audit trail captures
-     *               the boundary attempt.
+     *               here is rejected at dispatch time as a
+     *               `ToolException` (surfaced as an `isError: true`
+     *               tool-result envelope) naming `allowAdminChanges`
+     *               as the reason. The rejection still writes a
+     *               `cortex_invocations` row with `kind=tool_error`
+     *               so the audit trail captures the boundary attempt.
      *
      *               Override via project config or
      *               `config/cortex.php` to tighten the admin-level
@@ -145,22 +145,25 @@ class Settings extends Model
 
     /**
      * @var bool Whether the HTTP transport (`POST/GET/DELETE
-     *          /cortex/mcp`) accepts requests. Defaults to false so
-     *          production installs stay off until auth (sub-gates
-     *          7.2 / 7.3) and per-user filtering (7.4) land. With
-     *          this flag false, every request to the endpoint returns
-     *          503 Service Unavailable regardless of headers or
-     *          credentials.
+     *          /cortex/mcp`) accepts requests. Defaults to false: the
+     *          HTTP transport is opt-in, so a default install exposes
+     *          only the trusted local stdio transport. It is also the
+     *          kill switch — with this flag false, the MCP, OAuth, and
+     *          `.well-known` controllers all return 503 Service
+     *          Unavailable regardless of headers or credentials.
      */
     public bool $httpEnabled = false;
 
     /**
      * @var string[] Allowlist of `Origin` header values the HTTP
-     *               transport accepts. Empty means permissive — every
-     *               Origin is accepted, intended for dev only. When
-     *               the list is non-empty, requests whose `Origin`
-     *               does not match exactly are rejected with 403
-     *               Forbidden. DNS-rebinding defense per MCP 2025-06-
+     *               transport accepts. An empty list fails CLOSED
+     *               outside `devMode` — the controller rejects the
+     *               request with 403 and forces the operator to name
+     *               an Origin before enabling HTTP in production; in
+     *               `devMode` an empty list warns-and-allows so local
+     *               work isn't blocked. When the list is non-empty,
+     *               requests whose `Origin` does not match exactly are
+     *               rejected with 403 Forbidden. DNS-rebinding defense per MCP 2025-06-
      *               18 ("Servers MUST validate the Origin header on
      *               all incoming connections").
      */
