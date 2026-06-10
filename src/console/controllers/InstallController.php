@@ -60,6 +60,16 @@ class InstallController extends Controller
     // Constants
     // =========================================================================
 
+    /**
+     * How many timestamped `<file>.bak.*` backups to retain per client
+     * config when re-applying. Older backups beyond this count are
+     * pruned on each write so the config directory doesn't grow without
+     * bound.
+     *
+     * @since 5.0.0
+     */
+    private const BACKUP_KEEP = 5;
+
     private const CLIENTS = [
         'claude-desktop' => 'Claude Desktop',
         'claude-code' => 'Claude Code',
@@ -1342,6 +1352,19 @@ JSON;
     {
         $dir = dirname($path);
 
+        // Capture the existing file's permission mode before we touch
+        // anything, so the atomic replace preserves an operator's
+        // deliberate tightening (e.g. 0600 on a file that may carry a
+        // token) instead of silently widening it to the new-file
+        // default. Null when there is no existing file to inherit from.
+        $existingMode = null;
+        if ($existing !== null && PHP_OS_FAMILY !== 'Windows') {
+            $perms = @fileperms($path);
+            if ($perms !== false) {
+                $existingMode = $perms & 0777;
+            }
+        }
+
         // Backup the existing file first — if anything later fails, the
         // original is still intact and the .bak gives the user an audit
         // trail of writes.
@@ -1356,6 +1379,7 @@ JSON;
             if (!@copy($path, $backup)) {
                 throw new \RuntimeException("could not write backup to {$backup}");
             }
+            $this->_pruneBackups($path);
         }
 
         $temp = @tempnam($dir, 'cortex-mcp-');
@@ -1368,17 +1392,41 @@ JSON;
             throw new \RuntimeException("could not write to temp file {$temp}");
         }
 
-        // tempnam() creates with 0600; match the prevailing posix default
-        // for user config files (0644) so editors and the host MCP client
-        // can read it without surprise. Skip on Windows where chmod is
-        // a no-op for ACL-managed paths.
+        // tempnam() creates with 0600. Preserve the prior file's mode
+        // when replacing one; otherwise default a new file to 0644 so
+        // editors and the host MCP client (same user) can read it
+        // without surprise. Skip on Windows where chmod is a no-op for
+        // ACL-managed paths.
         if (PHP_OS_FAMILY !== 'Windows') {
-            @chmod($temp, 0644);
+            @chmod($temp, $existingMode ?? 0644);
         }
 
         if (!@rename($temp, $path)) {
             @unlink($temp);
             throw new \RuntimeException("could not rename temp file into {$path}");
+        }
+    }
+
+    /**
+     * Keep the most recent `self::BACKUP_KEEP` `<path>.bak.*` files and
+     * delete the rest, so repeated `--force` applies don't litter the
+     * client-config directory unboundedly. Best-effort: a failed unlink
+     * is ignored — pruning stale backups must never break a write.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _pruneBackups(string $path): void
+    {
+        $backups = @glob("{$path}.bak.*");
+        if ($backups === false || count($backups) <= self::BACKUP_KEEP) {
+            return;
+        }
+
+        // Newest first by mtime, then drop everything past the keep count.
+        usort($backups, static fn(string $a, string $b): int => (@filemtime($b) ?: 0) <=> (@filemtime($a) ?: 0));
+        foreach (array_slice($backups, self::BACKUP_KEEP) as $stale) {
+            @unlink($stale);
         }
     }
 }

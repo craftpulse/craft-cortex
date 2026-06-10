@@ -65,10 +65,18 @@ class DocsController extends Controller
      */
     public function actionAll(): int
     {
-        $this->actionTools();
-        $this->actionPrompts();
-        $this->actionResources();
-        return ExitCode::OK;
+        // Run all three; report failure if any sub-action failed so CI
+        // calling `cortex/docs/all` can detect a partial write rather
+        // than reading the always-OK exit as success. The later docs
+        // still attempt to write even if an earlier one errored — a
+        // single IO failure shouldn't suppress the others.
+        $tools = $this->actionTools();
+        $prompts = $this->actionPrompts();
+        $resources = $this->actionResources();
+
+        return ($tools === ExitCode::OK && $prompts === ExitCode::OK && $resources === ExitCode::OK)
+            ? ExitCode::OK
+            : ExitCode::UNSPECIFIED_ERROR;
     }
 
     /**

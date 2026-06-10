@@ -207,13 +207,23 @@ class Users extends AbstractTool implements ContextAwareToolInterface
     /**
      * Credential / privilege fields refused over the HTTP transport.
      *
-     * Changing a password (`newPassword`), changing the email
-     * (`email`), or granting / modifying admin status (`admin`) are
-     * exactly the operations Craft's own CP gates behind an elevated
-     * (re-authenticated) session. The MCP HTTP transport has no
-     * elevated-session layer yet, so until one ships these operations
-     * are refused over HTTP and remain available only over the trusted
-     * local stdio transport. See `docs/SECURITY.md`.
+     * Changing a password (`newPassword`), setting or changing the
+     * email (`email`), or granting / modifying admin status (`admin`)
+     * are exactly the operations Craft's own CP gates behind an
+     * elevated (re-authenticated) session, and `email` is personally
+     * identifying. The MCP HTTP transport has no elevated-session
+     * layer, so these fields are refused over HTTP and are available
+     * only over the trusted local stdio transport — PII and credential
+     * mutations stay on the local-trust path by design.
+     *
+     * **Consequence — `mode=create` is stdio-only.** `email` is
+     * required on create (see `getInputSchema`), and `email` is in
+     * this set, so every HTTP `create` is refused. This is intentional:
+     * provisioning a user (which always carries an email) is a
+     * local-operator action, not a remote-agent one. `update` works
+     * over HTTP for the non-refused fields (username, status flags,
+     * groups, custom fields); only the credential/PII/admin fields
+     * above are stdio-gated. See `docs/SECURITY.md`.
      *
      * @since 5.0.0
      */
