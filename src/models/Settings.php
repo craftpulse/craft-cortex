@@ -2,7 +2,10 @@
 
 namespace craftpulse\cortex\models;
 
+use Craft;
 use craft\base\Model;
+use DateInterval;
+use Throwable;
 
 /**
  * =========================================================================
@@ -315,10 +318,41 @@ class Settings extends Model
         $rules[] = [['execEnabled', 'execDryRunDefault', 'httpEnabled', 'dcrEnabled'], 'boolean'];
         $rules[] = [['allowedCommands', 'adminLevelCommands', 'userCustomFieldAllowlist', 'allowedOrigins'], 'each', 'rule' => ['string', 'min' => 1]];
         $rules[] = [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl'], 'string', 'min' => 2];
+        $rules[] = [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl'], 'validateDateInterval'];
         $rules[] = [['auditResponseExcerptBytes'], 'integer', 'min' => 1, 'max' => 65535];
         $rules[] = [['auditRetentionDays'], 'integer', 'min' => 1];
         $rules[] = [['rateLimitBurst'], 'integer', 'min' => 1, 'max' => 10000];
         $rules[] = [['rateLimitPerSecond'], 'integer', 'min' => 1, 'max' => 1000];
         return $rules;
+    }
+
+    /**
+     * Validate that an OAuth TTL attribute is a parseable ISO-8601
+     * duration. `Oauth::getAuthorizationServer()` feeds these values
+     * straight into `new DateInterval(...)`, which throws on a
+     * malformed string (e.g. `1h` instead of `PT1H`) — without this
+     * rule an operator typo in project config would surface as an
+     * opaque 500 on every `/oauth/token` and `/oauth/authorize` call
+     * instead of a clean settings-validation error.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function validateDateInterval(string $attribute): void
+    {
+        $value = $this->$attribute;
+        if (!is_string($value)) {
+            return;
+        }
+
+        try {
+            new DateInterval($value);
+        } catch (Throwable) {
+            $this->addError($attribute, Craft::t(
+                'cortex',
+                '“{value}” is not a valid ISO-8601 duration (e.g. PT1H, P30D).',
+                ['value' => $value],
+            ));
+        }
     }
 }

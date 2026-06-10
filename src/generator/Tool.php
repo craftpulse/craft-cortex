@@ -127,6 +127,13 @@ class Tool extends BaseGenerator
 `{$this->_toolName}` tool — TODO: describe what this tool does in one
 to three sentences. Answer "when would I call this?" — avoid
 implementation detail; describe the user-visible effect.
+
+Attributes: add `#[Title('Human Readable Name')]` for the display name
+shown to clients, and swap/extend the behavioural attributes below as
+the tool actually behaves — `#[IsDestructive]` if it mutates or deletes,
+`#[IsOpenWorld]` if it reaches outside this Craft install,
+`#[IsStdioOnly]` to forbid the HTTP transport. Defaults assume a
+read-only, idempotent, closed-world tool.
 =========================================================================
 
 @author Craftpulse
@@ -134,7 +141,9 @@ implementation detail; describe the user-visible effect.
 COMMENT);
 
         // Default attributes — most tools are read-only and idempotent.
-        // Adjust manually if the tool mutates state or has side effects.
+        // Adjust per the attribute guidance in the class docblock above
+        // if the tool mutates state, has side effects, or must be
+        // stdio-only.
         $class->addAttribute(IsReadOnly::class);
         $class->addAttribute(IsIdempotent::class);
 
@@ -163,8 +172,18 @@ BODY);
         $class->getMethod('execute')
             ->setComment("@inheritdoc\n\n@author Craftpulse\n@since  5.0.0")
             ->setBody(<<<'BODY'
-// TODO: implement.
-return [];
+// TODO: implement. Return a JSON-serialisable associative array — the
+// dispatcher wraps it in the MCP `content[]` envelope (and emits it as
+// `structuredContent` when you declare an `outputSchema()`). Throw a
+// `ToolException` for expected tool-level failures (bad input, missing
+// entity, permission denied); the dispatcher renders those as an
+// `isError: true` result the LLM can self-correct against. Let any
+// other exception propagate — it becomes a JSON-RPC internal error.
+// For long-running work, return a `\Generator` instead and yield
+// progress frames (see `StreamableToolInterface`).
+return [
+    'ok' => true,
+];
 BODY);
 
         $this->writePhpClass($namespace);
