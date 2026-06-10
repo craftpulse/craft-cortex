@@ -7,8 +7,10 @@
  *
  *   - No `eval()`, `exec()`, `shell_exec()`, `passthru()`, `popen()`,
  *     `proc_open()`, or backtick operator anywhere in `src/`. The only
- *     "eval" surface in cortex is `craft_exec`, which goes through
- *     Craft's `ExecController` not PHP's eval directly.
+ *     permitted `eval` site is `tools/dev/CraftExec.php` (`craft_exec`),
+ *     which calls PHP's `eval` directly — same approach as Craft's own
+ *     `ExecController` — behind six layered security gates, and is
+ *     exempted by name in the scan below.
  *
  *   - No `declare(strict_types=1)` in plugin source. Per project rules
  *     this is a Craft convention violation.
