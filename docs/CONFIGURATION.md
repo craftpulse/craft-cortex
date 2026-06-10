@@ -117,7 +117,7 @@ The endpoint supports three methods:
 
 - **`POST`** — single JSON-RPC message per request (or an SSE stream when the client sends `Accept: text/event-stream`). Headers required:
   - `Authorization: Bearer <token>` (missing/malformed → 401; invalid/revoked → 401).
-  - `MCP-Protocol-Version: 2025-06-18` (missing/wrong → 400).
+  - `MCP-Protocol-Version: 2025-11-25` or `2025-06-18` (missing → 400; an unsupported version → 400).
   - `Origin: …` (must match `allowedOrigins` when the list is non-empty → 403).
   - `Mcp-Session-Id: …` (required on every request except `initialize` → 400; unknown id → 404).
 - **`GET`** — reserved for SSE upgrade. Returns 405 today.

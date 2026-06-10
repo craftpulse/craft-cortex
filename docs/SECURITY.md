@@ -90,7 +90,7 @@ Expressions matching destructive patterns (`delete*`, `drop*`, `truncate*`, `Ele
 
 ### Gate 6 — Destructive annotation
 
-`craft_exec` ships with `#[IsDestructive]` per the MCP 2025-06-18 spec's tool annotation surface. Spec-compliant clients warn the user before the call goes through. This is a defence-in-depth gate — it relies on client cooperation, where gates 1-5 don't.
+`craft_exec` ships with `#[IsDestructive]` per the MCP spec's tool annotation surface. Spec-compliant clients warn the user before the call goes through. This is a defence-in-depth gate — it relies on client cooperation, where gates 1-5 don't.
 
 ## `craft_command` — allowlist model
 
