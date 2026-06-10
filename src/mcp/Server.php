@@ -213,9 +213,10 @@ class Server
     /**
      * @param string $transport `Server::TRANSPORT_STDIO` (default) or
      *                          `Server::TRANSPORT_HTTP`. Set per
-     *                          transport adapter — only the stdio
-     *                          adapter ships today; the HTTP adapter
-     *                          will land in a future release.
+     *                          transport adapter — the stdio adapter is
+     *                          `console/controllers/ServeController`,
+     *                          the HTTP adapter is
+     *                          `controllers/McpController`.
      *
      * @author Craftpulse
      * @since  5.0.0
