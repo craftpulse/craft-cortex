@@ -264,7 +264,7 @@ it('create mode throws when ownerType is not user', function() {
             $caught = $e;
         }
         expect($caught)->not->toBeNull();
-        expect($caught->getMessage())->toContain('Commerce');
+        expect($caught->getMessage())->toContain('commerce-customer');
         expect($caught->getMessage())->toContain('not supported');
     });
 });

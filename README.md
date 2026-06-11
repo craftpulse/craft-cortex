@@ -2,7 +2,7 @@
 
 Cortex is a [Model Context Protocol](https://modelcontextprotocol.io/) server that gives your AI assistant a direct line into your Craft 5 project. Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf — they all connect over a single stdio transport and immediately have read access to your content model, your content, and a bundled ~30,000-line corpus of authored Craft expertise. Stop pasting Craft docs into your chat window.
 
-The free tier ships **33 tools**, **10 prompts**, and **98 resources**. The upcoming Pro tier (Phase 2) adds an authenticated HTTP transport with content-write capabilities for non-developer operators — agencies hand it to their clients without handing over shell access.
+The free tier ships **33 tools**, **10 prompts**, and **98 resources**. The Pro tier adds an authenticated HTTP transport with content-write capabilities for non-developer operators — agencies hand it to their clients without handing over shell access.
 
 ## Requirements
 
@@ -179,7 +179,7 @@ The `initialize` handshake should succeed (`cortex 5.0.0`, protocol `2025-11-25`
 ## Roadmap
 
 - **Phase 1 — Free. Shipping.** 33 tools, 10 prompts, 98 resources, stdio transport, allowlist UI, full install toolkit (snippet printer + per-client auto-apply + auto-detect + interactive auto-apply across detected clients), MCP `outputSchema` / `structuredContent` dual-emit per MCP 2025-11-25 (negotiating 2025-06-18), docs generators, extension events for third-party tools / prompts / resources, full Pest + PHPStan level 8 + ECS green.
-- **Phase 2 — Pro.** Streamable HTTP transport with OAuth 2.1, per-user permission filtering on `tools/list` (architecture locked: static `shouldRegister()` + instance `filterFor($user)` + instance `inputSchemaFor($user)`), DB-backed audit log, 7 net-new write tools (`entry`, `category`, `tag`, `address`, `global_set`, `users`, `bulk_entries`), mode unlocks on Free tools (`drafts_and_revisions apply/discard`, `content_audit` fix modes, `import_export` import, `system_diagnostics manage_queue`), Pro-exclusive custom-skills element type, minimal CP UI for tokens / activity / connection.
+- **Phase 2 — Pro. Built.** Streamable HTTP transport with OAuth 2.1 + bearer tokens, per-user permission filtering on `tools/list` (static `shouldRegister()` + instance `filterFor($user)` + instance `inputSchemaFor($user)`), DB-backed audit log with CP Activity view, 7 net-new write tools (`entry`, `category`, `tag`, `address`, `global_set`, `users`, `bulk_entries`), mode unlocks on Free tools (`drafts_and_revisions apply/discard`, `content_audit` fix modes, `import_export` import, `system_diagnostics manage_queue`), Pro-exclusive custom-skills element type, edition enforcement at every Pro boundary, and CP tabs for tokens / allowlist / activity. The connection-reference and skill-authoring CP tabs land in a Pro point release.
 - **Phase 3 — Polish.** CP-side install wizard (GUI affordance on top of the Phase 1 console actions, not a re-implementation), formal real-LLM E2E harness, vectorised docs search complementary to the authored skills corpus, third-party tool registration battle-tested across the ecosystem, skill remote-fetch, OAuth Client ID Metadata Documents (CIMD — the registration mechanism the MCP spec now recommends over DCR), and the planned migration to the stateless MCP 2026-07-28 revision.
 
 ## Support

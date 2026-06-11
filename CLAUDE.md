@@ -15,9 +15,9 @@
 - **Handle:** `cortex`
 - **Namespace:** `craftpulse\cortex`
 - **Author:** Craftpulse
-- **Status:** Phase 1 (Free tier) feature-complete on `develop-v5`. Shipping: 33 tools, 8 prompts, 77 resources, stdio transport, project-config + DB allowlist, six `craft_exec` security gates, install command, full Pest + PHPStan + ECS green. Pre-Plugin-Store-submission; Phase 2 (Pro tier — HTTP transport, write tools, custom skills, CP UI) is on the roadmap.
+- **Status:** Free + Pro tiers feature-complete, pre-Plugin-Store-submission (release tag on hold). Free: 33 tools, 10 prompts, 98 resources, stdio transport, project-config + DB allowlist, six `craft_exec` security gates, install command. Pro (on the `gate-9-*` branch stack, PRs #2/#3 → `develop-v5`): Streamable HTTP transport with OAuth 2.1 + bearer tokens, 9 write tools, per-user tool filtering, audit log, custom-skill element type, CP tabs (Settings · Tokens · Allowlist · Activity), edition enforcement (403 gates), MCP spec 2025-11-25. Full Pest + PHPStan L8 + ECS green. The Connection and Skill-authoring CP tabs slipped to a Pro point release.
 
-Cortex is a Model Context Protocol server for Craft CMS. It exposes Craft internals to AI agents over dual transport (stdio for dev, Streamable HTTP for content ops). Editions: Free / Pro / Commerce. Locked architecture decisions live in this repo's auto-memory and the planning doc (see Paths below).
+Cortex is a Model Context Protocol server for Craft CMS. It exposes Craft internals to AI agents over dual transport (stdio for dev, Streamable HTTP for content ops). Editions: Free / Pro (Commerce support is planned as a separate plugin, not an edition). Locked architecture decisions live in this repo's auto-memory and the planning doc (see Paths below).
 
 ## General
 

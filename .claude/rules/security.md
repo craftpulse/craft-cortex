@@ -16,7 +16,7 @@
 - **`craft exec` is stdio-only.** Reject it at the HTTP transport layer regardless of caller permissions or token scope.
 - **No `Process`, `exec()`, `shell_exec()`, `passthru()`, backticks, or `popen()` anywhere.** Console commands dispatch through Craft's internal console runner.
 - **Command allowlist is enforced at the tool layer**, not at the prompt layer. A user disabling allowlist checks in the CP must not be possible without admin permissions.
-- **PII tools are Pro/Commerce only** — Free tier must not expose user PII, addresses, order data, or customer lookups.
+- **PII tools are Pro-only** — Free tier must not expose user PII, addresses, order data, or customer lookups.
 - **Bearer tokens for HTTP transport are bound to a Craft user.** Token revocation must invalidate all in-flight requests.
 - **Rate limit the HTTP transport** at the controller layer. stdio is single-process so it doesn't need it.
 - **Audit log every tool invocation over HTTP** — tool name, user, timestamp, arguments redacted of secrets.

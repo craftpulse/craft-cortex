@@ -127,7 +127,7 @@ Free tier:
 
 Pro tier (Phase 2):
 
-- PII tools (`users`, `addresses`, `orders`, customer lookups for Commerce) ship in Pro and require explicit per-user authorization.
+- PII tools (`users`, `address`) ship in Pro and require explicit per-user authorization. Commerce data (orders, customer lookups) is not exposed by Cortex; Commerce support is planned as a separate plugin.
 - Pro tools default to `#[IsStdioOnly(false)]` (HTTP-allowed) and add Craft permission checks via `shouldRegister()`. A user without `accessUsers` won't see the `users` tool in `tools/list`.
 
 Even on Pro, PII tools default to read-only with explicit per-call confirmation for any mutation. The same six-gate philosophy applies — destructive write tools require dry-run + dangerous handshake.
