@@ -360,4 +360,6 @@ PHPStan + ECS green, evidence archived under
 
 > Previous runs: [2026-06-10/11](smoke-evidence/2026-06-11-results.md)
 > (pre-submission run — found and fixed six CP/OAuth bugs plus the
-> edition-enforcement gap).
+> edition-enforcement gap);
+> [2026-06-11 Section E rerun](smoke-evidence/2026-06-11-section-e-rerun.md)
+> (edition enforcement re-confirmed against the packaging commit — GO).
