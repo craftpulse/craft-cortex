@@ -4,6 +4,7 @@ namespace craftpulse\cortex\controllers;
 
 use Craft;
 use craft\elements\User;
+use craft\web\View;
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\oauth\entities\UserEntity;
 use JsonException;
@@ -377,6 +378,14 @@ class OauthController extends AbstractOauthController
      * username, and a hidden form payload that POSTs back to this
      * action with the user's decision.
      *
+     * Rendered with `View::TEMPLATE_MODE_CP` explicitly — `/oauth/
+     * authorize` is a SITE request, and the `cortex/...` plugin
+     * template root only resolves in CP template mode (a site-mode
+     * render throws `TemplateLoaderException`; caught by the gate-9
+     * browser smoke).
+     *
+     * @throws \Throwable from template rendering.
+     *
      * @author Craftpulse
      * @since  5.0.0
      */
@@ -397,6 +406,7 @@ class OauthController extends AbstractOauthController
                 'username' => $user->username ?? $user->email,
                 'query' => $this->request->getQueryParams(),
             ],
+            View::TEMPLATE_MODE_CP,
         );
         return $this->response;
     }
