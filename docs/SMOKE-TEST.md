@@ -227,23 +227,23 @@ Call `tools/list` over HTTP and confirm the write tools appear (Pro). Call a rea
 
 | # | Case | Edition | Result | Console/Network clean? | Evidence (screenshot / response) | Notes |
 |---|---|---|---|---|---|---|
-| A1 | Nav + tabs | Free/Pro | | | | |
-| A2 | Settings save | Free/Pro | | | | |
-| A3 | Allowlist table+slideout | Free/Pro | | | | |
-| A4 | Tokens issue/revoke | Pro | | | | |
-| A5 | Activity table/filter/detail/redaction | Pro | | | | |
-| B1 | .well-known JSON (S256-only) | Pro | | | | |
-| B2 | Consent renders | Pro | | | | |
-| B3 | **Consent XSS escaped (no dialog)** | Pro | | | | |
-| C1 | initialize 2025-11-25 | Free/Pro | | | | |
-| C2 | list counts (33/10/98 · 42 Pro) | both | | | | |
-| C3 | tool calls + redaction + relation-stub | Free | | | | |
-| C4 | craft_exec gates | Free | | | | |
-| C5 | prompts/get + resources/read | Free | | | | |
-| D1 | initialize over HTTP + session | Pro | | | | |
-| D2 | version negotiation (echo / 400) | Pro | | | | |
-| D3 | auth gates (401) | Pro | | | | |
-| D4 | **craft_exec rejected over HTTP** | Pro | | | | |
-| D5 | write tools listed + audited | Pro | | | | |
+| A1 | Nav + tabs | Free/Pro | Pro: PASS · Free: **FAIL** | yes | `smoke-evidence/smoke-A1-pro-tabs.png` | Tab bar is static (`_cp/_layout.twig:32`) — **no edition gating anywhere**: on Free, Tokens/Activity/Connection tabs render, their pages 200, token issuance works, and `/cortex/mcp` serves a Free-issued token (200). Registry stays Free-gated (33 tools) so no data leak — but the Pro licensing boundary is open. Also: a fifth Connection tab exists on both editions (9.4 placeholder). |
+| A2 | Settings save | Free/Pro | PASS | yes | POST 302 → reload | `execDryRunDefault` round-tripped off→on, `project.yaml` reflected both writes. First save hit a stale "Complete the Update" interstitial (env artifact after CLI PC apply); second save clean. |
+| A3 | Allowlist table+slideout | Free/Pro | PASS (after fixes #1, #2) | yes (1 benign Garnish `aria-hidden` warn) | `smoke-A3-allowlist-tabledata-404.png` (before), `smoke-A3-allowlist-slideout.png`, `smoke-A3-allowlist-row-added.png` | Found broken: all CP AJAX 404'd (bug #1) and row callbacks threw (bug #2). After fixes: slideout opens, add `utils/*` live-updates table, remove works. Nit: delete-confirm shows literal `{name}`. |
+| A4 | Tokens issue/revoke | Pro | PASS (after fixes #1, #3) | yes | `smoke-A4-issue-slideout.png`, `smoke-A4-plaintext-reveal.png` (token since revoked) | User picker was dead (bug #3 — element-select init JS never shipped). After fix: issue → plaintext shown exactly once → row carries only `tokenPrefix` → not recoverable after reload → revoke immediate → revoked token gets 401 on the wire. |
+| A5 | Activity table/filter/detail/redaction | Pro | PASS (after fixes #5, #6) | yes | `smoke-A5-detail-slideout-redacted.png`, `smoke-A5-filtered-config.png` | Detail 500'd on truncated excerpt (bug #5); filters/sort silently ignored (bug #6 — no `criteria` option in VueAdminTable). After fixes: rows render with `tool / mode`, tool filter narrows server-side (6→3), durationMs sort server-side, detail shows redacted args/response — no credentials (db config shows `unixSocket: "<set>"`, no user/password keys). |
+| B1 | .well-known JSON (S256-only) | Pro | PASS | n/a (curl) | both JSON bodies captured | RFC 8414 + 9728 shapes; `code_challenge_methods_supported: ["S256"]` only; scopes read/write. |
+| B2 | Consent renders | Pro | PASS (after fix #4) | yes | `smoke-B2-consent.png` | First render threw `TemplateLoaderException` — site request, CP template path (bug #4). After `View::TEMPLATE_MODE_CP`: renders client name, scope `read` + description, Authorize/Deny, signed-in user. |
+| B3 | **Consent XSS escaped (no dialog)** | Pro | **PASS** | yes (console empty) | `smoke-B3-xss-escaped.png` | `<script>alert(1)</script>` client name renders as literal escaped text (`&lt;script&gt;` in DOM), 0 inline script tags, **no dialog fired**. Security guarantee #1 proven. |
+| C1 | initialize 2025-11-25 | Free/Pro | PASS | yes | `smoke-C1-inspector-connected.png` + raw stdio frame | Inspector (stdio via `docker exec`) connects; wire response `protocolVersion: "2025-11-25"`, `serverInfo: cortex 5.0.0`. Verified on both editions. |
+| C2 | list counts (33/10/98 · 42 Pro) | both | PASS | n/a | stdio `tools/prompts/resources` list | Pro: **42/10/98**, `entry`/`users`/`bulk_entries`/`skill` present. Free: **33/10/98**, all four absent; `craft_exec` present (stdio). Exact spec match. |
+| C3 | tool calls + redaction + relation-stub | Free | PASS | n/a | trimmed responses on file | `get_initial_context` (sites/sections/elementTypes/10 skillPrompts/exec posture/allowlist — note: no Cortex-edition field, doc expectation unverifiable as written); `entries` relation stub `{type:"relation",loaded:false}` under `fields`; count mode → `{count: 4868}`; `search_skills` ranked w/ snippet+`craft-skills://` URI+`source`; `sections`/`fields` list; `config mode=db` excludes credentials; bad arg → `isError:true` envelope, not protocol error. |
+| C4 | craft_exec gates | Free | PASS | n/a | three response shapes captured | Dry-run default (`evaluated:false` + hint); `confirm:true` → `result: 2`; destructive expr + `confirm` → `blocked:true`, demands `dangerous:true`. |
+| C5 | prompts/get + resources/read | Free | PASS | n/a | first 200 chars verified | `craftcms_extending` returns verbatim SKILL.md; `craft-skills://craftcms/elements` returns the authored reference doc. |
+| D1 | initialize over HTTP + session | Pro | PASS | n/a | 200 + `mcp-session-id` header | Echo `2025-11-25`, session id minted. |
+| D2 | version negotiation (echo / 400) | Pro | PASS | n/a | both outcomes captured | `2025-06-18` echoed (200); `2024-01-01` → 400 `Unsupported … supports: 2025-11-25, 2025-06-18`. |
+| D3 | auth gates (401) | Pro | PASS | n/a | headers captured | No header → 401 + `WWW-Authenticate: Bearer realm="cortex", resource_metadata=…`; bad token → 401; `Origin: https://evil.test` warn-allowed (devMode + empty allowlist, as documented). |
+| D4 | **craft_exec rejected over HTTP** | Pro | **PASS** | n/a | JSON-RPC error frame | `{"code":-32601,"message":"Tool 'craft_exec' is stdio-only and cannot be invoked over the HTTP transport."}`. Security guarantee #2 proven. |
+| D5 | write tools listed + audited | Pro | PASS (1 observation) | n/a | tools/list + Activity rows | 42 tools over HTTP incl. all nine write tools; `get_initial_context` 200; audit rows landed with user/clientName/redacted args (verified in A5). Observation: `craft_exec` is *advertised* in HTTP `tools/list` (call correctly rejected) — consider transport-filtering the list. |
 
-**Go / no-go for submission:** ____ (all cases PASS, no unredacted secrets, B3 + D4 confirmed = the two security guarantees most worth proving by hand). Then: restore edition to Free, complete the packaging punch-list (LICENSE, `src/icon.svg`, `extra.changelogUrl`, release tag), tag, submit.
+**Go / no-go for submission:** **NO-GO** until the Free-edition gating gap (A1-Free) is resolved — on Free, the Tokens/Activity/Connection CP surfaces, token issuance, and the HTTP transport itself are all reachable with no edition checks (tab map `_cp/_layout.twig`, `SettingsController`, `McpController`, well-known/OAuth endpoints). Everything else passed after the six in-session fixes (routes, callback composites, slideout JS delta, consent template mode, truncated-excerpt 500, filter params), with both hand-proven security guarantees (B3, D4) green and Pest 1128/0, PHPStan L8, ECS clean. Edition restored to Free. Then: packaging punch-list (LICENSE, `src/icon.svg`, `extra.changelogUrl`, release tag), tag, submit.
