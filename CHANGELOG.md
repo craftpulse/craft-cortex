@@ -213,7 +213,7 @@ All notable changes to Cortex are documented here. Format follows
   a later interface break.
 - No auth on the endpoint in 7.1 — auth lands in 7.2 (bearer tokens).
 
-## [5.0.0] — 2026-05-14
+## [5.0.0] - 2026-05-14
 
 ### Initial release
 
