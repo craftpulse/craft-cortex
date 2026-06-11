@@ -141,7 +141,7 @@ class Address extends AbstractTool
             'resolves to editUsers on the owner. countryCode is validated at execute-time ' .
             'against the ISO 3166-1 alpha-2 list — bad codes surface in the validation ' .
             'envelope (errors.countryCode), not as a thrown error, so the LLM iterates. ' .
-            'Owner type: only `user` supported in Phase 1 (Commerce owner types deferred). ' .
+            'Owner type: only `user` is supported — other owner types are rejected. ' .
             'Address fields (countryCode, addressLine1, locality, etc.) pass through to ' .
             'Craft\'s save validation, which honours the per-country required-field map. ' .
             'Returns the serialised address on success; on validation failure returns ' .
@@ -173,7 +173,7 @@ class Address extends AbstractTool
             'ownerId' => Schema::integer()->description('Owner id. Required for create + list. On update, ownership changes are rejected.'),
             'ownerType' => Schema::string()
                 ->default(self::OWNER_TYPE_USER)
-                ->description('Owner element type. Phase 1 supports `user` only; Commerce owner types are deferred. Defaults to `user`.'),
+                ->description('Owner element type. Only `user` is supported; other owner types are rejected. Defaults to `user`.'),
 
             // Site targeting.
             'siteId' => Schema::integer()->description('Target site id. Defaults to the primary site.'),
@@ -701,8 +701,7 @@ class Address extends AbstractTool
         }
 
         throw new ToolException(sprintf(
-            'address: ownerType `%s` is not supported in Phase 1 — Commerce owner types ' .
-                'are deferred to the Commerce edition. Only `user` is currently supported.',
+            'address: ownerType `%s` is not supported. Only `user` is currently supported.',
             $ownerType,
         ));
     }
