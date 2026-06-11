@@ -634,6 +634,12 @@ class Server
      * resolves to `null` and the call goes to `asListPayloadFor(null)`,
      * which by locked invariant equals the legacy `asListPayload()`.
      *
+     * Off-stdio, stdio-only tools (`craft_exec`) are dropped from the
+     * list as well (Gate 9.7): advertising a tool every call to which
+     * is hard-rejected just burns the LLM's tool-selection budget. The
+     * `tools/call` reject in `_resolveToolCall()` remains the security
+     * boundary — this filter is UX, defense stays in depth.
+     *
      * @return array<string,mixed>
      *
      * @author Craftpulse
@@ -641,8 +647,21 @@ class Server
      */
     private function _toolsList(): array
     {
+        $tools = Cortex::getInstance()->tools->asListPayloadFor($this->_resolveUser());
+
+        if ($this->_transport !== self::TRANSPORT_STDIO) {
+            $registry = Cortex::getInstance()->tools;
+            $tools = array_values(array_filter(
+                $tools,
+                static function(array $entry) use ($registry): bool {
+                    $tool = $registry->getByName((string) ($entry['name'] ?? ''));
+                    return $tool === null || !AttributeReader::isStdioOnly($tool);
+                },
+            ));
+        }
+
         return [
-            'tools' => Cortex::getInstance()->tools->asListPayloadFor($this->_resolveUser()),
+            'tools' => $tools,
         ];
     }
 

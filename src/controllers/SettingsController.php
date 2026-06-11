@@ -16,6 +16,7 @@ use craftpulse\cortex\records\RuntimeOverride;
 use craftpulse\cortex\tools\support\InvocationLogger;
 use yii\base\Exception;
 use yii\base\InvalidArgumentException;
+use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
@@ -42,6 +43,12 @@ use yii\web\Response;
  *     pre-existing `actionAddOverride` /
  *     `actionRemoveOverride`)                         — `requirePostRequest`
  *                                                       + `requireAdmin(requireAdminChanges: true)`.
+ *
+ * Edition posture per Gate 9.7: Tokens / Activity / Connection are Pro
+ * surfaces — every action behind those tabs opens with `_requirePro()`
+ * (403 on Free) BEFORE its permission gates. Settings + Allowlist stay
+ * Free. The tab map in `_cp/_layout.twig` hides the Pro tabs on Free,
+ * but these gates are the enforcement; the tabs are UX.
  * =========================================================================
  *
  * @author Craftpulse
@@ -103,6 +110,8 @@ class SettingsController extends Controller
      */
     public function actionTokens(): Response
     {
+        $this->_requirePro();
+
         $this->requireAdmin(false);
 
         return $this->renderTemplate('cortex/_cp/tokens', [
@@ -146,6 +155,8 @@ class SettingsController extends Controller
      */
     public function actionTokensTableData(): Response
     {
+        $this->_requirePro();
+
         $this->requireAcceptsJson();
         $this->requireAdmin(false);
 
@@ -225,6 +236,8 @@ class SettingsController extends Controller
      */
     public function actionTokenIssueSlideout(): Response
     {
+        $this->_requirePro();
+
         $this->requireAdmin(false);
 
         $view = Craft::$app->getView();
@@ -269,6 +282,8 @@ class SettingsController extends Controller
      */
     public function actionIssueToken(): ?Response
     {
+        $this->_requirePro();
+
         $this->requirePostRequest();
         $this->requireAcceptsJson();
         $this->requireAdmin(requireAdminChanges: true);
@@ -334,6 +349,8 @@ class SettingsController extends Controller
      */
     public function actionRevokeToken(): ?Response
     {
+        $this->_requirePro();
+
         $this->requirePostRequest();
         $this->requireAcceptsJson();
         $this->requireAdmin(requireAdminChanges: true);
@@ -519,6 +536,8 @@ class SettingsController extends Controller
      */
     public function actionActivity(): Response
     {
+        $this->_requirePro();
+
         $this->requirePermission(Cortex::PERMISSION_VIEW_ACTIVITY);
 
         $identity = Craft::$app->getUser()->getIdentity();
@@ -572,6 +591,8 @@ class SettingsController extends Controller
      */
     public function actionActivityTableData(): Response
     {
+        $this->_requirePro();
+
         $this->requireAcceptsJson();
         $this->requirePermission(Cortex::PERMISSION_VIEW_ACTIVITY);
 
@@ -692,6 +713,8 @@ class SettingsController extends Controller
      */
     public function actionActivityRow(): Response
     {
+        $this->_requirePro();
+
         $this->requireAcceptsJson();
         $this->requirePermission(Cortex::PERMISSION_VIEW_ACTIVITY);
 
@@ -753,6 +776,8 @@ class SettingsController extends Controller
      */
     public function actionConnection(): Response
     {
+        $this->_requirePro();
+
         $this->requireAdmin(false);
 
         return $this->renderTemplate('cortex/_cp/connection');
@@ -1057,6 +1082,29 @@ class SettingsController extends Controller
         }
         $mode = $decoded['mode'] ?? null;
         return is_string($mode) && $mode !== '' ? $mode : null;
+    }
+
+    /**
+     * Throw unless the install is Pro. Tokens / Activity / Connection
+     * are Pro surfaces (PLANNING.md §4 — they exist to operate the
+     * Pro-only HTTP transport); the registry's `shouldRegister()` gate
+     * cannot help here because CP actions never pass through the tool
+     * dispatcher. Called as the FIRST statement of every Pro action,
+     * ahead of the permission gates.
+     *
+     * 403, not 404 — the fail-closed 404 on `actionActivityRow` guards
+     * per-row enumeration; this is a tier boundary and should say so.
+     *
+     * @throws ForbiddenHttpException on Free installs.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _requirePro(): void
+    {
+        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+            throw new ForbiddenHttpException('This feature requires the Cortex Pro edition.');
+        }
     }
 
     /**

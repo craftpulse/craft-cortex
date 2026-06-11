@@ -1,7 +1,9 @@
 # Gate 9.7 — Edition gating of Pro surfaces
 
-> Status: PLANNED (numbering provisional — slots after the shipped 9.5 Tokens /
-> 9.3 Activity work; 9.4 Connection and 9.6 Skill-authoring remain slipped).
+> Status: SHIPPED 2026-06-11 (all six steps, Pest 1149/0). Re-verified on
+> the wire in both editions — see the updated `docs/SMOKE-TEST.md` A1/D5
+> rows and the GO verdict. 9.4 Connection and 9.6 Skill-authoring remain
+> slipped.
 >
 > Source: gate-9 browser smoke (2026-06-10/11), `docs/SMOKE-TEST.md` case
 > A1-Free — the submission blocker.

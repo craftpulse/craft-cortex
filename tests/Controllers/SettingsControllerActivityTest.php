@@ -180,6 +180,16 @@ beforeEach(function() {
     Craft::$app->getDb()->createCommand()->delete(Table::INVOCATIONS)->execute();
     // Leave whatever identity a prior test set in a known state.
     Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
+
+    // The Activity tab is a Pro surface (Gate 9.7) — pin Pro for the
+    // file so `_requirePro()` doesn't 403 every case; the dedicated
+    // Free-edition test flips it back inline.
+    $this->originalEdition = Cortex::getInstance()->edition;
+    Cortex::getInstance()->edition = Cortex::EDITION_PRO;
+});
+
+afterEach(function() {
+    Cortex::getInstance()->edition = $this->originalEdition;
 });
 
 afterAll(function() {
@@ -195,6 +205,32 @@ it('declares the Activity endpoints', function() {
     foreach (['actionActivity', 'actionActivityTableData', 'actionActivityRow'] as $method) {
         expect($rc->hasMethod($method))->toBeTrue("missing {$method}");
     }
+});
+
+it('every Activity action is Pro-gated — 403 on Free (Gate 9.7)', function(string $method, array $params) {
+    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+
+    $controller = new _CortexActivityHarness('settings', Cortex::getInstance());
+    $controller->withParams($params);
+
+    // `_requirePro()` is private, so the harness's permission no-ops
+    // cannot accidentally bypass it — exactly the point.
+    expect(fn() => $controller->{$method}())
+        ->toThrow(\yii\web\ForbiddenHttpException::class);
+})->with([
+    'activity view' => ['actionActivity', []],
+    'table data' => ['actionActivityTableData', []],
+    'row detail' => ['actionActivityRow', ['id' => 1]],
+]);
+
+it('actionConnection is Pro-gated — 403 on Free (Gate 9.7)', function() {
+    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+
+    $controller = new _CortexActivityHarness('settings', Cortex::getInstance());
+    $controller->withParams([]);
+
+    expect(fn() => $controller->actionConnection())
+        ->toThrow(\yii\web\ForbiddenHttpException::class);
 });
 
 it('the activity detail slideout partial compiles and renders the redacted columns', function() {

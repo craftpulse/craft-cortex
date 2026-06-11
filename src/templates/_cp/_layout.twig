@@ -29,13 +29,26 @@
     { label: 'Plugins'|t('app'), url: url('settings/plugins') },
 ] %}
 
-{% set tabs = {
-    settings: { label: 'Settings'|t('cortex'), url: url('settings/plugins/cortex') },
-    tokens: { label: 'Tokens'|t('cortex'), url: url('cortex/tokens') },
-    allowlist: { label: 'Allowlist'|t('cortex'), url: url('cortex/allowlist') },
-    activity: { label: 'Activity'|t('cortex'), url: url('cortex/activity') },
-    connection: { label: 'Connection'|t('cortex'), url: url('cortex/connection') },
-} %}
+{# Tokens / Activity / Connection are Pro surfaces (Gate 9.7) — hidden
+   on Free. This is presentation only: the SettingsController actions
+   behind those tabs each open with `_requirePro()` (403 on Free), so a
+   hand-typed URL gets the same answer the missing tab implies. #}
+{% set isPro = craft.app.plugins.getPlugin('cortex').is('pro') %}
+
+{% if isPro %}
+    {% set tabs = {
+        settings: { label: 'Settings'|t('cortex'), url: url('settings/plugins/cortex') },
+        tokens: { label: 'Tokens'|t('cortex'), url: url('cortex/tokens') },
+        allowlist: { label: 'Allowlist'|t('cortex'), url: url('cortex/allowlist') },
+        activity: { label: 'Activity'|t('cortex'), url: url('cortex/activity') },
+        connection: { label: 'Connection'|t('cortex'), url: url('cortex/connection') },
+    } %}
+{% else %}
+    {% set tabs = {
+        settings: { label: 'Settings'|t('cortex'), url: url('settings/plugins/cortex') },
+        allowlist: { label: 'Allowlist'|t('cortex'), url: url('cortex/allowlist') },
+    } %}
+{% endif %}
 
 {% block content %}
     {# Default content block — every concrete tab template overrides this. #}
