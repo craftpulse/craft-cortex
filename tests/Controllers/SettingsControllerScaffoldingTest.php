@@ -171,6 +171,24 @@ it('_cp/_layout declares all five tab entries', function() {
     }
 });
 
+it('_cp/_layout gates the Pro tabs behind the edition (Gate 9.7)', function() {
+    // Presentation-side mirror of the `_requirePro()` action gates:
+    // the tab map must branch on `is('pro')`, and the Free branch must
+    // carry exactly Settings + Allowlist — no tokens/activity/
+    // connection URLs outside the Pro branch.
+    $contents = (string) file_get_contents(__DIR__ . '/../../src/templates/_cp/_layout.twig');
+    expect($contents)->toContain(".is('pro')");
+
+    // The Free branch is the `{% else %}` block — extract it and prove
+    // it carries no Pro tab keys.
+    expect(preg_match('/\{%\s*else\s*%\}(.*?)\{%\s*endif\s*%\}/s', $contents, $m))->toBe(1);
+    expect($m[1])->toContain('settings:')
+        ->toContain('allowlist:')
+        ->not->toContain('tokens:')
+        ->not->toContain('activity:')
+        ->not->toContain('connection:');
+});
+
 // Locks the locale-undefined bug found in the 9.1 manual smoke. The
 // `|date` filter's third arg is a locale; passing the bare `locale`
 // identifier resolves it as a Twig variable, which is not in scope on
@@ -485,6 +503,43 @@ it('allowlist tab template instantiates a Craft.VueAdminTable', function() {
 // -----------------------------------------------------------------------------
 // 9.5 — Tokens endpoints
 // -----------------------------------------------------------------------------
+
+// -----------------------------------------------------------------------------
+// 9.7 — edition gating invariant
+// -----------------------------------------------------------------------------
+
+it('every Pro action opens with the _requirePro() edition gate', function() {
+    // Tokens / Activity / Connection are Pro surfaces (Gate 9.7). The
+    // gate must be the FIRST statement — ahead of the permission
+    // checks — so a Free install never reaches admin/permission logic
+    // for a tier it does not own.
+    $proActions = [
+        'actionTokens',
+        'actionTokensTableData',
+        'actionTokenIssueSlideout',
+        'actionIssueToken',
+        'actionRevokeToken',
+        'actionActivity',
+        'actionActivityTableData',
+        'actionActivityRow',
+        'actionConnection',
+    ];
+
+    foreach ($proActions as $method) {
+        $body = _cortex_controller_method_body($method);
+        expect($body)->toMatch(
+            '/\A\s*\{\s*\$this->_requirePro\(\);/',
+            "{$method} must open with \$this->_requirePro()",
+        );
+    }
+});
+
+it('Free-tier actions carry no edition gate', function() {
+    foreach (['actionIndex', 'actionSave', 'actionAllowlist', 'actionAllowlistTableData', 'actionAllowlistOverrideSlideout', 'actionAddOverride', 'actionRemoveOverride'] as $method) {
+        $body = _cortex_controller_method_body($method);
+        expect($body)->not->toContain('_requirePro', "{$method} must stay Free");
+    }
+});
 
 it('declares the Tokens data + slideout + mutation actions', function() {
     $rc = new ReflectionClass(SettingsController::class);

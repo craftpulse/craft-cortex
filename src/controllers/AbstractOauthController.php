@@ -21,6 +21,12 @@ use yii\web\Response;
  * Unavailable before any DB work, DCR insert, or token issuance can
  * run — mirroring `McpController::beforeAction()`'s Gate 1.
  *
+ * Behind the kill switch sits the Pro edition gate (Gate 9.7): OAuth
+ * and discovery only exist to serve the Streamable HTTP transport,
+ * which is Pro-only (PLANNING.md §4 — Free ships stdio only). On a
+ * Free install every action returns 403 with an edition-naming body,
+ * mirroring `McpController::beforeAction()`'s Gate 2.
+ *
  * The check fires in `beforeAction()` ahead of `parent::beforeAction()`
  * so the 503 short-circuits before Craft's standard pipeline (CSRF
  * exemption, `_enforceAllowAnonymous`) even looks at the request.
@@ -50,11 +56,12 @@ abstract class AbstractOauthController extends Controller
     /**
      * @inheritdoc
      *
-     * Runs the `httpEnabled` kill switch, then the IP-keyed throttle
-     * for the actions named by `_throttledActionIds()`, before
-     * delegating to Craft's standard pipeline. Returns false (with a
-     * 503 or 429 populated on the response) when a gate trips;
-     * otherwise hands off to `parent::beforeAction()`.
+     * Runs the `httpEnabled` kill switch, then the Pro edition gate,
+     * then the IP-keyed throttle for the actions named by
+     * `_throttledActionIds()`, before delegating to Craft's standard
+     * pipeline. Returns false (with a 503, 403, or 429 populated on
+     * the response) when a gate trips; otherwise hands off to
+     * `parent::beforeAction()`.
      *
      * @throws \yii\web\BadRequestHttpException From `parent::beforeAction()`.
      *
@@ -65,6 +72,11 @@ abstract class AbstractOauthController extends Controller
     {
         if (!Cortex::getInstance()->getSettings()->httpEnabled) {
             $this->_httpDisabled();
+            return false;
+        }
+
+        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+            $this->_proRequired();
             return false;
         }
 
@@ -161,6 +173,25 @@ abstract class AbstractOauthController extends Controller
         $this->response->setStatusCode(503);
         $this->response->data = [
             'error' => 'HTTP transport is disabled. Set Settings::$httpEnabled = true to enable.',
+        ];
+        return $this->response;
+    }
+
+    /**
+     * Populate the shared 403 response used on Free installs. OAuth and
+     * discovery serve only the Pro-tier HTTP transport — 403, not 503,
+     * because the edition is a durable licensing state, not a config
+     * switch. Mirrors `McpController::beforeAction()`'s Gate 2.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _proRequired(): Response
+    {
+        $this->response->format = Response::FORMAT_JSON;
+        $this->response->setStatusCode(403);
+        $this->response->data = [
+            'error' => 'The HTTP transport requires the Cortex Pro edition.',
         ];
         return $this->response;
     }

@@ -83,9 +83,15 @@ beforeEach(function() {
     // `beforeAction()`; the kill-switch tests drive `beforeAction()`
     // explicitly.
     $settings->httpEnabled = true;
+
+    // Discovery serves the Pro-only HTTP transport (Gate 9.7) — pin
+    // Pro for the file; the Free-edition test flips it inline.
+    $this->originalEdition = Cortex::getInstance()->edition;
+    Cortex::getInstance()->edition = Cortex::EDITION_PRO;
 });
 
 afterEach(function() {
+    Cortex::getInstance()->edition = $this->originalEdition;
     Cortex::getInstance()->getSettings()->httpEnabled = $this->originalHttpEnabled;
 });
 
@@ -219,4 +225,21 @@ it('does not fire the 503 gate in beforeAction when httpEnabled is true', functi
     $controller->runBeforeAction();
 
     expect($controller->response->statusCode)->not->toBe(503);
+});
+
+// -----------------------------------------------------------------------------
+// Pro edition gate (Gate 9.7) — discovery returns 403 on Free
+// -----------------------------------------------------------------------------
+
+it('returns 403 from beforeAction on a Free install', function() {
+    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+
+    $controller = new _CortexWellKnownHarness('well-known', Cortex::getInstance());
+    $controller->response = new Response();
+    $proceeded = $controller->runBeforeAction();
+
+    expect($proceeded)->toBeFalse();
+    expect($controller->response->statusCode)->toBe(403);
+    expect($controller->response->data)
+        ->toHaveKey('error', 'The HTTP transport requires the Cortex Pro edition.');
 });

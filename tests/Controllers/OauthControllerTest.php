@@ -231,9 +231,15 @@ beforeEach(function() {
     // that exercise the flow; the kill-switch tests flip it off
     // explicitly and drive `beforeAction()` directly.
     $settings->httpEnabled = true;
+
+    // OAuth serves the Pro-only HTTP transport (Gate 9.7) — pin Pro
+    // for the file; the dedicated Free-edition test flips it inline.
+    $this->originalEdition = Cortex::getInstance()->edition;
+    Cortex::getInstance()->edition = Cortex::EDITION_PRO;
 });
 
 afterEach(function() {
+    Cortex::getInstance()->edition = $this->originalEdition;
     Cortex::getInstance()->getSettings()->httpEnabled = $this->originalHttpEnabled;
     OauthClientRecord::deleteAll(['like', 'clientName', '_test_/%', false]);
     OauthCodeRecord::deleteAll(['like', 'clientId', '%', false]);
@@ -711,6 +717,22 @@ it('does not fire the 503 gate in beforeAction when httpEnabled is true', functi
     // owns whatever status follows.
     expect($controller->response->statusCode)->not->toBe(503);
 });
+
+// -----------------------------------------------------------------------------
+// Pro edition gate (Gate 9.7) — every OAuth action returns 403 on Free
+// -----------------------------------------------------------------------------
+
+it('returns 403 from beforeAction on a Free install', function(string $method, string $url) {
+    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+
+    $controller = _cortex_oauth_request(method: $method, url: $url);
+    $proceeded = $controller->runBeforeAction();
+
+    expect($proceeded)->toBeFalse();
+    expect($controller->response->statusCode)->toBe(403);
+    expect($controller->response->data)
+        ->toHaveKey('error', 'The HTTP transport requires the Cortex Pro edition.');
+})->with('oauth endpoints');
 
 // -----------------------------------------------------------------------------
 // IP throttle — anonymous /oauth/register, /token, /revoke are 429'd

@@ -218,6 +218,13 @@ beforeEach(function() {
     $settings->httpEnabled = true;
     $settings->allowedOrigins = [];
 
+    // The HTTP transport is Pro-only (Gate 9.7) — pin Pro for the
+    // file so the edition gate doesn't 403 every case; the dedicated
+    // Free-edition test flips it back inline. Mirrors the
+    // `cortex_with_edition()` mechanics (plain property, no PC write).
+    $this->originalEdition = Cortex::getInstance()->edition;
+    Cortex::getInstance()->edition = Cortex::EDITION_PRO;
+
     // Auth scaffolding — issue a fresh bearer token bound to the
     // playground's admin user for the majority of tests. Tests that
     // exercise the no-auth / bad-auth paths swap the header out.
@@ -238,6 +245,7 @@ beforeEach(function() {
 });
 
 afterEach(function() {
+    Cortex::getInstance()->edition = $this->originalEdition;
     $settings = Cortex::getInstance()->getSettings();
     $settings->httpEnabled = $this->originalHttpEnabled;
     $settings->allowedOrigins = $this->originalAllowedOrigins;
@@ -264,6 +272,37 @@ afterEach(function() {
 // -----------------------------------------------------------------------------
 
 it('returns 503 when Settings::$httpEnabled is false', function() {
+    Cortex::getInstance()->getSettings()->httpEnabled = false;
+
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $this->bearerHeader,
+    ]);
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(503);
+});
+
+// -----------------------------------------------------------------------------
+// Pro edition gate (Gate 9.7) — the HTTP transport does not exist on Free
+// -----------------------------------------------------------------------------
+
+it('returns 403 on a Free install even with a valid bearer', function() {
+    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $this->bearerHeader,
+    ]);
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(403);
+    expect($response->data)->toBeArray()
+        ->toHaveKey('error', 'The HTTP transport requires the Cortex Pro edition.');
+});
+
+it('the kill switch outranks the edition gate (503 wins on Free with httpEnabled off)', function() {
+    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
     Cortex::getInstance()->getSettings()->httpEnabled = false;
 
     $controller = _cortex_mcp_harness('POST', [

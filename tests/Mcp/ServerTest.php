@@ -411,6 +411,28 @@ it('rejects a stdio-only tool when dispatched on the HTTP transport', function()
     expect($response['error']['message'])->toContain('craft_exec');
 });
 
+it('omits stdio-only tools from tools/list on the HTTP transport (Gate 9.7)', function() {
+    // Advertising a tool every call to which is hard-rejected just
+    // burns the LLM's tool-selection budget. The list filter is UX;
+    // the tools/call reject above stays the security boundary.
+    $httpServer = new Server(Server::TRANSPORT_HTTP);
+
+    $httpNames = array_column(
+        $httpServer->dispatch(['jsonrpc' => '2.0', 'id' => 10, 'method' => 'tools/list'])['result']['tools'],
+        'name',
+    );
+    $stdioNames = array_column(
+        $this->server->dispatch(['jsonrpc' => '2.0', 'id' => 11, 'method' => 'tools/list'])['result']['tools'],
+        'name',
+    );
+
+    expect($httpNames)->not->toContain('craft_exec');
+    expect($stdioNames)->toContain('craft_exec');
+    // craft_exec is the only stdio-only tool — the lists differ by
+    // exactly that entry.
+    expect(count($stdioNames) - count($httpNames))->toBe(1);
+});
+
 it('does not reject stdio-only tools on the stdio transport', function() {
     // Same call as above, but on the stdio server. The tool's dry-run
     // default will short-circuit before evaluating, so the response is

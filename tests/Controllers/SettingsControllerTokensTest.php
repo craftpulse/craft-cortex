@@ -147,6 +147,16 @@ beforeEach(function() {
         ->createCommand()
         ->delete(Table::TOKENS)
         ->execute();
+
+    // The Tokens tab is a Pro surface (Gate 9.7) — pin Pro for the
+    // file so `_requirePro()` doesn't 403 every case; the dedicated
+    // Free-edition test flips it back inline.
+    $this->originalEdition = Cortex::getInstance()->edition;
+    Cortex::getInstance()->edition = Cortex::EDITION_PRO;
+});
+
+afterEach(function() {
+    Cortex::getInstance()->edition = $this->originalEdition;
 });
 
 afterAll(function() {
@@ -166,6 +176,24 @@ it('declares the Tokens endpoints', function() {
         expect($rc->hasMethod($method))->toBeTrue("missing {$method}");
     }
 });
+
+it('every Tokens action is Pro-gated — 403 on Free (Gate 9.7)', function(string $method, array $params) {
+    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+
+    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller->withParams($params);
+
+    // `_requirePro()` is private, so the harness's `requireAdmin`
+    // no-op cannot accidentally bypass it — exactly the point.
+    expect(fn() => $controller->{$method}())
+        ->toThrow(\yii\web\ForbiddenHttpException::class);
+})->with([
+    'tokens view' => ['actionTokens', []],
+    'table data' => ['actionTokensTableData', []],
+    'issue slideout' => ['actionTokenIssueSlideout', []],
+    'issue' => ['actionIssueToken', ['userId' => 1]],
+    'revoke' => ['actionRevokeToken', ['id' => 1]],
+]);
 
 it('actionTokenIssueSlideout returns {html, headHtml, bodyHtml} with the view JS deltas', function() {
     // The full render cannot be driven through the Pest harness — the
