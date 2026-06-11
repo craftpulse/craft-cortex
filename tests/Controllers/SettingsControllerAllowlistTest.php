@@ -16,8 +16,11 @@
  * (architecture invariant — every action body opens with the gate) and
  * the route-permission matrix lives there too. This file focuses on
  * the data shape contract: the row tuple
- * `[id, pattern, note, expiresAt, createdBy, dateCreated, isExpired]`
- * is architecture-invariant; drift breaks the table silently.
+ * `[id, pattern: {pattern, isExpired}, note, expiresAt: {value, isExpired},
+ * createdBy, dateCreated]` is architecture-invariant; drift breaks the
+ * table silently. The `pattern`/`expiresAt` cells are composites because
+ * VueAdminTable column callbacks receive only the cell value, never the
+ * row.
  *
  * Tests bypass HTTP plumbing via the `_CortexAllowlistHarness` subclass.
  * Real CP smoke lives in the gate-9.2 manual verification step.
@@ -202,8 +205,9 @@ it('actionAllowlistTableData data[0] keys equal the locked tuple exactly', funct
         'expiresAt',
         'createdBy',
         'dateCreated',
-        'isExpired',
     ]);
+    expect(array_keys($row['pattern']))->toBe(['pattern', 'isExpired']);
+    expect(array_keys($row['expiresAt']))->toBe(['value', 'isExpired']);
 });
 
 it('actionAllowlistTableData marks expired rows with isExpired=true', function() {
@@ -221,8 +225,9 @@ it('actionAllowlistTableData marks expired rows with isExpired=true', function()
 
     expect($response->data['data'])->toBeArray()->not->toBeEmpty();
     $row = $response->data['data'][0];
-    expect($row['pattern'])->toBe('expired/*');
-    expect($row['isExpired'])->toBeTrue();
+    expect($row['pattern']['pattern'])->toBe('expired/*');
+    expect($row['pattern']['isExpired'])->toBeTrue();
+    expect($row['expiresAt']['isExpired'])->toBeTrue();
 });
 
 it('actionAllowlistTableData handles a never-expiring override (expiresAt null)', function() {
@@ -236,8 +241,8 @@ it('actionAllowlistTableData handles a never-expiring override (expiresAt null)'
     $response = $controller->actionAllowlistTableData();
 
     $row = $response->data['data'][0];
-    expect($row['expiresAt'])->toBeNull();
-    expect($row['isExpired'])->toBeFalse();
+    expect($row['expiresAt']['value'])->toBeNull();
+    expect($row['expiresAt']['isExpired'])->toBeFalse();
 });
 
 it('actionAllowlistTableData search filters by pattern substring', function() {
@@ -250,7 +255,7 @@ it('actionAllowlistTableData search filters by pattern substring', function() {
     $response = $controller->actionAllowlistTableData();
 
     expect($response->data['data'])->toHaveCount(1);
-    expect($response->data['data'][0]['pattern'])->toBe('mailer/test');
+    expect($response->data['data'][0]['pattern']['pattern'])->toBe('mailer/test');
 });
 
 it('actionAllowlistTableData sort dateCreated DESC reverses default order', function() {
@@ -275,8 +280,8 @@ it('actionAllowlistTableData sort dateCreated DESC reverses default order', func
     $controller->withParams(['sort.0.field' => 'dateCreated', 'sort.0.direction' => 'desc']);
     $response = $controller->actionAllowlistTableData();
 
-    expect($response->data['data'][0]['pattern'])->toBe('second/*');
-    expect($response->data['data'][1]['pattern'])->toBe('first/*');
+    expect($response->data['data'][0]['pattern']['pattern'])->toBe('second/*');
+    expect($response->data['data'][1]['pattern']['pattern'])->toBe('first/*');
 });
 
 it('actionAllowlistTableData pagination respects per_page', function() {
@@ -336,11 +341,10 @@ it('actionAddOverride JSON happy path returns the serialised row', function() {
         'expiresAt',
         'createdBy',
         'dateCreated',
-        'isExpired',
     ]);
-    expect($response->data['model']['pattern'])->toBe('mailer/test');
+    expect($response->data['model']['pattern']['pattern'])->toBe('mailer/test');
     expect($response->data['model']['note'])->toBe('ticket-123');
-    expect($response->data['model']['isExpired'])->toBeFalse();
+    expect($response->data['model']['pattern']['isExpired'])->toBeFalse();
 
     // Row landed in the table.
     $count = (new Query())->from(Table::RUNTIME_OVERRIDES)
@@ -411,6 +415,7 @@ it('actionAddOverride success row carries the locked row keys', function() {
         'expiresAt',
         'createdBy',
         'dateCreated',
-        'isExpired',
     ]);
+    expect(array_keys($response->data['model']['pattern']))->toBe(['pattern', 'isExpired']);
+    expect(array_keys($response->data['model']['expiresAt']))->toBe(['value', 'isExpired']);
 });

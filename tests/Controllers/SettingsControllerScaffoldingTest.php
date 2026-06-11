@@ -475,7 +475,10 @@ it('allowlist tab template instantiates a Craft.VueAdminTable', function() {
     $contents = file_get_contents($path);
     expect($contents)->not->toBeFalse();
     expect($contents)->toContain('Craft.VueAdminTable');
-    expect($contents)->toContain('cortex/allowlist/table-data');
+    // Action routes, not the CP URL aliases — VueAdminTable resolves
+    // `tableDataEndpoint` via `Craft.getActionUrl`, which never consults
+    // CP URL rules (the gate-9 smoke caught the alias 404ing).
+    expect($contents)->toContain('cortex/settings/allowlist-table-data');
     expect($contents)->toContain('cortex/settings/remove-override');
 });
 
@@ -544,7 +547,9 @@ it('tokens tab template instantiates a Craft.VueAdminTable wired to the token en
     $contents = file_get_contents($path);
     expect($contents)->not->toBeFalse();
     expect($contents)->toContain('Craft.VueAdminTable');
-    expect($contents)->toContain('cortex/tokens/table-data');
-    expect($contents)->toContain('cortex/tokens/revoke');
+    // Action routes, not the CP URL aliases — see the allowlist variant
+    // of this invariant for the why.
+    expect($contents)->toContain('cortex/settings/tokens-table-data');
+    expect($contents)->toContain('cortex/settings/revoke-token');
     expect($contents)->toContain('openTokenIssuanceSlideout');
 });

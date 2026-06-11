@@ -167,6 +167,31 @@ it('declares the Tokens endpoints', function() {
     }
 });
 
+it('actionTokenIssueSlideout returns {html, headHtml, bodyHtml} with the view JS deltas', function() {
+    // The full render cannot be driven through the Pest harness — the
+    // partial's `csrfInput()` needs a web request/response pair and the
+    // bootstrap binds console ones (same constraint documented in
+    // OauthControllerTest). Lock the contract structurally instead: the
+    // action must return the JSON triple and pull the head/body deltas
+    // off the view, so the element-select init that
+    // `forms.elementSelectField` registers through the view reaches the
+    // browser. A bare-fragment response ships the user picker dead —
+    // caught by the gate-9 browser smoke.
+    $method = new ReflectionMethod(SettingsController::class, 'actionTokenIssueSlideout');
+    $lines = file((string) $method->getFileName());
+    expect($lines)->not->toBeFalse();
+    $source = implode('', array_slice(
+        $lines,
+        $method->getStartLine() - 1,
+        $method->getEndLine() - $method->getStartLine() + 1,
+    ));
+
+    expect($source)->toContain('asJson');
+    expect($source)->toContain("'html' => \$html");
+    expect($source)->toContain("'headHtml' => \$view->getHeadHtml()");
+    expect($source)->toContain("'bodyHtml' => \$view->getBodyHtml()");
+});
+
 // -----------------------------------------------------------------------------
 // actionTokensTableData — locked row tuple + pagination contract
 // -----------------------------------------------------------------------------

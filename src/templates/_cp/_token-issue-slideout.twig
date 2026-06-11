@@ -4,17 +4,20 @@
    Token-issuance slideout body partial.
 
    Rendered by `actionTokenIssueSlideout` and fetched via
-   `Craft.sendActionRequest('GET', 'cortex/tokens/issue-slideout')` from
-   `Cortex.openTokenIssuanceSlideout()`. The returned HTML is passed into
+   `Craft.sendActionRequest('GET', 'cortex/settings/token-issue-slideout')` from
+   `Cortex.openTokenIssuanceSlideout()`. The action returns
+   `{html, headHtml, bodyHtml}` JSON: `html` is this fragment (passed into
    `new Craft.Slideout(html, {containerElement: 'form', ...})` — the
-   slideout container supplies the `<form>` shell.
+   slideout container supplies the `<form>` shell) and the head/body
+   deltas carry the JS that `forms.elementSelectField` registers through
+   the view (a bare-fragment response would ship the user picker dead).
 
    Two states share one fragment:
      1. `[data-cortex-issue-form]` — the issue form (name, user, TTL).
         Visible on open.
      2. `[data-cortex-reveal]`     — the one-time plaintext reveal.
         Hidden on open; the JS un-hides it and injects the plaintext
-        into `[data-cortex-token]` after `cortex/tokens/issue` returns
+        into `[data-cortex-token]` after `cortex/settings/issue-token` returns
         200. The plaintext lives ONLY in this DOM node and the JSON
         response that produced it — never in a URL, a flash, or a log.
 

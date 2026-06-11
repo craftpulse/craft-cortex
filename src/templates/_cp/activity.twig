@@ -12,11 +12,13 @@
    the `filters[userId]` param (fail-closed, decision 7).
 
    Data path:
-     - Table data : GET cortex/activity/table-data → JSON {pagination, data}
-     - Row detail : GET cortex/activity/row?id=<id> → JSON {html}
+     - Table data : GET cortex/settings/activity-table-data → JSON {pagination, data}
+     - Row detail : GET cortex/settings/activity-row?id=<id> → JSON {html}
 
    The row shape is locked in `SettingsController::_serializeActivityRow`:
-   `{id, tool, mode, kind, user, durationMs, dateCreated}`.
+   `{id, tool: {id, tool, mode}, kind, user, durationMs, dateCreated}` —
+   the tool cell is a composite because VueAdminTable column callbacks
+   receive only the cell value, never the row.
 
    Filter values are passed in from the controller:
      - `kinds`     : the five audit-kind enum values.
@@ -160,17 +162,20 @@
             };
         }
 
-        function renderToolCell(value, row) {
-            var tool = value ? Craft.escapeHtml(value) : Craft.t('cortex', 'tool call');
-            if (row.mode) {
-                tool += ' <span class="light">/ ' + Craft.escapeHtml(row.mode) + '</span>';
+        function renderToolCell(value) {
+            // VueAdminTable callbacks receive ONLY the cell value — the
+            // controller serialises a `{id, tool, mode}` composite so the
+            // detail-trigger id and mode suffix travel inside the value.
+            var tool = value && value.tool ? Craft.escapeHtml(value.tool) : Craft.t('cortex', 'tool call');
+            if (value && value.mode) {
+                tool += ' <span class="light">/ ' + Craft.escapeHtml(value.mode) + '</span>';
             }
             // The tool cell is the row's detail trigger — a real <button>
             // so it is reachable and operable by keyboard (Space/Enter)
             // without depending on VueAdminTable row internals.
             return (
                 '<button type="button" class="cortex-activity-row-trigger" ' +
-                'data-cortex-activity-id="' + parseInt(row.id, 10) + '">' +
+                'data-cortex-activity-id="' + parseInt(value && value.id, 10) + '">' +
                 tool +
                 '</button>'
             );
@@ -219,31 +224,33 @@
             { name: 'dateCreated', title: Craft.t('cortex', 'When'), sortField: 'dateCreated', callback: renderWhenCell },
         ];
 
-        // Shared, mutated-in-place criteria object. VueAdminTable reads
-        // `this.criteria` at every fetch and forwards it as query params,
-        // so mutating these keys + calling `.reload()` re-issues the
-        // query with the current filter values.
-        var criteria = currentFilters();
-
         var adminTable = new Craft.VueAdminTable({
             container: tableContainer,
             columns: columns,
-            tableDataEndpoint: 'cortex/activity/table-data',
-            criteria: criteria,
+            tableDataEndpoint: 'cortex/settings/activity-table-data',
+            // VueAdminTable has NO `criteria` option — custom params must
+            // go through the `onQueryParams` hook, which fires on every
+            // fetch. Reading the live DOM here means a filter change only
+            // needs `.reload()` (gate-9 smoke caught the criteria config
+            // being silently ignored).
+            onQueryParams: function(params) {
+                var filters = currentFilters();
+                params['filters[kind]'] = filters.kind;
+                params['filters[toolName]'] = filters.toolName;
+                params['filters[userId]'] = filters.userId;
+                params['filters[from]'] = filters.from;
+                params['filters[to]'] = filters.to;
+                return params;
+            },
             search: true,
             searchPlaceholder: Craft.t('cortex', 'Search activity'),
             emptyMessage: Craft.t('cortex', 'No activity recorded yet.'),
         });
 
-        // Filter changes copy the live DOM values onto the shared criteria
-        // object (in place — VueAdminTable holds the same reference) then
-        // reload.
+        // Filter changes just reload — `onQueryParams` re-reads the live
+        // DOM values on the fetch it triggers.
         document.querySelectorAll('#cortex-activity-filters select, #cortex-activity-filters input').forEach(function(el) {
             el.addEventListener('change', function() {
-                var fresh = currentFilters();
-                Object.keys(fresh).forEach(function(key) {
-                    criteria[key] = fresh[key];
-                });
                 adminTable.reload();
             });
         });

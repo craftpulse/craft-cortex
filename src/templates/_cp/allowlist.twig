@@ -9,8 +9,8 @@
    Garnish.Slideout pattern reused by Tokens (9.5).
 
    Data path:
-     - Table data : GET  cortex/allowlist/table-data   → JSON {pagination, data}
-     - Slideout   : GET  cortex/allowlist/override-slideout → HTML fragment
+     - Table data : GET  cortex/settings/allowlist-table-data → JSON {pagination, data}
+     - Slideout   : GET  cortex/settings/allowlist-override-slideout → HTML fragment
      - Add        : POST cortex/settings/add-override  → JSON {model, message}
      - Remove     : POST cortex/settings/remove-override (VueAdminTable
                                                           deleteAction) → JSON {message}
@@ -48,9 +48,12 @@
     (function() {
         var tableContainer = '#cortex-allowlist-vue-admin-table';
 
-        function renderPatternCell(value, row) {
-            var pattern = Craft.escapeHtml(value || '');
-            var muted = row.isExpired ? ' style="opacity:0.55"' : '';
+        function renderPatternCell(value) {
+            // VueAdminTable callbacks receive ONLY the cell value — the
+            // controller serialises `{pattern, isExpired}` composites so
+            // the expired flag travels inside the value.
+            var pattern = Craft.escapeHtml((value && value.pattern) || '');
+            var muted = value && value.isExpired ? ' style="opacity:0.55"' : '';
             return '<code class="cortex-token-prefix"' + muted + '>' + pattern + '</code>';
         }
 
@@ -61,14 +64,16 @@
             return Craft.escapeHtml(value);
         }
 
-        function renderExpiresCell(value, row) {
-            if (!value) {
+        function renderExpiresCell(value) {
+            // `value` is the `{value, isExpired}` composite from
+            // `_serializeOverrideRow` — null `value.value` means never.
+            if (!value || !value.value) {
                 return '<span class="light">' + Craft.t('cortex', 'Never') + '</span>';
             }
 
-            var expiresAt = new Date(value);
+            var expiresAt = new Date(value.value);
             var formatted = Craft.formatDate(expiresAt, 'short');
-            if (row.isExpired) {
+            if (value.isExpired) {
                 return (
                     '<span style="opacity:0.55">' +
                     Craft.escapeHtml(formatted) +
@@ -132,7 +137,7 @@
         var adminTable = new Craft.VueAdminTable({
             container: tableContainer,
             columns: columns,
-            tableDataEndpoint: 'cortex/allowlist/table-data',
+            tableDataEndpoint: 'cortex/settings/allowlist-table-data',
             deleteAction: 'cortex/settings/remove-override',
             deleteConfirmationMessage: Craft.t('cortex', 'Are you sure you want to remove the override “{name}”?'),
             deleteSuccessMessage: Craft.t('cortex', 'Override removed.'),

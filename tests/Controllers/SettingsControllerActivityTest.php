@@ -199,10 +199,11 @@ it('declares the Activity endpoints', function() {
 
 it('the activity detail slideout partial compiles and renders the redacted columns', function() {
     // The slideout partial is the console-renderable surface (no
-    // `_layouts/cp` chrome). Rendering it directly proves the `json_decode`
-    // round-trip, the `b-or` JSON-flag bitwise op, and the metadata grid
-    // all compile. The full-page index template is browser-smoke-verified
-    // per the gate-9.3 plan (it depends on `_layouts/cp`, which needs a web
+    // `_layouts/cp` chrome). `mode` / `argsPretty` / `responsePretty`
+    // are pre-computed by `actionActivityRow` (PHP-side tolerant decode
+    // — see `_prettyRedactedColumn`), so they are passed here the same
+    // way. The full-page index template is browser-smoke-verified per
+    // the gate-9.3 plan (it depends on `_layouts/cp`, which needs a web
     // request the console harness cannot supply).
     $html = Craft::$app->getView()->renderTemplate('cortex/_cp/_activity-detail-slideout', [
         'row' => [
@@ -218,6 +219,9 @@ it('the activity detail slideout partial compiles and renders the redacted colum
             'rateLimitRemaining' => 59,
         ],
         'user' => null,
+        'mode' => 'list',
+        'argsPretty' => json_encode(['mode' => 'list', 'apiKey' => '[redacted]'], JSON_PRETTY_PRINT),
+        'responsePretty' => json_encode(['ok' => true], JSON_PRETTY_PRINT),
     ], View::TEMPLATE_MODE_CP);
 
     expect($html)->toBeString()
@@ -258,12 +262,16 @@ it('actionActivityTableData data[0] keys equal the locked tuple exactly', functi
     expect(array_keys($row))->toBe([
         'id',
         'tool',
-        'mode',
         'kind',
         'user',
         'durationMs',
         'dateCreated',
     ]);
+    // The tool cell is a `{id, tool, mode}` composite — VueAdminTable
+    // column callbacks receive only the cell value, never the row, so
+    // the detail-trigger id and mode suffix travel inside the value.
+    expect(array_keys($row['tool']))->toBe(['id', 'tool', 'mode']);
+    expect($row['tool']['id'])->toBe($row['id']);
 });
 
 it('actionActivityTableData never surfaces redacted payload columns in the table', function() {
@@ -288,7 +296,7 @@ it('actionActivityTableData extracts the mode from redacted args', function() {
         ->withParams([])
         ->actionActivityTableData();
 
-    expect($response->data['data'][0]['mode'])->toBe('create');
+    expect($response->data['data'][0]['tool']['mode'])->toBe('create');
 });
 
 // -----------------------------------------------------------------------------
@@ -380,7 +388,7 @@ it('filters by toolName', function() {
         ->actionActivityTableData();
 
     expect($response->data['pagination']['total'])->toBe(1);
-    expect($response->data['data'][0]['tool'])->toBe('entry');
+    expect($response->data['data'][0]['tool']['tool'])->toBe('entry');
 });
 
 it('filters by date range', function() {
@@ -400,7 +408,7 @@ it('filters by date range', function() {
         ->actionActivityTableData();
 
     expect($response->data['pagination']['total'])->toBe(1);
-    expect($response->data['data'][0]['tool'])->toBe('new');
+    expect($response->data['data'][0]['tool']['tool'])->toBe('new');
 });
 
 it('search matches the tool name', function() {
@@ -413,7 +421,7 @@ it('search matches the tool name', function() {
         ->actionActivityTableData();
 
     expect($response->data['pagination']['total'])->toBe(1);
-    expect($response->data['data'][0]['tool'])->toBe('entry');
+    expect($response->data['data'][0]['tool']['tool'])->toBe('entry');
 });
 
 it('defaults to dateCreated DESC', function() {
@@ -431,7 +439,7 @@ it('defaults to dateCreated DESC', function() {
         ->withParams([])
         ->actionActivityTableData();
 
-    expect($response->data['data'][0]['tool'])->toBe('second');
+    expect($response->data['data'][0]['tool']['tool'])->toBe('second');
 });
 
 // -----------------------------------------------------------------------------
@@ -461,6 +469,24 @@ it('non-admin can view their own row detail', function() {
         ->withParams(['id' => (int) $row->id])
         ->actionActivityRow();
 
+    expect($response->data['html'])->toBeString()->not->toBe('');
+});
+
+it('row detail survives a truncated (non-JSON) response excerpt', function() {
+    // The logger clips `responseExcerpt` to a fixed length, so a real
+    // excerpt is frequently cut mid-document — NOT valid JSON. The
+    // detail render must fall back to the raw text instead of letting
+    // `Json::decode` throw (a truncated excerpt 500'd the slideout in
+    // the gate-9 browser smoke).
+    $truncated = substr(json_encode(['data' => "multi\nline value", 'big' => str_repeat('x', 50)]), 0, 40);
+    $row = _cortexSeedInvocation(['response_excerpt' => $truncated]);
+
+    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
+    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+        ->withParams(['id' => (int) $row->id])
+        ->actionActivityRow();
+
+    expect($response->data)->toHaveKey('html');
     expect($response->data['html'])->toBeString()->not->toBe('');
 });
 
