@@ -2,7 +2,7 @@
    Activity-detail slideout body partial.
 
    Rendered by `SettingsController::actionActivityRow` and fetched via
-   `Craft.sendActionRequest('GET', 'cortex/activity/row', {params: {id}})`
+   `Craft.sendActionRequest('GET', 'cortex/settings/activity-row', {params: {id}})`
    from `Cortex.openActivityDetailSlideout()`. The returned HTML is passed
    into `new Craft.Slideout(html, {...})`.
 
@@ -24,32 +24,12 @@
    ========================================================================= #}
 
 {% set kind = row.kind is defined ? row.kind : '' %}
-{% set argsRaw = row.argsRedacted is defined ? row.argsRedacted : null %}
-{% set responseRaw = row.responseExcerpt is defined ? row.responseExcerpt : null %}
 
-{% set mode = null %}
-{% if argsRaw %}
-    {% set decodedForMode = argsRaw|json_decode %}
-    {% set mode = (decodedForMode is iterable and decodedForMode.mode is defined) ? decodedForMode.mode : null %}
-{% endif %}
-
-{# Pretty-print the redacted JSON columns; fall through to the raw text on
-   a malformed column rather than erroring. #}
-{% set argsPretty = null %}
-{% if argsRaw %}
-    {% set decodedArgs = argsRaw|json_decode %}
-    {% set argsPretty = decodedArgs is iterable
-        ? decodedArgs|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES'))
-        : argsRaw %}
-{% endif %}
-
-{% set responsePretty = null %}
-{% if responseRaw %}
-    {% set decodedResp = responseRaw|json_decode %}
-    {% set responsePretty = decodedResp is iterable
-        ? decodedResp|json_encode(constant('JSON_PRETTY_PRINT') b-or constant('JSON_UNESCAPED_SLASHES'))
-        : responseRaw %}
-{% endif %}
+{# `mode`, `argsPretty`, and `responsePretty` arrive pre-computed from
+   `actionActivityRow` — the decode is PHP-side with a try/catch because
+   the `responseExcerpt` column is clipped by the logger and frequently
+   is NOT valid JSON. Twig's `|json_decode` (`Json::decode`) throws on a
+   truncated excerpt instead of falling through (gate-9 browser smoke). #}
 
 <div class="so-body" data-cortex-activity-detail>
     <header class="pane-header">

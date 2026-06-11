@@ -7,6 +7,7 @@ use craft\elements\User;
 use craft\helpers\AdminTable;
 use craft\helpers\DateTimeHelper;
 use craft\helpers\Db;
+use craft\helpers\Json;
 use craft\web\Controller;
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\db\InvocationQuery;
@@ -14,6 +15,7 @@ use craftpulse\cortex\models\Token;
 use craftpulse\cortex\records\RuntimeOverride;
 use craftpulse\cortex\tools\support\InvocationLogger;
 use yii\base\Exception;
+use yii\base\InvalidArgumentException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
@@ -203,12 +205,20 @@ class SettingsController extends Controller
     /**
      * Render the "+ New token" slideout body partial. Fetched by
      * `Cortex.openTokenIssuanceSlideout()` and passed into
-     * `new Craft.Slideout(html, {...})`. Returns a bare HTML fragment —
-     * the slideout container supplies the `<form>` chrome.
+     * `new Craft.Slideout(html, {...})`.
+     *
+     * Returns `{html, headHtml, bodyHtml}` JSON — NOT a bare fragment.
+     * The partial's `forms.elementSelectField` registers its
+     * `Craft.BaseElementSelectInput` init through the view, and a plain
+     * fragment response would drop it (the user picker arrives dead —
+     * caught by the gate-9 browser smoke). The JS side appends the
+     * head/body deltas after mounting the slideout so the element
+     * select wires up.
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
      * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
+     * @throws \Throwable                              from template rendering.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -217,8 +227,15 @@ class SettingsController extends Controller
     {
         $this->requireAdmin(false);
 
-        return $this->renderTemplate('cortex/_cp/_token-issue-slideout', [
+        $view = Craft::$app->getView();
+        $html = $view->renderTemplate('cortex/_cp/_token-issue-slideout', [
             'settings' => Cortex::getInstance()->getSettings(),
+        ]);
+
+        return $this->asJson([
+            'html' => $html,
+            'headHtml' => $view->getHeadHtml(),
+            'bodyHtml' => $view->getBodyHtml(),
         ]);
     }
 
@@ -707,9 +724,18 @@ class SettingsController extends Controller
             }
         }
 
+        // Decode + pretty-print the redacted columns PHP-side. The
+        // `responseExcerpt` column is clipped to a fixed length by the
+        // logger, so the stored string is frequently NOT valid JSON —
+        // Twig's `|json_decode` (`Json::decode`) throws on it instead of
+        // falling through (a truncated excerpt 500'd the slideout; caught
+        // by the gate-9 browser smoke).
         $html = $this->getView()->renderTemplate('cortex/_cp/_activity-detail-slideout', [
             'row' => $row,
             'user' => $user,
+            'mode' => $this->_extractMode($row['argsRedacted'] ?? null),
+            'argsPretty' => $this->_prettyRedactedColumn($row['argsRedacted'] ?? null),
+            'responsePretty' => $this->_prettyRedactedColumn($row['responseExcerpt'] ?? null),
         ]);
 
         return $this->asJson(['html' => $html]);
@@ -962,9 +988,11 @@ class SettingsController extends Controller
      *
      * Row shape:
      *   - `id`          — int primary key.
-     *   - `tool`        — string tool name (column `toolName`).
-     *   - `mode`        — string|null tool mode, extracted from the
-     *                      redacted args' `mode` key when present.
+     *   - `tool`        — `{id, tool, mode}` composite. VueAdminTable
+     *                      column callbacks receive ONLY the cell value
+     *                      (never the row), so everything the tool cell
+     *                      renders — including the detail-slideout
+     *                      trigger id — must travel inside the value.
      *   - `kind`        — string audit kind (status pill colour).
      *   - `user`        — `{id, label, cpEditUrl}` or null (anonymous /
      *                      deleted user).
@@ -997,8 +1025,11 @@ class SettingsController extends Controller
 
         return [
             'id' => (int) ($row['id'] ?? 0),
-            'tool' => (string) ($row['toolName'] ?? ''),
-            'mode' => $this->_extractMode($row['argsRedacted'] ?? null),
+            'tool' => [
+                'id' => (int) ($row['id'] ?? 0),
+                'tool' => (string) ($row['toolName'] ?? ''),
+                'mode' => $this->_extractMode($row['argsRedacted'] ?? null),
+            ],
             'kind' => (string) ($row['kind'] ?? ''),
             'user' => $user,
             'durationMs' => (int) ($row['durationMs'] ?? 0),
@@ -1029,6 +1060,35 @@ class SettingsController extends Controller
     }
 
     /**
+     * Pretty-print a redacted JSON audit column for the detail slideout.
+     * The `responseExcerpt` column is clipped to a fixed length by the
+     * logger, so the stored string is frequently NOT valid JSON — fall
+     * back to the raw text instead of letting `Json::decode` throw (a
+     * truncated excerpt 500'd the slideout; gate-9 browser smoke).
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _prettyRedactedColumn(mixed $raw): ?string
+    {
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        try {
+            $decoded = Json::decode($raw);
+        } catch (InvalidArgumentException) {
+            return $raw;
+        }
+
+        if (!is_array($decoded)) {
+            return $raw;
+        }
+
+        return Json::encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
      * Serialise a `RuntimeOverride` row into the locked VueAdminTable
      * data tuple. Shared by `actionAllowlistTableData` and the success
      * branch of `actionAddOverride` so the row returned by the issue
@@ -1036,14 +1096,16 @@ class SettingsController extends Controller
      *
      * Row shape:
      *   - `id`           — int primary key.
-     *   - `pattern`      — string (the fnmatch glob).
+     *   - `pattern`      — `{pattern, isExpired}` composite. VueAdminTable
+     *                       column callbacks receive ONLY the cell value
+     *                       (never the row), so the expired flag the cell
+     *                       renderer mutes on must travel inside the value.
      *   - `note`         — string|null (admin freeform).
-     *   - `expiresAt`    — string|null ISO-8601, or null = never.
+     *   - `expiresAt`    — `{value, isExpired}` composite; `value` is
+     *                       string|null ISO-8601, null = never.
      *   - `createdBy`    — `{id, label, cpEditUrl}` or null when the
      *                       issuing user record is missing.
      *   - `dateCreated`  — string ISO-8601.
-     *   - `isExpired`    — bool derived against `now`; the VueAdminTable
-     *                       cell renderer styles expired rows muted.
      *
      * @param array<string,mixed> $row The raw DB row from `Allowlist::getAllOverrides`
      *                                 or `RuntimeOverride::toArray()`.
@@ -1076,12 +1138,17 @@ class SettingsController extends Controller
 
         return [
             'id' => (int) ($row['id'] ?? 0),
-            'pattern' => (string) ($row['pattern'] ?? ''),
+            'pattern' => [
+                'pattern' => (string) ($row['pattern'] ?? ''),
+                'isExpired' => $isExpired,
+            ],
             'note' => isset($row['note']) && $row['note'] !== '' ? (string) $row['note'] : null,
-            'expiresAt' => is_string($expiresAt) && $expiresAt !== '' ? $expiresAt : null,
+            'expiresAt' => [
+                'value' => is_string($expiresAt) && $expiresAt !== '' ? $expiresAt : null,
+                'isExpired' => $isExpired,
+            ],
             'createdBy' => $createdBy,
             'dateCreated' => (string) ($row['dateCreated'] ?? ''),
-            'isExpired' => $isExpired,
         ];
     }
 

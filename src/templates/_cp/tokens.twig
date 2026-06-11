@@ -11,10 +11,10 @@
    pattern locked by Allowlist (9.2).
 
    Data path:
-     - Table data : GET  cortex/tokens/table-data      → JSON {pagination, data}
-     - Slideout   : GET  cortex/tokens/issue-slideout   → HTML fragment
-     - Issue      : POST cortex/tokens/issue            → JSON {token, model, message}
-     - Revoke     : POST cortex/tokens/revoke (VueAdminTable
+     - Table data : GET  cortex/settings/tokens-table-data    → JSON {pagination, data}
+     - Slideout   : GET  cortex/settings/token-issue-slideout → JSON {html, headHtml, bodyHtml}
+     - Issue      : POST cortex/settings/issue-token          → JSON {token, model, message}
+     - Revoke     : POST cortex/settings/revoke-token (VueAdminTable
                                                 deleteAction) → JSON {message}
 
    The row shape is locked in `SettingsController::_serializeTokenRow`:
@@ -152,8 +152,8 @@
         var adminTable = new Craft.VueAdminTable({
             container: tableContainer,
             columns: columns,
-            tableDataEndpoint: 'cortex/tokens/table-data',
-            deleteAction: 'cortex/tokens/revoke',
+            tableDataEndpoint: 'cortex/settings/tokens-table-data',
+            deleteAction: 'cortex/settings/revoke-token',
             deleteConfirmationMessage: Craft.t('cortex', 'Are you sure you want to revoke the token “{name}”?'),
             deleteSuccessMessage: Craft.t('cortex', 'Token revoked.'),
             emptyMessage: Craft.t('cortex', 'No tokens issued yet.'),

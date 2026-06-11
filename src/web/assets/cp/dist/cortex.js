@@ -50,7 +50,7 @@
          *                              successful issuance.
          */
         openAllowlistOverrideSlideout: function(adminTable) {
-            Craft.sendActionRequest('GET', 'cortex/allowlist/override-slideout')
+            Craft.sendActionRequest('GET', 'cortex/settings/allowlist-override-slideout')
                 .then(function(response) {
                     var html = response.data;
 
@@ -136,7 +136,7 @@
          * `Craft.Slideout` with `containerElement: 'form'`, then wires
          * the submit / cancel / copy / done handlers.
          *
-         * On submit the issue form POSTs `cortex/tokens/issue`; on 200
+         * On submit the issue form POSTs `cortex/settings/issue-token`; on 200
          * the slideout swaps from the form to the reveal panel and
          * injects the plaintext (carried in the JSON response's `token`
          * key) into the `<code>` block. The plaintext lives ONLY in that
@@ -148,9 +148,16 @@
          *                              successful issuance.
          */
         openTokenIssuanceSlideout: function(adminTable) {
-            Craft.sendActionRequest('GET', 'cortex/tokens/issue-slideout')
+            Craft.sendActionRequest('GET', 'cortex/settings/token-issue-slideout')
                 .then(function(response) {
-                    var slideout = new Craft.Slideout(response.data, {
+                    // The action returns `{html, headHtml, bodyHtml}` —
+                    // the body delta carries the element-select init JS
+                    // that `forms.elementSelectField` registered through
+                    // the view. Append it AFTER mounting the slideout so
+                    // the script finds its container in the DOM.
+                    var data = response.data || {};
+
+                    var slideout = new Craft.Slideout(data.html || '', {
                         containerElement: 'form',
                         containerAttributes: {
                             action: '',
@@ -159,6 +166,13 @@
                             class: 'cortex-slideout cortex-token-slideout',
                         },
                     });
+
+                    if (data.headHtml) {
+                        Craft.appendHeadHtml(data.headHtml);
+                    }
+                    if (data.bodyHtml) {
+                        Craft.appendBodyHtml(data.bodyHtml);
+                    }
 
                     Cortex._wireTokenSlideout(slideout, adminTable);
                 })
@@ -220,7 +234,7 @@
                     $field.children('ul.errors').remove();
                 });
 
-                Craft.sendActionRequest('POST', 'cortex/tokens/issue', {
+                Craft.sendActionRequest('POST', 'cortex/settings/issue-token', {
                     data: $container.serialize(),
                 })
                     .then(function(response) {
@@ -272,7 +286,7 @@
          * @param {number} id - The `cortex_invocations` row id.
          */
         openActivityDetailSlideout: function(id) {
-            Craft.sendActionRequest('GET', 'cortex/activity/row', {
+            Craft.sendActionRequest('GET', 'cortex/settings/activity-row', {
                 params: { id: id },
             })
                 .then(function(response) {
