@@ -1,7 +1,7 @@
 # Smoke rerun — Section E only (edition enforcement on the wire)
 
 **Date:** 2026-06-11 (afternoon, same day as the full run)
-**Commit under test:** `85f02eb` (Plugin Store packaging assets: LICENSE.md, src/icon.svg, extra.changelogUrl, CHANGELOG heading fix)
+**Commit under test:** `f671528` (Plugin Store packaging assets: LICENSE.md, src/icon.svg, extra.changelogUrl, CHANGELOG heading fix)
 **Scope:** Section E of [SMOKE-TEST.md](../SMOKE-TEST.md) re-run after the packaging commit, per the runbook's "re-run after any CP/transport/edition change" rule. Sections A–D were not re-run (no code paths touched by the packaging commit); E2's positive path incidentally re-covered A1-Pro, the A4 issue/revoke flow, and D1.
 **Driver:** curl + raw stdio for the wire; Chrome DevTools MCP for the CP (logged in as a throwaway `smoke-e` admin — created via `craft users/create`, hard-deleted after the run).
 
@@ -13,7 +13,7 @@
 | E2 | Pro unlocks them | Pro | **PASS** | yes | `smoke-e2-pro-tabs.png` | Five tabs render. Discovery 200 (RFC 8414 JSON, `S256`-only). Token issued via slideout (user-picker regression guard OK, plaintext shown once); HTTP initialize → 200 + `Mcp-Session-Id`, echoes `2025-11-25`, `serverInfo cortex 5.0.0`. stdio 42 tools, `cortex.edition: "pro"`. Revoke: row gone live, then wire 401. |
 | E3 | kill switch outranks edition (503) | both | **PASS** | yes | — | **Pro:** `httpEnabled=false` → `/cortex/mcp` 503 `{"error":"HTTP transport is disabled…"}`, homepage unaffected, across 3 flip/restore rounds. **Free:** same flip → 503, not 403 — config-off beats not-licensed, as specified. |
 
-**Verdict: GO** — edition enforcement re-confirmed at `85f02eb`. Finish line met: edition restored to **Free** (`cortex/edition/show` → `is(pro): false`), `httpEnabled` restored to `true` (wire re-probe: Free 403), Pest 1149/0 + PHPStan L8 + ECS green after the run.
+**Verdict: GO** — edition enforcement re-confirmed at `f671528`. Finish line met: edition restored to **Free** (`cortex/edition/show` → `is(pro): false`), `httpEnabled` restored to `true` (wire re-probe: Free 403), Pest 1149/0 + PHPStan L8 + ECS green after the run.
 
 ## Observations
 

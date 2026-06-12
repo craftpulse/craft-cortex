@@ -156,7 +156,7 @@ clauses in those three spots.
 - `src/models/Settings.php:158-167` (`allowedOrigins`): *"Empty means permissive — every
   Origin is accepted, intended for dev only."* The shipped code fails **closed** for an empty
   allowlist outside devMode (`McpController::_passesOrigin`, :381-399, the remediation in
-  `9b0299d`). The property doc still describes the pre-remediation behaviour.
+  `9e94759`). The property doc still describes the pre-remediation behaviour.
 - `src/models/Settings.php:147-155` (`httpEnabled`): *"Defaults to false so production installs
   stay off until auth (sub-gates 7.2 / 7.3) and per-user filtering (7.4) land."* Auth and
   per-user filtering shipped; the rationale is stale.

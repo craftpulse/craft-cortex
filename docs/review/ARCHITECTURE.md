@@ -155,11 +155,11 @@ The deep dives escalate and extend `REVIEW.md`'s original counts (`0 blocker / 8
 
 | Blocker | Commit |
 |---|---|
-| Audit `response_excerpt` + `craft_command` output unredacted | `b9868d2` |
-| Skill trashed-handle recreate → `IntegrityException` | `3c50ae7` |
-| OAuth / `.well-known` ignore `httpEnabled` kill switch | `368eff3` |
-| Anonymous OAuth endpoints unthrottled | `2d77cdd` |
-| OAuth codes/tokens never pruned (+ false docblock) | `a139646` |
+| Audit `response_excerpt` + `craft_command` output unredacted | `dd65e99` |
+| Skill trashed-handle recreate → `IntegrityException` | `8f75c38` |
+| OAuth / `.well-known` ignore `httpEnabled` kill switch | `fc369ac` |
+| Anonymous OAuth endpoints unthrottled | `a3e89eb` |
+| OAuth codes/tokens never pruned (+ false docblock) | `626b55e` |
 
 Implementation notes: the IP throttle was added as a parallel `RateLimiter::consumeKey(string)` (user-keyed `consume(int)` untouched); the kill switch is now enforced via a shared `AbstractOauthController` base; the gc prune deletes only already-dead rows (`expiresAt < now` OR `dateRevoked` set), so active refresh-rotation chains are never severed, and all OAuth repositories were confirmed fail-closed before pruning.
 
@@ -167,24 +167,24 @@ Implementation notes: the IP throttle was added as a parallel `RateLimiter::cons
 
 | Major | Commit(s) |
 |---|---|
-| OAuth consent POST CSRF | `8b60310` |
-| Origin allowlist fails closed outside devMode | `9b0299d` |
-| Skill handle format validation + post-create immutability | `ca5ef99`, `09a48ea` |
-| Elevated-session: refuse password/email/admin over HTTP (real-transport context seam) | `939773b`, `59253cb` |
-| stdio hardening (bounded read, testable framing, fatal-handler envelope, SIGTERM/SIGINT + broken-pipe, stdout-log redirect, capture re-entrancy) | `f0aa1ea`, `1da3d13`, `4899a94`, `74c00ec`, `5524694` |
-| `FiberProgressBridge` cancel-drain (listener-leak fix) | `bf13a33` |
-| Doc majors: EXTENDING interface contract, CONFIGURATION shipped-state + `stdioMaxMessageBytes`, tool-count reconcile (33 Free), doc-drift comments | `3cb5dce`, `43c7f1d`, `fabfb94`, `09f0e4d` |
+| OAuth consent POST CSRF | `49ba6cc` |
+| Origin allowlist fails closed outside devMode | `9e94759` |
+| Skill handle format validation + post-create immutability | `7d08868`, `735d73e` |
+| Elevated-session: refuse password/email/admin over HTTP (real-transport context seam) | `5abb762`, `89bf872` |
+| stdio hardening (bounded read, testable framing, fatal-handler envelope, SIGTERM/SIGINT + broken-pipe, stdout-log redirect, capture re-entrancy) | `13cf6d0`, `8a53a4e`, `26abc8e`, `2484cf9`, `56ce9a8` |
+| `FiberProgressBridge` cancel-drain (listener-leak fix) | `8e766d1` |
+| Doc majors: EXTENDING interface contract, CONFIGURATION shipped-state + `stdioMaxMessageBytes`, tool-count reconcile (33 Free), doc-drift comments | `26e26d5`, `8bef504`, `4b2cebe`, `0a414f0` |
 
-The doc-drift nit (the `m260514` "logical FK" comment vs the hard `ON DELETE CASCADE` from `m260515_080000`) was fixed in `09f0e4d`.
+The doc-drift nit (the `m260514` "logical FK" comment vs the hard `ON DELETE CASCADE` from `m260515_080000`) was fixed in `0a414f0`.
 
-**The minor/nit tail is also closed** (`28b8850`, `922bf1c`, `fb894c2`):
+**The minor/nit tail is also closed** (`4524d7e`, `42d1143`, `cd7e0b6`):
 
 | Item | Resolution |
 |---|---|
-| `Invocations::prune()` redundant param bind | Fixed — let Yii bind the cutoff (`28b8850`) |
-| `RateLimiter::check()` docblock overstates use | Fixed — docblock now says introspection-only, never a gate (`922bf1c`) |
-| Session enumeration / operator-disconnect | Documented out-of-scope — no enumerable surface by design; revocation = next-request block (`fb894c2`) |
-| Sliding-TTL vs long streams | Verified safe — `sessionTtl` 3600s ≫ the minutes-bounded max stream; invariant documented (`fb894c2`) |
+| `Invocations::prune()` redundant param bind | Fixed — let Yii bind the cutoff (`4524d7e`) |
+| `RateLimiter::check()` docblock overstates use | Fixed — docblock now says introspection-only, never a gate (`42d1143`) |
+| Session enumeration / operator-disconnect | Documented out-of-scope — no enumerable surface by design; revocation = next-request block (`cd7e0b6`) |
+| Sliding-TTL vs long streams | Verified safe — `sessionTtl` 3600s ≫ the minutes-bounded max stream; invariant documented (`cd7e0b6`) |
 | Skill `afterSave` not transactional | **False positive** — verified against `craftcms/cms`: `afterSave()` already runs inside `Elements::_saveElementInternal()`'s transaction. No change. |
 | `inputSchemaFor` HTTP field-hiding | **Deferred by design** — needs transport in the `tools/list` path; the execute-level refusal is already the security boundary. |
 
