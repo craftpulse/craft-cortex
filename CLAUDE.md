@@ -41,12 +41,14 @@ Use `gh` for all GitHub operations — it's already authenticated.
 ddev composer check-cs               # ECS code style
 ddev composer fix-cs                 # ECS auto-fix
 ddev composer phpstan                # PHPStan analysis
-ddev exec vendor/bin/pest            # Pest tests
+make v5-pest PLUGIN=craft-cortex     # Pest tests (run from the playground root)
 ddev craft up                        # Migrations + project config
 ddev composer install                # Install deps (auto-runs craft up)
 ```
 
 These commands run against the test environment in `~/dev/craft-plugin-playground/cms_v5`, where this plugin is symlinked during development.
+
+**Run Pest plugin-locally**, via `make v5-pest PLUGIN=craft-cortex` (from `~/dev/craft-plugin-playground`) or directly from the plugin dir with its own vendor (`docker exec -w <plugin dir> <web-container> sh -c 'vendor/bin/pest'`). This isolates the suite from whatever the *shared* `cms/vendor` contains. The legacy cms-root form (`ddev exec -d /var/www/html/cms vendor/bin/pest --configuration=vendor/craftpulse/craft-cortex/phpunit.xml.dist`) works only when no other symlinked plugin has pulled a conflicting Pest/`craft-pest-core` into the shared vendor — when one has, it dies with a `Cannot declare class Yii` fatal before Cortex's bootstrap runs. The bootstrap finds Craft via `CORTEX_TEST_CRAFT_BASE`, then cwd, then `/var/www/html/cms`.
 
 ## Plugin Structure
 
