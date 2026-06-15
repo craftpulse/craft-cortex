@@ -2,8 +2,10 @@
 
 namespace craftpulse\cortex;
 
+use Craft;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
+use craft\elements\User;
 use craft\helpers\UrlHelper;
 use craftpulse\cortex\models\Settings;
 use craftpulse\cortex\plugin\PluginTrait;
@@ -120,8 +122,16 @@ class Cortex extends BasePlugin
 
     /**
      * @inheritdoc
+     *
+     * Cortex owns a top-level CP section (`/cortex`) so its operator
+     * surfaces — Settings, Temporary grants, and the Pro Tokens /
+     * Activity / Connection screens — live in the global sidebar with a
+     * permission- and edition-gated subnav (`getCpNavItem()`), rather
+     * than buried behind Settings → Plugins. The plugin Settings page
+     * stays reachable from Settings → Plugins → Cortex too
+     * (`getSettingsResponse()` is unchanged).
      */
-    public bool $hasCpSection = false;
+    public bool $hasCpSection = true;
 
     // Static Methods
     // =========================================================================
@@ -222,8 +232,94 @@ class Cortex extends BasePlugin
     public function getSettingsResponse(): mixed
     {
         /** @var \craft\web\Response $response */
-        $response = \Craft::$app->getResponse();
+        $response = Craft::$app->getResponse();
         return $response->redirect(UrlHelper::cpUrl('settings/plugins/cortex'));
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Builds the Cortex CP section's subnav, permission- and
+     * edition-gated so each operator only sees the screens they can
+     * actually open. The gating here is presentation only — every
+     * controller action behind these items re-checks its own
+     * `requireAdmin` / `requirePermission` / `_requirePro()` posture, so a
+     * hand-typed URL gets the same answer the hidden item implies. The
+     * nav never widens access; it only hides what the user can't reach.
+     *
+     * Subnav map (in display order):
+     *   - Settings          — admin (`requireAdmin(false)`), all editions.
+     *   - Temporary grants   — admin, all editions (the runtime allowlist
+     *                          override surface; route handle stays
+     *                          `allowlist`).
+     *   - Tokens            — admin + Pro.
+     *   - Activity          — `cortex:viewActivity` + Pro (admins pass
+     *                          implicitly via `can()`).
+     *   - Connection        — admin + Pro.
+     *
+     * Free installs therefore see only Settings + Temporary grants,
+     * matching the Pro-tab gate map the controller enforces.
+     *
+     * **Performance contract:** this method runs on every CP page render.
+     * It only reads the current identity, the edition handle, and
+     * permission checks — all sub-millisecond, no queries, no cache
+     * needed. Preserve that ceiling if a badge count is ever added.
+     *
+     * @throws \yii\base\InvalidConfigException from `Craft::$app->getUser()`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getCpNavItem(): ?array
+    {
+        $navItem = parent::getCpNavItem();
+
+        $user = Craft::$app->getUser()->getIdentity();
+        if (!$user instanceof User) {
+            return null;
+        }
+
+        $isPro = $this->is(self::EDITION_PRO, '>=');
+        $subnav = [];
+
+        if ($user->admin) {
+            $subnav['settings'] = [
+                'label' => Craft::t('cortex', 'Settings'),
+                'url' => 'cortex/settings',
+            ];
+            $subnav['grants'] = [
+                'label' => Craft::t('cortex', 'Temporary grants'),
+                'url' => 'cortex/allowlist',
+            ];
+        }
+
+        if ($isPro && $user->admin) {
+            $subnav['tokens'] = [
+                'label' => Craft::t('cortex', 'Tokens'),
+                'url' => 'cortex/tokens',
+            ];
+        }
+
+        if ($isPro && $user->can(self::PERMISSION_VIEW_ACTIVITY)) {
+            $subnav['activity'] = [
+                'label' => Craft::t('cortex', 'Activity'),
+                'url' => 'cortex/activity',
+            ];
+        }
+
+        if ($isPro && $user->admin) {
+            $subnav['connection'] = [
+                'label' => Craft::t('cortex', 'Connection'),
+                'url' => 'cortex/connection',
+            ];
+        }
+
+        if ($subnav === []) {
+            return null;
+        }
+
+        $navItem['subnav'] = $subnav;
+        return $navItem;
     }
 
     // Protected Methods

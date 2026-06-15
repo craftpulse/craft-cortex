@@ -67,7 +67,7 @@
                     Cortex._wireAllowlistSlideout(slideout, adminTable);
                 })
                 .catch(function(error) {
-                    Craft.cp.displayError(Craft.t('cortex', 'Could not open the override form.'));
+                    Craft.cp.displayError(Craft.t('cortex', 'Could not open the grant form.'));
                     if (window.console && console.error) {
                         console.error('Cortex slideout load failed:', error);
                     }
@@ -113,10 +113,10 @@
                         if (adminTable && typeof adminTable.reload === 'function') {
                             adminTable.reload();
                         }
-                        Craft.cp.displayNotice(Craft.t('cortex', 'Override added.'));
+                        Craft.cp.displayNotice(Craft.t('cortex', 'Grant issued.'));
                     })
                     .catch(function(error) {
-                        var message = Craft.t('cortex', 'Could not add override.');
+                        var message = Craft.t('cortex', 'Could not add grant.');
                         if (error && error.response && error.response.data && error.response.data.message) {
                             message = error.response.data.message;
                         }
@@ -309,6 +309,198 @@
                         console.error('Cortex activity detail load failed:', error);
                     }
                 });
+        },
+
+        /**
+         * Wire the grouped allowed-commands toggle browser on the Settings
+         * screen. For each enumerated console-command group:
+         *   - The disclosure button expands / collapses the per-action list.
+         *   - The group lightswitch, when ON, persists `group/*` and the
+         *     per-action switches are disabled (the glob covers them all);
+         *     when OFF, the per-action switches drive exact-id persistence.
+         *   - A "N/total allowed" badge reflects the partial state and hides
+         *     once the group switch is ON (full coverage).
+         *   - The filter input live-filters groups and actions by route id.
+         *
+         * No Garnish subclass — the lightswitches are already initialised by
+         * Craft's CP boot; we resolve each `Craft.LightSwitch` widget
+         * instance and listen for its Garnish `change` event (the widget
+         * fires it on itself, not as a bubbling DOM event) to toggle
+         * dependent UI. Read-only mode (`config/cortex.php` override)
+         * disables every control server-side, so this wiring is inert there.
+         *
+         * @param {Element} root - The `[data-cortex-command-browser]` element.
+         */
+        initCommandBrowser: function(root) {
+            if (!root || root.getAttribute('aria-disabled') === 'true') {
+                return;
+            }
+
+            var groups = root.querySelectorAll('[data-cortex-command-group]');
+            groups.forEach(function(group) {
+                Cortex._wireCommandGroup(group);
+            });
+
+            var filter = root.querySelector('[data-cortex-command-filter]');
+            if (filter) {
+                filter.addEventListener('input', function() {
+                    Cortex._filterCommandGroups(root, filter.value);
+                });
+            }
+        },
+
+        /**
+         * Wire a single command group: disclosure toggle, group-switch
+         * cascade onto the action switches, and the partial-state badge.
+         *
+         * @private
+         */
+        _wireCommandGroup: function(group) {
+            var expandBtn = group.querySelector('[data-cortex-group-expand]');
+            var actions = group.querySelector('[data-cortex-command-actions]');
+            var caret = group.querySelector('.cortex-command-group-caret');
+            var groupSwitch = group.querySelector('.cortex-command-group-header > .lightswitch');
+
+            if (expandBtn && actions) {
+                expandBtn.addEventListener('click', function() {
+                    var expanded = expandBtn.getAttribute('aria-expanded') === 'true';
+                    expandBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
+                    actions.hidden = expanded;
+                    if (caret) {
+                        caret.textContent = expanded ? '▸' : '▾';
+                    }
+                });
+            }
+
+            // Craft's `Craft.LightSwitch` is a Garnish.Base widget: it
+            // fires `change` via `this.trigger('change')` on the WIDGET
+            // object, not as a bubbling DOM event on the `.lightswitch`
+            // element. Binding `Craft.$(el).on('change', ...)` would never
+            // fire. Resolve the widget instance (Craft stashes it via
+            // `$el.data('lightswitch', this)`) and register on it.
+            var groupWidget = Cortex._lightswitchWidget(groupSwitch);
+            if (groupWidget) {
+                groupWidget.on('change', function() {
+                    Cortex._applyGroupSwitchState(group);
+                });
+            }
+
+            var actionSwitches = group.querySelectorAll('[data-cortex-command-action] .lightswitch');
+            actionSwitches.forEach(function(sw) {
+                var actionWidget = Cortex._lightswitchWidget(sw);
+                if (actionWidget) {
+                    actionWidget.on('change', function() {
+                        Cortex._updateGroupBadge(group);
+                    });
+                }
+            });
+
+            Cortex._applyGroupSwitchState(group);
+        },
+
+        /**
+         * Reflect the group lightswitch state onto its action switches: ON
+         * disables each action switch (covered by `group/*`); OFF re-enables
+         * them so exact ids drive persistence. Always refreshes the badge.
+         *
+         * @private
+         */
+        _applyGroupSwitchState: function(group) {
+            var groupSwitch = group.querySelector('.cortex-command-group-header > .lightswitch');
+            var on = !!groupSwitch && groupSwitch.classList.contains('on');
+            var badge = group.querySelector('[data-cortex-group-badge]');
+
+            var actionSwitches = group.querySelectorAll('[data-cortex-command-action] .lightswitch');
+            actionSwitches.forEach(function(sw) {
+                var widget = Cortex._lightswitchWidget(sw);
+                if (!widget) {
+                    return;
+                }
+                if (on) {
+                    widget.disable();
+                } else {
+                    widget.enable();
+                }
+            });
+
+            if (badge) {
+                badge.hidden = on;
+            }
+            if (!on) {
+                Cortex._updateGroupBadge(group);
+            }
+        },
+
+        /**
+         * Recompute and render a group's "N/total allowed" badge from the
+         * current action-switch states.
+         *
+         * @private
+         */
+        _updateGroupBadge: function(group) {
+            var badge = group.querySelector('[data-cortex-group-badge]');
+            if (!badge) {
+                return;
+            }
+
+            var actionSwitches = group.querySelectorAll('[data-cortex-command-action] .lightswitch');
+            var total = actionSwitches.length;
+            var allowed = 0;
+            actionSwitches.forEach(function(sw) {
+                if (sw.classList.contains('on')) {
+                    allowed++;
+                }
+            });
+
+            badge.textContent = Craft.t('cortex', '{count}/{total} allowed', { count: allowed, total: total });
+        },
+
+        /**
+         * Resolve the `Craft.LightSwitch` widget instance bound to a
+         * lightswitch element so we can call its `enable()` / `disable()`
+         * API instead of toggling classes by hand (the widget owns the
+         * disabled hidden-input state the form posts).
+         *
+         * @private
+         */
+        _lightswitchWidget: function(el) {
+            if (!el) {
+                return null;
+            }
+            var widget = Craft.$(el).data('lightswitch');
+            return widget || null;
+        },
+
+        /**
+         * Live-filter the command groups + actions by a needle matched
+         * against the group handle and each action's route id. A group with
+         * any matching action (or a matching handle) stays visible with its
+         * non-matching actions hidden; a group with no match is hidden
+         * entirely. An empty needle restores everything.
+         *
+         * @private
+         */
+        _filterCommandGroups: function(root, needle) {
+            needle = (needle || '').trim().toLowerCase();
+            var groups = root.querySelectorAll('[data-cortex-command-group]');
+
+            groups.forEach(function(group) {
+                var handle = (group.getAttribute('data-group-handle') || '').toLowerCase();
+                var handleMatches = needle === '' || handle.indexOf(needle) !== -1;
+                var anyActionMatches = false;
+
+                var actions = group.querySelectorAll('[data-cortex-command-action]');
+                actions.forEach(function(action) {
+                    var routeId = (action.getAttribute('data-route-id') || '').toLowerCase();
+                    var match = needle === '' || handleMatches || routeId.indexOf(needle) !== -1;
+                    action.hidden = !match;
+                    if (match) {
+                        anyActionMatches = true;
+                    }
+                });
+
+                group.hidden = !(handleMatches || anyActionMatches);
+            });
         },
 
         /**

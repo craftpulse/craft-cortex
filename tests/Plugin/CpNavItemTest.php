@@ -1,0 +1,91 @@
+<?php
+
+/**
+ * =========================================================================
+ * `Cortex::getCpNavItem()` behavioural tests.
+ *
+ * The subnav is presentation-only — every controller action behind a nav
+ * item re-checks its own `requireAdmin` / `requirePermission` /
+ * `_requirePro()` posture, so these tests verify the nav HIDES correctly
+ * without ever widening access. The boundary is enforced by the
+ * controller; the nav must merely match it:
+ *
+ *   - Anonymous                          → null (no nav at all).
+ *   - Admin / Free                       → Settings + Temporary grants only.
+ *   - Admin / Pro                        → all five items.
+ *   - Non-admin with `viewActivity` / Pro → Activity only.
+ *
+ * Edition flips go through `cortex_with_edition()` so the project-config
+ * write is muted and restored. Identity is set with `setIdentity()` and
+ * cleared in `afterEach`.
+ * =========================================================================
+ *
+ * @author Craftpulse
+ * @since  5.0.0
+ */
+
+use craft\elements\User;
+use craftpulse\cortex\Cortex;
+
+beforeEach(function() {
+    $this->admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio');
+    if (!$this->admin instanceof User) {
+        $this->markTestSkipped('No admin user `michtio` in the playground.');
+    }
+});
+
+afterEach(function() {
+    Craft::$app->getUser()->setIdentity(null);
+});
+
+it('returns null for an anonymous request', function() {
+    Craft::$app->getUser()->setIdentity(null);
+
+    expect(Cortex::getInstance()->getCpNavItem())->toBeNull();
+});
+
+it('shows only Settings + Temporary grants to an admin on Free', function() {
+    Craft::$app->getUser()->setIdentity($this->admin);
+
+    cortex_with_edition(Cortex::EDITION_FREE, function() {
+        $navItem = Cortex::getInstance()->getCpNavItem();
+
+        expect($navItem)->toBeArray();
+        expect(array_keys($navItem['subnav']))->toBe(['settings', 'grants']);
+    });
+});
+
+it('shows all five items to an admin on Pro', function() {
+    Craft::$app->getUser()->setIdentity($this->admin);
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() {
+        $navItem = Cortex::getInstance()->getCpNavItem();
+
+        expect($navItem)->toBeArray();
+        expect(array_keys($navItem['subnav']))
+            ->toBe(['settings', 'grants', 'tokens', 'activity', 'connection']);
+    });
+});
+
+it('shows only Activity to a non-admin with viewActivity on Pro', function() {
+    // A non-admin user granted only `cortex:viewActivity`. The playground
+    // may not seed one; skip rather than fail the suite if absent.
+    $nonAdmin = User::find()
+        ->admin(false)
+        ->status(null)
+        ->collect()
+        ->first(fn(User $u): bool => $u->can(Cortex::PERMISSION_VIEW_ACTIVITY));
+
+    if (!$nonAdmin instanceof User) {
+        $this->markTestSkipped('No non-admin user with cortex:viewActivity in the playground.');
+    }
+
+    Craft::$app->getUser()->setIdentity($nonAdmin);
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() {
+        $navItem = Cortex::getInstance()->getCpNavItem();
+
+        expect($navItem)->toBeArray();
+        expect(array_keys($navItem['subnav']))->toBe(['activity']);
+    });
+});

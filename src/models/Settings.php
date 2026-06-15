@@ -4,6 +4,7 @@ namespace craftpulse\cortex\models;
 
 use Craft;
 use craft\base\Model;
+use craftpulse\cortex\services\Allowlist;
 use DateInterval;
 use Throwable;
 
@@ -80,17 +81,14 @@ class Settings extends Model
      *               Override via project config or
      *               `config/cortex.php` to tighten the admin-level
      *               surface per environment.
+     *
+     *               The default mirrors
+     *               `Allowlist::DEFAULT_ADMIN_LEVEL_PATTERNS` — the
+     *               single source of truth the CP command browser also
+     *               classifies routes against. Referencing the constant
+     *               keeps the two in lockstep without a literal copy.
      */
-    public array $adminLevelCommands = [
-        'project-config/*',
-        'migrate/*',
-        'up',
-        'make/*',
-        'entrify/*',
-        'sections/*',
-        'fields/*',
-        'fixture/*',
-    ];
+    public array $adminLevelCommands = Allowlist::DEFAULT_ADMIN_LEVEL_PATTERNS;
 
     /**
      * @var string[] Operator-curated allowlist of custom-field

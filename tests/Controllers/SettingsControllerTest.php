@@ -235,7 +235,8 @@ it('ships the _cp/settings tab template', function() {
     $path = __DIR__ . '/../../src/templates/_cp/settings.twig';
     expect(file_exists($path))->toBeTrue();
     $contents = file_get_contents($path);
-    expect($contents)->toContain('Allowed commands');
+    expect($contents)->toContain('Content commands');
+    expect($contents)->toContain('Admin-level commands');
     expect($contents)->not->toContain('Runtime overrides');
 });
 
@@ -295,7 +296,7 @@ it('actionAddOverride catches allowlist exceptions, returns 400 JSON, and logs',
     expect($response)->toBeInstanceOf(Response::class);
     expect($response->statusCode)->toBe(400);
 
-    expect($response->data)->toBeArray()->toHaveKey('message', 'Could not add override.');
+    expect($response->data)->toBeArray()->toHaveKey('message', 'Could not add grant.');
 
     $cortexEntries = _cortexCapturedCortexLogs($this->logCountBefore);
     expect($cortexEntries)->not->toBeEmpty();

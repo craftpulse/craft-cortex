@@ -80,10 +80,29 @@ class SettingsController extends Controller
         $this->requireAdmin(false);
 
         $plugin = Cortex::getInstance();
+        $settings = $plugin->getSettings();
+
+        // Resolve the saved content-level (`allowedCommands`) and
+        // admin-level (`adminLevelCommands`) patterns onto the enumerated
+        // console-command groups so the browser can render two toggle
+        // sections. Patterns that don't map to a known group-glob or exact
+        // action id (power-user globs, since-removed plugins) surface in
+        // the per-bucket custom-patterns editable tables — never silently
+        // dropped, never moved across buckets.
+        $toggleState = $plugin->allowlist->mapPatternsToToggleState(
+            $settings->allowedCommands,
+            $settings->adminLevelCommands,
+        );
 
         return $this->renderTemplate('cortex/_cp/settings', [
             'plugin' => $plugin,
-            'settings' => $plugin->getSettings(),
+            'settings' => $settings,
+            'commandGroups' => $toggleState['groups'],
+            'contentCustomPatterns' => $toggleState['contentCustomPatterns'],
+            'adminCustomPatterns' => $toggleState['adminCustomPatterns'],
+            'allowedCommandsOverridden' => $this->isSettingOverridden('allowedCommands'),
+            'adminLevelCommandsOverridden' => $this->isSettingOverridden('adminLevelCommands'),
+            'allowAdminChanges' => Craft::$app->getConfig()->getGeneral()->allowAdminChanges,
         ]);
     }
 
@@ -393,8 +412,38 @@ class SettingsController extends Controller
     {
         $this->requireAdmin(false);
 
+        $allowlist = Cortex::getInstance()->allowlist;
+
+        // Index active grants by pattern so the effective-allowlist panel
+        // can annotate each grant row with its expiry. Base Settings
+        // patterns carry no expiry; an active grant whose pattern also
+        // appears in Settings is still shown as a grant (expiry wins) since
+        // the union dedupes by pattern string.
+        $grantExpiryByPattern = [];
+        foreach ($allowlist->getActiveOverrides() as $override) {
+            $pattern = (string) ($override['pattern'] ?? '');
+            $expiresAt = $override['expiresAt'] ?? null;
+            if ($pattern !== '' && is_string($expiresAt) && $expiresAt !== '') {
+                $grantExpiryByPattern[$pattern] = DateTimeHelper::toDateTime($expiresAt) ?: null;
+            }
+        }
+
+        // Flag which effective patterns are admin-level so the panel can
+        // label them distinctly (their presence in the effective set
+        // depends on `allowAdminChanges`). The configured admin-level set
+        // is the authority here — a tightened `adminLevelCommands` only
+        // contributes its own patterns, but each is still admin-level.
+        $adminLevelPatterns = array_fill_keys(
+            Cortex::getInstance()->getSettings()->adminLevelCommands,
+            true,
+        );
+
         return $this->renderTemplate('cortex/_cp/allowlist', [
             'settings' => Cortex::getInstance()->getSettings(),
+            'effective' => $allowlist->getEffective(),
+            'grantExpiryByPattern' => $grantExpiryByPattern,
+            'adminLevelPatterns' => $adminLevelPatterns,
+            'allowAdminChanges' => Craft::$app->getConfig()->getGeneral()->allowAdminChanges,
         ]);
     }
 
@@ -820,20 +869,40 @@ class SettingsController extends Controller
             $posted = [];
         }
 
-        // The `editableTableField` macro for `allowedCommands` posts as
-        // a 2D array (`settings[allowedCommands][N][pattern]`); the
-        // settings model is typed `string[]`. Flatten back to pattern
-        // strings before assignment so `setAttributes` accepts the
-        // payload and `savePluginSettings` persists it (otherwise
-        // shape-mismatch silently falls back to the prior PC value).
-        if (isset($posted['allowedCommands']) && is_array($posted['allowedCommands'])) {
-            $posted['allowedCommands'] = array_values(array_filter(
-                array_map(
-                    static fn($row) => is_array($row) ? trim((string) ($row['pattern'] ?? '')) : '',
-                    $posted['allowedCommands'],
-                ),
-                static fn(string $pattern) => $pattern !== '',
-            ));
+        // `allowedCommands` (content-level) and `adminLevelCommands`
+        // (admin-level) are each edited through the grouped toggle
+        // browser's two sections, not raw editable tables. Each section
+        // posts three sibling params:
+        //   - `cortex[Admin]CommandGroups[<handle>] = '1'` for a fully-toggled group.
+        //   - `cortex[Admin]CommandActions[<routeId>] = '1'` for an individually-checked action.
+        //   - `settings[<setting>][N][pattern]` from the "Custom patterns"
+        //     editable table — power-user globs preserved verbatim.
+        // Fold each section back into the flat `string[]` its setting
+        // persists, with the bucket boundary enforced in the service so a
+        // content toggle can never surface an admin route (and vice versa).
+        // Skip a setting entirely when it is locked by `config/cortex.php`
+        // — the file value wins regardless, and that section rendered
+        // read-only, so there is nothing meaningful to fold.
+        if (!$this->isSettingOverridden('allowedCommands')) {
+            $posted['allowedCommands'] = $plugin->allowlist->patternsFromToggleState(
+                fullGroups: $this->_postedToggleMap('cortexCommandGroups'),
+                actionIds: $this->_postedToggleMap('cortexCommandActions'),
+                customPatterns: $this->_postedCustomPatterns('allowedCommands'),
+                adminLevel: false,
+            );
+        } else {
+            unset($posted['allowedCommands']);
+        }
+
+        if (!$this->isSettingOverridden('adminLevelCommands')) {
+            $posted['adminLevelCommands'] = $plugin->allowlist->patternsFromToggleState(
+                fullGroups: $this->_postedToggleMap('cortexAdminCommandGroups'),
+                actionIds: $this->_postedToggleMap('cortexAdminCommandActions'),
+                customPatterns: $this->_postedCustomPatterns('adminLevelCommands'),
+                adminLevel: true,
+            );
+        } else {
+            unset($posted['adminLevelCommands']);
         }
 
         $settings->setAttributes($posted, false);
@@ -898,11 +967,11 @@ class SettingsController extends Controller
             );
         } catch (Exception $e) {
             Craft::error($e->getMessage(), 'cortex');
-            return $this->asFailure(Craft::t('cortex', 'Could not add override.'));
+            return $this->asFailure(Craft::t('cortex', 'Could not add grant.'));
         }
 
         return $this->asSuccess(
-            message: Craft::t('cortex', 'Override added.'),
+            message: Craft::t('cortex', 'Grant issued.'),
             data: ['model' => $this->_serializeOverrideRow($override->toArray())],
         );
     }
@@ -946,8 +1015,96 @@ class SettingsController extends Controller
         return $this->asSuccess(Craft::t('cortex', 'Override removed.'));
     }
 
+    // Protected Methods
+    // =========================================================================
+
+    /**
+     * Whether a plugin-settings attribute is overridden from
+     * `config/cortex.php`. Craft merges that file's keys over the
+     * project-config-stored settings when loading the plugin (see
+     * `craft\services\Plugins::createPlugin()` →
+     * `getConfig()->getConfigFromFile($handle)`), but exposes no
+     * per-attribute "is overridden" flag the way `GeneralConfig` does.
+     * Reading the config file back is the canonical detection: a key
+     * present there is locked, so the CP renders that control read-only
+     * with Craft's standard "defined in config" warning.
+     *
+     * Protected so the save-path test harness can stub the overridden
+     * branch without writing a real `config/cortex.php` mid-suite.
+     *
+     * @throws \yii\base\InvalidConfigException from `Craft::$app->getConfig()`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function isSettingOverridden(string $attribute): bool
+    {
+        $fileConfig = Craft::$app->getConfig()->getConfigFromFile('cortex');
+
+        return is_array($fileConfig) && array_key_exists($attribute, $fileConfig);
+    }
+
     // Private Methods
     // =========================================================================
+
+    /**
+     * Read a posted toggle map (`cortexCommandGroups` /
+     * `cortexCommandActions`) and keep only the keys whose lightswitch is
+     * on. Craft's lightswitch macro posts a hidden input for every switch
+     * — `'1'` when on, an empty string when off — so a raw read would
+     * report every group/action as present. Filtering to truthy values
+     * leaves only the enabled keys, which is what
+     * `Allowlist::patternsFromToggleState()` expects. Non-array payloads
+     * (none posted) normalise to an empty map.
+     *
+     * @return array<string,mixed>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _postedToggleMap(string $param): array
+    {
+        $value = $this->request->getBodyParam($param, []);
+        if (!is_array($value)) {
+            return [];
+        }
+
+        return array_filter(
+            $value,
+            static fn($v): bool => $v === '1' || $v === 1 || $v === true,
+        );
+    }
+
+    /**
+     * Read a "Custom patterns" editable-table payload posted under
+     * `settings[<setting>]` and flatten it to trimmed, non-empty pattern
+     * strings. The editable-table macro posts a 2D array
+     * (`settings[<setting>][N][pattern]`); the toggle browser folds these
+     * back in verbatim so power-user globs survive a round-trip. Used for
+     * both buckets — `allowedCommands` (content) and `adminLevelCommands`
+     * (admin-level).
+     *
+     * @return string[]
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _postedCustomPatterns(string $setting): array
+    {
+        $settings = $this->request->getBodyParam('settings', []);
+        $rows = is_array($settings) ? ($settings[$setting] ?? []) : [];
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map(
+                static fn($row) => is_array($row) ? trim((string) ($row['pattern'] ?? '')) : '',
+                $rows,
+            ),
+            static fn(string $pattern) => $pattern !== '',
+        ));
+    }
 
     /**
      * Whether the current CP user is an admin. Centralised so the

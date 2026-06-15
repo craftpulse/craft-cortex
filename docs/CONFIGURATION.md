@@ -125,31 +125,34 @@ The endpoint supports three methods:
 
 `craft_exec` is stdio-only and rejected at the dispatcher when called over HTTP regardless of caller permissions. The rejection comes back as a JSON-RPC error envelope (HTTP 200, JSON-RPC code -32601) so spec-compliant clients can render the message correctly.
 
-## The CP settings page
+## The CP section
 
-Cortex registers a tabbed Control Panel page at **Settings → Cortex**. Saving the **Settings** tab writes to project config so changes sync across environments via your normal `project-config/apply` flow; the other tabs read and mutate runtime DB state. The page has five tabs:
+Cortex registers a top-level Control Panel section, **Cortex**, in the global sidebar. Its subnav is permission- and edition-gated (`Cortex::getCpNavItem()`): Free installs see **Settings** and **Temporary grants**; Pro adds **Tokens**, **Activity**, and **Connection**. Saving the **Settings** screen writes to project config so changes sync across environments via your normal `project-config/apply` flow; the other screens read and mutate runtime DB state.
+
+The plugin Settings screen also stays reachable the usual way, from **Settings → Plugins → Cortex**.
 
 ### Settings
 
 Editable form fields for the project-config-synced plugin defaults.
 
-- **Allowed commands** — text-area editor for the `allowedCommands` array, one pattern per line.
+- **Allowed commands** — a grouped toggle browser over the `allowedCommands` patterns. Every console command on the install (core Craft plus installed plugins) is enumerated and grouped by controller. Flip a whole group on to allow `group/*`; expand a group and flip individual actions to allow exact route ids; a partially-allowed group shows an "N/total allowed" badge. A filter box narrows the list live. Patterns that don't map to a listed command — custom wildcards like `resave/ent*`, or commands for plugins not installed here — appear in a **Custom patterns** table and are preserved verbatim. When `allowedCommands` is set in `config/cortex.php` the browser renders read-only with a "defined in config" warning.
 - **`craft_exec` enabled** — toggle for `execEnabled`.
 - **`craft_exec` dry-run by default** — toggle for `execDryRunDefault`.
-- **Runtime override TTL (seconds)** — integer input for `runtimeOverrideTtl`.
+- **Temporary grant TTL (seconds)** — integer input for `runtimeOverrideTtl`.
 
-The Settings tab renders in read-only mode when `allowAdminChanges` is off; the save action gates on `requireAdmin(requireAdminChanges: true)`.
+The Settings screen renders in read-only mode when `allowAdminChanges` is off; the save action gates on `requireAdmin(requireAdminChanges: true)`.
 
-### Allowlist
+### Temporary grants
 
-A live editor for short-lived `craft_command` allowlist additions (DB-backed runtime overrides). Useful when you need to grant the LLM a one-off command (`db/restore` after a debugging session, `index-assets/all` while diagnosing a missing thumbnail) without committing the change to project config.
+A live editor for short-lived `craft_command` allowlist additions — time-bound grants an admin issues on top of the Settings allowlist that expire automatically (DB-backed; internally these are the runtime "override" rows). Useful when you need to grant the LLM a one-off command (`db/restore` after a debugging session, `index-assets/all` while diagnosing a missing thumbnail) without committing the change to project config.
 
-- **Add an override** — pattern (e.g. `db/restore`), optional note, optional custom expiry, edited through a Garnish slideout.
-- **Active overrides** — table view with expiry status. Cancelling soft-deletes immediately; expired overrides surface until Craft's `gc` sweep removes them.
+- **Issue grant** — pattern (e.g. `db/restore`), optional note, optional custom expiry, edited through a Garnish slideout.
+- **Grants table** — table view with expiry status. Removing one soft-deletes immediately; expired grants surface until Craft's `gc` sweep removes them.
+- **Effective allowlist right now** — a read-only panel listing the combined set `craft_command` may dispatch this moment: the base Settings patterns plus every active grant, each grant annotated with its expiry.
 
-Override mutations require `requireAdmin(requireAdminChanges: true)` — they're a security boundary, so non-admin CP users can't grant themselves new commands.
+Grant mutations require `requireAdmin(requireAdminChanges: true)` — they're a security boundary, so non-admin CP users can't grant themselves new commands.
 
-The effective allowlist `craft_command` consults at dispatch time is the **union** of `Settings::$allowedCommands` and the active runtime overrides. Both are checked; either grants permission.
+The effective allowlist `craft_command` consults at dispatch time is the **union** of `Settings::$allowedCommands` and the active grants. Both are checked; either grants permission.
 
 ### Tokens
 
