@@ -88,11 +88,11 @@ All three regenerate from the live registries via `ddev craft cortex/docs/all`.
 
 The plugin ships with sensible defaults. For environment-specific overrides, copy `vendor/craftpulse/craft-cortex/src/config/cortex.php` to your project's `config/cortex.php` and edit there. Per-environment blocks (`'production'`, `'staging'`) work the same way as Craft's other config files.
 
-Cortex's CP settings page (**Settings → Cortex**) provides a live editor for:
+Cortex's CP section (a top-level **Cortex** entry in the sidebar; Settings also reachable via **Settings → Plugins → Cortex**) provides a live editor for:
 
-- the `craft_command` allowlist (writes to project config so it syncs across environments)
+- the `craft_command` allowlist — a grouped toggle browser over every console command on the install (writes to project config so it syncs across environments)
 - the `craft_exec` toggles (`execEnabled`, `execDryRunDefault`)
-- runtime allowlist overrides (admin-only, auto-expiring patterns that layer on top of the project-config defaults)
+- temporary grants (admin-only, auto-expiring patterns that layer on top of the Settings allowlist), with an "effective allowlist right now" panel
 
 Full configuration reference: **[`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)**.
 
@@ -179,7 +179,7 @@ The `initialize` handshake should succeed (`cortex 5.0.0`, protocol `2025-11-25`
 ## Roadmap
 
 - **Phase 1 — Free. Shipping.** 33 tools, 10 prompts, 98 resources, stdio transport, allowlist UI, full install toolkit (snippet printer + per-client auto-apply + auto-detect + interactive auto-apply across detected clients), MCP `outputSchema` / `structuredContent` dual-emit per MCP 2025-11-25 (negotiating 2025-06-18), docs generators, extension events for third-party tools / prompts / resources, full Pest + PHPStan level 8 + ECS green.
-- **Phase 2 — Pro. Built.** Streamable HTTP transport with OAuth 2.1 + bearer tokens, per-user permission filtering on `tools/list` (static `shouldRegister()` + instance `filterFor($user)` + instance `inputSchemaFor($user)`), DB-backed audit log with CP Activity view, 7 net-new write tools (`entry`, `category`, `tag`, `address`, `global_set`, `users`, `bulk_entries`), mode unlocks on Free tools (`drafts_and_revisions apply/discard`, `content_audit` fix modes, `import_export` import, `system_diagnostics manage_queue`), Pro-exclusive custom-skills element type, edition enforcement at every Pro boundary, and CP tabs for tokens / allowlist / activity. The connection-reference and skill-authoring CP tabs land in a Pro point release.
+- **Phase 2 — Pro. Built.** Streamable HTTP transport with OAuth 2.1 + bearer tokens, per-user permission filtering on `tools/list` (static `shouldRegister()` + instance `filterFor($user)` + instance `inputSchemaFor($user)`), DB-backed audit log with CP Activity view, 7 net-new write tools (`entry`, `category`, `tag`, `address`, `global_set`, `users`, `bulk_entries`), mode unlocks on Free tools (`drafts_and_revisions apply/discard`, `content_audit` fix modes, `import_export` import, `system_diagnostics manage_queue`), Pro-exclusive custom-skills element type, edition enforcement at every Pro boundary, and a CP section (sidebar subnav) for settings / temporary grants / tokens / activity / connection. The skill-authoring CP screen lands in a Pro point release.
 - **Phase 3 — Polish.** CP-side install wizard (GUI affordance on top of the Phase 1 console actions, not a re-implementation), formal real-LLM E2E harness, vectorised docs search complementary to the authored skills corpus, third-party tool registration battle-tested across the ecosystem, skill remote-fetch, OAuth Client ID Metadata Documents (CIMD — the registration mechanism the MCP spec now recommends over DCR), and the planned migration to the stateless MCP 2026-07-28 revision.
 
 ## Support

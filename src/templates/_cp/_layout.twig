@@ -1,20 +1,21 @@
 {# =========================================================================
    Cortex CP shared layout.
 
-   Parent template for every tab in the Cortex settings screen
-   (Settings, Tokens, Allowlist, Activity, Connection). Extends
-   `_layouts/cp`
-   directly per locked decision 1 + cp.md §"Tabbed Settings Pages"
-   line 432 — `settingsHtml()` cannot host tabs, so Cortex owns the
-   full template lineage.
+   Parent template for every screen in the Cortex CP section (Settings,
+   Temporary grants, Tokens, Activity, Connection). Extends `_layouts/cp`
+   directly per locked decision 1 + cp.md §"Tabbed Settings Pages" — the
+   plugin owns the full template lineage.
 
-   Subtemplates set:
-     - `selectedTab`   (one of `settings`, `tokens`, `allowlist`, `activity`, `connection`)
-     - `{% block content %}` (the per-tab body)
+   The Gate 9 CP rework replaced the in-page tab bar with Craft's standard
+   global-sidebar subnav (`Cortex::getCpNavItem()`). Subtemplates set
+   `selectedSubnavItem` to the subnav key Craft should highlight — one of
+   `settings`, `grants`, `tokens`, `activity`, `connection` — and override
+   `{% block content %}` with their body. The subnav itself is rendered by
+   Craft from the section nav item; this template no longer paints tabs.
 
-   Per locked decision 6 the only plugin-side asset bundle Gate 9
-   ships is `CortexCpAsset` — registered here so every tab inherits
-   it without per-template duplication.
+   Per locked decision 6 the only plugin-side asset bundle Gate 9 ships is
+   `CortexCpAsset` — registered here so every screen inherits it without
+   per-template duplication.
    ========================================================================= #}
 
 {% extends "_layouts/cp" %}
@@ -22,34 +23,9 @@
 {% do view.registerAssetBundle("craftpulse\\cortex\\web\\assets\\cp\\CortexCpAsset") %}
 
 {% set title = 'Cortex'|t('cortex') %}
-{% set docTitle = (selectedTab|default('settings'))|capitalize ~ ' - Cortex' %}
-
-{% set crumbs = [
-    { label: 'Settings'|t('app'), url: url('settings') },
-    { label: 'Plugins'|t('app'), url: url('settings/plugins') },
-] %}
-
-{# Tokens / Activity / Connection are Pro surfaces (Gate 9.7) — hidden
-   on Free. This is presentation only: the SettingsController actions
-   behind those tabs each open with `_requirePro()` (403 on Free), so a
-   hand-typed URL gets the same answer the missing tab implies. #}
-{% set isPro = craft.app.plugins.getPlugin('cortex').is('pro') %}
-
-{% if isPro %}
-    {% set tabs = {
-        settings: { label: 'Settings'|t('cortex'), url: url('settings/plugins/cortex') },
-        tokens: { label: 'Tokens'|t('cortex'), url: url('cortex/tokens') },
-        allowlist: { label: 'Allowlist'|t('cortex'), url: url('cortex/allowlist') },
-        activity: { label: 'Activity'|t('cortex'), url: url('cortex/activity') },
-        connection: { label: 'Connection'|t('cortex'), url: url('cortex/connection') },
-    } %}
-{% else %}
-    {% set tabs = {
-        settings: { label: 'Settings'|t('cortex'), url: url('settings/plugins/cortex') },
-        allowlist: { label: 'Allowlist'|t('cortex'), url: url('cortex/allowlist') },
-    } %}
-{% endif %}
+{% set selectedSubnavItem = selectedSubnavItem ?? 'settings' %}
+{% set docTitle = (selectedSubnavItem)|capitalize ~ ' - Cortex' %}
 
 {% block content %}
-    {# Default content block — every concrete tab template overrides this. #}
+    {# Default content block — every concrete screen overrides this. #}
 {% endblock %}

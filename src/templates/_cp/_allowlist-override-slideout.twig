@@ -1,7 +1,7 @@
 {% import "_includes/forms.twig" as forms %}
 
 {# =========================================================================
-   Allowlist override slideout body partial.
+   Temporary-grant issuance slideout body partial.
 
    Rendered by `actionAllowlistOverrideSlideout` and fetched via
    `Craft.sendActionRequest('GET', 'cortex/settings/allowlist-override-slideout')`
@@ -21,7 +21,7 @@
 
 <div class="so-body" data-cortex-form>
     <header class="pane-header">
-        <h2 class="screen-title">{{ 'Issue allowlist override'|t('cortex') }}</h2>
+        <h2 class="screen-title">{{ 'Issue grant'|t('cortex') }}</h2>
     </header>
 
     <div class="so-content padded">
@@ -67,7 +67,7 @@
         <div class="flex flex-nowrap">
             <button type="button" class="btn" data-cortex-cancel>{{ 'Cancel'|t('app') }}</button>
             <div class="flex-grow"></div>
-            <button type="submit" class="btn submit" data-cortex-submit>{{ 'Issue override'|t('cortex') }}</button>
+            <button type="submit" class="btn submit" data-cortex-submit>{{ 'Issue grant'|t('cortex') }}</button>
         </div>
     </footer>
 </div>

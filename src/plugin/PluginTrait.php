@@ -318,6 +318,13 @@ trait PluginTrait
                 // back to the same URL (infinite loop).
                 $event->rules = array_merge([
                     'settings/plugins/cortex' => 'cortex/settings/index',
+                    // The CP section root (`/cortex`) and the Settings
+                    // subnav item both land on the Settings screen. The
+                    // section gained a `getCpNavItem()` subnav in the Gate 9
+                    // CP rework — clicking the sidebar section lands on
+                    // Settings, the first subnav entry.
+                    'cortex' => 'cortex/settings/index',
+                    'cortex/settings' => 'cortex/settings/index',
                     'cortex/tokens' => 'cortex/settings/tokens',
                     'cortex/tokens/table-data' => 'cortex/settings/tokens-table-data',
                     'cortex/tokens/issue-slideout' => 'cortex/settings/token-issue-slideout',

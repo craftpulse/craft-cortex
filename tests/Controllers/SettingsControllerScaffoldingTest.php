@@ -163,30 +163,30 @@ it('_cp/_layout extends _layouts/cp directly', function() {
     expect($contents)->toContain('extends "_layouts/cp"');
 });
 
-it('_cp/_layout declares all five tab entries', function() {
-    $contents = file_get_contents(__DIR__ . '/../../src/templates/_cp/_layout.twig');
-    expect($contents)->not->toBeFalse();
-    foreach (['settings:', 'tokens:', 'allowlist:', 'activity:', 'connection:'] as $tabKey) {
-        expect($contents)->toContain($tabKey);
-    }
+it('_cp/_layout drives the standard CP subnav, not an in-page tab bar', function() {
+    // The Gate 9 CP rework replaced the in-page tab bar with Craft's
+    // global-sidebar subnav (`Cortex::getCpNavItem()`). The layout now
+    // highlights the active subnav item via `selectedSubnavItem` and no
+    // longer builds its own `tabs` map.
+    $contents = (string) file_get_contents(__DIR__ . '/../../src/templates/_cp/_layout.twig');
+    expect($contents)->toContain('selectedSubnavItem');
+    expect($contents)->not->toContain('{% set tabs');
 });
 
-it('_cp/_layout gates the Pro tabs behind the edition (Gate 9.7)', function() {
-    // Presentation-side mirror of the `_requirePro()` action gates:
-    // the tab map must branch on `is('pro')`, and the Free branch must
-    // carry exactly Settings + Allowlist — no tokens/activity/
-    // connection URLs outside the Pro branch.
-    $contents = (string) file_get_contents(__DIR__ . '/../../src/templates/_cp/_layout.twig');
-    expect($contents)->toContain(".is('pro')");
-
-    // The Free branch is the `{% else %}` block — extract it and prove
-    // it carries no Pro tab keys.
-    expect(preg_match('/\{%\s*else\s*%\}(.*?)\{%\s*endif\s*%\}/s', $contents, $m))->toBe(1);
-    expect($m[1])->toContain('settings:')
-        ->toContain('allowlist:')
-        ->not->toContain('tokens:')
-        ->not->toContain('activity:')
-        ->not->toContain('connection:');
+it('getCpNavItem gates the Pro subnav entries behind the edition', function() {
+    // Presentation-side mirror of the `_requirePro()` action gates lives
+    // in `Cortex::getCpNavItem()` now — the source must reference each Pro
+    // subnav URL only under an `is(EDITION_PRO, '>=')` check. We assert the
+    // gating method carries the Pro edition comparison and every Pro
+    // subnav URL, and that the Free-always entries (Settings + Temporary
+    // grants) are present too.
+    $contents = (string) file_get_contents(__DIR__ . '/../../src/Cortex.php');
+    expect($contents)->toContain("is(self::EDITION_PRO, '>=')");
+    foreach (['cortex/tokens', 'cortex/activity', 'cortex/connection'] as $proUrl) {
+        expect($contents)->toContain($proUrl);
+    }
+    expect($contents)->toContain("'cortex/settings'")
+        ->toContain("'cortex/allowlist'");
 });
 
 // Locks the locale-undefined bug found in the 9.1 manual smoke. The
@@ -270,12 +270,18 @@ beforeEach(function() {
 
 beforeEach(function() {
     $this->originalAllowedCommands = Cortex::getInstance()->getSettings()->allowedCommands;
+    // `actionSave` now folds BOTH the content (`allowedCommands`) and the
+    // admin-level (`adminLevelCommands`) toggle buckets. These tests post
+    // no admin toggles, so a save would persist `adminLevelCommands = []`
+    // and wipe it for the rest of the suite — snapshot + restore it too.
+    $this->originalAdminLevelCommands = Cortex::getInstance()->getSettings()->adminLevelCommands;
 });
 
 afterEach(function() {
     \Yii::$app = $this->originalApp;
-    // Restore execEnabled + allowedCommands to the snapshotted values
-    // via PC write so the suite's other tests inherit the same baseline.
+    // Restore execEnabled + both command buckets to the snapshotted
+    // values via PC write so the suite's other tests inherit the same
+    // baseline.
     $settings = Cortex::getInstance()->getSettings();
     $needsRestore = false;
     if ($settings->execEnabled !== $this->originalExecEnabled) {
@@ -284,6 +290,10 @@ afterEach(function() {
     }
     if ($settings->allowedCommands !== $this->originalAllowedCommands) {
         $settings->allowedCommands = $this->originalAllowedCommands;
+        $needsRestore = true;
+    }
+    if ($settings->adminLevelCommands !== $this->originalAdminLevelCommands) {
+        $settings->adminLevelCommands = $this->originalAdminLevelCommands;
         $needsRestore = true;
     }
     if ($needsRestore) {

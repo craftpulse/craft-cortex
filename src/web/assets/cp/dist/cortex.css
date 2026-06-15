@@ -113,6 +113,90 @@
     word-break: break-word;
 }
 
+/* Allowed-commands grouped toggle browser (Settings screen) */
+.cortex-command-browser--disabled {
+    opacity: 0.6;
+}
+
+.cortex-command-search {
+    margin-bottom: 12px;
+}
+
+.cortex-command-groups {
+    border: 1px solid var(--hairline-color, rgba(31, 41, 51, 0.1));
+    border-radius: var(--medium-border-radius, 5px);
+    overflow: hidden;
+}
+
+.cortex-command-group + .cortex-command-group {
+    border-top: 1px solid var(--hairline-color, rgba(31, 41, 51, 0.1));
+}
+
+.cortex-command-group-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+}
+
+.cortex-command-group-toggle {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    border: none;
+    background: none;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    color: var(--text-color, #1f2933);
+}
+
+.cortex-command-group-caret {
+    width: 1em;
+    color: var(--medium-text-color, #606d7b);
+}
+
+.cortex-command-group-name {
+    font-weight: 600;
+}
+
+.cortex-command-group-source {
+    font-size: 12px;
+}
+
+.cortex-command-group-badge {
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.cortex-command-actions {
+    padding: 4px 12px 10px 32px;
+    background: var(--gray-050, #f3f7fc);
+}
+
+.cortex-command-action {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 0;
+}
+
+.cortex-command-action-label {
+    margin: 0;
+}
+
+.cortex-custom-patterns {
+    margin-top: 18px;
+}
+
+.cortex-custom-patterns > summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
 /* Activity detail slideout — redacted payload dump */
 .cortex-payload {
     max-height: 320px;

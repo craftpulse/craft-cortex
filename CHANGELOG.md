@@ -6,6 +6,24 @@ All notable changes to Cortex are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed — control panel
+
+- The Cortex CP screens now live under a standard sidebar section with a
+  Settings / Temporary grants / Tokens / Activity / Connection subnav
+  (edition- and permission-gated), replacing the in-page tab bar. Added a
+  CP nav icon.
+- The Settings screen's allowed-commands editor is now a grouped toggle
+  browser: every available console command (core plus installed plugins)
+  is listed by group with on/off switches and a live filter, instead of a
+  raw glob-pattern table. Content-level and admin-level commands are shown
+  in separate sections — admin-level commands (project config, migrations,
+  scaffolding, schema, fixtures) are clearly marked and only dispatch when
+  `allowAdminChanges` is enabled. Hand-written glob patterns are preserved
+  in a per-section "Custom patterns" table.
+- Renamed the "Allowlist" screen to "Temporary grants" and added an
+  "Effective allowlist" panel showing the combined result of the
+  configured defaults plus active grants.
+
 ### Added — Gate 7.7 (Pro tier, SSE streaming infrastructure)
 
 - `StreamableToolInterface` — opt-in contract for tools that stream

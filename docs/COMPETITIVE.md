@@ -64,7 +64,7 @@ Versus Cortex the gap is **categorical, not incremental** — and it is a gap in
 | Permission enforcement | **None** anywhere in `src` (grep: zero `requirePermission`/`canSave`/`canDelete`/`canView`). | Native Craft permissions at the tool **and** mode layer, fail-closed, defense-in-depth `execute()` re-check. |
 | Privileged execution | `tinker` → `eval`; `run_query` → raw SQL; `create_backup` → SQL dump. Arch tests do **not** forbid `eval`/`exec`/`shell_exec`. | `craft_exec` only, six gates, stdio-only; **no** `Process`/`exec`/`shell` anywhere, enforced by a tokenising architecture test. |
 | Extensibility | Good — typed `RegisterTools/Prompts/Resources` events, `ConditionalToolProvider` contract, completion providers. No generator, no schema DSL. | `EVENT_REGISTER_{TOOLS,PROMPTS,RESOURCES}` + a `ddev craft make cortex-tool` generator + a chainable Schema DSL + `EXTENDING.md`. |
-| Operator UI | **None** (`hasCpSettings=false`); config via `config/mcp.php` only. | Tabbed CP operator surface — Settings, Allowlist, Tokens, Activity shipped (Connection + Skill-authoring slipped to a point release). |
+| Operator UI | **None** (`hasCpSettings=false`); config via `config/mcp.php` only. | CP operator surface in a standard sidebar section — Settings, Temporary grants, Tokens, Activity shipped (Connection + Skill-authoring slipped to a point release). |
 
 ### What craft-mcp does well (fair credit)
 
@@ -102,7 +102,7 @@ Legend: ✓ yes · ✗ no · ~ partial/qualified · **!** security-negative. "?"
 | TCP-disconnect handling | ✓ (Fiber bridge) | ✗ | ? | ? | ? | ? | ✗ | ? | ? | ? |
 | Bundled knowledge corpus | ✓ ~30k lines | ✗ | ✗ | ~ product docs | ✗ | ✗ (discovery tools) | ✓ 216 articles (~480 KB) + 15 skills | ✗ | ✗ | ✓ guidelines + skills |
 | Vectorized retrieval | ✗ (keyword; Phase 3) | ✗ | ✓ (in AI module, not MCP) | ✓ semantic_search | ✓ semantic_search | ✗ | ✗ (keyword) | ~ (Enterprise RAG, separate) | ✗ | ✓ (17k+ doc chunks) |
-| CP / admin UI | ✓ tabbed (Settings/Allowlist/Tokens/Activity) | ✗ | ✓ | ✓ (Studio) | ✓ | ✓ (Vue 3) | ✗ (CLI only) | ✓ | ✓ | ✗ |
+| CP / admin UI | ✓ sidebar section (Settings/Grants/Tokens/Activity) | ✗ | ✓ | ✓ (Studio) | ✓ | ✓ (Vue 3) | ✗ (CLI only) | ✓ | ✓ | ✗ |
 | Editions / commercial | Free + paid Pro | single free | all GPL free | Free/Growth/Enterprise + AI credits | free MCP + paid AI Actions | single free | single free | free MCP + Enterprise RAG | core free + paid tiers | single free |
 | Self-hosted | ✓ | ✓ | ✓ | ✗ (remote SaaS) | ~ (local server → SaaS) | ✓ | ✓ | ✓ | ✓ | ✓ |
 | License | **proprietary (Craft)** | MIT | GPL-2.0 | MIT (Studio) / proprietary SaaS | MIT (local) / proprietary SaaS | MIT | MIT | MIT | MSCL / MIT (local pkg) | MIT |
@@ -252,7 +252,7 @@ Drupal's surface is a **fragmented constellation of GPL contrib modules**, not o
 - Authorization is **token-scope only and explicitly NOT wired to CMS user permissions**; Cortex enforces native per-user perms at tool+mode with an `execute()` re-check. (The v1.7.0 OAuth *consent* step is Kirby-user-backed, but the resulting token still authorizes by scope, not the user's Panel permissions.)
 - A stricter OAuth 2.1 profile — Kirby's provider **accepts the `plain` PKCE method** (OAuth 2.1 mandates S256-only; Cortex rejects `plain`), requires PKCE only for public clients, and ships disabled by default; Cortex additionally documents RFC 8707 audience binding, which Kirby does not.
 - **No persisted invocation audit log** (Kirby's redaction covers only `mcp_dump()` debug logs); Cortex persists redacted `cortex_invocations`.
-- No streaming progress/cancellation, no CP/admin UI (CLI-only); Cortex has both plus a tabbed CP surface.
+- No streaming progress/cancellation, no CP/admin UI (CLI-only); Cortex has both plus a CP operator surface.
 - Ships `kirby_eval` and **shells out via `symfony/process`**; Cortex forbids all `Process`/`exec`/`shell` and confines `craft_exec` behind six gates, stdio-only.
 - Per-user + anonymous-IP rate limiting; PII edition gating; a far larger corpus (~30k lines vs ~480 KB — both keyword); a published automated-quality posture.
 

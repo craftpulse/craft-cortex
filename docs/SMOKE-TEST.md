@@ -104,35 +104,64 @@ printf '%s\n' \
 
 ## Section A — CP operator surface
 
-### A1 — Plugin loads, tab gating *(Free + Pro)*
-1. Log in, open `…/admin/settings/plugins/cortex`, snapshot.
-2. Repeat on the other edition.
+### A1 — Plugin loads, subnav gating *(Free + Pro)*
+1. Log in; confirm the **Cortex** section appears in the global CP sidebar
+   (icon-mask rendered). Open it, snapshot the subnav.
+2. Open `…/admin/settings/plugins/cortex` (Settings → Plugins → Cortex) and
+   confirm it still lands on the Cortex Settings screen.
+3. Repeat on the other edition.
 
-**Expected:** page renders under `_layouts/cp` with the Cortex tab bar.
-**Free:** exactly **Settings + Allowlist** (`tab-tokens` / `tab-activity` /
-`tab-connection` absent from the HTML). **Pro:** all five — Settings ·
-Tokens · Allowlist · Activity · Connection. No console errors, no failed
-requests.
-**Measure:** which `id="tab-…"` anchors are present per edition.
+**Expected:** the Cortex section is a top-level sidebar entry; clicking it
+lands on **Settings**. The subnav is built by `Cortex::getCpNavItem()` —
+permission- and edition-gated.
+**Free:** exactly **Settings + Temporary grants**. **Pro:** Settings ·
+Temporary grants · Tokens · Activity · Connection. There is no in-page tab
+bar anymore — the active screen is highlighted via `selectedSubnavItem`.
+Settings → Plugins → Cortex still reaches Settings. No console errors, no
+failed requests.
+**Measure:** which subnav entries render per edition; that the section
+icon shows; that `settings/plugins/cortex` still resolves.
 
-### A2 — Settings tab: exec toggles persist to project config *(Free + Pro)*
+### A2 — Settings screen: exec toggles + allowed-commands browser *(Free + Pro)*
 1. Toggle `execDryRunDefault` off, **Save**; reload; confirm it stuck.
-2. Restore it to on and Save.
+   Restore it to on and Save.
+2. Under **Allowed commands**, confirm the grouped toggle browser renders:
+   groups (core + installed plugins) with a group lightswitch each;
+   expanding a group reveals per-action switches; a partially-allowed group
+   shows an "N/total allowed" badge. Type in the filter box — groups and
+   actions filter live.
+3. Turn a whole group on (e.g. `cache`), Save, reload → the group switch is
+   on and `cache/*` is persisted. Turn the group off, expand it, enable one
+   action (e.g. `resave/entries`), Save, reload → only that exact id is
+   persisted and the group switch is off with the badge showing `1/N`.
+4. Confirm the **Custom patterns** table preserves a hand-typed glob
+   (`resave/ent*`) across a Save.
 
-**Expected:** POST → 302 → reload, value persists both directions,
-`grep execDryRunDefault cms/config/project/project.yaml` tracks each save.
-**Measure:** POST status, persisted value, PC write.
+**Expected:** POST → 302 → reload, exec value persists both directions;
+allowed-commands toggles round-trip to `plugins.cortex.settings.allowedCommands`
+in `project.yaml` (group toggle → `group/*`, action toggle → exact id,
+custom patterns verbatim). When `allowedCommands` is set in
+`config/cortex.php`, the browser renders read-only with a "defined in
+config" warning.
+**Measure:** POST status, persisted patterns, PC write, filter behaviour.
 
-### A3 — Allowlist tab: VueAdminTable + slideout *(Free + Pro)*
-1. Open **Allowlist**; the overrides table renders (rows or the empty
+### A3 — Temporary grants screen: VueAdminTable + slideout + effective panel *(Free + Pro)*
+1. Open **Temporary grants**; the grants table renders (rows or the empty
    message), data via `cortex/settings/allowlist-table-data` → 200.
-2. **Add override** → Garnish slideout opens. Fill a pattern
-   (`utils/*`), note, TTL; **Issue override**.
+2. **Issue grant** → Garnish slideout opens. Fill a pattern (`utils/*`),
+   note, TTL; **Issue grant**.
 3. New row appears live (no full reload), expiry rendered.
-4. Remove it (confirm dialog) → row disappears live.
+4. The **Effective allowlist right now** panel lists the combined set: base
+   Settings patterns (Source: Settings, no expiry) plus the active grant
+   (Source: Grant, expiry shown).
+5. Remove the grant (confirm dialog) → row disappears live; the effective
+   panel drops it on reload.
 
 **Expected:** table-data 200, slideout HTML 200, `add-override` POST 200,
-live reload after add/remove. No console errors.
+live reload after add/remove; effective panel reflects
+`Allowlist::getEffective()`. The screen and its copy say "grant" /
+"Temporary grants" throughout; internal routes / table / permissions keep
+the `allowlist` / `override` names. No console errors.
 **Known nit (parked):** the delete confirm shows a literal `{name}`
 placeholder.
 
@@ -317,7 +346,7 @@ untouched (C2 Free counts unchanged); `get_initial_context` reports
 `cortex.edition: "free"`.
 
 ### E2 — Pro unlocks them *(Pro)*
-Flip to Pro and spot-check the positive path: five tabs (A1), token
+Flip to Pro and spot-check the positive path: five subnav items (A1), token
 issuance + HTTP initialize 200 (A4/D1), discovery 200 (B1),
 `cortex.edition: "pro"`.
 
@@ -331,9 +360,9 @@ editions — config-off beats not-licensed.
 
 | # | Case | Edition | Result | Console/Network clean? | Evidence | Notes |
 |---|---|---|---|---|---|---|
-| A1 | Nav + tab gating | Free/Pro | | | | |
-| A2 | Settings save | Free/Pro | | | | |
-| A3 | Allowlist table+slideout | Free/Pro | | | | |
+| A1 | Sidebar section + subnav gating | Free/Pro | | | | |
+| A2 | Settings save + command browser | Free/Pro | | | | |
+| A3 | Temporary grants table+slideout+effective | Free/Pro | | | | |
 | A4 | Tokens issue/plaintext-once/revoke | Pro | | | | |
 | A5 | Activity rows/filters/sort/redaction | Pro | | | | |
 | B1 | .well-known JSON (S256-only) | Pro | | | | |
