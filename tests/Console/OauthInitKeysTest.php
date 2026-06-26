@@ -88,6 +88,13 @@ function _cortex_init_keys_cleanup(string $testKeysDir): void
 }
 
 beforeEach(function() {
+    // Force lazy initialization of the typed `_storagePath` slot before we
+    // snapshot it. Craft sets it on first `getStoragePath()` access; test
+    // execution order (Pest runs prior defects first) doesn't guarantee an
+    // earlier test already triggered it, and reading an uninitialized typed
+    // property throws.
+    Craft::$app->getPath()->getStoragePath();
+
     // Snapshot the storage path so we can restore it after the test
     // mutates Craft's path component.
     $rc = new ReflectionClass(Craft::$app->getPath());
