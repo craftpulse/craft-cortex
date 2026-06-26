@@ -218,6 +218,13 @@ beforeEach(function() {
     $settings->httpEnabled = true;
     $settings->allowedOrigins = [];
 
+    // The HTTP transport is Pro-only (Gate 9.7) — pin Pro for the
+    // file so the edition gate doesn't 403 every case; the dedicated
+    // Free-edition test flips it back inline. Mirrors the
+    // `cortex_with_edition()` mechanics (plain property, no PC write).
+    $this->originalEdition = Cortex::getInstance()->edition;
+    Cortex::getInstance()->edition = Cortex::EDITION_PRO;
+
     // Auth scaffolding — issue a fresh bearer token bound to the
     // playground's admin user for the majority of tests. Tests that
     // exercise the no-auth / bad-auth paths swap the header out.
@@ -238,6 +245,7 @@ beforeEach(function() {
 });
 
 afterEach(function() {
+    Cortex::getInstance()->edition = $this->originalEdition;
     $settings = Cortex::getInstance()->getSettings();
     $settings->httpEnabled = $this->originalHttpEnabled;
     $settings->allowedOrigins = $this->originalAllowedOrigins;
@@ -276,6 +284,37 @@ it('returns 503 when Settings::$httpEnabled is false', function() {
 });
 
 // -----------------------------------------------------------------------------
+// Pro edition gate (Gate 9.7) — the HTTP transport does not exist on Free
+// -----------------------------------------------------------------------------
+
+it('returns 403 on a Free install even with a valid bearer', function() {
+    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $this->bearerHeader,
+    ]);
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(403);
+    expect($response->data)->toBeArray()
+        ->toHaveKey('error', 'The HTTP transport requires the Cortex Pro edition.');
+});
+
+it('the kill switch outranks the edition gate (503 wins on Free with httpEnabled off)', function() {
+    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+    Cortex::getInstance()->getSettings()->httpEnabled = false;
+
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $this->bearerHeader,
+    ]);
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(503);
+});
+
+// -----------------------------------------------------------------------------
 // MCP-Protocol-Version header validation
 // -----------------------------------------------------------------------------
 
@@ -296,6 +335,29 @@ it('returns 400 when MCP-Protocol-Version is unrecognised', function() {
     $response = $controller->runIndex();
 
     expect($response->statusCode)->toBe(400);
+});
+
+it('accepts a supported older MCP-Protocol-Version header', function() {
+    // 2025-06-18 remains negotiable alongside the 2025-11-25 default,
+    // so a client pinned to the older revision is not locked out at
+    // the header gate.
+    $body = json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+
+    $controller = _cortex_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => '2025-06-18',
+        'Authorization' => $this->bearerHeader,
+    ], body: (string) $body);
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(200);
 });
 
 // -----------------------------------------------------------------------------
@@ -336,6 +398,56 @@ it('passes Origin validation when Origin matches the allowlist exactly', functio
     $response = $controller->runIndex();
 
     expect($response->statusCode)->toBe(200);
+});
+
+it('returns 403 on an empty Origin allowlist when devMode is off', function() {
+    Cortex::getInstance()->getSettings()->allowedOrigins = [];
+    $general = Craft::$app->getConfig()->getGeneral();
+    $originalDevMode = $general->devMode;
+    $general->devMode = false;
+
+    try {
+        $controller = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            Http::HEADER_ORIGIN => 'https://anything.example',
+            'Authorization' => $this->bearerHeader,
+        ]);
+        $response = $controller->runIndex();
+
+        expect($response->statusCode)->toBe(403);
+    } finally {
+        $general->devMode = $originalDevMode;
+    }
+});
+
+it('allows an empty Origin allowlist when devMode is on (warn-and-allow)', function() {
+    Cortex::getInstance()->getSettings()->allowedOrigins = [];
+    $general = Craft::$app->getConfig()->getGeneral();
+    $originalDevMode = $general->devMode;
+    $general->devMode = true;
+
+    $body = json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+
+    try {
+        $controller = _cortex_mcp_harness('POST', [
+            Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+            Http::HEADER_ORIGIN => 'https://anything.example',
+            'Authorization' => $this->bearerHeader,
+        ], (string) $body);
+        $response = $controller->runIndex();
+
+        expect($response->statusCode)->toBe(200);
+    } finally {
+        $general->devMode = $originalDevMode;
+    }
 });
 
 // -----------------------------------------------------------------------------

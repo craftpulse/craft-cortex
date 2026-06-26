@@ -66,6 +66,21 @@ class Skill extends Element
      */
     public const PERMISSION_MANAGE = 'manageCortexSkills';
 
+    /**
+     * Slug-format constraint on the handle (the skill's natural key).
+     * Lowercase letters, digits, and single internal hyphens only — the
+     * handle is interpolated into `craft-skills://<handle>` resource
+     * URIs and `name:` frontmatter, and must stay URI-safe and match the
+     * bundled `michtio/craftcms-claude-skills` lowercase-dash convention
+     * (e.g. `craft-php-guidelines`, `ddev`). Craft's `HandleValidator`
+     * is deliberately NOT reused: it permits camelCase and underscores,
+     * which would break URI addressability and the bundled-override
+     * contract.
+     *
+     * @since 5.0.0
+     */
+    public const HANDLE_PATTERN = '/^[a-z0-9]+(-[a-z0-9]+)*$/';
+
     // Public Properties
     // =========================================================================
 
@@ -395,6 +410,13 @@ class Skill extends Element
         $rules = parent::defineRules();
         $rules[] = [['handle'], 'required'];
         $rules[] = [['handle'], 'string', 'max' => 255];
+        $rules[] = [
+            ['handle'],
+            'match',
+            'pattern' => self::HANDLE_PATTERN,
+            'message' => Craft::t('cortex', 'Handle must be a lowercase slug: letters, digits, and single hyphens (e.g. “my-skill”).'),
+        ];
+        $rules[] = [['handle'], 'validateHandleImmutable'];
         $rules[] = [['handle'], 'validateHandleUnique'];
         $rules[] = [['description'], 'string', 'max' => 4096];
         return $rules;
@@ -402,11 +424,15 @@ class Skill extends Element
 
     /**
      * Validates that the handle is not already in use by another
-     * (non-trashed, non-self) skill element. The DB UNIQUE index
-     * catches duplicates at save time; this validator surfaces the
-     * collision in the Yii errors-array shape so tool consumers see a
-     * structured validation envelope rather than a database
-     * integrity-violation exception.
+     * skill element — including a soft-deleted (trashed) one. The DB
+     * UNIQUE index on `cortex_skills.handle` holds the trashed row, so
+     * a default (`trashed=false`) probe would let a colliding-with-
+     * trashed handle pass model validation and then explode with a raw
+     * `IntegrityException` inside `afterSave()`, leaving a half-saved
+     * element. Probing the trashed slot too makes the create fail
+     * closed with a structured validation error pointing the operator
+     * at restore-or-hard-delete — mirroring the UPDATE-path hint in
+     * `tools\system\Skill::_resolveSkillElement()`.
      *
      * @param string $attribute The attribute under validation.
      *
@@ -433,6 +459,72 @@ class Skill extends Element
                 $attribute,
                 Craft::t('cortex', 'Handle “{value}” is already in use by another skill.', [
                     'value' => $this->handle,
+                ]),
+            );
+            return;
+        }
+
+        // The live slot is clear, but the DB UNIQUE index still holds any
+        // soft-deleted row with this handle. Catch it here so the save
+        // fails closed with a clean validation error instead of throwing
+        // an IntegrityException mid-`afterSave()`.
+        $trashedQuery = static::find()
+            ->status(null)
+            ->site('*')
+            ->trashed(true)
+            ->handle($this->handle);
+
+        if ($this->id !== null) {
+            $trashedQuery->andWhere(['not', ['elements.id' => $this->id]]);
+        }
+
+        if ($trashedQuery->exists()) {
+            $this->addError(
+                $attribute,
+                Craft::t('cortex', 'Handle “{value}” is in use by a trashed skill. Restore it via the Craft CP, or hard-delete the trashed skill (mode=delete with hardDelete=true) to free the handle.', [
+                    'value' => $this->handle,
+                ]),
+            );
+        }
+    }
+
+    /**
+     * Enforces the natural-key invariant: a skill's handle is immutable
+     * once the element exists. The handle is interpolated into
+     * `craft-skills://<handle>` resource URIs and bundled-override keys,
+     * so renaming it would orphan every cached reference. The `skill`
+     * tool refuses handle changes at its own layer, but Craft's built-in
+     * `elements/save` (the Gate 9.6 CP authoring path) bypasses that
+     * check — enforcing it here means both paths inherit the guarantee.
+     *
+     * Skipped for brand-new elements (no persisted handle to compare
+     * against) and when the value is unchanged.
+     *
+     * @param string $attribute The attribute under validation.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function validateHandleImmutable(string $attribute): void
+    {
+        if ($this->id === null) {
+            return;
+        }
+
+        // No persisted record yet → this is the element's first save
+        // (the canonical row hasn't been written), so there's no prior
+        // handle to hold immutable.
+        $record = SkillRecord::findOne($this->id);
+        if ($record === null) {
+            return;
+        }
+
+        if ($this->handle !== $record->handle) {
+            $this->addError(
+                $attribute,
+                Craft::t('cortex', 'Handle is immutable; “{old}” cannot be renamed to “{new}”. Create a new skill instead.', [
+                    'old' => (string) $record->handle,
+                    'new' => (string) $this->handle,
                 ]),
             );
         }

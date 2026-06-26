@@ -20,18 +20,24 @@
  * @since  5.0.0
  */
 
-// __DIR__ resolves through the symlink to the cortex source repo, which has
-// no Craft install — so we anchor on the working directory instead. The
-// canonical invocation is `ddev exec --dir=/var/www/html/cms vendor/bin/pest
-// --configuration=vendor/craftpulse/craft-cortex/phpunit.xml.dist`, which
-// puts cwd at the playground's Craft root.
-$craftBase = getcwd();
+// The canonical invocation is plugin-local — from the plugin directory with
+// its own vendor, so pest plugins that other harnesses install into the
+// shared cms vendor (e.g. craft-pest-core) can never hijack this suite:
+//   ddev exec --dir=<plugin dir> "[ -d vendor ] || composer install; vendor/bin/pest"
+// The surrounding Craft install is located via `CORTEX_TEST_CRAFT_BASE` when
+// set, then the working directory (legacy cms-root invocation), then the
+// playground's in-container default.
+$craftBase = getenv('CORTEX_TEST_CRAFT_BASE') ?: getcwd();
 
 if ($craftBase === false || !file_exists($craftBase . '/craft')) {
-    fwrite(STDERR, "Cortex test bootstrap could not locate Craft at cwd={$craftBase}.\n");
+    $craftBase = '/var/www/html/cms';
+}
+
+if (!file_exists($craftBase . '/craft')) {
+    fwrite(STDERR, "Cortex test bootstrap could not locate a Craft install (tried CORTEX_TEST_CRAFT_BASE, cwd, /var/www/html/cms).\n");
     fwrite(STDERR, "Run tests via:\n");
-    fwrite(STDERR, "  ddev exec --dir=/var/www/html/cms vendor/bin/pest \\\n");
-    fwrite(STDERR, "    --configuration=vendor/craftpulse/craft-cortex/phpunit.xml.dist\n");
+    fwrite(STDERR, "  ddev exec --dir=<plugin dir> \"vendor/bin/pest\"\n");
+    fwrite(STDERR, "or point CORTEX_TEST_CRAFT_BASE at a Craft root.\n");
     exit(1);
 }
 
@@ -67,7 +73,10 @@ if (is_object($composerLoader) && method_exists($composerLoader, 'addPsr4')) {
 }
 
 // Pest's auto-discovery looks for `tests/Pest.php` relative to its working
-// directory; since pest runs from the playground but our config lives in
-// cortex/tests/, we load it explicitly here so `uses()` and the custom
-// `expect()` extensions register before tests run.
-require __DIR__ . '/Pest.php';
+// directory; under the legacy cms-root invocation that misses our config in
+// cortex/tests/, so we load it explicitly here so `uses()` and the custom
+// `expect()` extensions register before tests run. `require_once`, not
+// `require`: under the plugin-local invocation pest's own BootFiles has
+// already include_once'd this file, and a plain require would fatally
+// redeclare every helper function.
+require_once __DIR__ . '/Pest.php';

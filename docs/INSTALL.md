@@ -184,10 +184,10 @@ Returns a fresh `client_id` (and `client_secret` if the method is not `none`). D
 5. Use the resulting access token:
    ```bash
    curl -X POST https://your-site.test/cortex/mcp \
-     -H 'MCP-Protocol-Version: 2025-06-18' \
+     -H 'MCP-Protocol-Version: 2025-11-25' \
      -H 'Authorization: Bearer <access_token>' \
      -H 'Content-Type: application/json' \
-     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","clientInfo":{"name":"my-client","version":"1.0"}}}'
+     -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","clientInfo":{"name":"my-client","version":"1.0"}}}'
    ```
 
 **Audience binding (RFC 8707):** The `resource` parameter on `/authorize` and `/token` ends up in the JWT `aud` claim. Cortex verifies it matches the canonical `cortex/mcp` URL on every request — a token issued for resource A can't be replayed against resource B. Pass `resource=<absolute URL to /cortex/mcp>` on both endpoints.
@@ -225,7 +225,7 @@ Accept: text/event-stream
 Content-Type: application/json
 Authorization: Bearer <token>
 Mcp-Session-Id: <session-id>
-MCP-Protocol-Version: 2025-06-18
+MCP-Protocol-Version: 2025-11-25
 
 {"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"<tool>","arguments":{...},"_meta":{"progressToken":"prog-1"}}}
 ```
@@ -254,7 +254,7 @@ The terminal frame carries the original request id and the `tools/call` result e
 POST /cortex/mcp
 Authorization: Bearer <token>
 Mcp-Session-Id: <session-id>
-MCP-Protocol-Version: 2025-06-18
+MCP-Protocol-Version: 2025-11-25
 
 {"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":2,"reason":"user requested"}}
 ```
@@ -270,7 +270,7 @@ curl -N -X POST https://your-site.test/cortex/mcp \
   -H "Authorization: Bearer $TOKEN" \
   -H "Mcp-Session-Id: $SESSION" \
   -H 'Accept: text/event-stream' \
-  -H 'MCP-Protocol-Version: 2025-06-18' \
+  -H 'MCP-Protocol-Version: 2025-11-25' \
   -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"_streaming_test","arguments":{},"_meta":{"progressToken":"prog-1"}}}'
 ```
@@ -428,7 +428,7 @@ In the Inspector UI, point at:
 - **Command:** `docker`
 - **Arguments:** `exec -i ddev-<project>-web php /var/www/html/craft cortex/serve`
 
-A successful `initialize` handshake reports `cortex 5.0.0` and protocol `2025-06-18`. `tools/list` returns 32 entries; `prompts/list` returns 8; `resources/list` returns 77.
+A successful `initialize` handshake reports `cortex 5.0.0` and the negotiated protocol version — `2025-11-25` (the latest Cortex advertises) when your client requests it, or `2025-06-18` when an older client does. On a Free install `tools/list` returns 33 entries; `prompts/list` returns 10; `resources/list` returns 98.
 
 ## Troubleshooting
 

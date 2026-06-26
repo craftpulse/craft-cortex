@@ -228,6 +228,41 @@ class InvocationQuery extends Query
         return $this;
     }
 
+    /**
+     * Return the distinct, alphabetised list of `toolName` values across
+     * the whole `cortex_invocations` table. Feeds the Activity tab's tool
+     * filter dropdown (Gate 9.3). `toolName` is an indexed column so the
+     * `DISTINCT` scan stays cheap; this method is called once per
+     * `actionActivity` render.
+     *
+     * Resets `select`, `distinct`, and `orderBy` on a fresh clone so a
+     * caller that has already composed filters on `$this` does not have
+     * its column projection mutated as a side effect.
+     *
+     * Scaling caveat (gate-9.md sub-gate 9.3 risk note): at thousands of
+     * distinct tools the dropdown grows unwieldy and should become a
+     * typeahead — out of scope here, where the tool set is bounded by the
+     * registered tool count (low dozens).
+     *
+     * @return string[]
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function distinctToolNames(): array
+    {
+        $values = (new self())
+            ->select(['toolName'])
+            ->distinct()
+            ->orderBy(['toolName' => SORT_ASC])
+            ->column();
+
+        return array_values(array_filter(
+            array_map(static fn(mixed $v): string => (string) $v, $values),
+            static fn(string $v): bool => $v !== '',
+        ));
+    }
+
     // Private Methods
     // =========================================================================
 

@@ -68,7 +68,7 @@
     <div class="panel">
         <h1>{{ 'Authorize {client}'|t('cortex', { client: clientName }) }}</h1>
         <p class="lead">
-            {{ '{client} is requesting access to your Craft account.'|t('cortex', { client: '<span class="client">' ~ clientName ~ '</span>' })|raw }}
+            {{ '{client} is requesting access to your Craft account.'|t('cortex', { client: '<span class="client">' ~ clientName|e('html') ~ '</span>' })|raw }}
         </p>
 
         <div class="user-row">

@@ -4,7 +4,7 @@ namespace craftpulse\cortex\controllers;
 
 use Craft;
 use craft\elements\User;
-use craft\web\Controller;
+use craft\web\View;
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\oauth\entities\UserEntity;
 use JsonException;
@@ -50,15 +50,26 @@ use yii\web\Response;
  *     callers revoke tokens with no further auth — the token itself
  *     is the proof.
  *
- * `$enableCsrfValidation = false` because every endpoint is either
- * PSR-7-bridged (auth handled by league) or revocation-style (token
- * is the proof).
+ * `$enableCsrfValidation = false` by default because `token`,
+ * `register`, and `revoke` are anonymous PSR-7 / token-proof endpoints
+ * with no Craft session — a CSRF token would be meaningless there.
+ * `authorize` is the exception: its consent POST is a session-backed
+ * "approve this client for *your* Craft account" form, so it IS
+ * CSRF-vulnerable (PKCE protects the code→token exchange, not the
+ * consent grant). `beforeAction()` re-enables CSRF validation for that
+ * one action; league's `validateAuthorizationRequest()` reads the OAuth
+ * parameters from the query string (not the body), so the consent
+ * GET→POST round-trip still resolves with CSRF on.
+ *
+ * Extends `AbstractOauthController` for the shared `httpEnabled` kill
+ * switch — every action returns 503 before any DB work or DCR insert
+ * when `Settings::$httpEnabled` is false.
  * =========================================================================
  *
  * @author Craftpulse
  * @since  5.0.0
  */
-class OauthController extends Controller
+class OauthController extends AbstractOauthController
 {
     // Protected Properties
     // =========================================================================
@@ -76,8 +87,60 @@ class OauthController extends Controller
      */
     public $enableCsrfValidation = false;
 
+    // Protected Methods
+    // =========================================================================
+
+    /**
+     * @inheritdoc
+     *
+     * The three unauthenticated OAuth endpoints get the IP-keyed
+     * throttle — `register` first (an unauthenticated bcrypt-per-call
+     * plus a row insert), `token` and `revoke` alongside. `authorize`
+     * is excluded: it requires a live Craft session, so the per-user
+     * surface already covers it.
+     *
+     * @return string[]
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _throttledActionIds(): array
+    {
+        return ['register', 'token', 'revoke'];
+    }
+
     // Public Methods
     // =========================================================================
+
+    /**
+     * @inheritdoc
+     *
+     * Re-enables CSRF validation for the `authorize` action only. The
+     * consent POST is session-backed, so it must carry a valid CSRF
+     * token — the template at `oauth/authorize.twig` already embeds one.
+     * `token` / `register` / `revoke` keep `$enableCsrfValidation =
+     * false`: they're anonymous token-proof endpoints with no session.
+     *
+     * The toggle is set before delegating to
+     * `AbstractOauthController::beforeAction()`, which runs the
+     * `httpEnabled` kill switch and IP throttle and then hands off to
+     * Craft's pipeline — where Yii performs the CSRF check on unsafe
+     * methods.
+     *
+     * @throws \yii\web\BadRequestHttpException When the `authorize`
+     *         consent POST is missing or carries an invalid CSRF token.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function beforeAction($action): bool
+    {
+        if ($action->id === 'authorize') {
+            $this->enableCsrfValidation = true;
+        }
+
+        return parent::beforeAction($action);
+    }
 
     /**
      * GET / POST authorize. GET validates the authorization request
@@ -315,6 +378,14 @@ class OauthController extends Controller
      * username, and a hidden form payload that POSTs back to this
      * action with the user's decision.
      *
+     * Rendered with `View::TEMPLATE_MODE_CP` explicitly — `/oauth/
+     * authorize` is a SITE request, and the `cortex/...` plugin
+     * template root only resolves in CP template mode (a site-mode
+     * render throws `TemplateLoaderException`; caught by the gate-9
+     * browser smoke).
+     *
+     * @throws \Throwable from template rendering.
+     *
      * @author Craftpulse
      * @since  5.0.0
      */
@@ -335,6 +406,7 @@ class OauthController extends Controller
                 'username' => $user->username ?? $user->email,
                 'query' => $this->request->getQueryParams(),
             ],
+            View::TEMPLATE_MODE_CP,
         );
         return $this->response;
     }

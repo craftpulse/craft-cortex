@@ -31,13 +31,14 @@
         "php": ">=8.2",
         "craftcms/cms": "^5.0",
         "league/oauth2-server": "^9.0",
-        "michtio/craftcms-claude-skills": "^1.4.2"
+        "nyholm/psr7": "^1.8",
+        "michtio/craftcms-claude-skills": "^1.6.1"
     },
     "require-dev": {
         "craftcms/ecs": "dev-main",
         "craftcms/generator": "^2.0",
         "craftcms/phpstan": "dev-main",
-        "pestphp/pest": "^3.0"
+        "pestphp/pest": "^2.36"
     },
     "autoload": {
         "psr-4": {
@@ -69,6 +70,7 @@
         "developer": "Craftpulse",
         "developerUrl": "https://craftpulse.com",
         "documentationUrl": "https://github.com/craftpulse/craft-cortex",
+        "changelogUrl": "https://raw.githubusercontent.com/craftpulse/craft-cortex/develop-v5/CHANGELOG.md",
         "class": "craftpulse\\cortex\\Cortex"
     }
 }

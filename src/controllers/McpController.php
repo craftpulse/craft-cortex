@@ -137,14 +137,16 @@ class McpController extends Controller
     /**
      * @inheritdoc
      *
-     * Six gates run before the action body sees the request:
+     * Seven gates run before the action body sees the request:
      *
      *   1. `parent::beforeAction()` — Yii's standard pipeline.
      *   2. `httpEnabled` 503 check — kill switch.
-     *   3. `Origin` allowlist — DNS-rebinding defense.
-     *   4. `MCP-Protocol-Version` header.
-     *   5. `Authorization: Bearer` lookup against `cortex_tokens`.
-     *   6. Per-user rate limit consume (Gate 7.6).
+     *   3. Pro edition 403 check — the HTTP transport is a Pro
+     *      surface (PLANNING.md §4: Free ships stdio only).
+     *   4. `Origin` allowlist — DNS-rebinding defense.
+     *   5. `MCP-Protocol-Version` header.
+     *   6. `Authorization: Bearer` lookup against `cortex_tokens`.
+     *   7. Per-user rate limit consume (Gate 7.6).
      *
      * DELETE skips the bearer check because it carries no JSON-RPC
      * payload and only references an `Mcp-Session-Id` for
@@ -169,13 +171,14 @@ class McpController extends Controller
         //
         // Order:
         //   1. httpEnabled kill switch.
-        //   2. Origin allowlist.
-        //   3. DELETE early-exit (no bearer required — see below).
-        //   4. Method check (GET = 405, non-POST = 405).
-        //   5. MCP-Protocol-Version header.
-        //   6. Authorization: Bearer lookup + identity binding.
-        //   7. Per-user rate limit consume (Gate 7.6).
-        //   8. parent::beforeAction() — now sees an authenticated user.
+        //   2. Pro edition gate.
+        //   3. Origin allowlist.
+        //   4. DELETE early-exit (no bearer required — see below).
+        //   5. Method check (GET = 405, non-POST = 405).
+        //   6. MCP-Protocol-Version header.
+        //   7. Authorization: Bearer lookup + identity binding.
+        //   8. Per-user rate limit consume (Gate 7.6).
+        //   9. parent::beforeAction() — now sees an authenticated user.
 
         $settings = Cortex::getInstance()->getSettings();
 
@@ -185,14 +188,24 @@ class McpController extends Controller
             return false;
         }
 
-        // Gate 2 — Origin allowlist.
+        // Gate 2 — edition. The Streamable HTTP transport is Pro-only
+        // (PLANNING.md §4: the Free tier ships stdio only). 403, not
+        // 503 — the kill switch means "configured off"; this means
+        // "not licensed". Runs before Origin/bearer work so Free
+        // installs spend nothing on requests they will never serve.
+        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+            $this->_status(403, 'The HTTP transport requires the Cortex Pro edition.');
+            return false;
+        }
+
+        // Gate 3 — Origin allowlist.
         if (!$this->_passesOrigin($settings->allowedOrigins)) {
             return false;
         }
 
         $method = strtoupper($this->request->getMethod());
 
-        // Gate 3 — DELETE bypasses bearer auth: it's a side-channel
+        // Gate 4 — DELETE bypasses bearer auth: it's a side-channel
         // for session cleanup that doesn't carry a JSON-RPC payload
         // and references only the opaque session id. The session id
         // itself is unguessable (`random_bytes(16)`), and termination
@@ -208,7 +221,7 @@ class McpController extends Controller
             return true;
         }
 
-        // Gate 3b — GET is reserved for SSE upgrade in 7.7. Reject
+        // Gate 4b — GET is reserved for SSE upgrade in 7.7. Reject
         // before authenticating so we don't burn a DB probe on a
         // method that can't proceed anyway.
         if ($method === 'GET') {
@@ -221,14 +234,14 @@ class McpController extends Controller
             return false;
         }
 
-        // Gate 4 — MCP-Protocol-Version. Validated before auth so
+        // Gate 5 — MCP-Protocol-Version. Validated before auth so
         // wrong-version clients get the spec-shaped 400 they expect
         // rather than a misleading 401.
         if (!$this->_passesProtocolVersion()) {
             return false;
         }
 
-        // Gate 5 — bearer-token authentication. 401 with
+        // Gate 6 — bearer-token authentication. 401 with
         // WWW-Authenticate: Bearer realm="cortex" on every reject
         // path per RFC 6750.
         //
@@ -236,10 +249,14 @@ class McpController extends Controller
         //   1. OAuth access tokens (short-lived, audience-bound).
         //   2. Long-lived bearer tokens (cortex_tokens).
         //
-        // Disambiguation: JWTs contain dots, bearer tokens are 64-char
-        // hex without dots. Probe OAuth first when dots present;
-        // fall back to bearer when the OAuth lookup misses. Either
-        // path resolving wins; both missing → 401.
+        // Disambiguation: OAuth JWTs contain dots; opaque bearer tokens
+        // are 64-char hex with no dots (`bin2hex(random_bytes(32))` —
+        // see `Tokens::issue()`). The shapes are disjoint, so the token
+        // format selects exactly one lookup path: a dotted token is
+        // treated as an OAuth JWT and is NOT retried as an opaque
+        // bearer when the OAuth lookup misses; a dotless token goes
+        // straight to the bearer table. Whichever path matches wins;
+        // a miss on the selected path → 401.
         $bearer = $this->_extractBearer();
         if ($bearer === null) {
             $this->_unauthorized('Missing or malformed Authorization header. Expected: Authorization: Bearer <token>.');
@@ -267,7 +284,7 @@ class McpController extends Controller
             }
         }
 
-        // Gate 5b — per-user rate limit. One token per authenticated
+        // Gate 6b — per-user rate limit. One token per authenticated
         // POST dispatch. DELETE already returned above, so the consume
         // only runs on the dispatch path. The HTTP rate limit is the
         // backstop against runaway agents that loop `tools/call`
@@ -285,7 +302,7 @@ class McpController extends Controller
             }
         }
 
-        // Gate 6 — Craft's own beforeAction pipeline. Runs CSRF
+        // Gate 7 — Craft's own beforeAction pipeline. Runs CSRF
         // exemption, `_enforceAllowAnonymous`, and any further
         // base-class checks. With the identity bound above, the
         // `allowAnonymous = []` posture passes for the authenticated
@@ -354,9 +371,13 @@ class McpController extends Controller
 
     /**
      * Validate the `Origin` header against the configured allowlist.
-     * Empty allowlist is permissive in dev — log a warning so
-     * operators that flip `httpEnabled=true` without configuring
-     * `allowedOrigins` see the soft-landing diagnostic in the log.
+     *
+     * An empty allowlist fails CLOSED outside `devMode` — flipping
+     * `httpEnabled=true` in production without naming any origin is a
+     * DNS-rebinding hole, so a 403 forces the operator to configure
+     * `Settings::$allowedOrigins` first. In `devMode` the empty list
+     * keeps the warn-and-allow soft-landing so local development isn't
+     * blocked.
      *
      * Returns true to continue, false (with the response populated)
      * to short-circuit.
@@ -371,6 +392,17 @@ class McpController extends Controller
         $origin = $this->request->getHeaders()->get(Http::HEADER_ORIGIN);
 
         if ($allowedOrigins === []) {
+            /** @var \craft\web\Application $app */
+            $app = Craft::$app;
+            if (!$app->getConfig()->getGeneral()->devMode) {
+                $this->_status(
+                    403,
+                    'HTTP transport refused: configure Settings::$allowedOrigins before enabling '
+                    . 'the HTTP transport in production. An empty Origin allowlist is rejected outside devMode.',
+                );
+                return false;
+            }
+
             Craft::warning(
                 'cortex HTTP transport: Origin allowlist is empty and httpEnabled is true. '
                 . 'Configure Settings::$allowedOrigins for any non-dev environment.',
@@ -406,11 +438,11 @@ class McpController extends Controller
             $this->_status(400, 'Missing MCP-Protocol-Version header.');
             return false;
         }
-        if ($version !== Server::PROTOCOL_VERSION) {
+        if (!in_array($version, Server::SUPPORTED_PROTOCOL_VERSIONS, true)) {
             $this->_status(400, sprintf(
-                'Unsupported MCP-Protocol-Version: "%s". This server supports "%s".',
+                'Unsupported MCP-Protocol-Version: "%s". This server supports: %s.',
                 $version,
-                Server::PROTOCOL_VERSION,
+                implode(', ', Server::SUPPORTED_PROTOCOL_VERSIONS),
             ));
             return false;
         }

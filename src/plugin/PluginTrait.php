@@ -64,7 +64,7 @@ trait PluginTrait
         $this->_registerGcListener();
         $this->_registerAuditLogListener();
         $this->_registerSkillElementType();
-        $this->_registerSkillPermissions();
+        $this->_registerCortexPermissions();
         $this->_registerSkillProjectConfigHandlers();
         $this->_registerUrlRules();
     }
@@ -98,12 +98,15 @@ trait PluginTrait
     }
 
     /**
-     * Prunes expired runtime-override rows and (when audit retention
-     * is configured) old `cortex_invocations` rows during Craft's
-     * gc sweep. Both deletes are single indexed `deleteAll` calls,
-     * cheaper than the overhead of a queue job. Audit retention
-     * defaults to forever (`Settings::$auditRetentionDays = null`);
-     * when null the prune call is a no-op.
+     * Prunes expired runtime-override rows, old `cortex_invocations`
+     * rows (when audit retention is configured), and dead OAuth codes /
+     * tokens during Craft's gc sweep. Every delete is a single indexed
+     * `deleteAll`, cheaper than the overhead of a queue job. Audit
+     * retention defaults to forever (`Settings::$auditRetentionDays =
+     * null`); when null that prune call is a no-op. The OAuth prune
+     * only drops already-expired authorization codes and expired /
+     * revoked tokens — fail-closed-safe per `Oauth::pruneExpired()`,
+     * and never severs an active refresh-rotation chain.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -117,6 +120,7 @@ trait PluginTrait
                 $plugin = Cortex::getInstance();
                 $plugin->allowlist->pruneExpired();
                 $plugin->invocations->prune();
+                $plugin->oauth->pruneExpired();
             },
         );
     }
@@ -175,17 +179,23 @@ trait PluginTrait
     }
 
     /**
-     * Registers the `manageCortexSkills` permission under a Cortex
-     * heading on the user-permissions screen. The permission is
-     * global (no per-instance ACL); the element's
-     * `canSave / canDelete / canView / canDuplicate` overrides
-     * consult it directly. Shape verified against
+     * Registers every Cortex permission under a shared Cortex
+     * heading on the user-permissions screen.
+     *
+     *   - `Skill::PERMISSION_MANAGE` (`manageCortexSkills`) — global
+     *     (no per-instance ACL); the element's `canSave / canDelete /
+     *     canView / canDuplicate` overrides consult it directly.
+     *   - `Cortex::PERMISSION_VIEW_ACTIVITY` (`cortex:viewActivity`) —
+     *     gates the Activity tab (Gate 9.3); the controller scopes
+     *     queries to the caller's own rows when the user is non-admin.
+     *
+     * Shape verified against
      * `vendor/craftcms/cms/src/services/UserPermissions.php:85-96`.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _registerSkillPermissions(): void
+    private function _registerCortexPermissions(): void
     {
         Event::on(
             UserPermissions::class,
@@ -199,6 +209,13 @@ trait PluginTrait
                             'info' => Craft::t(
                                 'cortex',
                                 'Allows creating, updating, and deleting Cortex skill elements through the MCP server.',
+                            ),
+                        ],
+                        Cortex::PERMISSION_VIEW_ACTIVITY => [
+                            'label' => Craft::t('cortex', 'View Cortex activity log'),
+                            'info' => Craft::t(
+                                'cortex',
+                                'Allows viewing the Activity tab in Cortex CP. Non-admins only see their own invocations; admins see every row.',
                             ),
                         ],
                     ],
@@ -228,24 +245,41 @@ trait PluginTrait
     }
 
     /**
-     * Registers the HTTP transport endpoint at `/cortex/mcp`. The
-     * route sits under the site URL rules (front-end-style endpoint,
-     * no cpTrigger) because MCP clients hit a stable public URL that
-     * doesn't move with cpTrigger reconfiguration.
+     * Registers the HTTP transport endpoint at `/cortex/mcp` and the
+     * CP-side routes for the tabbed Cortex settings screen.
      *
-     * POST is the JSON-RPC entry point; GET is reserved for SSE
-     * upgrade; DELETE terminates the session. The controller
-     * refuses every request when `Settings::$httpEnabled` is
-     * false, so registering the route unconditionally is safe —
-     * feature gating happens at the controller layer, not at the
-     * route layer.
+     * Two events fire — `EVENT_REGISTER_SITE_URL_RULES` for the
+     * front-end `cortex/mcp` + OAuth + `.well-known/*` routes, and
+     * `EVENT_REGISTER_CP_URL_RULES` for the CP-side tabs introduced
+     * in Gate 9. The events fire at different stages of the URL
+     * manager bootstrap; mixing them in one handler silently drops
+     * half the routes.
      *
-     * OAuth endpoints sit at `/oauth/*` (not under `/cortex/`) for
-     * client compatibility — most MCP clients expect bare
-     * `/oauth/authorize`, `/oauth/token`, etc. The `.well-known/*`
-     * discovery endpoints land at the site root per RFC 8414 §3
-     * and RFC 9728 §3 — both RFCs explicitly require the
-     * well-known paths to be at the root of the issuer URL.
+     * **Site rules** (POST/GET/DELETE `cortex/mcp`, `oauth/*`,
+     * `.well-known/*`): MCP clients hit a stable public URL that
+     * doesn't move with cpTrigger reconfiguration. POST is the
+     * JSON-RPC entry point; GET is reserved for SSE upgrade; DELETE
+     * terminates the session. All three controllers — `McpController`,
+     * `OauthController`, and `WellKnownController` — refuse every
+     * request with 503 when `Settings::$httpEnabled` is false (the MCP
+     * controller in its own `beforeAction()`, the OAuth + well-known
+     * controllers via the shared `AbstractOauthController` base), so
+     * registering these routes unconditionally is safe — feature
+     * gating happens at the controller layer, not at the route layer.
+     * OAuth endpoints sit
+     * at `/oauth/*` (not under `/cortex/`) for client compatibility;
+     * the `.well-known/*` discovery endpoints land at the site root
+     * per RFC 8414 §3 and RFC 9728 §3 — both RFCs explicitly require
+     * the well-known paths to be at the root of the issuer URL.
+     *
+     * **CP rules** (Gate 9.1): `settings/plugins/cortex` is the
+     * redirect target from `Cortex::getSettingsResponse()` and the
+     * Settings → Plugins → Cortex nav link. The `cortex/{tab}` URLs
+     * are the per-tab routes (locked decision 2 — per-tab routes
+     * over anchor-based tabs for bookmarking, deep links, and
+     * independent badge counts). Table-data + mutation routes
+     * (token issue/revoke, activity rows) land in 9.2 / 9.3 alongside
+     * their respective controller actions.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -268,6 +302,42 @@ trait PluginTrait
 
                 $event->rules['GET .well-known/oauth-authorization-server'] = 'cortex/well-known/authorization-server';
                 $event->rules['GET .well-known/oauth-protected-resource'] = 'cortex/well-known/protected-resource';
+            },
+        );
+
+        Event::on(
+            UrlManager::class,
+            UrlManager::EVENT_REGISTER_CP_URL_RULES,
+            static function(RegisterUrlRulesEvent $event): void {
+                // Prepend so the literal `settings/plugins/cortex` pattern beats
+                // Craft's wildcard `settings/plugins/<handle>` rule from
+                // `vendor/craftcms/cms/src/config/cproutes/common.php:66`. Yii
+                // matches rules in array order — the wildcard is loaded first
+                // and would otherwise route to `plugins/edit-plugin-settings`,
+                // which calls `Cortex::getSettingsResponse()` and redirects
+                // back to the same URL (infinite loop).
+                $event->rules = array_merge([
+                    'settings/plugins/cortex' => 'cortex/settings/index',
+                    // The CP section root (`/cortex`) and the Settings
+                    // subnav item both land on the Settings screen. The
+                    // section gained a `getCpNavItem()` subnav in the Gate 9
+                    // CP rework — clicking the sidebar section lands on
+                    // Settings, the first subnav entry.
+                    'cortex' => 'cortex/settings/index',
+                    'cortex/settings' => 'cortex/settings/index',
+                    'cortex/tokens' => 'cortex/settings/tokens',
+                    'cortex/tokens/table-data' => 'cortex/settings/tokens-table-data',
+                    'cortex/tokens/issue-slideout' => 'cortex/settings/token-issue-slideout',
+                    'cortex/tokens/issue' => 'cortex/settings/issue-token',
+                    'cortex/tokens/revoke' => 'cortex/settings/revoke-token',
+                    'cortex/allowlist' => 'cortex/settings/allowlist',
+                    'cortex/allowlist/table-data' => 'cortex/settings/allowlist-table-data',
+                    'cortex/allowlist/override-slideout' => 'cortex/settings/allowlist-override-slideout',
+                    'cortex/activity' => 'cortex/settings/activity',
+                    'cortex/activity/table-data' => 'cortex/settings/activity-table-data',
+                    'cortex/activity/row' => 'cortex/settings/activity-row',
+                    'cortex/connection' => 'cortex/settings/connection',
+                ], $event->rules);
             },
         );
     }

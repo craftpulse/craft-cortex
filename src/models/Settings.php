@@ -2,7 +2,11 @@
 
 namespace craftpulse\cortex\models;
 
+use Craft;
 use craft\base\Model;
+use craftpulse\cortex\services\Allowlist;
+use DateInterval;
+use Throwable;
 
 /**
  * =========================================================================
@@ -67,27 +71,24 @@ class Settings extends Model
      *
      *               When `allowAdminChanges` is `false`, a
      *               `craft_command` invocation matching a pattern
-     *               here is rejected at dispatch time with JSON-RPC
-     *               code `-32002` and an error message naming
-     *               `allowAdminChanges` as the reason. The rejection
-     *               still writes a `cortex_invocations` row with
-     *               `kind=tool_error` so the audit trail captures
-     *               the boundary attempt.
+     *               here is rejected at dispatch time as a
+     *               `ToolException` (surfaced as an `isError: true`
+     *               tool-result envelope) naming `allowAdminChanges`
+     *               as the reason. The rejection still writes a
+     *               `cortex_invocations` row with `kind=tool_error`
+     *               so the audit trail captures the boundary attempt.
      *
      *               Override via project config or
      *               `config/cortex.php` to tighten the admin-level
      *               surface per environment.
+     *
+     *               The default mirrors
+     *               `Allowlist::DEFAULT_ADMIN_LEVEL_PATTERNS` — the
+     *               single source of truth the CP command browser also
+     *               classifies routes against. Referencing the constant
+     *               keeps the two in lockstep without a literal copy.
      */
-    public array $adminLevelCommands = [
-        'project-config/*',
-        'migrate/*',
-        'up',
-        'make/*',
-        'entrify/*',
-        'sections/*',
-        'fields/*',
-        'fixture/*',
-    ];
+    public array $adminLevelCommands = Allowlist::DEFAULT_ADMIN_LEVEL_PATTERNS;
 
     /**
      * @var string[] Operator-curated allowlist of custom-field
@@ -145,22 +146,25 @@ class Settings extends Model
 
     /**
      * @var bool Whether the HTTP transport (`POST/GET/DELETE
-     *          /cortex/mcp`) accepts requests. Defaults to false so
-     *          production installs stay off until auth (sub-gates
-     *          7.2 / 7.3) and per-user filtering (7.4) land. With
-     *          this flag false, every request to the endpoint returns
-     *          503 Service Unavailable regardless of headers or
-     *          credentials.
+     *          /cortex/mcp`) accepts requests. Defaults to false: the
+     *          HTTP transport is opt-in, so a default install exposes
+     *          only the trusted local stdio transport. It is also the
+     *          kill switch — with this flag false, the MCP, OAuth, and
+     *          `.well-known` controllers all return 503 Service
+     *          Unavailable regardless of headers or credentials.
      */
     public bool $httpEnabled = false;
 
     /**
      * @var string[] Allowlist of `Origin` header values the HTTP
-     *               transport accepts. Empty means permissive — every
-     *               Origin is accepted, intended for dev only. When
-     *               the list is non-empty, requests whose `Origin`
-     *               does not match exactly are rejected with 403
-     *               Forbidden. DNS-rebinding defense per MCP 2025-06-
+     *               transport accepts. An empty list fails CLOSED
+     *               outside `devMode` — the controller rejects the
+     *               request with 403 and forces the operator to name
+     *               an Origin before enabling HTTP in production; in
+     *               `devMode` an empty list warns-and-allows so local
+     *               work isn't blocked. When the list is non-empty,
+     *               requests whose `Origin` does not match exactly are
+     *               rejected with 403 Forbidden. DNS-rebinding defense per MCP 2025-06-
      *               18 ("Servers MUST validate the Origin header on
      *               all incoming connections").
      */
@@ -173,6 +177,17 @@ class Settings extends Model
      *          clients evict naturally. Default: 1 hour. Override
      *          higher for long-running coding sessions, lower for
      *          tighter session-affinity rotation.
+     *
+     *          Invariant: `touch()` fires once per request before the
+     *          (possibly streaming) `tools/call` runs, not mid-stream,
+     *          so this TTL MUST exceed the longest single stream's
+     *          wall-clock — otherwise a stream that outlives its one
+     *          touch could evict the session while a sibling request is
+     *          in flight. The 3600s default clears the realistic
+     *          ceiling (streams are bounded by `max_execution_time` and
+     *          cooperative client-disconnect cancel) by two orders of
+     *          magnitude. Do not lower it below your longest expected
+     *          stream.
      */
     public int $sessionTtl = 3600;
 
@@ -241,6 +256,25 @@ class Settings extends Model
     public ?int $auditRetentionDays = null;
 
     /**
+     * @var int Maximum size (in bytes) of a single newline-delimited
+     *          JSON-RPC message the stdio transport will buffer before
+     *          rejecting it with a JSON-RPC `-32600` Invalid Request.
+     *          The stdio reader reassembles a line in bounded chunks; if
+     *          the accumulated bytes for one line exceed this cap before
+     *          a newline arrives, the reader drains the rest of the line,
+     *          emits the error envelope, and continues with the next
+     *          message rather than buffering an unbounded payload into
+     *          memory. Default 4 MiB — comfortably larger than any
+     *          legitimate `tools/call` argument blob, small enough that a
+     *          hostile client streaming one giant line can't OOM the
+     *          long-running serve process. stdio is a trusted-local
+     *          transport, but a trusted local *user* is not the same as a
+     *          trusted client *implementation* (cf. the `craft_exec`
+     *          threat model), so the cap holds regardless.
+     */
+    public int $stdioMaxMessageBytes = 4194304;
+
+    /**
      * @var int Burst capacity for the per-user HTTP rate limiter — the
      *          maximum tokens a single Craft user's bucket can hold at
      *          any one time. Each authenticated POST to
@@ -277,14 +311,46 @@ class Settings extends Model
     {
         $rules = parent::defineRules();
         $rules[] = [['runtimeOverrideTtl', 'sessionTtl'], 'integer', 'min' => 1];
+        $rules[] = [['stdioMaxMessageBytes'], 'integer', 'min' => 1024];
         $rules[] = [['tokenTtlDefault'], 'integer', 'min' => 1];
         $rules[] = [['execEnabled', 'execDryRunDefault', 'httpEnabled', 'dcrEnabled'], 'boolean'];
         $rules[] = [['allowedCommands', 'adminLevelCommands', 'userCustomFieldAllowlist', 'allowedOrigins'], 'each', 'rule' => ['string', 'min' => 1]];
         $rules[] = [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl'], 'string', 'min' => 2];
+        $rules[] = [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl'], 'validateDateInterval'];
         $rules[] = [['auditResponseExcerptBytes'], 'integer', 'min' => 1, 'max' => 65535];
         $rules[] = [['auditRetentionDays'], 'integer', 'min' => 1];
         $rules[] = [['rateLimitBurst'], 'integer', 'min' => 1, 'max' => 10000];
         $rules[] = [['rateLimitPerSecond'], 'integer', 'min' => 1, 'max' => 1000];
         return $rules;
+    }
+
+    /**
+     * Validate that an OAuth TTL attribute is a parseable ISO-8601
+     * duration. `Oauth::getAuthorizationServer()` feeds these values
+     * straight into `new DateInterval(...)`, which throws on a
+     * malformed string (e.g. `1h` instead of `PT1H`) — without this
+     * rule an operator typo in project config would surface as an
+     * opaque 500 on every `/oauth/token` and `/oauth/authorize` call
+     * instead of a clean settings-validation error.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function validateDateInterval(string $attribute): void
+    {
+        $value = $this->$attribute;
+        if (!is_string($value)) {
+            return;
+        }
+
+        try {
+            new DateInterval($value);
+        } catch (Throwable) {
+            $this->addError($attribute, Craft::t(
+                'cortex',
+                '“{value}” is not a valid ISO-8601 duration (e.g. PT1H, P30D).',
+                ['value' => $value],
+            ));
+        }
     }
 }

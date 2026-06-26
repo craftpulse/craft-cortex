@@ -24,6 +24,36 @@ use yii\caching\CacheInterface;
  * line (sub-gate 7.5); the session itself is purely transient session
  * affinity.
  *
+ * Not enumerable by design. The surface is create / get / touch /
+ * terminate — there is no list/scan. PSR-16 exposes no key-scan
+ * primitive, so a "currently-connected" or "live streaming" view
+ * cannot be built from the cache, and a global force-disconnect
+ * cannot be retrofitted here. This matches the Gate 9 plan: the CP
+ * Activity tab is historical-only (it reads the `cortex_invocations`
+ * audit log), and there is deliberately no live-session view.
+ *
+ * Operator-side revocation therefore runs through bearer-token
+ * revocation, NOT session enumeration. Revoking a token blocks the
+ * next request that presents it — the `touch()` user-id-mismatch /
+ * unknown-token paths surface as a 401 and force a re-handshake. An
+ * in-flight stream is not killed by token revocation mid-frame; it
+ * ends when the tool completes or the client disconnects (see
+ * `McpController::_streamPost()` cooperative-cancel). There is no
+ * server-initiated force-disconnect of an established session.
+ *
+ * Sliding TTL — every `touch()` resets the cache entry's expiry, so
+ * an active client stays alive while idle clients evict naturally.
+ * `touch()` fires once per request at the start of dispatch, BEFORE
+ * the (possibly streaming) `tools/call` runs — it is not re-fired
+ * mid-stream. The session therefore must outlive the longest single
+ * stream from a single touch: `Settings::$sessionTtl` MUST exceed the
+ * maximum stream wall-clock. The 3600s default clears this by two
+ * orders of magnitude — streams are bounded by the SAPI's
+ * `max_execution_time` (tens of seconds to a few minutes) and by the
+ * cooperative client-disconnect cancel in `_streamPost()`, never an
+ * hour. If you ever shorten `sessionTtl` below your longest expected
+ * stream, refresh the session at stream start instead.
+ *
  * Carbon over `DateTimeHelper` here per the services rule — services
  * use Carbon, elements/queries use DateTimeHelper. Sessions writes
  * timestamps; it's a service.

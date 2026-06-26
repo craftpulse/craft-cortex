@@ -44,6 +44,22 @@ Tools mark themselves stdio-only via the `#[IsStdioOnly]` attribute. The dispatc
 
 `craft_exec` carries `#[IsStdioOnly]`. So does `import_export` (Free has export-only, Pro will lift this restriction once the Pro permission gating lands).
 
+### Credential and privilege mutations are stdio-only
+
+Craft's own control panel guards three user operations behind an **elevated session** — the user must re-enter their password before the change is accepted:
+
+- changing a password,
+- changing an email address,
+- granting or modifying admin status.
+
+The MCP HTTP transport has **no elevated-session layer yet**. Rather than accept these mutations from a bearer-authenticated request that never re-authenticated, Cortex refuses them over HTTP. The `users` tool rejects any `create` or `update` call that carries `newPassword`, `email`, or `admin` when the resolved transport is HTTP, returning a tool error:
+
+> `users: changing password/email/admin status is not permitted over the HTTP transport; use the stdio transport (elevated-session support over HTTP is not yet available).`
+
+This is a fail-closed gate, not the full elevation layer. It keys on the real transport threaded from the dispatcher (`InvocationContext::$transport`), never on a proxy such as "is a Craft user resolved" — an HTTP bearer whose user id fails to resolve must not be misread as stdio. When the transport cannot be determined, the request is treated as HTTP and refused.
+
+All three operations remain available over the trusted **stdio** transport, where the local user already controls the Craft process. Every other `users` operation — `list`, `get`, non-sensitive `create`/`update` (custom fields, names, group assignment), `delete` — works over both transports, subject to the usual per-user permission gating. When a real elevated-session handshake ships for the HTTP transport, this blanket refusal is replaced by a re-authentication challenge.
+
 ## `craft_exec` — six security gates
 
 `craft_exec` evaluates arbitrary PHP expressions through Craft's own `ExecController`. It's the most powerful tool Cortex ships, and it's wrapped in six gates that all run before any expression is evaluated. The gates cannot be turned off from outside the dispatcher.
@@ -74,7 +90,7 @@ Expressions matching destructive patterns (`delete*`, `drop*`, `truncate*`, `Ele
 
 ### Gate 6 — Destructive annotation
 
-`craft_exec` ships with `#[IsDestructive]` per the MCP 2025-06-18 spec's tool annotation surface. Spec-compliant clients warn the user before the call goes through. This is a defence-in-depth gate — it relies on client cooperation, where gates 1-5 don't.
+`craft_exec` ships with `#[IsDestructive]` per the MCP spec's tool annotation surface. Spec-compliant clients warn the user before the call goes through. This is a defence-in-depth gate — it relies on client cooperation, where gates 1-5 don't.
 
 ## `craft_command` — allowlist model
 
@@ -111,7 +127,7 @@ Free tier:
 
 Pro tier (Phase 2):
 
-- PII tools (`users`, `addresses`, `orders`, customer lookups for Commerce) ship in Pro and require explicit per-user authorization.
+- PII tools (`users`, `address`) ship in Pro and require explicit per-user authorization. Commerce data (orders, customer lookups) is not exposed by Cortex; Commerce support is planned as a separate plugin.
 - Pro tools default to `#[IsStdioOnly(false)]` (HTTP-allowed) and add Craft permission checks via `shouldRegister()`. A user without `accessUsers` won't see the `users` tool in `tools/list`.
 
 Even on Pro, PII tools default to read-only with explicit per-call confirmation for any mutation. The same six-gate philosophy applies — destructive write tools require dry-run + dangerous handshake.

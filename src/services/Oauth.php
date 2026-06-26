@@ -12,6 +12,7 @@ use craftpulse\cortex\oauth\repositories\ClientRepository;
 use craftpulse\cortex\oauth\repositories\RefreshTokenRepository;
 use craftpulse\cortex\oauth\repositories\ScopeRepository;
 use craftpulse\cortex\records\OauthClient as OauthClientRecord;
+use craftpulse\cortex\records\OauthCode as OauthCodeRecord;
 use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
 use DateInterval;
 use Lcobucci\Clock\SystemClock;
@@ -471,6 +472,51 @@ class Oauth extends Component
         );
 
         return $count > 0;
+    }
+
+    /**
+     * Prune dead OAuth rows during Craft's gc sweep. Deletes:
+     *
+     *   - authorization codes whose `expiresAt` has passed
+     *     (`cortex_oauth_codes`), and
+     *   - access / refresh tokens that are either expired (`expiresAt`
+     *     in the past) or revoked (`dateRevoked` set)
+     *     (`cortex_oauth_tokens`).
+     *
+     * Both deletes are fail-closed-safe. Every repository
+     * (`AccessTokenRepository`, `AuthCodeRepository`,
+     * `RefreshTokenRepository`) treats a missing row as
+     * revoked/invalid, so dropping an already-expired or already-
+     * revoked row can never resurrect a credential that should be
+     * rejected — the validation path returns the same answer whether
+     * the dead row is present or gone. Active refresh-rotation chains
+     * (non-expired, non-revoked tokens) are never touched, so a quiet
+     * client's refresh ability survives the sweep.
+     *
+     * Pruned unconditionally — expired/revoked rows are always safe to
+     * drop, so there's no retention knob to honour (unlike the audit
+     * log's `auditRetentionDays`). Returns the total rows deleted
+     * across both tables.
+     *
+     * Wired to `Gc::EVENT_RUN` in `PluginTrait::_registerGcListener()`
+     * alongside the runtime-override and invocation prunes.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function pruneExpired(): int
+    {
+        $now = Carbon::now()->toDateTimeString();
+
+        $codes = (int) OauthCodeRecord::deleteAll(['<', 'expiresAt', $now]);
+
+        $tokens = (int) OauthTokenRecord::deleteAll([
+            'or',
+            ['<', 'expiresAt', $now],
+            ['not', ['dateRevoked' => null]],
+        ]);
+
+        return $codes + $tokens;
     }
 
     /**

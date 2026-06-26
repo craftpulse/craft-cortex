@@ -15,9 +15,9 @@
 - **Handle:** `cortex`
 - **Namespace:** `craftpulse\cortex`
 - **Author:** Craftpulse
-- **Status:** Phase 1 (Free tier) feature-complete on `develop-v5`. Shipping: 33 tools, 8 prompts, 77 resources, stdio transport, project-config + DB allowlist, six `craft_exec` security gates, install command, full Pest + PHPStan + ECS green. Pre-Plugin-Store-submission; Phase 2 (Pro tier — HTTP transport, write tools, custom skills, CP UI) is on the roadmap.
+- **Status:** Free + Pro tiers feature-complete, pre-Plugin-Store-submission (release tag on hold). Free: 33 tools, 10 prompts, 98 resources, stdio transport, project-config + DB allowlist, six `craft_exec` security gates, install command. Pro (on the `gate-9-*` branch stack, PRs #2/#3 → `develop-v5`): Streamable HTTP transport with OAuth 2.1 + bearer tokens, 9 write tools, per-user tool filtering, audit log, custom-skill element type, CP tabs (Settings · Tokens · Allowlist · Activity), edition enforcement (403 gates), MCP spec 2025-11-25. Full Pest + PHPStan L8 + ECS green. The Connection and Skill-authoring CP tabs slipped to a Pro point release.
 
-Cortex is a Model Context Protocol server for Craft CMS. It exposes Craft internals to AI agents over dual transport (stdio for dev, Streamable HTTP for content ops). Editions: Free / Pro / Commerce. Locked architecture decisions live in this repo's auto-memory and the planning doc (see Paths below).
+Cortex is a Model Context Protocol server for Craft CMS. It exposes Craft internals to AI agents over dual transport (stdio for dev, Streamable HTTP for content ops). Editions: Free / Pro (Commerce support is planned as a separate plugin, not an edition). Locked architecture decisions live in this repo's auto-memory and the planning doc (see Paths below).
 
 ## General
 
@@ -41,12 +41,14 @@ Use `gh` for all GitHub operations — it's already authenticated.
 ddev composer check-cs               # ECS code style
 ddev composer fix-cs                 # ECS auto-fix
 ddev composer phpstan                # PHPStan analysis
-ddev exec vendor/bin/pest            # Pest tests
+make v5-pest PLUGIN=craft-cortex     # Pest tests (run from the playground root)
 ddev craft up                        # Migrations + project config
 ddev composer install                # Install deps (auto-runs craft up)
 ```
 
 These commands run against the test environment in `~/dev/craft-plugin-playground/cms_v5`, where this plugin is symlinked during development.
+
+**Run Pest plugin-locally**, via `make v5-pest PLUGIN=craft-cortex` (from `~/dev/craft-plugin-playground`) or directly from the plugin dir with its own vendor (`docker exec -w <plugin dir> <web-container> sh -c 'vendor/bin/pest'`). This isolates the suite from whatever the *shared* `cms/vendor` contains. The legacy cms-root form (`ddev exec -d /var/www/html/cms vendor/bin/pest --configuration=vendor/craftpulse/craft-cortex/phpunit.xml.dist`) works only when no other symlinked plugin has pulled a conflicting Pest/`craft-pest-core` into the shared vendor — when one has, it dies with a `Cannot declare class Yii` fatal before Cortex's bootstrap runs. The bootstrap finds Craft via `CORTEX_TEST_CRAFT_BASE`, then cwd, then `/var/www/html/cms`.
 
 ## Plugin Structure
 

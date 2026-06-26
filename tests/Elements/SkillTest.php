@@ -17,9 +17,10 @@
  *   - `SkillQuery::handle()` filter returns the saved row.
  *
  * Fixture strategy: prefix every handle with
- * `__cortex_skilltest_<hex>_` so `afterEach` can `LIKE`-hard-delete
- * the entire test run. No global state — element overrides land in
- * the DB and are gone by next test.
+ * `cortex-skilltest-<hex>-` (slug-shaped to satisfy
+ * `Skill::HANDLE_PATTERN`) so `afterEach` can `LIKE`-hard-delete the
+ * entire test run. No global state — element overrides land in the DB
+ * and are gone by next test.
  * =========================================================================
  *
  * @author Craftpulse
@@ -35,7 +36,9 @@ use craftpulse\cortex\elements\Skill;
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_skilltest_' . bin2hex(random_bytes(4)) . '_';
+    // Slug-shaped so handles satisfy Skill::HANDLE_PATTERN
+    // (lowercase letters, digits, single hyphens).
+    $this->fixturePrefix = 'cortex-skilltest-' . bin2hex(random_bytes(4)) . '-';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -139,6 +142,34 @@ it('persists a row in the cortex_skills table after save', function() {
 // Handle uniqueness
 // -----------------------------------------------------------------------------
 
+it('rejects a handle change on an existing skill at the element layer', function() {
+    $handle = $this->fixturePrefix . 'immutable';
+    $skill = _cortex_skill_save($handle, 'Immutable');
+
+    // Reload and rename the handle, then save via the canonical
+    // elements/save path (what the Gate 9.6 CP authoring screen uses).
+    $reloaded = Skill::find()->status(null)->site('*')->id($skill->id)->one();
+    expect($reloaded)->toBeInstanceOf(Skill::class);
+    $reloaded->handle = $this->fixturePrefix . 'renamed';
+
+    expect(Craft::$app->getElements()->saveElement($reloaded))->toBeFalse();
+    expect($reloaded->getErrors('handle'))->not->toBeEmpty();
+
+    // The persisted handle is untouched.
+    $fresh = Skill::find()->status(null)->site('*')->id($skill->id)->one();
+    expect($fresh->handle)->toBe($handle);
+});
+
+it('allows re-saving an existing skill with an unchanged handle', function() {
+    $handle = $this->fixturePrefix . 'unchanged';
+    $skill = _cortex_skill_save($handle, 'Unchanged');
+
+    $reloaded = Skill::find()->status(null)->site('*')->id($skill->id)->one();
+    $reloaded->title = 'Unchanged — edited';
+    // Handle left as-is.
+    expect(Craft::$app->getElements()->saveElement($reloaded))->toBeTrue();
+});
+
 it('rejects duplicate handles via validateHandleUnique', function() {
     $handle = $this->fixturePrefix . 'dup';
     _cortex_skill_save($handle, 'First');
@@ -155,6 +186,86 @@ it('requires a non-empty handle', function() {
     $skill->title = 'No handle';
     expect(Craft::$app->getElements()->saveElement($skill))->toBeFalse();
     expect($skill->getErrors('handle'))->not->toBeEmpty();
+});
+
+it('rejects a malformed handle that is not a lowercase slug', function(string $handle) {
+    $skill = new Skill();
+    $skill->handle = $handle;
+    $skill->title = 'Malformed';
+    expect(Craft::$app->getElements()->saveElement($skill))->toBeFalse();
+    expect($skill->getErrors('handle'))->not->toBeEmpty();
+})->with([
+    'spaces' => 'Foo Bar',
+    'slash' => 'a/b',
+    'uppercase' => 'FooBar',
+    'underscore' => 'foo_bar',
+    'leading hyphen' => '-foo',
+    'trailing hyphen' => 'foo-',
+    'double hyphen' => 'foo--bar',
+    'dot' => 'foo.bar',
+]);
+
+it('accepts a valid lowercase-slug handle', function(string $handle) {
+    $skill = new Skill();
+    $skill->handle = $handle;
+    $skill->title = 'Valid';
+    expect(Craft::$app->getElements()->saveElement($skill))->toBeTrue();
+    // Clean up directly — these bypass the fixturePrefix cleanup filter.
+    Craft::$app->getElements()->deleteElement($skill, hardDelete: true);
+})->with([
+    'single word' => 'myskill',
+    'dashed' => 'my-skill',
+    'with digits' => 'craft-5-guidelines',
+    'bundled-style' => 'craft-php-guidelines',
+    'short' => 'ddev',
+]);
+
+it('rejects recreating a soft-deleted handle with a clean validation error — no IntegrityException, no orphaned element row', function() {
+    // BLOCKER (Gate 9 hardening): the DB UNIQUE index on
+    // cortex_skills.handle holds the trashed row, so a default
+    // (trashed=false) uniqueness probe used to pass, saveElement()
+    // persisted the element + elements_sites rows, then afterSave()'s
+    // raw SkillRecord save threw an IntegrityException — leaving a
+    // half-saved element. validateHandleUnique() must probe the trashed
+    // slot and fail closed.
+    $handle = $this->fixturePrefix . 'trashedhandle';
+    $original = _cortex_skill_save($handle, 'Original');
+
+    // Soft-delete it. The cortex_skills row (and the UNIQUE index entry)
+    // survive a soft delete.
+    Craft::$app->getElements()->deleteElement($original, hardDelete: false);
+    expect(Skill::find()->status(null)->handle($handle)->one())->toBeNull();
+
+    $elementRowsBefore = (new \craft\db\Query())
+        ->from(\craft\db\Table::ELEMENTS)
+        ->where(['type' => Skill::class])
+        ->count();
+
+    // Attempt the colliding create. Must fail closed at validation —
+    // no exception, no new element row.
+    $clash = new Skill();
+    $clash->handle = $handle;
+    $clash->title = 'Clash';
+
+    $saved = null;
+    try {
+        $saved = Craft::$app->getElements()->saveElement($clash);
+    } catch (\Throwable $e) {
+        $this->fail('Expected a clean validation failure, got ' . $e::class . ': ' . $e->getMessage());
+    }
+
+    expect($saved)->toBeFalse();
+    expect($clash->getErrors('handle'))->not->toBeEmpty();
+    expect($clash->getFirstError('handle'))->toContain('trashed');
+
+    // No orphaned element row: the failed create must not have persisted
+    // an `elements` row (the id stays null on a validation-rejected save).
+    expect($clash->id)->toBeNull();
+    $elementRowsAfter = (new \craft\db\Query())
+        ->from(\craft\db\Table::ELEMENTS)
+        ->where(['type' => Skill::class])
+        ->count();
+    expect($elementRowsAfter)->toBe($elementRowsBefore);
 });
 
 // -----------------------------------------------------------------------------

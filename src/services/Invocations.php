@@ -9,7 +9,6 @@ use craftpulse\cortex\db\InvocationQuery;
 use craftpulse\cortex\records\Invocation as InvocationRecord;
 use Throwable;
 use yii\base\Component;
-use yii\db\Expression;
 
 /**
  * =========================================================================
@@ -153,9 +152,7 @@ class Invocations extends Component
         }
 
         $cutoff = Carbon::now()->subDays($retentionDays)->toDateTimeString();
-        return (int) InvocationRecord::deleteAll([
-            '<', 'dateCreated', new Expression(':cutoff', [':cutoff' => $cutoff]),
-        ]);
+        return (int) InvocationRecord::deleteAll(['<', 'dateCreated', $cutoff]);
     }
 
     /**

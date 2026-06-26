@@ -20,7 +20,10 @@ use League\OAuth2\Server\Repositories\AuthCodeRepositoryInterface;
  *
  * `revokeAuthCode()` flips the `isRevoked` bit rather than deleting
  * the row — preserves audit history for the brief 5-minute window the
- * code is alive. The gc sweep prunes expired rows.
+ * code is alive. `Oauth::pruneExpired()`, wired to `Gc::EVENT_RUN` in
+ * `PluginTrait::_registerGcListener()`, deletes rows whose `expiresAt`
+ * has passed during Craft's gc sweep; a missing row is treated as
+ * revoked by `isAuthCodeRevoked()` below, so the prune is fail-closed.
  * =========================================================================
  *
  * @author Craftpulse
