@@ -81,13 +81,7 @@
                     <li>
                         <span class="scope-name">{{ scope }}</span>
                         <span class="scope-desc">
-                            {%- if scope == 'read' -%}
-                                {{ 'Read content, schema, and configuration. No writes.'|t('cortex') }}
-                            {%- elseif scope == 'write' -%}
-                                {{ 'Modify entries, fields, and other Craft state.'|t('cortex') }}
-                            {%- else -%}
-                                {{ 'Additional scope.'|t('cortex') }}
-                            {%- endif -%}
+                            {{- scopeDescriptions[scope] ?? 'Additional scope.'|t('cortex') -}}
                         </span>
                     </li>
                 {% endfor %}

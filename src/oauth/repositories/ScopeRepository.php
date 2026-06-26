@@ -2,6 +2,7 @@
 
 namespace craftpulse\cortex\oauth\repositories;
 
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\oauth\entities\ScopeEntity;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Entities\ScopeEntityInterface;
@@ -11,11 +12,13 @@ use League\OAuth2\Server\Repositories\ScopeRepositoryInterface;
  * =========================================================================
  * League adapter — `ScopeRepositoryInterface`.
  *
- * Cortex's Phase 1 scope vocabulary is two-valued: `read` and `write`.
- * Both pass `getScopeEntityByIdentifier()` so DCR + authorize flows
- * don't break for clients that ask for `write`, but no Phase 1 tool
- * honours `write` — the per-tool `filterFor()` contract that Gate 7.4
- * lands gates write tools out of the Free registry independently.
+ * Cortex's scope vocabulary is the capability set owned by the `Scopes`
+ * service (`content:read`, `content:write`, `assets:write`,
+ * `schema:read`, `system:read`, `users:read`, `users:write`). The
+ * legacy coarse `read` / `write`
+ * scopes are still accepted at this boundary for back-compat — they're
+ * expanded to their capability clusters at grant / dispatch time by
+ * `Scopes::expandLegacyScopes()`.
  *
  * Unknown scope identifiers return null. League then rejects the
  * authorization request with `invalid_scope`, which clients are
@@ -23,8 +26,9 @@ use League\OAuth2\Server\Repositories\ScopeRepositoryInterface;
  *
  * `finalizeScopes()` is the per-request rewrite hook: league calls it
  * with the scopes the client requested + the grant type + the client
- * entity + the user. Phase 1 returns the requested scopes unchanged —
- * the Phase 3 fine-grained scope expansion will rewrite here.
+ * entity + the user. Cortex expands any legacy coarse scope to its
+ * capability cluster here so the issued token carries fine-grained
+ * scopes from the moment it's minted.
  * =========================================================================
  *
  * @author Craftpulse
@@ -36,16 +40,25 @@ class ScopeRepository implements ScopeRepositoryInterface
     // =========================================================================
 
     /**
-     * The Phase 1 scope vocabulary. Listed in metadata under
-     * `scopes_supported` (RFC 8414). Phase 3 will expand; the
-     * Phase 1 array is exposed publicly so the well-known metadata
-     * controller stays in sync without a second source of truth.
+     * Back-compat alias for the capability scope vocabulary. Callers
+     * that still reference the constant resolve the live `Scopes`
+     * service list; the constant itself is kept for the legacy
+     * `read` / `write` shorthand. Prefer `Cortex::getInstance()->scopes->all()`
+     * in new code.
      *
      * @var string[]
      *
      * @since 5.0.0
      */
-    public const SUPPORTED_SCOPES = ['read', 'write'];
+    public const SUPPORTED_SCOPES = [
+        'content:read',
+        'content:write',
+        'assets:write',
+        'schema:read',
+        'system:read',
+        'users:read',
+        'users:write',
+    ];
 
     // Public Methods
     // =========================================================================
@@ -58,7 +71,7 @@ class ScopeRepository implements ScopeRepositoryInterface
      */
     public function getScopeEntityByIdentifier(string $identifier): ?ScopeEntityInterface
     {
-        if (!in_array($identifier, self::SUPPORTED_SCOPES, true)) {
+        if ($identifier === '' || !Cortex::getInstance()->scopes->isKnown($identifier)) {
             return null;
         }
 
@@ -70,6 +83,10 @@ class ScopeRepository implements ScopeRepositoryInterface
     /**
      * @inheritdoc
      *
+     * Expands legacy `read` / `write` scopes to capability clusters so
+     * the issued token carries fine-grained scopes. Capability scopes
+     * pass through unchanged.
+     *
      * @author Craftpulse
      * @since  5.0.0
      */
@@ -80,6 +97,22 @@ class ScopeRepository implements ScopeRepositoryInterface
         ?string $userIdentifier = null,
         ?string $authCodeId = null,
     ): array {
-        return $scopes;
+        $identifiers = array_map(
+            static fn(ScopeEntityInterface $scope): string => $scope->getIdentifier(),
+            $scopes,
+        );
+
+        $expanded = Cortex::getInstance()->scopes->expandLegacyScopes($identifiers);
+
+        $finalized = [];
+        foreach ($expanded as $identifier) {
+            if ($identifier === '') {
+                continue;
+            }
+            $entity = new ScopeEntity();
+            $entity->setIdentifier($identifier);
+            $finalized[] = $entity;
+        }
+        return $finalized;
     }
 }

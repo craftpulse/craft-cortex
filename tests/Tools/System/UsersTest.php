@@ -87,15 +87,15 @@ afterEach(function() {
 /**
  * Direct instantiation sidesteps the boot-time registry gate. The
  * invocation context defaults to a stdio transport so the credential-
- * mutation gate (HTTP-only refusal) treats these direct calls as the
- * trusted local path — matching how stdio dispatch behaves. HTTP-
- * transport tests pass `Server::TRANSPORT_HTTP` to exercise the
- * refusal.
+ * mutation gate treats these direct calls as the trusted local path —
+ * stdio is implicitly elevated. HTTP-transport tests pass
+ * `Server::TRANSPORT_HTTP` to exercise the un-elevated refusal, and
+ * `elevated: true` to exercise the WS2 elevated-HTTP allowance.
  */
-function _cortex_users_tool(string $transport = Server::TRANSPORT_STDIO): Users
+function _cortex_users_tool(string $transport = Server::TRANSPORT_STDIO, bool $elevated = false): Users
 {
     $tool = new Users();
-    $tool->setInvocationContext(new InvocationContext(transport: $transport));
+    $tool->setInvocationContext(new InvocationContext(transport: $transport, elevated: $elevated));
 
     return $tool;
 }
@@ -1064,10 +1064,10 @@ it('delete refuses a caller without deleteUsers', function() {
 });
 
 // -----------------------------------------------------------------------------
-// HTTP transport — credential / privilege mutation refusal
+// HTTP transport — credential / privilege mutation elevation gate (WS2)
 // -----------------------------------------------------------------------------
 
-it('refuses newPassword on update over the HTTP transport', function() {
+it('refuses newPassword on update over un-elevated HTTP', function() {
     $target = _cortex_users_user($this->fixturePrefix, 'httppw');
     if ($target === null) {
         $this->markTestSkipped('Could not seed target.');
@@ -1087,12 +1087,12 @@ it('refuses newPassword on update over the HTTP transport', function() {
 
         expect($caught)->not->toBeNull();
         expect($caught->getMessage())
-            ->toContain('not permitted over the HTTP transport')
-            ->toContain('use the stdio transport');
+            ->toContain('requires elevation')
+            ->toContain('/oauth/elevate');
     });
 });
 
-it('refuses email change on update over the HTTP transport', function() {
+it('refuses email change on update over un-elevated HTTP', function() {
     $target = _cortex_users_user($this->fixturePrefix, 'httpemail');
     if ($target === null) {
         $this->markTestSkipped('Could not seed target.');
@@ -1111,11 +1111,11 @@ it('refuses email change on update over the HTTP transport', function() {
         }
 
         expect($caught)->not->toBeNull();
-        expect($caught->getMessage())->toContain('not permitted over the HTTP transport');
+        expect($caught->getMessage())->toContain('requires elevation');
     });
 });
 
-it('refuses admin grant on create over the HTTP transport', function() {
+it('refuses admin grant on create over un-elevated HTTP', function() {
     cortex_with_edition(Cortex::EDITION_PRO, function() {
         $caught = null;
         try {
@@ -1130,7 +1130,7 @@ it('refuses admin grant on create over the HTTP transport', function() {
         }
 
         expect($caught)->not->toBeNull();
-        expect($caught->getMessage())->toContain('not permitted over the HTTP transport');
+        expect($caught->getMessage())->toContain('requires elevation');
     });
 });
 
@@ -1156,7 +1156,26 @@ it('fails closed and refuses a credential mutation when no transport context was
         }
 
         expect($caught)->not->toBeNull();
-        expect($caught->getMessage())->toContain('not permitted over the HTTP transport');
+        expect($caught->getMessage())->toContain('requires elevation');
+    });
+});
+
+it('allows a newPassword mutation over ELEVATED HTTP (WS2)', function() {
+    $target = _cortex_users_user($this->fixturePrefix, 'httpelev');
+    if ($target === null) {
+        $this->markTestSkipped('Could not seed target.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
+        $result = _cortex_users_tool(Server::TRANSPORT_HTTP, elevated: true)->execute([
+            'mode' => 'update',
+            'id' => $target->id,
+            'newPassword' => 'AllowedWhenElevated!42',
+        ]);
+
+        expect($result['success'])->toBeTrue();
+        expect($result['mode'])->toBe('update');
+        expect($result['user']['id'])->toBe((int) $target->id);
     });
 });
 
@@ -1236,7 +1255,7 @@ it('does not refuse a non-sensitive create over the HTTP transport', function() 
         }
 
         if ($caught !== null) {
-            expect($caught->getMessage())->not->toContain('not permitted over the HTTP transport');
+            expect($caught->getMessage())->not->toContain('requires elevation');
         }
     });
 });

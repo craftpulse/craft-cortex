@@ -22,6 +22,15 @@ use League\OAuth2\Server\Repositories\ClientRepositoryInterface;
  * calls this method on every request — including the PKCE-only paths
  * where no secret is presented. The PKCE proof itself is verified
  * separately in `AuthCodeGrant::respondToAccessTokenRequest()`.
+ *
+ * DCR approval gate (WS3): an UNAPPROVED client (`approved = 0`) is
+ * invisible to both `getClientEntity()` (authorize flow) and
+ * `validateClient()` (token flow) — both return null / false as if the
+ * client did not exist. League surfaces that as `invalid_client`, and
+ * the `OauthController` maps the authorize-time miss to a clear
+ * "pending admin approval" page so the operator knows to approve the
+ * client on the Clients CP screen. Out-of-band-seeded clients with
+ * `approved = 1` are unaffected.
  * =========================================================================
  *
  * @author Craftpulse
@@ -45,6 +54,14 @@ class ClientRepository implements ClientRepositoryInterface
             return null;
         }
 
+        // Unapproved clients are invisible to the authorize flow — the
+        // DCR approval gate (WS3). Treated as if the client did not
+        // exist; the controller surfaces a "pending admin approval"
+        // page from the resulting miss.
+        if (!(bool) $record->approved) {
+            return null;
+        }
+
         return $this->_hydrate($record);
     }
 
@@ -58,6 +75,12 @@ class ClientRepository implements ClientRepositoryInterface
     {
         $record = OauthClientRecord::findOne(['clientId' => $clientIdentifier]);
         if (!$record instanceof OauthClientRecord) {
+            return false;
+        }
+
+        // Unapproved clients fail the token flow too — the DCR approval
+        // gate, enforced on both authorize and token boundaries.
+        if (!(bool) $record->approved) {
             return false;
         }
 

@@ -150,9 +150,9 @@ it('declares every Gate 9.1 view action plus actionSave', function() {
 // Templates exist at the new _cp/ paths
 // -----------------------------------------------------------------------------
 
-it('ships the five _cp/ tab templates plus the shared layout', function() {
+it('ships the _cp/ tab templates plus the shared layout', function() {
     $base = __DIR__ . '/../../src/templates/_cp';
-    foreach (['_layout.twig', 'settings.twig', 'tokens.twig', 'allowlist.twig', 'activity.twig', 'connection.twig'] as $file) {
+    foreach (['_layout.twig', 'settings.twig', 'tokens.twig', 'clients.twig', 'allowlist.twig', 'activity.twig', 'connection.twig'] as $file) {
         expect(file_exists($base . '/' . $file))->toBeTrue("missing _cp/{$file}");
     }
 });
@@ -182,7 +182,7 @@ it('getCpNavItem gates the Pro subnav entries behind the edition', function() {
     // grants) are present too.
     $contents = (string) file_get_contents(__DIR__ . '/../../src/Cortex.php');
     expect($contents)->toContain("is(self::EDITION_PRO, '>=')");
-    foreach (['cortex/tokens', 'cortex/activity', 'cortex/connection'] as $proUrl) {
+    foreach (['cortex/tokens', 'cortex/clients', 'cortex/activity', 'cortex/connection'] as $proUrl) {
         expect($contents)->toContain($proUrl);
     }
     expect($contents)->toContain("'cortex/settings'")

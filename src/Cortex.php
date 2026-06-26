@@ -16,6 +16,7 @@ use craftpulse\cortex\services\Oauth;
 use craftpulse\cortex\services\Prompts;
 use craftpulse\cortex\services\RateLimiter;
 use craftpulse\cortex\services\Resources;
+use craftpulse\cortex\services\Scopes;
 use craftpulse\cortex\services\Sessions;
 use craftpulse\cortex\services\Skills;
 use craftpulse\cortex\services\Tokens;
@@ -152,6 +153,7 @@ class Cortex extends BasePlugin
                 'prompts' => ['class' => Prompts::class],
                 'rateLimiter' => ['class' => RateLimiter::class],
                 'resources' => ['class' => Resources::class],
+                'scopes' => ['class' => Scopes::class],
                 'sessions' => ['class' => Sessions::class],
                 'skills' => ['class' => Skills::class],
                 'tokens' => ['class' => Tokens::class],
@@ -253,6 +255,7 @@ class Cortex extends BasePlugin
      *                          override surface; route handle stays
      *                          `allowlist`).
      *   - Tokens            — admin + Pro.
+     *   - Clients           — admin + Pro (OAuth client approval gate).
      *   - Activity          — `cortex:viewActivity` + Pro (admins pass
      *                          implicitly via `can()`).
      *   - Connection        — admin + Pro.
@@ -297,6 +300,10 @@ class Cortex extends BasePlugin
             $subnav['tokens'] = [
                 'label' => Craft::t('cortex', 'Tokens'),
                 'url' => 'cortex/tokens',
+            ];
+            $subnav['clients'] = [
+                'label' => Craft::t('cortex', 'Clients'),
+                'url' => 'cortex/clients',
             ];
         }
 

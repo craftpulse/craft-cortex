@@ -12,6 +12,8 @@ use craftpulse\cortex\attributes\IsDestructive;
 use craftpulse\cortex\attributes\IsIdempotent;
 use craftpulse\cortex\attributes\Title;
 use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\cortex\tools\ContextAwareToolInterface;
+use craftpulse\cortex\tools\ElevationGatedToolTrait;
 use craftpulse\cortex\tools\IdempotencyTrait;
 use craftpulse\cortex\tools\PermissionedToolTrait;
 use craftpulse\cortex\tools\ProToolTrait;
@@ -84,8 +86,9 @@ use Throwable;
 #[IsDestructive]
 #[IsIdempotent(false)]
 #[Title('Entry — create / update / delete / restore / apply_draft')]
-class Entry extends AbstractTool
+class Entry extends AbstractTool implements ContextAwareToolInterface
 {
+    use ElevationGatedToolTrait;
     use IdempotencyTrait;
     use PermissionedToolTrait;
     use ProToolTrait;
@@ -319,6 +322,13 @@ class Entry extends AbstractTool
             throw new ToolException("entry: `mode` is required.");
         }
 
+        // The WS2 high-stakes elevation gate is applied inside each mode
+        // method, AFTER its `_assertPermission()` call — permission is the
+        // more fundamental gate, so a caller who can't perform the
+        // operation at all gets a permission error rather than a
+        // (misleading) "re-authenticate to elevate" prompt. See
+        // `_assertPublishElevation()` / the `delete` branch.
+
         return match ($mode) {
             'create' => $this->_create($arguments),
             'update' => $this->_update($arguments),
@@ -374,6 +384,43 @@ class Entry extends AbstractTool
         };
     }
 
+    /**
+     * Apply the WS2 elevation gate for a publication-status change, when
+     * the operation's EFFECTIVE outcome is a high-stakes one.
+     *
+     *   - `create`: gated whenever the effective outcome is a LIVE entry.
+     *     An absent `enabled` key defaults to a live entry, so it's gated
+     *     unless `enabled` is explicitly falsy — closing the omit-`enabled`
+     *     bypass (MAJOR 3) where an un-elevated HTTP create could publish
+     *     a live entry by simply leaving the key out.
+     *   - `update`: gated on any explicit `enabled` change (publishing a
+     *     disabled entry, or unpublishing a live one — both alter what the
+     *     public site serves). An update that omits the key leaves the
+     *     existing status untouched and is not gated.
+     *
+     * Called AFTER `_assertPermission()` so a caller who can't act at all
+     * gets a permission error, not an elevation prompt. stdio is
+     * implicitly elevated, so this is an HTTP-only gate.
+     *
+     * @param array<string,mixed> $arguments
+     * @throws ToolException When the request is not elevated.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _assertPublishElevation(string $mode, array $arguments): void
+    {
+        $gated = match ($mode) {
+            'create' => !array_key_exists('enabled', $arguments) || (bool) $arguments['enabled'],
+            'update' => array_key_exists('enabled', $arguments),
+            default => false,
+        };
+
+        if ($gated) {
+            $this->_assertElevated('changing the publication status of content');
+        }
+    }
+
     // Private Methods
     // =========================================================================
 
@@ -413,6 +460,7 @@ class Entry extends AbstractTool
         }
 
         $this->_assertPermission($arguments + ['sectionUid' => $section->uid]);
+        $this->_assertPublishElevation('create', $arguments);
 
         if ($entryType->id === null) {
             throw new ToolException("entry: resolved entry-type has no id (unsaved?).");
@@ -473,6 +521,7 @@ class Entry extends AbstractTool
         }
 
         $this->_assertPermission($arguments + ['sectionUid' => $section->uid]);
+        $this->_assertPublishElevation('update', $arguments);
 
         // Optional entry-type switch — when the caller supplied
         // entryTypeId/Uid/Handle the resolved type is set; otherwise
@@ -520,6 +569,7 @@ class Entry extends AbstractTool
         }
 
         $this->_assertPermission($arguments + ['sectionUid' => $section->uid]);
+        $this->_assertElevated('deleting content');
 
         $hardDelete = (bool) ($arguments['hardDelete'] ?? false);
 

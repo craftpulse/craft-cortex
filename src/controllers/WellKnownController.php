@@ -4,7 +4,6 @@ namespace craftpulse\cortex\controllers;
 
 use craft\helpers\UrlHelper;
 use craftpulse\cortex\Cortex;
-use craftpulse\cortex\oauth\repositories\ScopeRepository;
 use yii\web\Response;
 
 /**
@@ -58,8 +57,10 @@ class WellKnownController extends AbstractOauthController
      * types, PKCE methods, etc. Clients use this for discovery
      * before initiating the AuthCode flow.
      *
-     * Phase 1 vocabulary:
-     *   - `scopes_supported`: `["read", "write"]`
+     * Capability vocabulary:
+     *   - `scopes_supported`: the capability set from `Scopes::all()`
+     *     (`content:read`, `content:write`, `assets:write`,
+     *     `schema:read`, `system:read`, `users:read`, `users:write`).
      *   - `response_types_supported`: `["code"]`
      *   - `grant_types_supported`: `["authorization_code", "refresh_token"]`
      *   - `code_challenge_methods_supported`: `["S256"]` only —
@@ -81,7 +82,7 @@ class WellKnownController extends AbstractOauthController
             'authorization_endpoint' => UrlHelper::siteUrl('oauth/authorize'),
             'token_endpoint' => UrlHelper::siteUrl('oauth/token'),
             'revocation_endpoint' => UrlHelper::siteUrl('oauth/revoke'),
-            'scopes_supported' => ScopeRepository::SUPPORTED_SCOPES,
+            'scopes_supported' => Cortex::getInstance()->scopes->all(),
             'response_types_supported' => ['code'],
             'grant_types_supported' => ['authorization_code', 'refresh_token'],
             'code_challenge_methods_supported' => ['S256'],
@@ -116,7 +117,7 @@ class WellKnownController extends AbstractOauthController
         $metadata = [
             'resource' => UrlHelper::siteUrl('cortex/mcp'),
             'authorization_servers' => [rtrim(UrlHelper::baseSiteUrl(), '/')],
-            'scopes_supported' => ScopeRepository::SUPPORTED_SCOPES,
+            'scopes_supported' => Cortex::getInstance()->scopes->all(),
             'bearer_methods_supported' => ['header'],
             'resource_documentation' => 'https://github.com/craftpulse/craft-cortex',
         ];

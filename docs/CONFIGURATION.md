@@ -18,6 +18,10 @@ This document covers each setting in detail, then explains how to use the CP UI 
   - [`httpEnabled`](#httpenabled)
   - [`allowedOrigins`](#allowedorigins)
   - [`sessionTtl`](#sessionttl)
+  - [`dcrEnabled`](#dcrenabled)
+  - [`dcrAutoApprove`](#dcrautoapprove)
+  - [`oauthAccessTokenTtl` / `oauthRefreshTokenTtl`](#oauthaccesstokenttl--oauthrefreshtokenttl)
+  - [`elevationTtl`](#elevationttl)
 - [HTTP transport](#http-transport)
 - [The CP settings page](#the-cp-settings-page)
 - [Audit log](#audit-log)
@@ -104,6 +108,30 @@ Sliding TTL applied to HTTP-transport sessions in Craft's cache. Every authentic
 
 Sessions are keyed by an opaque `Mcp-Session-Id` returned in the response header on `initialize` and required on every subsequent POST. They are stored in the configured cache backend (PSR-16) — no DB write — and survive request boundaries but not cache flushes.
 
+### `dcrEnabled`
+
+**Type:** `bool` &nbsp;&nbsp; **Default:** `true`
+
+Whether RFC 7591 Dynamic Client Registration is open on `POST /oauth/register`. MCP-native clients self-register on first contact; flip to `false` to require out-of-band client seeding.
+
+### `dcrAutoApprove`
+
+**Type:** `bool` &nbsp;&nbsp; **Default:** `false`
+
+Whether a newly DCR-registered client is auto-approved. Default `false` means every self-registered client lands **unapproved** — its authorize and token flows are rejected with a "pending admin approval" error until an admin approves it on the **Clients** CP screen. Flip to `true` for trusted / dev installs that want the zero-friction self-registration MCP clients expect. Out-of-band-seeded clients are approved directly and never face this gate.
+
+### `oauthAccessTokenTtl` / `oauthRefreshTokenTtl`
+
+**Type:** `string` (ISO-8601 duration) &nbsp;&nbsp; **Defaults:** `PT1H` / `P30D`
+
+The OAuth access-token and refresh-token lifetimes. Refresh tokens rotate on every exchange and carry family-lineage theft detection (a replayed consumed refresh token revokes the whole family — see [SECURITY.md](SECURITY.md)).
+
+### `elevationTtl`
+
+**Type:** `int` (seconds) &nbsp;&nbsp; **Default:** `300` (5 minutes)
+
+Lifetime of an elevation marker minted by the in-band `/oauth/elevate` re-authentication flow. After a fresh Craft re-auth (password + 2FA), high-stakes operations over HTTP — credential / email / admin-status mutations on `users`, and content publish / delete — are permitted for this window, bound to the specific access token. Tracked server-side, never trusted from a client claim. `craft_exec` is **never** unlocked by elevation. See [SECURITY.md](SECURITY.md).
+
 ## HTTP transport
 
 The Streamable HTTP transport at `/cortex/mcp` is **authenticated on every request** — there is no anonymous access. Setting `httpEnabled = true` opens the endpoint; the controller's `beforeAction` pipeline then enforces, in order: method allowlist, `MCP-Protocol-Version` validation, **bearer-token / OAuth 2.1 authentication**, and per-user rate limiting before the JSON-RPC dispatcher ever sees the request. An unauthenticated request gets `401 Unauthorized` with `WWW-Authenticate: Bearer realm="cortex"` per RFC 6750. See [INSTALL.md](INSTALL.md) for issuing tokens and [SECURITY.md](SECURITY.md) for the full auth model.
@@ -127,7 +155,7 @@ The endpoint supports three methods:
 
 ## The CP section
 
-Cortex registers a top-level Control Panel section, **Cortex**, in the global sidebar. Its subnav is permission- and edition-gated (`Cortex::getCpNavItem()`): Free installs see **Settings** and **Temporary grants**; Pro adds **Tokens**, **Activity**, and **Connection**. Saving the **Settings** screen writes to project config so changes sync across environments via your normal `project-config/apply` flow; the other screens read and mutate runtime DB state.
+Cortex registers a top-level Control Panel section, **Cortex**, in the global sidebar. Its subnav is permission- and edition-gated (`Cortex::getCpNavItem()`): Free installs see **Settings** and **Temporary grants**; Pro adds **Tokens**, **Clients**, **Activity**, and **Connection**. The **Clients** screen lists registered OAuth clients and is where an admin approves or revokes them (the DCR approval gate). Saving the **Settings** screen writes to project config so changes sync across environments via your normal `project-config/apply` flow; the other screens read and mutate runtime DB state.
 
 The plugin Settings screen also stays reachable the usual way, from **Settings → Plugins → Cortex**.
 

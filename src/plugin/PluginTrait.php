@@ -296,6 +296,8 @@ trait PluginTrait
 
                 $event->rules['GET oauth/authorize'] = 'cortex/oauth/authorize';
                 $event->rules['POST oauth/authorize'] = 'cortex/oauth/authorize';
+                $event->rules['GET oauth/elevate'] = 'cortex/oauth/elevate';
+                $event->rules['POST oauth/elevate'] = 'cortex/oauth/elevate';
                 $event->rules['POST oauth/token'] = 'cortex/oauth/token';
                 $event->rules['POST oauth/register'] = 'cortex/oauth/register';
                 $event->rules['POST oauth/revoke'] = 'cortex/oauth/revoke';
@@ -337,6 +339,10 @@ trait PluginTrait
                     'cortex/activity/table-data' => 'cortex/settings/activity-table-data',
                     'cortex/activity/row' => 'cortex/settings/activity-row',
                     'cortex/connection' => 'cortex/settings/connection',
+                    'cortex/clients' => 'cortex/settings/clients',
+                    'cortex/clients/table-data' => 'cortex/settings/clients-table-data',
+                    'cortex/clients/approve' => 'cortex/settings/approve-client',
+                    'cortex/clients/revoke' => 'cortex/settings/revoke-client',
                 ], $event->rules);
             },
         );

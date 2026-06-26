@@ -24,15 +24,24 @@ use craftpulse\cortex\db\Table;
  * endpoint URL before accepting the token.
  * =========================================================================
  *
+ * `familyId` ties every access + refresh token minted from one
+ * authorization (and every rotation descended from it) into a single
+ * lineage. `consumedAt` marks a refresh token that has been rotated
+ * away; a present-but-revoked refresh token whose `consumedAt` is set,
+ * presented again, is a replay of a consumed token — theft signal that
+ * revokes the whole `familyId` (RFC 6819 / OAuth 2.1 rotation BCP).
+ *
  * @property int $id
  * @property string $tokenType
  * @property string $tokenHash
  * @property int|null $userId
  * @property string $clientId
+ * @property string|null $familyId
  * @property string|null $scope
  * @property string|null $audience
  * @property string $expiresAt
  * @property string|null $dateRevoked
+ * @property string|null $consumedAt
  * @property string $dateCreated
  * @property string $dateUpdated
  * @property string $uid
@@ -69,6 +78,7 @@ class OauthToken extends ActiveRecord
             [['tokenType'], 'in', 'range' => ['access', 'refresh']],
             [['tokenHash'], 'string', 'length' => 64],
             [['clientId'], 'string', 'max' => 64],
+            [['familyId'], 'string', 'max' => 36],
             [['userId'], 'integer'],
             [['scope'], 'string', 'max' => 255],
         ];

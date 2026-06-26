@@ -6,6 +6,42 @@ All notable changes to Cortex are documented here. Format follows
 
 ## [Unreleased]
 
+### Added — authentication and authorization (Pro HTTP transport)
+
+- **Capability-grained OAuth scopes.** Replaced the coarse `read` / `write`
+  scope pair with a capability vocabulary — `content:read`,
+  `content:write`, `content:publish`, `content:delete`, `assets:write`,
+  `schema:read`, `system:read`, `users:read`, `users:write`. Every tool
+  maps to the scope it requires; over the HTTP transport a tool is visible
+  and callable only when the token's granted scopes cover it, the user's
+  Craft permissions allow it, and the edition permits it. The old
+  `read` / `write` scopes are still accepted and expanded to the matching
+  capabilities, so existing tokens keep working.
+- **In-band elevation for high-stakes operations.** Added an
+  `/oauth/elevate` re-authentication flow. Changing a user's password,
+  email, or admin status, and publishing or deleting content, are now
+  permitted over the HTTP transport only after a fresh re-authentication
+  (password + 2FA via Craft's login). The elevation is short-lived,
+  tracked server-side, and bound to the specific access token. Code
+  execution (`craft_exec`) remains stdio-only and is never unlocked by
+  elevation. This reverses the previous blanket refusal of credential
+  mutations over HTTP.
+- **Refresh-token rotation with theft detection.** Refresh tokens now
+  rotate on every use and are grouped into a family. Presenting an
+  already-used refresh token (a sign of token theft) revokes the entire
+  family of tokens, records a security event in the audit log, and forces
+  the client to re-authorize.
+- **Client approval gate for self-registration.** Clients that register
+  themselves automatically now start unapproved and cannot connect until
+  an administrator approves them on the new **Clients** control-panel
+  screen. A new setting auto-approves clients for trusted or development
+  installs.
+
+### Added — control panel
+
+- **Clients screen.** A new admin-only screen listing every registered
+  OAuth client, with inline approve / revoke actions.
+
 ### Changed — control panel
 
 - The Cortex CP screens now live under a standard sidebar section with a

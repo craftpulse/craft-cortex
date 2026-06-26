@@ -202,6 +202,29 @@ class Server
     private ?int $_rateLimitRemaining = null;
 
     /**
+     * @var bool Whether this request carries a live WS2 elevation
+     *           marker. Set by `McpController::beforeAction()` from the
+     *           per-token elevation cache. stdio leaves it at the
+     *           constructor default (true for stdio — the trusted local
+     *           transport is implicitly elevated; the elevation gate is
+     *           an HTTP-transport concern). Threaded onto every
+     *           `InvocationContext` so high-stakes tools can gate.
+     */
+    private bool $_elevated;
+
+    /**
+     * @var string[]|null Capability scopes carried by the authenticating
+     *                    OAuth access token, or null for stdio / bearer-
+     *                    token requests (which are not scope-gated). Set
+     *                    by the HTTP controller after the bearer lookup
+     *                    resolves an OAuth token's `scope` claim. Threaded
+     *                    to `Tools::asListPayloadFor()` / `getByNameFor()`
+     *                    so a tool surfaces over HTTP only when its
+     *                    required scope is granted.
+     */
+    private ?array $_grantedScopes = null;
+
+    /**
      * @var User|null Memoized result of resolving `$_userId` through
      *                `Users::getUserById()`. Lazy — populated on the
      *                first call to `_resolveUser()` for the request,
@@ -259,6 +282,12 @@ class Server
     public function __construct(string $transport = self::TRANSPORT_STDIO)
     {
         $this->_transport = $transport;
+        // stdio is the trusted local transport — implicitly elevated,
+        // since the WS2 elevation gate exists only to compensate for the
+        // absence of a re-auth handshake over HTTP. HTTP requests start
+        // un-elevated until the controller flips this from the per-token
+        // elevation cache.
+        $this->_elevated = $transport === self::TRANSPORT_STDIO;
     }
 
     /**
@@ -278,6 +307,39 @@ class Server
     public function setUserId(?int $userId): void
     {
         $this->_userId = $userId;
+    }
+
+    /**
+     * Bind the capability scope set the authenticating OAuth access
+     * token carries. Called by `McpController::beforeAction()` after
+     * the bearer lookup resolves an OAuth token. Null (the default)
+     * marks the request as not scope-gated — stdio and long-lived
+     * bearer tokens take this path and see every tool their user
+     * permission + edition allow.
+     *
+     * @param string[]|null $scopes
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function setGrantedScopes(?array $scopes): void
+    {
+        $this->_grantedScopes = $scopes;
+    }
+
+    /**
+     * Bind whether this request carries a live WS2 elevation marker.
+     * Called by `McpController::beforeAction()` after checking the
+     * per-token elevation cache. Threaded onto every invocation context
+     * so high-stakes tools can gate. stdio never calls this — the
+     * constructor leaves stdio implicitly elevated.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function setElevated(bool $elevated): void
+    {
+        $this->_elevated = $elevated;
     }
 
     /**
@@ -647,7 +709,7 @@ class Server
      */
     private function _toolsList(): array
     {
-        $tools = Cortex::getInstance()->tools->asListPayloadFor($this->_resolveUser());
+        $tools = Cortex::getInstance()->tools->asListPayloadFor($this->_resolveUser(), $this->_grantedScopes);
 
         if ($this->_transport !== self::TRANSPORT_STDIO) {
             $registry = Cortex::getInstance()->tools;
@@ -883,7 +945,7 @@ class Server
             return $miss;
         }
 
-        $tool = Cortex::getInstance()->tools->getByNameFor($name, $this->_resolveUser());
+        $tool = Cortex::getInstance()->tools->getByNameFor($name, $this->_resolveUser(), $this->_grantedScopes);
         if ($tool === null) {
             // Indistinguishable from "tool not registered" on the wire —
             // a tool the user lacks permission for fails closed as
@@ -1076,6 +1138,7 @@ class Server
             tokenId: $this->_tokenId,
             sessionId: $this->_sessionId,
             rateLimitRemaining: $this->_rateLimitRemaining,
+            elevated: $this->_elevated,
             cancellationToken: $token,
         );
     }
@@ -1281,6 +1344,7 @@ class Server
             tokenId: $this->_tokenId,
             sessionId: $this->_sessionId,
             rateLimitRemaining: $this->_rateLimitRemaining,
+            elevated: $this->_elevated,
         );
     }
 

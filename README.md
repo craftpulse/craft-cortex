@@ -98,14 +98,18 @@ Full configuration reference: **[`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
 
 ## Security
 
-Cortex's security model treats the transport as the boundary. The Phase 1 stdio transport is trusted (local user, single process). The Phase 2 HTTP transport will authenticate every request against a Craft user before dispatching.
+Cortex's security model treats the transport as the boundary. The stdio transport is trusted (local user, single process). The HTTP transport authenticates every request against a Craft user before dispatching.
 
 Highlights:
 
+- **OAuth 2.1 with capability scopes.** The HTTP transport authenticates via OAuth 2.1 (Authorization Code + PKCE) or long-lived bearer tokens. Authorization is the conjunction of **scope ∧ Craft-permission ∧ edition** — capability scopes (`content:read`, `content:write`, `content:publish`, `content:delete`, `assets:write`, `schema:read`, `system:read`, `users:read`, `users:write`) gate which tools a token can reach.
+- **Dynamic Client Registration with an approval gate.** Self-registered clients start unapproved; an admin approves them on the **Clients** CP screen before they can connect (or auto-approve for trusted installs).
+- **Refresh-token rotation + theft detection.** Refresh tokens rotate on every exchange and carry family-lineage tracking — replaying a consumed refresh token revokes the entire token family and logs a security event (RFC 6819 / OAuth 2.1 BCP).
+- **In-band elevation for high-stakes operations.** Credential / admin mutations and content publish / delete over HTTP require a fresh re-authentication via `/oauth/elevate`. Code execution (`craft_exec`) stays stdio-only **always** — elevation never unlocks it.
 - `craft_exec` runs PHP `eval` behind six layered security gates (same approach as Craft's own `ExecController`, not a wrapper around it): dry-run-default, structured output, secret redaction, destructive-op guard, hard HTTP rejection, and `destructiveHint: true` annotation.
 - `craft_command` enforces an allowlist at the tool layer, layered as project-config defaults + admin-issued runtime overrides + optional `config/cortex.php` overrides.
 - No `eval` / `shell_exec` / `proc_open` / `passthru` / `popen` / backticks anywhere in the source — verified by the architecture test suite.
-- Every tool invocation emits one structured audit-log line (`cortex` channel) with secret-redacted arguments. The line shape is locked across Phase 1 and Phase 2 so log consumers stay stable through the transport upgrade.
+- Every tool invocation emits one structured audit-log line (`cortex` channel) with secret-redacted arguments.
 
 Full security reference: **[`docs/SECURITY.md`](docs/SECURITY.md)**.
 

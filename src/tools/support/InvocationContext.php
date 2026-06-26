@@ -105,6 +105,21 @@ final class InvocationContext
      *                                                 bucket headroom for this
      *                                                 user. Null on stdio. Zero
      *                                                 on throttle-write paths.
+     * @param bool                  $elevated          Whether the request carries
+     *                                                 a live WS2 elevation marker
+     *                                                 (fresh re-auth via
+     *                                                 `/oauth/elevate`). Always
+     *                                                 true on stdio (trusted local
+     *                                                 transport — no elevation gate
+     *                                                 applies); set per-token on
+     *                                                 HTTP from the elevation cache.
+     *                                                 High-stakes tools (credential
+     *                                                 / admin mutations, content
+     *                                                 publish / delete) require it
+     *                                                 over HTTP. `craft_exec` /
+     *                                                 `IsStdioOnly` tools stay
+     *                                                 stdio-only regardless — never
+     *                                                 unlocked by elevation.
      * @param CancellationToken|null $cancellationToken Cooperative cancellation
      *                                                 signal. Defaults to a fresh,
      *                                                 unfired token so non-streaming
@@ -122,6 +137,7 @@ final class InvocationContext
         public readonly ?int $tokenId = null,
         public readonly ?string $sessionId = null,
         public readonly ?int $rateLimitRemaining = null,
+        public readonly bool $elevated = false,
         ?CancellationToken $cancellationToken = null,
     ) {
         $this->_cancellationToken = $cancellationToken ?? new CancellationToken();
