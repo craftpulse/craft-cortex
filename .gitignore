@@ -6,6 +6,7 @@
 # Personal Claude Code settings (per-developer permissions, not shared)
 /.claude/settings.local.json
 /.claude/memory/
+/.claude/scheduled_tasks.lock
 
 # Internal dev knowledge — full gate-by-gate history, audit findings,
 # smoke results, anything that's "our knowledge" rather than user-facing

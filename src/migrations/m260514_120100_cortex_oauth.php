@@ -64,6 +64,7 @@ class m260514_120100_cortex_oauth extends Migration
                 'redirectUris' => $this->text()->notNull(),
                 'scope' => $this->string(255)->null(),
                 'isPublic' => $this->boolean()->notNull()->defaultValue(false),
+                'approved' => $this->boolean()->notNull()->defaultValue(false),
                 'clientSecretHash' => $this->string(255)->null(),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),
@@ -71,6 +72,7 @@ class m260514_120100_cortex_oauth extends Migration
             ]);
 
             $this->createIndex(null, Table::OAUTH_CLIENTS, ['clientId'], true);
+            $this->createIndex(null, Table::OAUTH_CLIENTS, ['approved']);
         }
 
         if (!$this->db->tableExists(Table::OAUTH_CODES)) {
@@ -115,10 +117,12 @@ class m260514_120100_cortex_oauth extends Migration
                 'tokenHash' => $this->string(64)->notNull(),
                 'userId' => $this->integer()->null(),
                 'clientId' => $this->string(64)->notNull(),
+                'familyId' => $this->string(36)->null(),
                 'scope' => $this->string(255)->null(),
                 'audience' => $this->string(2000)->null(),
                 'expiresAt' => $this->dateTime()->notNull(),
                 'dateRevoked' => $this->dateTime()->null(),
+                'consumedAt' => $this->dateTime()->null(),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),
                 'uid' => $this->uid(),
@@ -130,6 +134,7 @@ class m260514_120100_cortex_oauth extends Migration
             $this->createIndex(null, Table::OAUTH_TOKENS, ['tokenHash'], true);
             $this->createIndex(null, Table::OAUTH_TOKENS, ['userId']);
             $this->createIndex(null, Table::OAUTH_TOKENS, ['clientId']);
+            $this->createIndex(null, Table::OAUTH_TOKENS, ['familyId']);
             $this->createIndex(null, Table::OAUTH_TOKENS, ['expiresAt']);
             $this->createIndex(null, Table::OAUTH_TOKENS, ['dateRevoked']);
 

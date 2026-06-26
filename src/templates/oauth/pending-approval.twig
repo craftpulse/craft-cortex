@@ -1,0 +1,67 @@
+{#
+ # =========================================================================
+ # OAuth client pending-approval screen.
+ #
+ # Rendered by `OauthController::actionAuthorize()` (via
+ # `_rejectIfClientPendingApproval()`) when the requesting client is
+ # registered but not yet approved by an admin. The DCR approval gate
+ # (WS3) keeps every self-registered client unapproved until an admin
+ # approves it on the Clients CP screen, or `dcrAutoApprove` is on.
+ #
+ # Strict template isolation — every variable consumed is declared in
+ # the controller's render() call (`clientName`).
+ # =========================================================================
+ #
+ # @author Craftpulse
+ # @since  5.0.0
+ #}
+<!DOCTYPE html>
+<html lang="{{ craft.app.language }}">
+<head>
+    <meta charset="utf-8">
+    <title>{{ 'Client awaiting approval'|t('cortex') }}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        :root {
+            color-scheme: light dark;
+            --bg: #f7f7f9;
+            --panel: #fff;
+            --text: #1c2329;
+            --muted: #5b6470;
+            --border: #e4e7eb;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #14171b;
+                --panel: #1d2228;
+                --text: #e7eaee;
+                --muted: #8e98a4;
+                --border: #2a3038;
+            }
+        }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); }
+        .container { max-width: 480px; margin: 80px auto; padding: 0 16px; }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 28px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+        h1 { margin: 0 0 16px; font-size: 22px; font-weight: 600; }
+        .lead { margin: 0 0 12px; color: var(--muted); line-height: 1.5; }
+        .client { font-weight: 600; color: var(--text); }
+        .meta { margin-top: 20px; font-size: 12px; color: var(--muted); text-align: center; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="panel">
+        <h1>{{ 'Awaiting approval'|t('cortex') }}</h1>
+        <p class="lead">
+            {{ '{client} has registered but is not yet approved.'|t('cortex', { client: '<span class="client">' ~ clientName|e('html') ~ '</span>' })|raw }}
+        </p>
+        <p class="lead">
+            {{ 'An administrator must approve this client in the Cortex control panel (Clients) before it can connect.'|t('cortex') }}
+        </p>
+        <div class="meta">
+            {{ 'Cortex OAuth — Powered by craftpulse/craft-cortex'|t('cortex') }}
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -44,21 +44,74 @@ Tools mark themselves stdio-only via the `#[IsStdioOnly]` attribute. The dispatc
 
 `craft_exec` carries `#[IsStdioOnly]`. So does `import_export` (Free has export-only, Pro will lift this restriction once the Pro permission gating lands).
 
-### Credential and privilege mutations are stdio-only
+### High-stakes operations require elevation over HTTP
 
-Craft's own control panel guards three user operations behind an **elevated session** — the user must re-enter their password before the change is accepted:
+Craft's own control panel guards certain operations behind an **elevated session** — the user must re-authenticate (re-enter their password; 2FA is part of the standard login) before the change is accepted. Cortex brings the same posture to the HTTP transport with an in-band elevation flow.
 
-- changing a password,
-- changing an email address,
-- granting or modifying admin status.
+The operations that require elevation over HTTP are:
 
-The MCP HTTP transport has **no elevated-session layer yet**. Rather than accept these mutations from a bearer-authenticated request that never re-authenticated, Cortex refuses them over HTTP. The `users` tool rejects any `create` or `update` call that carries `newPassword`, `email`, or `admin` when the resolved transport is HTTP, returning a tool error:
+- **`users` credential / privilege fields** — changing a password (`newPassword`), changing an email address (`email`), or granting / modifying admin status (`admin`).
+- **Content publish / unpublish** — toggling the `enabled` (publication status) field on the `entry` tool's `create` / `update` modes.
+- **Content / element deletes** — the `entry` tool's `delete` mode.
 
-> `users: changing password/email/admin status is not permitted over the HTTP transport; use the stdio transport (elevated-session support over HTTP is not yet available).`
+When one of these is attempted over HTTP **without elevation**, Cortex refuses it with a tool error naming the elevation flow:
 
-This is a fail-closed gate, not the full elevation layer. It keys on the real transport threaded from the dispatcher (`InvocationContext::$transport`), never on a proxy such as "is a Craft user resolved" — an HTTP bearer whose user id fails to resolve must not be misread as stdio. When the transport cannot be determined, the request is treated as HTTP and refused.
+> `users: changing password/email/admin status over the HTTP transport requires elevation. Re-authenticate via the /oauth/elevate flow, then retry.`
 
-All three operations remain available over the trusted **stdio** transport, where the local user already controls the Craft process. Every other `users` operation — `list`, `get`, non-sensitive `create`/`update` (custom fields, names, group assignment), `delete` — works over both transports, subject to the usual per-user permission gating. When a real elevated-session handshake ships for the HTTP transport, this blanket refusal is replaced by a re-authentication challenge.
+#### The `/oauth/elevate` flow
+
+To elevate, the user re-authenticates through Craft:
+
+1. The client opens `/oauth/elevate?token=<access_token>` in a browser.
+2. Cortex requires a live Craft session (anonymous visitors are redirected to the CP login).
+3. On confirmation, Cortex calls Craft's native `requireElevatedSession()` — a fresh password re-entry (2FA is handled by the standard login).
+4. Cortex verifies the token belongs to the logged-in user, then mints a short-lived **elevation marker** bound to that specific access token's `jti`, stored server-side in the cache for `elevationTtl` seconds (default 300 / 5 minutes).
+
+Elevation is tracked **server-side**, never trusted from a client claim. It binds to the exact access token presented — a second token for the same user is not elevated unless it goes through its own elevate flow. The marker is read on every HTTP request and threaded onto `InvocationContext::$elevated`; the gated tools check that flag.
+
+The gate keys on the real `InvocationContext` threaded from the dispatcher — never on a proxy such as "is a Craft user resolved". When the context cannot be determined, the request is treated as un-elevated HTTP and refused (fail closed). stdio is the trusted local transport and is implicitly elevated, so a stdio caller is never gated.
+
+#### Elevation does NOT unlock code execution
+
+This is a hard, non-negotiable boundary: **`craft_exec` (and any `#[IsStdioOnly]` tool) stays stdio-only ALWAYS, regardless of elevation.** Elevation compensates for the missing HTTP re-authentication on credential and content operations; it never crosses the code-execution transport boundary. An elevated HTTP request that invokes `craft_exec` is still hard-rejected at the dispatcher (`mcp/Server.php`) with the stdio-only error.
+
+## OAuth 2.1 authorization
+
+The HTTP transport authenticates every request against a Craft user via OAuth 2.1 (Authorization Code + PKCE) or a long-lived bearer token. Three layers harden the OAuth surface.
+
+### Capability scopes
+
+Authorization over HTTP is the conjunction of three independent gates: **scope ∧ Craft-permission ∧ edition**. A tool is visible (`tools/list`) and callable (`tools/call`) only when all three hold.
+
+The scope vocabulary is capability-grained:
+
+| Scope | Grants |
+|-------|--------|
+| `content:read` | Read entries, assets, categories, tags, globals |
+| `content:write` | Create / update content + bulk / scaffold tools |
+| `content:publish` | Change entry publication status |
+| `content:delete` | Delete content |
+| `assets:write` | Mutate assets and address records |
+| `schema:read` | Read sections, fields, entry types, volumes, sites |
+| `system:read` | Read config, plugins, routes, diagnostics |
+| `users:read` | Read user records (PII-gated) |
+| `users:write` | Create / update / delete users |
+
+Every registered tool maps to exactly one required scope in `services/Scopes.php` (the single source of truth). A tool absent from the map defaults to `system:read` — fail-safe: an unmapped tool is gated behind a read scope, never granted a write capability by default. stdio is not scope-gated (the trusted local transport). The legacy coarse `read` / `write` scopes are still accepted at the authorize / DCR boundary and expanded to their capability clusters at grant time, so pre-existing tokens keep working.
+
+`craft_exec` maps to a scope for completeness but stays stdio-only at the transport boundary regardless — no scope can reach it over HTTP.
+
+### Dynamic Client Registration requires approval
+
+RFC 7591 Dynamic Client Registration lets any caller self-register a client. Cortex starts every DCR-registered client **unapproved**: the authorize and token flows reject it (it is invisible to league's client repository) until an admin approves it on the **Clients** CP screen. An unapproved client's authorize request renders a clear "pending admin approval" page rather than a generic OAuth error.
+
+The `dcrAutoApprove` setting (default `false`) flips this to zero-friction self-registration for trusted / dev installs. Out-of-band-seeded clients are approved directly. The `/oauth/register` endpoint is also per-IP rate-limited.
+
+### Refresh-token rotation + theft detection
+
+Refresh tokens rotate on every exchange — league issues a new access + refresh pair and revokes the old refresh token. Cortex adds **family lineage** tracking (RFC 6819 §5.2.2.3 / the OAuth 2.1 refresh-rotation BCP): every token minted from one authorization, and every rotation descended from it, shares a `familyId`.
+
+When an **already-consumed** refresh token is presented again (a replay — the canonical stolen-token signal), Cortex revokes the **entire family** — every live access and refresh token in the lineage — emits a `kind=security` audit row, and returns an OAuth error. The legitimate client must re-authorize through the consent flow. This bounds the blast radius of a leaked refresh token to a single rotation window.
 
 ## `craft_exec` — six security gates
 

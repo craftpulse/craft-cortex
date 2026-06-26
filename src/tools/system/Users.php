@@ -205,29 +205,27 @@ class Users extends AbstractTool implements ContextAwareToolInterface
     public const LIST_STATUSES = ['active', 'pending', 'suspended', 'locked', 'inactive'];
 
     /**
-     * Credential / privilege fields refused over the HTTP transport.
+     * Credential / privilege fields that require ELEVATION over the
+     * HTTP transport.
      *
      * Changing a password (`newPassword`), setting or changing the
      * email (`email`), or granting / modifying admin status (`admin`)
      * are exactly the operations Craft's own CP gates behind an
      * elevated (re-authenticated) session, and `email` is personally
-     * identifying. The MCP HTTP transport has no elevated-session
-     * layer, so these fields are refused over HTTP and are available
-     * only over the trusted local stdio transport — PII and credential
-     * mutations stay on the local-trust path by design.
+     * identifying. WS2 adds an in-band `/oauth/elevate` fresh-re-auth
+     * flow: over HTTP these fields are now ALLOWED iff the request
+     * carries a live elevation marker (the user re-authenticated,
+     * including 2FA); otherwise they are refused with an error naming
+     * the elevation flow. stdio is the trusted local transport and is
+     * implicitly elevated, so it is never gated here.
      *
-     * **Consequence — `mode=create` is stdio-only.** `email` is
-     * required on create (see `getInputSchema`), and `email` is in
-     * this set, so every HTTP `create` is refused. This is intentional:
-     * provisioning a user (which always carries an email) is a
-     * local-operator action, not a remote-agent one. `update` works
-     * over HTTP for the non-refused fields (username, status flags,
-     * groups, custom fields); only the credential/PII/admin fields
-     * above are stdio-gated. See `docs/SECURITY.md`.
+     * `craft_exec` / any `IsStdioOnly` tool is NOT in scope of this
+     * gate — those stay stdio-only ALWAYS, regardless of elevation
+     * (enforced at the transport boundary in `Server::_validateToolCall`).
      *
      * @since 5.0.0
      */
-    public const HTTP_REFUSED_FIELDS = ['newPassword', 'email', 'admin'];
+    public const ELEVATION_REQUIRED_FIELDS = ['newPassword', 'email', 'admin'];
 
     // Private Properties
     // =========================================================================
@@ -490,27 +488,32 @@ class Users extends AbstractTool implements ContextAwareToolInterface
     // =========================================================================
 
     /**
-     * Refuse credential / privilege mutations over the HTTP transport.
+     * Gate credential / privilege mutations over the HTTP transport
+     * behind WS2 elevation.
      *
      * Setting a new password (`newPassword`), changing the email
      * (`email`), or granting / modifying admin status (`admin`) are the
      * operations Craft's CP guards behind an elevated (re-authenticated)
-     * session. The MCP HTTP transport has no elevated-session layer yet,
-     * so these are refused over HTTP and remain available only over the
-     * trusted local stdio transport.
+     * session. Over HTTP these are now ALLOWED iff the request carries a
+     * live elevation marker (the user completed the in-band
+     * `/oauth/elevate` fresh-re-auth flow); otherwise they are refused
+     * with an error naming the elevation flow.
      *
-     * Keys on the real `InvocationContext::$transport` threaded from the
-     * dispatcher — never inferred from a proxy such as a resolved-user
-     * check. Fails closed: when no context was injected (transport
-     * indeterminate) the request is treated as HTTP and refused.
+     * Keys on the real `InvocationContext` threaded from the dispatcher
+     * — never inferred from a proxy. stdio is implicitly elevated
+     * (`InvocationContext::$elevated` is true for stdio), so it always
+     * passes. Fails closed: when no context was injected (transport
+     * indeterminate) the request is treated as un-elevated HTTP and
+     * refused.
      *
-     * No-op when none of the guarded fields are present in the payload,
-     * so non-sensitive create / update operations (custom fields, name
-     * attributes, group assignment, etc.) keep working over HTTP.
+     * No-op when none of the guarded fields are present, so non-
+     * sensitive create / update operations (custom fields, name
+     * attributes, group assignment, status flags) keep working over
+     * HTTP without elevation.
      *
      * @param array<string,mixed> $arguments
      * @throws ToolException When a guarded field is present and the
-     *                       resolved transport is not stdio.
+     *                       request is not elevated.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -518,24 +521,25 @@ class Users extends AbstractTool implements ContextAwareToolInterface
     private function _assertTransportAllowsCredentialMutations(array $arguments): void
     {
         $guarded = array_values(array_filter(
-            self::HTTP_REFUSED_FIELDS,
+            self::ELEVATION_REQUIRED_FIELDS,
             static fn(string $field): bool => array_key_exists($field, $arguments),
         ));
         if ($guarded === []) {
             return;
         }
 
-        // Fail closed — only an explicit stdio transport is exempt.
-        $isStdio = $this->_invocationContext !== null
-            && $this->_invocationContext->transport === Server::TRANSPORT_STDIO;
-        if ($isStdio) {
+        // Fail closed — only an elevated context is exempt. stdio is the
+        // trusted local transport and is implicitly elevated; HTTP
+        // requires the elevation marker minted by `/oauth/elevate`.
+        $ctx = $this->_invocationContext;
+        if ($ctx !== null && ($ctx->elevated || $ctx->transport === Server::TRANSPORT_STDIO)) {
             return;
         }
 
         throw new ToolException(
-            'users: changing password/email/admin status is not permitted over the HTTP ' .
-                'transport; use the stdio transport (elevated-session support over HTTP is ' .
-                'not yet available).'
+            'users: changing password/email/admin status over the HTTP transport requires ' .
+                'elevation. Re-authenticate via the /oauth/elevate flow, then retry. ' .
+                '(Over the trusted stdio transport this is always permitted.)'
         );
     }
 

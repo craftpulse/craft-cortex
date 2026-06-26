@@ -120,6 +120,29 @@ class McpController extends Controller
     private ?int $_authenticatedTokenId = null;
 
     /**
+     * @var string[]|null Capability scopes carried by the OAuth access
+     *                    token that authenticated this request, or null
+     *                    when authentication was via a (non-scope-gated)
+     *                    long-lived bearer token. Threaded onto the
+     *                    dispatcher in `_handlePost()` so `tools/list` and
+     *                    `tools/call` gate on the granted scope set.
+     */
+    private ?array $_grantedScopes = null;
+
+    /**
+     * @var bool Whether this request's bound user carries a live WS2
+     *           elevation marker (`cortex:elevation:{userIdHash}`).
+     *           Resolved in `beforeAction()` from the per-user elevation
+     *           cache; threaded onto the dispatcher in `_handlePost()` so
+     *           high-stakes tools (credential / admin mutations, content
+     *           publish / delete) can gate. Bearer-token requests leave
+     *           this false — elevation rides on OAuth access tokens only,
+     *           and bearer tokens have no re-auth handshake to elevate
+     *           through.
+     */
+    private bool $_elevated = false;
+
+    /**
      * @var int|null Post-consume rate-limit headroom for the request,
      *               captured in `beforeAction()` after
      *               `RateLimiter::consume()` succeeds. Threaded onto
@@ -271,6 +294,13 @@ class McpController extends Controller
 
         $this->_authenticatedUserId = $resolved['userId'];
         $this->_authenticatedTokenId = $resolved['tokenId'] ?? null;
+        $this->_grantedScopes = $resolved['scopes'] ?? null;
+        // WS2 elevation: an OAuth request is elevated only when the bound
+        // user holds a live marker (minted by the `/oauth/elevate` fresh-
+        // re-auth flow, keyed by user id). Resolved here server-side —
+        // never from a client claim, and never from a URL-borne token.
+        $this->_elevated = $this->_authenticatedUserId !== null
+            && Cortex::getInstance()->oauth->isElevated($this->_authenticatedUserId);
 
         // Bind the resolved user onto Craft's auth surface so the
         // parent `_enforceAllowAnonymous` gate sees a non-guest, and
@@ -548,6 +578,12 @@ class McpController extends Controller
         if ($this->_authenticatedTokenId !== null) {
             $server->setTokenId($this->_authenticatedTokenId);
         }
+        // Thread the OAuth capability scope set onto the dispatcher so
+        // tools/list and tools/call gate on the granted scopes. Null
+        // for bearer-token requests (not scope-gated).
+        $server->setGrantedScopes($this->_grantedScopes);
+        // Thread the WS2 elevation state so high-stakes tools can gate.
+        $server->setElevated($this->_elevated);
         // Thread the session id onto the dispatcher so the audit log
         // can group every invocation in the same HTTP session. Null
         // for the initialize call (session id is minted in the
@@ -843,7 +879,18 @@ class McpController extends Controller
      * and the audit table's single `tokenId` FK slot is bearer-only
      * per the locked schema decision in the migration's docblock.
      *
-     * @return array{userId:?int, tokenId:?int}|null
+     * The OAuth path additionally carries the token's capability
+     * `scopes` (parsed from the space-delimited `scope` claim) so the
+     * dispatcher can gate `tools/list` / `tools/call` on the granted
+     * set. The bearer path leaves `scopes` null — long-lived bearer
+     * tokens are admin-issued and not scope-gated (their gating is the
+     * user-permission + edition path).
+     *
+     * The OAuth path also carries the token's `jti` so the controller
+     * can check the WS2 elevation cache; the bearer path leaves it null
+     * (bearer tokens have no elevation handshake).
+     *
+     * @return array{userId:?int, tokenId:?int, scopes:?array<int,string>, jti:?string}|null
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -867,14 +914,22 @@ class McpController extends Controller
                 return null;
             }
 
-            return ['userId' => $oauthHit['userId'], 'tokenId' => null];
+            $scopeClaim = is_string($oauthHit['scope'] ?? null) ? $oauthHit['scope'] : '';
+            $scopes = preg_split('/\s+/', trim($scopeClaim), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+            return [
+                'userId' => $oauthHit['userId'],
+                'tokenId' => null,
+                'scopes' => $scopes,
+                'jti' => $oauthHit['jti'] ?? null,
+            ];
         }
 
         $token = Cortex::getInstance()->tokens->lookup($bearer);
         if ($token === null) {
             return null;
         }
-        return ['userId' => $token->userId, 'tokenId' => $token->id];
+        return ['userId' => $token->userId, 'tokenId' => $token->id, 'scopes' => null, 'jti' => null];
     }
 
     /**

@@ -7,6 +7,7 @@ use craft\elements\User;
 use craft\web\View;
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\oauth\entities\UserEntity;
+use craftpulse\cortex\records\OauthClient as OauthClientRecord;
 use JsonException;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\RequestTypes\AuthorizationRequestInterface;
@@ -79,6 +80,9 @@ class OauthController extends AbstractOauthController
      */
     protected array|int|bool $allowAnonymous = ['token', 'register', 'revoke'];
 
+    // (`elevate` is intentionally absent — it requires a live Craft
+    // session, like `authorize`.)
+
     // Public Properties
     // =========================================================================
 
@@ -135,7 +139,10 @@ class OauthController extends AbstractOauthController
      */
     public function beforeAction($action): bool
     {
-        if ($action->id === 'authorize') {
+        // `authorize` and `elevate` are the two session-backed consent
+        // POSTs — they must carry a valid CSRF token. The token-proof
+        // endpoints (`token` / `register` / `revoke`) keep CSRF off.
+        if ($action->id === 'authorize' || $action->id === 'elevate') {
             $this->enableCsrfValidation = true;
         }
 
@@ -174,6 +181,19 @@ class OauthController extends AbstractOauthController
         $currentUser = $identity;
 
         $oauth = Cortex::getInstance()->oauth;
+
+        // DCR approval gate (WS3): an unapproved client is invisible to
+        // league's `ClientRepository`, so `validateAuthorizationRequest`
+        // would surface a generic `invalid_client`. Detect the
+        // unapproved-but-registered case first and render a clear
+        // "pending admin approval" page so the operator knows the
+        // client exists and just needs approving on the Clients CP
+        // screen.
+        $pendingResponse = $this->_rejectIfClientPendingApproval();
+        if ($pendingResponse !== null) {
+            return $pendingResponse;
+        }
+
         $psrRequest = $this->_buildPsrRequest();
 
         try {
@@ -313,8 +333,184 @@ class OauthController extends AbstractOauthController
         return $this->response;
     }
 
+    /**
+     * GET / POST `/oauth/elevate` — in-band high-stakes elevation (WS2).
+     *
+     * High-stakes operations over the HTTP transport (credential / email
+     * / admin-status mutations on `users`, and content publish / delete)
+     * require a *fresh* re-authentication that is genuinely independent of
+     * Craft's ambient elevated-session state. `requireElevatedSession()`
+     * is deliberately NOT used: it never prompts for a password (it only
+     * throws when the session isn't already elevated), and Craft treats a
+     * recent CP login — or any session when `elevatedSessionDuration ===
+     * 0` — as already elevated. Relying on it would mint elevation off an
+     * ambient session with no fresh challenge.
+     *
+     * The flow:
+     *
+     *   1. Requires a live Craft CP session — anonymous visitors are
+     *      redirected to the CP login (with a return URL) by Craft's
+     *      standard pipeline, since `elevate` is not in `$allowAnonymous`.
+     *   2. GET renders a CP-context page with a password field + CSRF.
+     *   3. POST verifies the submitted password against the *currently
+     *      logged-in* user via `User::authenticate()` — the same
+     *      credential path `users/login` uses, which also runs the
+     *      account status checks (locked / cooldown / suspended). When the
+     *      account has an active 2FA method, password-only elevation is
+     *      refused and the operator is told to elevate via Craft's native
+     *      elevated-session flow in the CP first (Cortex does not
+     *      re-implement the full WebAuthn / TOTP challenge here).
+     *   4. Only after that verification succeeds does it mint the per-user
+     *      elevation marker for `Settings::$elevationTtl` seconds.
+     *
+     * Elevation is keyed by the logged-in user's id — never by the access
+     * token, and the access token never appears in the URL. The MCP
+     * dispatcher checks the marker against the userId the presented access
+     * token is bound to, so the logged-in user who elevates and the token
+     * owner are the same account. Per-user elevation within the short TTL
+     * is acceptable and mirrors Craft's own (per-user) session-elevation
+     * model.
+     *
+     * @throws \yii\base\InvalidConfigException When the OAuth keys are
+     *         not yet generated.
+     * @throws \Throwable                       from template rendering.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionElevate(): Response
+    {
+        /** @var \craft\web\Application $app */
+        $app = Craft::$app;
+        $identity = $app->getUser()->getIdentity();
+        if (!$identity instanceof User) {
+            throw new \yii\web\ForbiddenHttpException('OAuth elevation requires an authenticated Craft user.');
+        }
+
+        if ($identity->id === null) {
+            throw new \yii\web\ForbiddenHttpException('OAuth elevation requires a saved Craft user.');
+        }
+
+        if (strtoupper($this->request->getMethod()) === 'POST') {
+            return $this->_completeElevation($identity);
+        }
+
+        return $this->_renderElevateScreen($identity);
+    }
+
     // Private Methods
     // =========================================================================
+
+    /**
+     * Verify the submitted password against the logged-in user and mint
+     * the per-user elevation marker on success. Re-renders the elevate
+     * screen with an error on failure. Password-only elevation is refused
+     * for accounts with an active 2FA method — those must use Craft's
+     * native elevated-session flow in the CP first.
+     *
+     * @throws \Throwable from template rendering.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _completeElevation(User $identity): Response
+    {
+        // Accounts with active 2FA can't be safely re-challenged with a
+        // bare password field — refuse and point at Craft's native flow
+        // rather than mint a weaker elevation than the account's own
+        // login posture.
+        if ($this->_userHasActiveMfa($identity)) {
+            return $this->_renderElevateScreen(
+                $identity,
+                Craft::t(
+                    'cortex',
+                    'Your account uses two-step verification. Start an elevated session from the Craft control panel first, then retry.',
+                ),
+            );
+        }
+
+        $password = $this->request->getBodyParam('password');
+        if (!is_string($password) || $password === '') {
+            return $this->_renderElevateScreen(
+                $identity,
+                Craft::t('cortex', 'Enter your password to confirm elevated access.'),
+            );
+        }
+
+        // `authenticate()` validates the password AND runs the account
+        // status checks (locked / cooldown / suspended) — the same path
+        // `users/login` uses. A fresh challenge, independent of any
+        // ambient elevated-session state.
+        if (!$identity->authenticate($password)) {
+            return $this->_renderElevateScreen(
+                $identity,
+                Craft::t('cortex', 'Incorrect password.'),
+            );
+        }
+
+        Cortex::getInstance()->oauth->grantElevation((int) $identity->id);
+
+        return $this->_renderElevateTemplate('cortex/oauth/elevated', [
+            'ttl' => Cortex::getInstance()->getSettings()->elevationTtl,
+        ]);
+    }
+
+    /**
+     * Render the elevate confirm screen (password challenge). Optionally
+     * carries an error message after a failed POST.
+     *
+     * @throws \Throwable from template rendering.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _renderElevateScreen(User $identity, ?string $error = null): Response
+    {
+        return $this->_renderElevateTemplate('cortex/oauth/elevate', [
+            'username' => $identity->username ?? $identity->email,
+            'error' => $error,
+        ]);
+    }
+
+    /**
+     * Render a CP-context elevate template onto the response. Isolated as
+     * a protected seam so the auth + mint decision in `_completeElevation`
+     * can be exercised in isolation from CP Twig rendering, which needs a
+     * live web request the console-bootstrapped test harness can't supply.
+     *
+     * @param array<string,mixed> $variables
+     * @throws \Throwable from template rendering.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _renderElevateTemplate(string $template, array $variables): Response
+    {
+        $this->response->format = Response::FORMAT_HTML;
+        $this->response->content = Craft::$app->getView()->renderTemplate(
+            $template,
+            $variables,
+            View::TEMPLATE_MODE_CP,
+        );
+        return $this->response;
+    }
+
+    /**
+     * Whether the user has an active two-step-verification method (and
+     * 2FA is not globally disabled). Mirrors the `users/login` check.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _userHasActiveMfa(User $identity): bool
+    {
+        /** @var \craft\web\Application $app */
+        $app = Craft::$app;
+        if ($app->getConfig()->getGeneral()->disable2fa) {
+            return false;
+        }
+        return $app->getAuth()->hasActiveMethod($identity);
+    }
 
     /**
      * Build a Nyholm PSR-7 ServerRequest from the live Yii request.
@@ -396,6 +592,15 @@ class OauthController extends AbstractOauthController
             $authRequest->getScopes(),
         );
 
+        // Build a {scope => plain-English description} map so the
+        // consent screen renders one capability line per requested
+        // scope without baking the vocabulary into the template.
+        $scopesService = Cortex::getInstance()->scopes;
+        $scopeDescriptions = [];
+        foreach ($scopes as $scope) {
+            $scopeDescriptions[$scope] = $scopesService->describe($scope);
+        }
+
         $this->response->format = Response::FORMAT_HTML;
         $this->response->content = Craft::$app->getView()->renderTemplate(
             'cortex/oauth/authorize',
@@ -403,6 +608,7 @@ class OauthController extends AbstractOauthController
                 'clientName' => $authRequest->getClient()->getName(),
                 'clientId' => $authRequest->getClient()->getIdentifier(),
                 'scopes' => $scopes,
+                'scopeDescriptions' => $scopeDescriptions,
                 'username' => $user->username ?? $user->email,
                 'query' => $this->request->getQueryParams(),
             ],
@@ -463,6 +669,42 @@ class OauthController extends AbstractOauthController
             $resource = $this->request->getBodyParam('resource');
         }
         return is_string($resource) && $resource !== '' ? $resource : null;
+    }
+
+    /**
+     * Render a "pending admin approval" page when the `client_id` on
+     * the authorize request resolves to a registered-but-unapproved
+     * client. Returns null when the client is approved, unknown, or
+     * the `client_id` param is absent — in every one of those cases
+     * league's own validation is left to run and produce the right
+     * OAuth error.
+     *
+     * The plaintext-safe `clientName` is rendered through the consent
+     * template's escaping; no client-controlled value is emitted raw.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _rejectIfClientPendingApproval(): ?Response
+    {
+        $clientId = $this->request->getQueryParam('client_id');
+        if (!is_string($clientId) || $clientId === '') {
+            return null;
+        }
+
+        $record = OauthClientRecord::findOne(['clientId' => $clientId]);
+        if (!$record instanceof OauthClientRecord || (bool) $record->approved) {
+            return null;
+        }
+
+        $this->response->setStatusCode(403);
+        $this->response->format = Response::FORMAT_HTML;
+        $this->response->content = Craft::$app->getView()->renderTemplate(
+            'cortex/oauth/pending-approval',
+            ['clientName' => (string) $record->clientName],
+            View::TEMPLATE_MODE_CP,
+        );
+        return $this->response;
     }
 
     /**

@@ -20,12 +20,17 @@ use craftpulse\cortex\db\Table;
  * decoding so consumers receive a typed `string[]`.
  * =========================================================================
  *
+ * DCR-registered clients start UNAPPROVED (`approved = 0`): the
+ * authorize + token flows reject them until an admin approves the row
+ * on the Clients CP screen, or `Settings::$dcrAutoApprove` is on.
+ *
  * @property int $id
  * @property string $clientId
  * @property string $clientName
  * @property string $redirectUris
  * @property string|null $scope
  * @property bool $isPublic
+ * @property bool $approved
  * @property string|null $clientSecretHash
  * @property string $dateCreated
  * @property string $dateUpdated
@@ -70,7 +75,7 @@ class OauthClient extends ActiveRecord
             [['clientName'], 'string', 'max' => 255],
             [['scope'], 'string', 'max' => 255],
             [['clientSecretHash'], 'string', 'max' => 255],
-            [['isPublic'], 'boolean'],
+            [['isPublic', 'approved'], 'boolean'],
         ];
     }
 }

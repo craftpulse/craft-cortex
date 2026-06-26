@@ -8,6 +8,7 @@ use craftpulse\cortex\services\Oauth;
 use craftpulse\cortex\services\Prompts;
 use craftpulse\cortex\services\RateLimiter;
 use craftpulse\cortex\services\Resources;
+use craftpulse\cortex\services\Scopes;
 use craftpulse\cortex\services\Sessions;
 use craftpulse\cortex\services\Skills;
 use craftpulse\cortex\services\Tokens;
@@ -49,6 +50,7 @@ use yii\base\InvalidConfigException;
  * @property Prompts $prompts the MCP prompts registry
  * @property RateLimiter $rateLimiter the per-user rate limiter
  * @property Resources $resources the MCP resources registry
+ * @property Scopes $scopes the OAuth capability-scope vocabulary + tool→scope authority
  * @property Sessions $sessions the HTTP-transport session store
  * @property Skills $skills the Cortex skills service — field layout + merged-corpus lookup
  * @property Tokens $tokens the bearer-token issuance / lookup / revoke service
@@ -152,6 +154,22 @@ trait Services
     {
         $component = $this->get('resources');
         assert($component instanceof Resources);
+        return $component;
+    }
+
+    /**
+     * Returns the OAuth capability-scope service — the scope
+     * vocabulary plus the authoritative tool→scope map.
+     *
+     * @throws InvalidConfigException When the component is not registered.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getScopes(): Scopes
+    {
+        $component = $this->get('scopes');
+        assert($component instanceof Scopes);
         return $component;
     }
 

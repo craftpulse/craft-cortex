@@ -3,6 +3,7 @@
 namespace craftpulse\cortex\services;
 
 use craft\elements\User;
+use craftpulse\cortex\Cortex;
 use craftpulse\cortex\events\RegisterToolsEvent;
 use craftpulse\cortex\tools\content\Address;
 use craftpulse\cortex\tools\content\Assets;
@@ -208,16 +209,23 @@ class Tools extends Component
      * `.claude/rules/architecture.md` "Per-user tool visibility" and
      * `docs/plans/gate-7.md` locked decision 3.
      *
+     * @param string[]|null $grantedScopes OAuth capability scopes carried
+     *                                     by the access token, or null for
+     *                                     stdio / bearer (not scope-gated).
      * @return array<int,array<string,mixed>>
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public function asListPayloadFor(?User $user): array
+    public function asListPayloadFor(?User $user, ?array $grantedScopes = null): array
     {
+        $scopes = Cortex::getInstance()->scopes;
         $payload = [];
         foreach ($this->_tools as $tool) {
             if (!$tool->filterFor($user)) {
+                continue;
+            }
+            if (!$scopes->grantsTool($tool::getName(), $grantedScopes)) {
                 continue;
             }
             $payload[] = $this->_buildListEntry($tool, $user);
@@ -237,16 +245,23 @@ class Tools extends Component
      * `.claude/rules/architecture.md` "Per-user tool visibility" and
      * `docs/plans/gate-7.md` locked decision 3.
      *
+     * @param string[]|null $grantedScopes OAuth capability scopes carried
+     *                                     by the access token, or null for
+     *                                     stdio / bearer (not scope-gated).
+     *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public function getByNameFor(string $name, ?User $user): ?ToolInterface
+    public function getByNameFor(string $name, ?User $user, ?array $grantedScopes = null): ?ToolInterface
     {
         $tool = $this->_byName[$name] ?? null;
         if ($tool === null) {
             return null;
         }
         if (!$tool->filterFor($user)) {
+            return null;
+        }
+        if (!Cortex::getInstance()->scopes->grantsTool($tool::getName(), $grantedScopes)) {
             return null;
         }
         return $tool;

@@ -55,7 +55,7 @@ it('shows only Settings + Temporary grants to an admin on Free', function() {
     });
 });
 
-it('shows all five items to an admin on Pro', function() {
+it('shows all items to an admin on Pro', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
     cortex_with_edition(Cortex::EDITION_PRO, function() {
@@ -63,7 +63,7 @@ it('shows all five items to an admin on Pro', function() {
 
         expect($navItem)->toBeArray();
         expect(array_keys($navItem['subnav']))
-            ->toBe(['settings', 'grants', 'tokens', 'activity', 'connection']);
+            ->toBe(['settings', 'grants', 'tokens', 'clients', 'activity', 'connection']);
     });
 });
 

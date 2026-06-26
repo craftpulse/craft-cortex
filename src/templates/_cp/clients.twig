@@ -1,0 +1,206 @@
+{% extends "cortex/_cp/_layout" %}
+
+{# =========================================================================
+   Cortex Clients tab — VueAdminTable of registered OAuth clients + inline
+   approve / revoke.
+
+   The DCR approval gate (WS3) lands every self-registered client
+   UNAPPROVED. An admin approves it here before its authorize + token
+   flows resolve. Revoking flips it back to unapproved AND revokes every
+   live token it issued. Reuses the VueAdminTable pattern locked by
+   Tokens (9.5).
+
+   Data path:
+     - Table data : GET  cortex/settings/clients-table-data → JSON {pagination, data}
+     - Approve    : POST cortex/settings/approve-client      → JSON {message}
+     - Revoke     : POST cortex/settings/revoke-client (VueAdminTable
+                                                deleteAction) → JSON {message}
+
+   The row shape is locked in `SettingsController::_serializeClientRow`:
+   `{id, clientName, clientId, type, approved, redirectUris, dateCreated}`.
+   ========================================================================= #}
+
+{% set selectedSubnavItem = 'clients' %}
+
+{% do view.registerTranslations('cortex', [
+    'Approve',
+    'Approved',
+    'Are you sure you want to revoke the client “{name}”? This revokes every token it issued.',
+    'Client',
+    'Client ID',
+    'Client approved.',
+    'Client revoked.',
+    'Created',
+    'No clients registered yet.',
+    'Pending approval',
+    'Redirect URIs',
+    'Revoke client',
+    'Search clients',
+    'Status',
+    'Type',
+    'confidential',
+    'public',
+]) %}
+
+{% block content %}
+    <p class="light">
+        {{ 'OAuth clients that have registered with this server. Self-registered (DCR) clients start unapproved — approve one before it can connect.'|t('cortex') }}
+    </p>
+
+    <div id="cortex-clients-vue-admin-table"></div>
+{% endblock %}
+
+{% js %}
+    (function() {
+        var tableContainer = '#cortex-clients-vue-admin-table';
+
+        function renderNameCell(value) {
+            if (!value) {
+                return '<span class="light">—</span>';
+            }
+            return Craft.escapeHtml(value);
+        }
+
+        function renderClientIdCell(value) {
+            if (!value) {
+                return '<span class="light">—</span>';
+            }
+            return '<code>' + Craft.escapeHtml(value) + '</code>';
+        }
+
+        function renderTypeCell(value) {
+            if (!value) {
+                return '<span class="light">—</span>';
+            }
+            return Craft.escapeHtml(Craft.t('cortex', value));
+        }
+
+        function renderStatusCell(value) {
+            if (value === true) {
+                return '<span class="status green"></span> ' + Craft.t('cortex', 'Approved');
+            }
+            return '<span class="status orange"></span> ' + Craft.t('cortex', 'Pending approval');
+        }
+
+        function renderRedirectCell(value) {
+            if (!value || !value.length) {
+                return '<span class="light">—</span>';
+            }
+            return value.map(function(uri) {
+                return '<code>' + Craft.escapeHtml(uri) + '</code>';
+            }).join('<br>');
+        }
+
+        function renderDateCreatedCell(value) {
+            if (!value) {
+                return '';
+            }
+            var d = new Date(value);
+            return Craft.escapeHtml(Craft.formatDate(d, 'short'));
+        }
+
+        // Approve action — rendered inline in a detail column. The cell
+        // callback receives `{id, approved}` so the button can post the
+        // client id and hide itself when already approved.
+        function renderApproveCell(value) {
+            if (!value || value.approved === true) {
+                return '';
+            }
+            return (
+                '<button type="button" class="btn small cortex-approve-client" data-id="' +
+                Craft.escapeHtml(String(value.id)) +
+                '">' + Craft.t('cortex', 'Approve') + '</button>'
+            );
+        }
+
+        var columns = [
+            {
+                name: 'clientName',
+                title: Craft.t('cortex', 'Client'),
+                callback: renderNameCell,
+            },
+            {
+                name: 'clientId',
+                title: Craft.t('cortex', 'Client ID'),
+                callback: renderClientIdCell,
+            },
+            {
+                name: 'type',
+                title: Craft.t('cortex', 'Type'),
+                callback: renderTypeCell,
+            },
+            {
+                name: 'approved',
+                title: Craft.t('cortex', 'Status'),
+                callback: renderStatusCell,
+            },
+            {
+                name: 'approveAction',
+                title: '',
+                callback: renderApproveCell,
+            },
+            {
+                name: 'redirectUris',
+                title: Craft.t('cortex', 'Redirect URIs'),
+                callback: renderRedirectCell,
+            },
+            {
+                name: 'dateCreated',
+                title: Craft.t('cortex', 'Created'),
+                callback: renderDateCreatedCell,
+            },
+        ];
+
+        var adminTable = new Craft.VueAdminTable({
+            container: tableContainer,
+            columns: columns,
+            tableDataEndpoint: 'cortex/settings/clients-table-data',
+            deleteAction: 'cortex/settings/revoke-client',
+            deleteConfirmationMessage: Craft.t('cortex', 'Are you sure you want to revoke the client “{name}”? This revokes every token it issued.'),
+            deleteSuccessMessage: Craft.t('cortex', 'Client revoked.'),
+            emptyMessage: Craft.t('cortex', 'No clients registered yet.'),
+            search: true,
+            searchPlaceholder: Craft.t('cortex', 'Search clients'),
+        });
+
+        // The inline approve button posts the client id. The server is
+        // the authority on whether the row is approvable — approving an
+        // already-approved client is a harmless no-op that still returns
+        // success.
+        //
+        // Scope the delegated listener to the table container rather than
+        // `document`: if this view is ever loaded into a slideout, a
+        // document-level listener would leak across slideout open/close
+        // cycles. The container is replaced wholesale by VueAdminTable, so
+        // binding to it is leak-safe.
+        var tableEl = document.querySelector(tableContainer);
+        (tableEl || document).addEventListener('click', function(event) {
+            var btn = event.target.closest('.cortex-approve-client');
+            if (!btn) {
+                return;
+            }
+            event.preventDefault();
+            var id = btn.getAttribute('data-id');
+            if (!id) {
+                return;
+            }
+            btn.setAttribute('disabled', 'disabled');
+            Craft.sendActionRequest('POST', 'cortex/settings/approve-client', {
+                data: { id: id },
+            }).then(function(response) {
+                Craft.cp.displayNotice(
+                    (response.data && response.data.message) || Craft.t('cortex', 'Client approved.')
+                );
+                adminTable.reload();
+            }).catch(function(error) {
+                btn.removeAttribute('disabled');
+                var message = error && error.response && error.response.data && error.response.data.message
+                    ? error.response.data.message
+                    : Craft.t('cortex', 'A server error occurred.');
+                Craft.cp.displayError(message);
+            });
+        });
+
+        window.cortexClientsTable = adminTable;
+    })();
+{% endjs %}
