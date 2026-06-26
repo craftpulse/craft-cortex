@@ -263,6 +263,33 @@ return [
         // 'dcrEnabled' => true,
 
         /**
+         * Whether a newly DCR-registered client is auto-approved.
+         * Default `false`: every self-registered client lands
+         * UNAPPROVED and its authorize / token flows are rejected with
+         * a "pending admin approval" error until an admin approves it
+         * on the Clients control-panel screen. Set `true` for trusted /
+         * dev installs that want zero-friction self-registration.
+         * Out-of-band-seeded clients are approved directly.
+         *
+         * @var bool
+         */
+        // 'dcrAutoApprove' => false,
+
+        /**
+         * Lifetime (in seconds) of an elevation marker minted by the
+         * in-band `/oauth/elevate` re-authentication flow. Default
+         * `300` (5 minutes). After a fresh Craft re-auth (password +
+         * 2FA), high-stakes operations over HTTP — credential / email /
+         * admin-status mutations on `users`, and content publish /
+         * delete — are permitted for this window, bound to the specific
+         * access token. Tracked server-side; never trusted from a
+         * client claim. `craft_exec` is never unlocked by elevation.
+         *
+         * @var int
+         */
+        // 'elevationTtl' => 300,
+
+        /**
          * Time-to-live for OAuth access tokens as an ISO 8601 duration
          * string (`DateInterval` format). Default `'PT1H'` — one hour.
          * Shorter values tighten the revocation window; longer values

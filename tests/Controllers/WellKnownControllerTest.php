@@ -121,9 +121,9 @@ it('authorization-server advertises only S256 PKCE', function() {
     expect($response->data['code_challenge_methods_supported'])->toBe(['S256']);
 });
 
-it('authorization-server lists the Phase 1 scope vocabulary', function() {
+it('authorization-server lists the capability scope vocabulary', function() {
     $response = $this->controller->actionAuthorizationServer();
-    expect($response->data['scopes_supported'])->toBe(['read', 'write']);
+    expect($response->data['scopes_supported'])->toBe(Cortex::getInstance()->scopes->all());
 });
 
 it('authorization-server lists only authorization_code and refresh_token grants', function() {
@@ -196,9 +196,9 @@ it('protected-resource resource URL points at the cortex MCP endpoint', function
     expect($response->data['resource'])->toContain('/cortex/mcp');
 });
 
-it('protected-resource lists the Phase 1 scope vocabulary', function() {
+it('protected-resource lists the capability scope vocabulary', function() {
     $response = $this->controller->actionProtectedResource();
-    expect($response->data['scopes_supported'])->toBe(['read', 'write']);
+    expect($response->data['scopes_supported'])->toBe(Cortex::getInstance()->scopes->all());
 });
 
 // -----------------------------------------------------------------------------

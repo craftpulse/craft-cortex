@@ -12,6 +12,7 @@ use craft\web\Controller;
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\db\InvocationQuery;
 use craftpulse\cortex\models\Token;
+use craftpulse\cortex\records\OauthClient as OauthClientRecord;
 use craftpulse\cortex\records\RuntimeOverride;
 use craftpulse\cortex\tools\support\InvocationLogger;
 use yii\base\Exception;
@@ -814,6 +815,155 @@ class SettingsController extends Controller
     }
 
     /**
+     * Clients tab — VueAdminTable of registered OAuth clients plus
+     * inline approve / revoke actions. The DCR approval gate (WS3)
+     * lands every self-registered client UNAPPROVED; an admin approves
+     * it here before it can connect.
+     *
+     * Admin-only + Pro per the locked CP posture — `_requirePro()`
+     * first, then `requireAdmin(false)` for view access. The
+     * approve / revoke mutations strictly gate writes via
+     * `requireAdmin(requireAdminChanges: true)`.
+     *
+     * @throws \craft\errors\MissingComponentException if the view component is unavailable.
+     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionClients(): Response
+    {
+        $this->_requirePro();
+
+        $this->requireAdmin(false);
+
+        return $this->renderTemplate('cortex/_cp/clients', [
+            'settings' => Cortex::getInstance()->getSettings(),
+        ]);
+    }
+
+    /**
+     * VueAdminTable data endpoint for the Clients tab. Returns the
+     * `{pagination, data}` shape Craft's Vue component consumes.
+     * Mirrors `actionTokensTableData` — in-PHP pagination / search /
+     * sort, bounded by the (low) number of registered clients.
+     *
+     * The row shape is locked:
+     * `[id, clientName, clientId, type, approved, redirectUris, dateCreated]`.
+     * `tests/Controllers/SettingsControllerClientsTest.php` asserts the
+     * tuple exactly — drift = test failure.
+     *
+     * @throws \craft\errors\MissingComponentException if the view component is unavailable.
+     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\web\BadRequestHttpException        from `requireAcceptsJson`.
+     * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionClientsTableData(): Response
+    {
+        $this->_requirePro();
+
+        $this->requireAcceptsJson();
+        $this->requireAdmin(false);
+
+        $page = max(1, (int) $this->request->getParam('page', 1));
+        $perPage = (int) $this->request->getParam('per_page', 50);
+        $perPage = max(1, min($perPage, 100));
+        $search = trim((string) $this->request->getParam('search', ''));
+
+        $rows = array_map(
+            fn(OauthClientRecord $client): array => $this->_serializeClientRow($client),
+            Cortex::getInstance()->oauth->getAllClients(),
+        );
+
+        if ($search !== '') {
+            $needle = mb_strtolower($search);
+            $rows = array_values(array_filter(
+                $rows,
+                static function(array $row) use ($needle): bool {
+                    $haystack = mb_strtolower((string) $row['clientName'] . ' ' . (string) $row['clientId']);
+                    return str_contains($haystack, $needle);
+                },
+            ));
+        }
+
+        $total = count($rows);
+        $offset = ($page - 1) * $perPage;
+        $slice = array_slice($rows, $offset, $perPage);
+
+        return $this->asJson([
+            'pagination' => AdminTable::paginationLinks($page, $total, $perPage),
+            'data' => array_values($slice),
+        ]);
+    }
+
+    /**
+     * Approve a registered OAuth client by id. JSON-only — wired to the
+     * Clients tab's row action. Returns `200 {message}` on success,
+     * `404 {message}` when the id is unknown.
+     *
+     * @throws \yii\base\InvalidConfigException  from `Cortex::getInstance()`.
+     * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
+     * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionApproveClient(): ?Response
+    {
+        $this->_requirePro();
+
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+        $this->requireAdmin(requireAdminChanges: true);
+
+        $id = (int) $this->request->getRequiredBodyParam('id');
+        $approved = Cortex::getInstance()->oauth->approveClient($id);
+
+        if (!$approved) {
+            $this->response->setStatusCode(404);
+            return $this->asJson(['message' => Craft::t('cortex', 'Client not found.')]);
+        }
+
+        return $this->asSuccess(Craft::t('cortex', 'Client approved.'));
+    }
+
+    /**
+     * Revoke a registered OAuth client by id: flip it to unapproved and
+     * revoke every live token it issued. JSON-only — wired to the
+     * Clients tab's row trash action. Returns `200 {message}` on
+     * success, `404 {message}` when the id is unknown.
+     *
+     * @throws \yii\base\InvalidConfigException  from `Cortex::getInstance()`.
+     * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
+     * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function actionRevokeClient(): ?Response
+    {
+        $this->_requirePro();
+
+        $this->requirePostRequest();
+        $this->requireAcceptsJson();
+        $this->requireAdmin(requireAdminChanges: true);
+
+        $id = (int) $this->request->getRequiredBodyParam('id');
+        $revoked = Cortex::getInstance()->oauth->revokeClient($id);
+
+        if (!$revoked) {
+            $this->response->setStatusCode(404);
+            return $this->asJson(['message' => Craft::t('cortex', 'Client not found.')]);
+        }
+
+        return $this->asSuccess(Craft::t('cortex', 'Client revoked.'));
+    }
+
+    /**
      * Connection tab — placeholder for 9.1. Real endpoint-URL display
      * + per-client config snippets land in 9.4.
      *
@@ -1354,6 +1504,53 @@ class SettingsController extends Controller
             ],
             'createdBy' => $createdBy,
             'dateCreated' => (string) ($row['dateCreated'] ?? ''),
+        ];
+    }
+
+    /**
+     * Serialise an `OauthClient` record into the locked Clients
+     * VueAdminTable data tuple. Shared by `actionClientsTableData` so
+     * the table shape is asserted in exactly one place.
+     *
+     * Row shape:
+     *   - `id`           — int primary key.
+     *   - `clientName`   — string operator-facing label.
+     *   - `clientId`     — string public client identifier.
+     *   - `type`         — `public` (PKCE-only) or `confidential`.
+     *   - `approved`     — bool; the DCR approval gate state.
+     *   - `redirectUris` — string[] decoded from the JSON column.
+     *   - `dateCreated`  — string ISO-8601.
+     *
+     * Never surfaces `clientSecretHash` — the hashed secret is internal.
+     *
+     * @return array<string,mixed>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _serializeClientRow(OauthClientRecord $client): array
+    {
+        $redirectUris = [];
+        $decoded = json_decode((string) $client->redirectUris, true);
+        if (is_array($decoded)) {
+            $redirectUris = array_values(array_filter($decoded, 'is_string'));
+        }
+
+        return [
+            'id' => (int) $client->id,
+            'clientName' => (string) $client->clientName,
+            'clientId' => (string) $client->clientId,
+            'type' => (bool) $client->isPublic ? 'public' : 'confidential',
+            'approved' => (bool) $client->approved,
+            // VueAdminTable column callbacks receive only the cell value,
+            // never the row — so the inline approve button needs both the
+            // id and the approval flag projected into its own cell value.
+            'approveAction' => [
+                'id' => (int) $client->id,
+                'approved' => (bool) $client->approved,
+            ],
+            'redirectUris' => $redirectUris,
+            'dateCreated' => (string) $client->dateCreated,
         ];
     }
 

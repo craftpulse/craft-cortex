@@ -76,6 +76,34 @@ class _CortexTokensHarness extends SettingsController
     }
 }
 
+/**
+ * Variant harness that stubs ONLY the HTTP plumbing and leaves the REAL
+ * `requireAdmin(requireAdminChanges: true)` gate in place — mirrors the
+ * Clients test, so the admin-only posture on issue / revoke is genuinely
+ * exercised (MAJOR 5) rather than asserted by inspection.
+ */
+class _CortexTokensRealAdminHarness extends SettingsController
+{
+    public function requirePostRequest(): void
+    {
+    }
+
+    public function requireAcceptsJson(): void
+    {
+    }
+
+    /**
+     * @param array<string,mixed> $params
+     */
+    public function withParams(array $params): self
+    {
+        $this->request = new _CortexTokensRequest($params);
+        $this->response = new \yii\web\Response();
+        $this->response->formatters[\yii\web\Response::FORMAT_JSON] = \yii\web\JsonResponseFormatter::class;
+        return $this;
+    }
+}
+
 class _CortexTokensRequest
 {
     public bool $isCpRequest = true;
@@ -191,6 +219,37 @@ it('every Tokens action is Pro-gated — 403 on Free (Gate 9.7)', function(strin
     'tokens view' => ['actionTokens', []],
     'table data' => ['actionTokensTableData', []],
     'issue slideout' => ['actionTokenIssueSlideout', []],
+    'issue' => ['actionIssueToken', ['userId' => 1]],
+    'revoke' => ['actionRevokeToken', ['id' => 1]],
+]);
+
+it('issue / revoke deny a non-admin via the REAL requireAdmin gate', function(string $method, array $params) {
+    // MAJOR 5: a logged-in non-admin must be refused by
+    // `requireAdmin(requireAdminChanges: true)`. This harness leaves the
+    // real gate in place (only plumbing is stubbed), so the admin-only
+    // posture is genuinely exercised, not asserted by source inspection.
+    $original = Craft::$app->getUser()->getIdentity();
+
+    $nonAdmin = new \craft\elements\User();
+    $nonAdmin->username = '_test_tokens_nonadmin_' . bin2hex(random_bytes(4));
+    $nonAdmin->email = $nonAdmin->username . '@example.test';
+    $nonAdmin->admin = false;
+    expect(Craft::$app->getElements()->saveElement($nonAdmin))->toBeTrue();
+
+    try {
+        Craft::$app->getUser()->setIdentity($nonAdmin);
+        expect(Craft::$app->getUser()->getIsAdmin())->toBeFalse();
+
+        $controller = new _CortexTokensRealAdminHarness('settings', Cortex::getInstance());
+        $controller->withParams($params);
+
+        expect(fn() => $controller->{$method}())
+            ->toThrow(\yii\web\ForbiddenHttpException::class);
+    } finally {
+        Craft::$app->getUser()->setIdentity($original);
+        Craft::$app->getElements()->deleteElement($nonAdmin, true);
+    }
+})->with([
     'issue' => ['actionIssueToken', ['userId' => 1]],
     'revoke' => ['actionRevokeToken', ['id' => 1]],
 ]);

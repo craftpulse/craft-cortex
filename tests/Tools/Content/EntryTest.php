@@ -82,9 +82,18 @@ afterEach(function() {
  * active at execute-time — `shouldRegister()` is a registry concern,
  * not an `execute()` concern.
  */
-function _cortex_entry_tool(): Entry
+function _cortex_entry_tool(string $transport = \craftpulse\cortex\mcp\Server::TRANSPORT_STDIO, bool $elevated = false): Entry
 {
-    return new Entry();
+    $tool = new Entry();
+    // Inject a context so the WS2 elevation gate has a transport signal.
+    // Default stdio = trusted local = implicitly elevated, matching how
+    // the dispatcher behaves for stdio dispatch. HTTP tests pass the
+    // transport (un-elevated) or `elevated: true` explicitly.
+    $tool->setInvocationContext(new \craftpulse\cortex\tools\support\InvocationContext(
+        transport: $transport,
+        elevated: $elevated,
+    ));
+    return $tool;
 }
 
 /**
@@ -643,4 +652,165 @@ it('create mode throws -32002-shape ToolException for a user without saveEntries
         Craft::$app->getUser()->setIdentity($this->admin);
         Craft::$app->getElements()->deleteElement($user, hardDelete: true);
     }
+});
+
+// -----------------------------------------------------------------------------
+// WS2 — high-stakes elevation gate
+// -----------------------------------------------------------------------------
+
+it('refuses a delete over un-elevated HTTP', function() {
+    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    if ($section === null) {
+        $this->markTestSkipped('No writable section available in playground.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+        // Seed an entry over stdio (always allowed), then attempt the
+        // delete over un-elevated HTTP.
+        $created = _cortex_entry_tool()->execute([
+            'mode' => 'create',
+            'sectionHandle' => $section->handle,
+            'title' => $this->fixturePrefix . 'http-delete',
+        ]);
+
+        $caught = null;
+        try {
+            _cortex_entry_tool(\craftpulse\cortex\mcp\Server::TRANSPORT_HTTP)->execute([
+                'mode' => 'delete',
+                'id' => $created['entry']['id'],
+            ]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->not->toBeNull();
+        expect($caught->getMessage())
+            ->toContain('requires elevation')
+            ->toContain('/oauth/elevate');
+    });
+});
+
+it('refuses a publication-status change over un-elevated HTTP', function() {
+    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    if ($section === null) {
+        $this->markTestSkipped('No writable section available in playground.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+        $created = _cortex_entry_tool()->execute([
+            'mode' => 'create',
+            'sectionHandle' => $section->handle,
+            'title' => $this->fixturePrefix . 'http-publish',
+        ]);
+
+        $caught = null;
+        try {
+            _cortex_entry_tool(\craftpulse\cortex\mcp\Server::TRANSPORT_HTTP)->execute([
+                'mode' => 'update',
+                'id' => $created['entry']['id'],
+                'enabled' => false,
+            ]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->not->toBeNull();
+        expect($caught->getMessage())->toContain('requires elevation');
+    });
+});
+
+it('refuses a create that omits `enabled` over un-elevated HTTP (defaults live)', function() {
+    // Regression (MAJOR 3): a create defaults `enabled = true`, so an
+    // un-elevated HTTP create that simply omits the key would publish a
+    // live entry. The gate must key on the EFFECTIVE published outcome,
+    // not the presence of the `enabled` argument.
+    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    if ($section === null) {
+        $this->markTestSkipped('No writable section available in playground.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+        $caught = null;
+        try {
+            _cortex_entry_tool(\craftpulse\cortex\mcp\Server::TRANSPORT_HTTP)->execute([
+                'mode' => 'create',
+                'sectionHandle' => $section->handle,
+                'title' => $this->fixturePrefix . 'http-create-default-live',
+                // `enabled` deliberately omitted — defaults to live.
+            ]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->not->toBeNull();
+        expect($caught->getMessage())
+            ->toContain('requires elevation')
+            ->toContain('/oauth/elevate');
+    });
+});
+
+it('allows a create with `enabled: false` over un-elevated HTTP (stays draft)', function() {
+    // The flip side of MAJOR 3: an explicitly-disabled create does NOT
+    // publish live content, so it must NOT trip the elevation gate.
+    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    if ($section === null) {
+        $this->markTestSkipped('No writable section available in playground.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+        $result = _cortex_entry_tool(\craftpulse\cortex\mcp\Server::TRANSPORT_HTTP)->execute([
+            'mode' => 'create',
+            'sectionHandle' => $section->handle,
+            'title' => $this->fixturePrefix . 'http-create-disabled',
+            'enabled' => false,
+        ]);
+
+        expect($result['success'])->toBeTrue();
+        expect($result['mode'])->toBe('create');
+    });
+});
+
+it('allows a delete over ELEVATED HTTP (WS2)', function() {
+    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    if ($section === null) {
+        $this->markTestSkipped('No writable section available in playground.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+        $created = _cortex_entry_tool()->execute([
+            'mode' => 'create',
+            'sectionHandle' => $section->handle,
+            'title' => $this->fixturePrefix . 'http-delete-ok',
+        ]);
+
+        $result = _cortex_entry_tool(\craftpulse\cortex\mcp\Server::TRANSPORT_HTTP, elevated: true)->execute([
+            'mode' => 'delete',
+            'id' => $created['entry']['id'],
+        ]);
+
+        expect($result['success'])->toBeTrue();
+        expect($result['mode'])->toBe('delete');
+    });
+});
+
+it('allows a delete over stdio without elevation', function() {
+    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    if ($section === null) {
+        $this->markTestSkipped('No writable section available in playground.');
+    }
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+        $created = _cortex_entry_tool()->execute([
+            'mode' => 'create',
+            'sectionHandle' => $section->handle,
+            'title' => $this->fixturePrefix . 'stdio-delete',
+        ]);
+
+        $result = _cortex_entry_tool()->execute([
+            'mode' => 'delete',
+            'id' => $created['entry']['id'],
+        ]);
+
+        expect($result['success'])->toBeTrue();
+    });
 });

@@ -4,6 +4,7 @@ namespace craftpulse\cortex\records;
 
 use craft\db\ActiveRecord;
 use craftpulse\cortex\db\Table;
+use craftpulse\cortex\tools\support\InvocationLogger;
 
 /**
  * =========================================================================
@@ -67,10 +68,9 @@ class Invocation extends ActiveRecord
      * Mirrors the migration's column constraints at the model layer so
      * `save()` fails cleanly via validation rather than as a raw DB
      * exception. The `kind` enum is enforced as a list-membership check
-     * to match the five documented values
-     * (`success` / `tool_error` / `internal_error` / `rate_limited` /
-     * `cancelled`) — Gate 7.6 added `rate_limited` for throttle events,
-     * Gate 7.7 added `cancelled` for streaming-tool cancellation events.
+     * sourced from `InvocationLogger`'s `KIND_*` constants — the single
+     * source of truth — so a new kind (e.g. `security` for the
+     * refresh-token theft event) only has to be declared in one place.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -81,7 +81,14 @@ class Invocation extends ActiveRecord
             [['toolName', 'kind', 'durationMs', 'transport'], 'required'],
             [['toolName'], 'string', 'max' => 64],
             [['kind'], 'string', 'max' => 20],
-            [['kind'], 'in', 'range' => ['success', 'tool_error', 'internal_error', 'rate_limited', 'cancelled']],
+            [['kind'], 'in', 'range' => [
+                InvocationLogger::KIND_SUCCESS,
+                InvocationLogger::KIND_TOOL_ERROR,
+                InvocationLogger::KIND_INTERNAL_ERROR,
+                InvocationLogger::KIND_RATE_LIMITED,
+                InvocationLogger::KIND_CANCELLED,
+                InvocationLogger::KIND_SECURITY,
+            ]],
             [['transport'], 'string', 'max' => 10],
             [['requestId', 'clientName', 'errorClass'], 'string', 'max' => 255],
             [['errorMessage'], 'string', 'max' => 1000],

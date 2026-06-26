@@ -147,6 +147,15 @@ class _CortexOauthRequest
 
 class _CortexOauthControllerHarness extends OauthController
 {
+    /**
+     * Captured template + variables from the last elevate render, so
+     * tests can assert on the outcome without driving CP Twig (which
+     * needs a web request the console bootstrap doesn't supply).
+     *
+     * @var array{template:string,variables:array<string,mixed>}|null
+     */
+    public ?array $renderedElevate = null;
+
     public function withRequest(_CortexOauthRequest $req): self
     {
         $this->request = $req;
@@ -157,6 +166,21 @@ class _CortexOauthControllerHarness extends OauthController
     {
         $this->response = new Response();
         return $this;
+    }
+
+    /**
+     * Override the CP-Twig render boundary. The auth + mint decision in
+     * `_completeElevation()` runs for real; only the HTML rendering is
+     * captured here.
+     *
+     * @param array<string,mixed> $variables
+     */
+    protected function _renderElevateTemplate(string $template, array $variables): Response
+    {
+        $this->renderedElevate = ['template' => $template, 'variables' => $variables];
+        $this->response->format = Response::FORMAT_RAW;
+        $this->response->content = $template;
+        return $this->response;
     }
 
     /**
@@ -232,6 +256,13 @@ beforeEach(function() {
     // explicitly and drive `beforeAction()` directly.
     $settings->httpEnabled = true;
 
+    // The full authorize → token flow needs an APPROVED client (the
+    // WS3 DCR approval gate). Auto-approve registered clients for the
+    // file so `registerClient()` lands an approved row; the dedicated
+    // approval-gate behaviour is covered in `ClientApprovalTest`.
+    $this->originalAutoApprove = $settings->dcrAutoApprove;
+    $settings->dcrAutoApprove = true;
+
     // OAuth serves the Pro-only HTTP transport (Gate 9.7) — pin Pro
     // for the file; the dedicated Free-edition test flips it inline.
     $this->originalEdition = Cortex::getInstance()->edition;
@@ -241,6 +272,7 @@ beforeEach(function() {
 afterEach(function() {
     Cortex::getInstance()->edition = $this->originalEdition;
     Cortex::getInstance()->getSettings()->httpEnabled = $this->originalHttpEnabled;
+    Cortex::getInstance()->getSettings()->dcrAutoApprove = $this->originalAutoApprove;
     OauthClientRecord::deleteAll(['like', 'clientName', '_test_/%', false]);
     OauthCodeRecord::deleteAll(['like', 'clientId', '%', false]);
     OauthTokenRecord::deleteAll(['like', 'clientId', '%', false]);
@@ -682,6 +714,214 @@ it('POST /oauth/revoke flips the dateRevoked on a known refresh token', function
 
     $fresh = OauthTokenRecord::findOne($record->id);
     expect($fresh->dateRevoked)->not->toBeNull();
+});
+
+// -----------------------------------------------------------------------------
+// /oauth/elevate — fresh re-auth (Blocker 1 + 2, MAJOR 4)
+// -----------------------------------------------------------------------------
+
+/**
+ * Create an active user with a known password so the elevate flow's
+ * `User::authenticate()` call can be exercised against real credentials.
+ */
+function _cortex_elevate_user(string $password): craft\elements\User
+{
+    $user = new craft\elements\User();
+    $user->username = '_test_elevate_' . bin2hex(random_bytes(4));
+    $user->email = $user->username . '@example.test';
+    $user->active = true;
+    expect(Craft::$app->getElements()->saveElement($user))->toBeTrue();
+
+    // Set the password hash directly. `newPassword` on a bare
+    // saveElement() doesn't reliably persist in the console test harness
+    // (the password-change scenario isn't engaged), so write the hash the
+    // same way Craft stores it. `passwordResetRequired` defaults true for
+    // a freshly-activated account with no real password event — clear it
+    // so `authenticate()` doesn't short-circuit on that gate.
+    $hash = Craft::$app->getSecurity()->hashPassword($password);
+    Craft::$app->getDb()->createCommand()
+        ->update(
+            \craft\db\Table::USERS,
+            ['password' => $hash, 'passwordResetRequired' => false],
+            ['id' => $user->id],
+        )
+        ->execute();
+
+    // Element queries omit the sensitive `password` column, so hydrate the
+    // returned user with the hash + cleared reset flag directly.
+    $fresh = Craft::$app->getUsers()->getUserById((int) $user->id);
+    expect($fresh)->not->toBeNull();
+    $fresh->password = $hash;
+    $fresh->passwordResetRequired = false;
+    expect($fresh->authenticate($password))->toBeTrue();
+    return $fresh;
+}
+
+it('elevate POST does NOT mint without a password and stays refused', function() {
+    $password = 'correct-horse-battery-staple-1';
+    $user = _cortex_elevate_user($password);
+    $oauth = Cortex::getInstance()->oauth;
+    Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
+
+    try {
+        Craft::$app->getUser()->setIdentity($user);
+
+        $controller = _cortex_oauth_request(method: 'POST', bodyParams: [], url: 'https://test.invalid/oauth/elevate');
+        $controller->actionElevate();
+
+        expect($oauth->isElevated((int) $user->id))->toBeFalse();
+        // Re-renders the challenge screen with an error, not the success.
+        expect($controller->renderedElevate['template'])->toBe('cortex/oauth/elevate');
+        expect($controller->renderedElevate['variables']['error'])->not->toBeNull();
+    } finally {
+        Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
+        Craft::$app->getElements()->deleteElement($user, true);
+    }
+});
+
+it('elevate POST rejects a wrong password and does NOT mint', function() {
+    $user = _cortex_elevate_user('correct-horse-battery-staple-2');
+    $oauth = Cortex::getInstance()->oauth;
+    Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
+
+    try {
+        Craft::$app->getUser()->setIdentity($user);
+
+        $controller = _cortex_oauth_request(
+            method: 'POST',
+            bodyParams: ['password' => 'this-is-not-the-password'],
+            url: 'https://test.invalid/oauth/elevate',
+        );
+        $controller->actionElevate();
+
+        expect($oauth->isElevated((int) $user->id))->toBeFalse();
+        expect($controller->renderedElevate['template'])->toBe('cortex/oauth/elevate');
+        expect($controller->renderedElevate['variables']['error'])->not->toBeNull();
+    } finally {
+        Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
+        Craft::$app->getElements()->deleteElement($user, true);
+    }
+});
+
+it('elevate POST mints on the correct password and unlocks the user', function() {
+    $password = 'correct-horse-battery-staple-3';
+    $user = _cortex_elevate_user($password);
+    $oauth = Cortex::getInstance()->oauth;
+    Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
+
+    try {
+        Craft::$app->getUser()->setIdentity($user);
+
+        expect($oauth->isElevated((int) $user->id))->toBeFalse();
+
+        $controller = _cortex_oauth_request(
+            method: 'POST',
+            bodyParams: ['password' => $password],
+            url: 'https://test.invalid/oauth/elevate',
+        );
+        $controller->actionElevate();
+
+        expect($oauth->isElevated((int) $user->id))->toBeTrue();
+        expect($controller->renderedElevate['template'])->toBe('cortex/oauth/elevated');
+    } finally {
+        Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
+        Craft::$app->getElements()->deleteElement($user, true);
+    }
+});
+
+it('elevate POST still requires the password when elevatedSessionDuration is 0 (Blocker 1)', function() {
+    // The crux of Blocker 1: when `elevatedSessionDuration === 0`,
+    // Craft's `getHasElevatedSession()` returns true unconditionally. A
+    // flow built on `requireElevatedSession()` would mint with no fresh
+    // challenge. Ours must still demand — and verify — the password.
+    $password = 'correct-horse-battery-staple-4';
+    $user = _cortex_elevate_user($password);
+    $oauth = Cortex::getInstance()->oauth;
+    $generalConfig = Craft::$app->getConfig()->getGeneral();
+    $originalDuration = $generalConfig->elevatedSessionDuration;
+    $generalConfig->elevatedSessionDuration = 0;
+    Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
+
+    try {
+        Craft::$app->getUser()->setIdentity($user);
+
+        // No password supplied — must NOT mint despite the ambient
+        // "elevated" session state.
+        $noPw = _cortex_oauth_request(method: 'POST', bodyParams: [], url: 'https://test.invalid/oauth/elevate');
+        $noPw->actionElevate();
+        expect($oauth->isElevated((int) $user->id))->toBeFalse();
+
+        // Correct password — now it mints.
+        $withPw = _cortex_oauth_request(
+            method: 'POST',
+            bodyParams: ['password' => $password],
+            url: 'https://test.invalid/oauth/elevate',
+        );
+        $withPw->actionElevate();
+        expect($oauth->isElevated((int) $user->id))->toBeTrue();
+    } finally {
+        $generalConfig->elevatedSessionDuration = $originalDuration;
+        Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
+        Craft::$app->getElements()->deleteElement($user, true);
+    }
+});
+
+it('elevation does not cross users — a token bound to a different user is not elevated', function() {
+    // MAJOR 4e in the user-keyed model: user A elevates, but the MCP
+    // dispatcher gates on the userId the access token is bound to. A token
+    // bound to user B therefore sees no elevation from A's grant.
+    $userA = _cortex_elevate_user('correct-horse-battery-staple-5a');
+    $userB = _cortex_elevate_user('correct-horse-battery-staple-5b');
+    $oauth = Cortex::getInstance()->oauth;
+    Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $userA->id));
+    Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $userB->id));
+
+    try {
+        Craft::$app->getUser()->setIdentity($userA);
+
+        $controller = _cortex_oauth_request(
+            method: 'POST',
+            bodyParams: ['password' => 'correct-horse-battery-staple-5a'],
+            url: 'https://test.invalid/oauth/elevate',
+        );
+        $controller->actionElevate();
+
+        // A is elevated; B (a different token's bound user) is not.
+        expect($oauth->isElevated((int) $userA->id))->toBeTrue()
+            ->and($oauth->isElevated((int) $userB->id))->toBeFalse();
+    } finally {
+        Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $userA->id));
+        Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $userB->id));
+        Craft::$app->getElements()->deleteElement($userA, true);
+        Craft::$app->getElements()->deleteElement($userB, true);
+    }
+});
+
+it('elevate has no token query param path (Blocker 2 — no token in URL)', function() {
+    // A token supplied as `?token=` must be irrelevant: elevation is
+    // keyed by the logged-in user, and the action never reads a token
+    // param. With no password, it must not mint even with a token in the
+    // query string.
+    $user = _cortex_elevate_user('correct-horse-battery-staple-6');
+    $oauth = Cortex::getInstance()->oauth;
+    Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
+
+    try {
+        Craft::$app->getUser()->setIdentity($user);
+
+        $controller = _cortex_oauth_request(
+            method: 'POST',
+            queryParams: ['token' => 'some-access-token-value'],
+            bodyParams: [],
+            url: 'https://test.invalid/oauth/elevate?token=some-access-token-value',
+        );
+        $controller->actionElevate();
+
+        expect($oauth->isElevated((int) $user->id))->toBeFalse();
+    } finally {
+        Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
+        Craft::$app->getElements()->deleteElement($user, true);
+    }
 });
 
 // -----------------------------------------------------------------------------

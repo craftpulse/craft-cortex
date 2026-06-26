@@ -28,9 +28,16 @@ use League\OAuth2\Server\CryptKey;
 
 beforeEach(function() {
     $this->service = Cortex::getInstance()->oauth;
+    // Auto-approve registered clients for this file so the
+    // ClientRepository hydrate / validateClient tests see a visible
+    // client. The WS3 approval gate itself is covered in
+    // `ClientApprovalTest`.
+    $this->originalAutoApprove = Cortex::getInstance()->getSettings()->dcrAutoApprove;
+    Cortex::getInstance()->getSettings()->dcrAutoApprove = true;
 });
 
 afterEach(function() {
+    Cortex::getInstance()->getSettings()->dcrAutoApprove = $this->originalAutoApprove;
     // Clean up any registrations made by the test suite.
     OauthClientRecord::deleteAll(['like', 'clientName', '_test_/%', false]);
     // Clean up tokens minted into orphaned client rows.
@@ -431,6 +438,7 @@ function _cortex_oauth_mint_client(): OauthClientRecord
     $record->clientName = '_test_/jwt-helper-' . bin2hex(random_bytes(4));
     $record->redirectUris = json_encode(['https://example.com/cb']);
     $record->isPublic = true;
+    $record->approved = true;
     $record->save();
     return $record;
 }

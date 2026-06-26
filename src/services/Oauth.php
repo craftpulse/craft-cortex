@@ -5,7 +5,9 @@ namespace craftpulse\cortex\services;
 use Carbon\Carbon;
 use Craft;
 use craft\helpers\App;
+use craft\helpers\StringHelper;
 use craftpulse\cortex\Cortex;
+use craftpulse\cortex\mcp\Server;
 use craftpulse\cortex\oauth\repositories\AccessTokenRepository;
 use craftpulse\cortex\oauth\repositories\AuthCodeRepository;
 use craftpulse\cortex\oauth\repositories\ClientRepository;
@@ -14,6 +16,7 @@ use craftpulse\cortex\oauth\repositories\ScopeRepository;
 use craftpulse\cortex\records\OauthClient as OauthClientRecord;
 use craftpulse\cortex\records\OauthCode as OauthCodeRecord;
 use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
+use craftpulse\cortex\tools\support\InvocationLogger;
 use DateInterval;
 use Lcobucci\Clock\SystemClock;
 use Lcobucci\JWT\Configuration;
@@ -167,6 +170,17 @@ class Oauth extends Component
      */
     private ?string $_pendingAudience = null;
 
+    /**
+     * @var string|null Family id to stamp onto the next access + refresh
+     *                  token pair the grant issues. On the auth-code
+     *                  flow this stays null and `AccessTokenRepository`
+     *                  mints a fresh family. On the refresh flow the
+     *                  `RefreshTokenRepository` sets it from the
+     *                  presented refresh token's row so the rotated
+     *                  pair inherits the lineage. Request-scoped.
+     */
+    private ?string $_pendingFamilyId = null;
+
     // Public Methods
     // =========================================================================
 
@@ -195,6 +209,126 @@ class Oauth extends Component
     public function getPendingAudience(): ?string
     {
         return $this->_pendingAudience;
+    }
+
+    /**
+     * Set the refresh-rotation lineage id the next-issued token pair
+     * inherits. Called by `RefreshTokenRepository::isRefreshTokenRevoked()`
+     * when it observes a live (non-consumed) refresh token being
+     * exchanged, so the rotated access + refresh tokens stay in the
+     * same family. Cleared after the pair is persisted.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function setPendingFamilyId(?string $familyId): void
+    {
+        $this->_pendingFamilyId = $familyId;
+    }
+
+    /**
+     * Read the pending family id back. Consumed by
+     * `AccessTokenRepository` and `RefreshTokenRepository` when
+     * stamping the rotated token rows. Null on the auth-code flow,
+     * where `AccessTokenRepository` mints a fresh family instead.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getPendingFamilyId(): ?string
+    {
+        return $this->_pendingFamilyId;
+    }
+
+    /**
+     * Revoke every live (non-revoked) access + refresh token in a
+     * rotation family, and emit a security event + audit row.
+     *
+     * Called by `RefreshTokenRepository::isRefreshTokenRevoked()` when
+     * an already-consumed refresh token is replayed — the canonical
+     * stolen-refresh-token signal per RFC 6819 §5.2.2.3 / the OAuth
+     * 2.1 refresh-rotation BCP. Revoking the whole family invalidates
+     * the legitimate client's in-flight credentials too, forcing a
+     * fresh consent flow — the safe response to a suspected theft.
+     *
+     * Returns the number of token rows revoked.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function revokeFamily(string $familyId, string $reason): int
+    {
+        $count = (int) OauthTokenRecord::updateAll(
+            ['dateRevoked' => Carbon::now()->toDateTimeString()],
+            ['familyId' => $familyId, 'dateRevoked' => null],
+        );
+
+        Craft::warning(
+            sprintf(
+                'cortex OAuth refresh-token theft detected — revoked %d token(s) in family %s. Reason: %s',
+                $count,
+                $familyId,
+                $reason,
+            ),
+            'cortex.oauth',
+        );
+
+        // Audit row so the Activity dashboard surfaces the security
+        // event alongside tool invocations. Soft-write: a DB failure
+        // inside the audit path cannot break the revoke response.
+        Cortex::getInstance()->invocations->record([
+            'tool' => '_oauth_token_theft',
+            'kind' => InvocationLogger::KIND_SECURITY,
+            'duration_ms' => 0,
+            'transport' => Server::TRANSPORT_HTTP,
+            'request_id' => null,
+            'user' => null,
+            'client' => null,
+            'token_id' => null,
+            'session_id' => null,
+            'rate_limit_remaining' => null,
+            'args' => null,
+            'response_excerpt' => null,
+            'error_class' => null,
+            'error_message' => sprintf(
+                'Refresh-token replay detected; revoked %d token(s) in family %s. %s',
+                $count,
+                $familyId,
+                $reason,
+            ),
+        ]);
+
+        return $count;
+    }
+
+    /**
+     * The family id of the token row a hashed refresh / access token
+     * belongs to, or null when no row matches. Used during rotation
+     * to inherit the lineage and during theft detection to target the
+     * family-wide revoke.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function familyIdForTokenHash(string $tokenHash): ?string
+    {
+        $record = OauthTokenRecord::findOne(['tokenHash' => $tokenHash]);
+        if (!$record instanceof OauthTokenRecord) {
+            return null;
+        }
+        return $record->familyId;
+    }
+
+    /**
+     * Mint a fresh rotation-family identifier. A UUID keeps the column
+     * a fixed 36 chars and is collision-free across the install.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function newFamilyId(): string
+    {
+        return StringHelper::UUID();
     }
 
     /**
@@ -286,7 +420,11 @@ class Oauth extends Component
      * URL — keeping that check at the boundary lets unit tests vary
      * the audience without monkey-patching.
      *
-     * @return array{userId:?int,clientId:string,scope:string,audience:?string}|null
+     * The `jti` (JWT token id) is also returned for revocation
+     * correlation. (WS2 elevation is keyed by the bound `userId`, not
+     * the `jti` — see `elevationCacheKey()`.)
+     *
+     * @return array{userId:?int,clientId:string,scope:string,audience:?string,jti:string}|null
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -341,7 +479,67 @@ class Oauth extends Component
             'clientId' => $rawClientId,
             'scope' => $this->_renderScopes($scopes),
             'audience' => $audience,
+            'jti' => $jti,
         ];
+    }
+
+    /**
+     * Cache key for the WS2 elevation marker bound to a Craft user.
+     *
+     * Elevation is keyed by the bound user's id, not the access token's
+     * `jti`. The `/oauth/elevate` flow never carries the access token in
+     * a URL — it elevates the *logged-in CP user* after a fresh password
+     * (and 2FA) re-auth, and the dispatcher consults the marker for the
+     * userId the access token is bound to. Per-user elevation within the
+     * short `Settings::$elevationTtl` window is acceptable and mirrors
+     * Craft's own session-elevation model (which is also per-user, not
+     * per-credential).
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function elevationCacheKey(int $userId): string
+    {
+        return 'cortex:elevation:' . hash('sha256', (string) $userId);
+    }
+
+    /**
+     * Mint an elevated marker for the Craft user identified by `$userId`,
+     * valid for `Settings::$elevationTtl` seconds. Called by the
+     * `/oauth/elevate` flow AFTER a fresh Craft re-authentication
+     * (password + 2FA) has been verified for that exact user. Tracked
+     * server-side in the cache — never a client-supplied claim.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function grantElevation(int $userId): void
+    {
+        $cache = Craft::$app->getCache();
+        if ($cache === null) {
+            return;
+        }
+        $ttl = Cortex::getInstance()->getSettings()->elevationTtl;
+        $cache->set($this->elevationCacheKey($userId), true, $ttl);
+    }
+
+    /**
+     * Whether the Craft user identified by `$userId` currently holds a
+     * live elevation marker. Read by `McpController::beforeAction()` on
+     * every HTTP request — against the userId the access token is bound
+     * to — so high-stakes tools can gate on the elevated state threaded
+     * through `InvocationContext`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function isElevated(int $userId): bool
+    {
+        $cache = Craft::$app->getCache();
+        if ($cache === null) {
+            return false;
+        }
+        return $cache->get($this->elevationCacheKey($userId)) === true;
     }
 
     /**
@@ -390,19 +588,16 @@ class Oauth extends Component
             $secretHash = password_hash($secret, PASSWORD_DEFAULT);
         }
 
-        // Phase 1 scope vocabulary — let the client list which scopes
-        // it wants but persist as space-delimited so it's a single
-        // column. Unknown scope strings are dropped silently rather
-        // than rejected — the scope filter on `/authorize` is the
-        // enforcement point.
+        // Capability scope vocabulary — let the client list which
+        // scopes it wants but persist as space-delimited so it's a
+        // single column. Unknown scope strings are dropped silently
+        // rather than rejected — the scope filter on `/authorize` is
+        // the enforcement point. Legacy `read` / `write` are accepted
+        // here and expanded at grant time by `Scopes`.
         $scope = '';
         if (isset($payload['scope']) && is_string($payload['scope'])) {
-            $allowed = ScopeRepository::SUPPORTED_SCOPES;
-            $requested = array_filter(
-                preg_split('/\s+/', trim($payload['scope']), -1, PREG_SPLIT_NO_EMPTY) ?: [],
-                static fn($s): bool => in_array($s, $allowed, true),
-            );
-            $scope = implode(' ', $requested);
+            $requested = preg_split('/\s+/', trim($payload['scope']), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+            $scope = implode(' ', Cortex::getInstance()->scopes->filterKnown($requested));
         }
 
         $record = new OauthClientRecord();
@@ -411,6 +606,12 @@ class Oauth extends Component
         $record->redirectUris = json_encode(array_values($redirectUris), JSON_UNESCAPED_SLASHES) ?: '[]';
         $record->scope = $scope !== '' ? $scope : null;
         $record->isPublic = $isPublic;
+        // DCR approval gate (WS3): new clients land UNAPPROVED unless
+        // the operator has opted into auto-approval for a trusted /
+        // dev install. The authorize + token flows reject an
+        // unapproved client until an admin approves it on the Clients
+        // CP screen.
+        $record->approved = Cortex::getInstance()->getSettings()->dcrAutoApprove;
         $record->clientSecretHash = $secretHash;
 
         if (!$record->save()) {
@@ -436,6 +637,79 @@ class Oauth extends Component
         }
 
         return $response;
+    }
+
+    /**
+     * Every registered OAuth client, newest first. Drives the Clients
+     * CP screen's VueAdminTable. Returns the raw records so the
+     * controller can serialise the columns it needs (approval status,
+     * redirect URIs, etc.).
+     *
+     * @return OauthClientRecord[]
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getAllClients(): array
+    {
+        /** @var OauthClientRecord[] $records */
+        $records = OauthClientRecord::find()
+            ->orderBy(['dateCreated' => SORT_DESC])
+            ->all();
+        return $records;
+    }
+
+    /**
+     * Approve a registered client by its row id so its authorize +
+     * token flows resolve. Returns true when a row was matched and
+     * flipped, false when the id is unknown. Idempotent: approving an
+     * already-approved client is a no-op that still returns true.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function approveClient(int $id): bool
+    {
+        $record = OauthClientRecord::findOne(['id' => $id]);
+        if (!$record instanceof OauthClientRecord) {
+            return false;
+        }
+        if ((bool) $record->approved) {
+            return true;
+        }
+        $record->approved = true;
+        return $record->save();
+    }
+
+    /**
+     * Revoke a registered client: flip it back to unapproved AND revoke
+     * every live access + refresh token it issued, so an approved
+     * client an admin no longer trusts is cut off immediately rather
+     * than only being blocked from re-authorizing. Returns true when a
+     * row was matched, false when the id is unknown.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function revokeClient(int $id): bool
+    {
+        $record = OauthClientRecord::findOne(['id' => $id]);
+        if (!$record instanceof OauthClientRecord) {
+            return false;
+        }
+
+        $record->approved = false;
+        $saved = $record->save();
+
+        // Cut off in-flight credentials too — un-approving a client
+        // should not leave its already-issued access tokens live until
+        // they expire.
+        OauthTokenRecord::updateAll(
+            ['dateRevoked' => Carbon::now()->toDateTimeString()],
+            ['clientId' => $record->clientId, 'dateRevoked' => null],
+        );
+
+        return $saved;
     }
 
     /**

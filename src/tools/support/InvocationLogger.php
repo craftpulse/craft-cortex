@@ -85,6 +85,16 @@ final class InvocationLogger
     public const KIND_CANCELLED = 'cancelled';
 
     /**
+     * Audit kind for an out-of-band security event that did not flow
+     * through a tool dispatch — currently the refresh-token theft
+     * detection family-wide revoke. Lets operators filter the Activity
+     * dashboard for security incidents independent of tool calls.
+     *
+     * @since 5.0.0
+     */
+    public const KIND_SECURITY = 'security';
+
+    /**
      * Fired once per `logCall()` invocation, after the formatted KV
      * line has been emitted to Craft's logger. Subscribers receive a
      * `LogCallEvent` carrying both the structured entry array and the

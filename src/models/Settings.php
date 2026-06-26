@@ -215,6 +215,35 @@ class Settings extends Model
     public bool $dcrEnabled = true;
 
     /**
+     * @var bool Whether RFC 7591 Dynamic Client Registration auto-
+     *           approves new clients. Default: false (require admin
+     *           approval) — every DCR-registered client lands
+     *           UNAPPROVED and the authorize + token flows reject it
+     *           with a "pending admin approval" error until an admin
+     *           approves it on the Clients CP screen. Flip to true for
+     *           trusted / dev installs where the operator wants the
+     *           zero-friction self-registration MCP clients expect.
+     *           Out-of-band-seeded clients are approved directly and
+     *           never face this gate.
+     */
+    public bool $dcrAutoApprove = false;
+
+    /**
+     * @var int Default TTL (in seconds) of an elevated marker minted by
+     *          the in-band `/oauth/elevate` re-authentication flow.
+     *          After fresh re-auth (Craft login + 2FA) a short-lived
+     *          elevated marker is bound to the access token; high-stakes
+     *          operations over HTTP (credential / email / admin-status
+     *          mutations on `users`, and content publish / delete)
+     *          require it. Default: 300s (5 minutes) — long enough for a
+     *          burst of privileged operations, short enough that a
+     *          leaked access token can't replay an elevation hours
+     *          later. Elevation is tracked server-side, never trusted
+     *          from a client claim.
+     */
+    public int $elevationTtl = 300;
+
+    /**
      * @var string ISO 8601 `DateInterval` string defining the OAuth
      *             access-token TTL. Default `PT1H` (1 hour) per the
      *             OAuth 2.1 spec recommendation for short-lived
@@ -310,10 +339,10 @@ class Settings extends Model
     protected function defineRules(): array
     {
         $rules = parent::defineRules();
-        $rules[] = [['runtimeOverrideTtl', 'sessionTtl'], 'integer', 'min' => 1];
+        $rules[] = [['runtimeOverrideTtl', 'sessionTtl', 'elevationTtl'], 'integer', 'min' => 1];
         $rules[] = [['stdioMaxMessageBytes'], 'integer', 'min' => 1024];
         $rules[] = [['tokenTtlDefault'], 'integer', 'min' => 1];
-        $rules[] = [['execEnabled', 'execDryRunDefault', 'httpEnabled', 'dcrEnabled'], 'boolean'];
+        $rules[] = [['execEnabled', 'execDryRunDefault', 'httpEnabled', 'dcrEnabled', 'dcrAutoApprove'], 'boolean'];
         $rules[] = [['allowedCommands', 'adminLevelCommands', 'userCustomFieldAllowlist', 'allowedOrigins'], 'each', 'rule' => ['string', 'min' => 1]];
         $rules[] = [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl'], 'string', 'min' => 2];
         $rules[] = [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl'], 'validateDateInterval'];

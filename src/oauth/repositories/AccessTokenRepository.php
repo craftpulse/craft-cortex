@@ -89,6 +89,22 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
             $audience = $accessTokenEntity->getAudience();
         }
 
+        // Rotation lineage. On the refresh flow the
+        // `RefreshTokenRepository` stamped the presented refresh
+        // token's family onto the `Oauth` service before this runs, so
+        // the rotated access token inherits it. On the auth-code flow
+        // the pending slot is null and we mint a fresh family — the
+        // root of a new lineage.
+        $oauth = Cortex::getInstance()->oauth;
+        $familyId = $oauth->getPendingFamilyId();
+        if ($familyId === null) {
+            $familyId = $oauth->newFamilyId();
+            // Stash it so the sibling refresh token persisted moments
+            // later in the same grant inherits the freshly-minted
+            // family rather than minting a second one.
+            $oauth->setPendingFamilyId($familyId);
+        }
+
         $record = new OauthTokenRecord();
         $record->tokenType = 'access';
         $record->tokenHash = hash('sha256', $accessTokenEntity->getIdentifier());
@@ -96,6 +112,7 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
             ? (int) $accessTokenEntity->getUserIdentifier()
             : null;
         $record->clientId = $accessTokenEntity->getClient()->getIdentifier();
+        $record->familyId = $familyId;
         $record->scope = implode(' ', array_map(
             static fn($scope): string => $scope->getIdentifier(),
             $accessTokenEntity->getScopes(),
