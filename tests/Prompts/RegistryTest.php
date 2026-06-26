@@ -12,7 +12,7 @@
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\prompts\PromptInterface;
 
-it('registers all eight skill-backed prompts with the planned MCP names', function() {
+it('registers all ten skill-backed prompts with the planned MCP names', function() {
     $expected = [
         'craftcms_extending',
         'craftcms_templates',
@@ -22,6 +22,8 @@ it('registers all eight skill-backed prompts with the planned MCP names', functi
         'craftcms_twig_standards',
         'craftcms_ddev',
         'craftcms_setup',
+        'craftcms_servd',
+        'craftcms_cloud',
     ];
 
     $prompts = Cortex::getInstance()->prompts;

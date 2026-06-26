@@ -176,6 +176,309 @@ it('remove() invalidates the active-overrides cache', function() {
     expect($this->service->getEffective())->not->toContain('_test_/cache-remove');
 });
 
+// =========================================================================
+// Command enumeration + toggle round-trip
+// =========================================================================
+
+it('getCommandGroups enumerates core Craft command groups', function() {
+    $groups = $this->service->getCommandGroups();
+
+    // Core controllers that always ship with Craft.
+    expect($groups)->toHaveKey('resave');
+    expect($groups)->toHaveKey('clear-caches');
+    expect($groups)->toHaveKey('gc');
+
+    // Each group carries its handle + a source label + an action list.
+    expect($groups['resave']['group'])->toBe('resave');
+    expect($groups['resave']['source'])->toBe('Craft');
+    expect($groups['resave']['actions'])->not->toBeEmpty();
+});
+
+it('getCommandGroups surfaces non-default actions as controller/action route ids', function() {
+    $groups = $this->service->getCommandGroups();
+
+    $resaveIds = array_column($groups['resave']['actions'], 'id');
+    // `resave/entries` is a stable core route.
+    expect($resaveIds)->toContain('resave/entries');
+});
+
+it('getCommandGroups surfaces a default-action-only controller as a bare route id', function() {
+    $groups = $this->service->getCommandGroups();
+
+    // `up` (UpController::actionIndex) dispatches bare — its only public
+    // action is the default `index`, so the route id is the controller
+    // handle itself with no trailing segment.
+    expect($groups)->toHaveKey('up');
+    $ids = array_column($groups['up']['actions'], 'id');
+    expect($ids)->toContain('up');
+});
+
+it('getCommandGroups registers a bare alias for a non-index default action', function() {
+    $groups = $this->service->getCommandGroups();
+
+    // `GcController` exposes only `actionRun` with `$defaultAction = 'run'`,
+    // so bare `gc` dispatches to `gc/run`. Enumeration must register the
+    // bare `gc` alias alongside `gc/run` so the shipped default `gc`
+    // pattern maps to the group instead of falling into custom patterns.
+    expect($groups)->toHaveKey('gc');
+    $ids = array_column($groups['gc']['actions'], 'id');
+    expect($ids)->toContain('gc');
+    expect($ids)->toContain('gc/run');
+});
+
+it('tags admin-level groups and content groups by classification', function() {
+    $groups = $this->service->getCommandGroups();
+
+    // `migrate/*` is in the default admin-level classification set.
+    expect($groups['migrate']['adminLevel'])->toBeTrue();
+    // `resave/*` is content-level.
+    expect($groups['resave']['adminLevel'])->toBeFalse();
+});
+
+it('isAdminLevelRoute classifies routes against the default admin patterns', function() {
+    expect($this->service->isAdminLevelRoute('migrate/up'))->toBeTrue();
+    expect($this->service->isAdminLevelRoute('project-config/apply'))->toBeTrue();
+    expect($this->service->isAdminLevelRoute('up'))->toBeTrue();
+    expect($this->service->isAdminLevelRoute('resave/entries'))->toBeFalse();
+    expect($this->service->isAdminLevelRoute('cache/flush-all'))->toBeFalse();
+});
+
+it('classifies the pc alias as admin-level so it cannot bypass the gate via project-config aliasing', function() {
+    // `PcController extends ProjectConfigController` — `pc/apply` mutates
+    // project config exactly as `project-config/apply` does, so it must sit
+    // in the admin bucket. Were it content-classified, toggling `pc` on in
+    // the CP would always-admit project-config mutations through the alias.
+    expect($this->service->isAdminLevelRoute('pc/apply'))->toBeTrue();
+    expect($this->service->isAdminLevelRoute('pc/rebuild'))->toBeTrue();
+});
+
+it('getCommandGroups includes enabled-plugin console commands', function() {
+    $groups = $this->service->getCommandGroups();
+
+    // Cortex itself ships console controllers under
+    // `craftpulse\cortex\console\controllers` — at minimum `cortex/serve`.
+    expect($groups)->toHaveKey('cortex');
+    $ids = array_column($groups['cortex']['actions'], 'id');
+    expect($ids)->toContain('cortex/serve');
+});
+
+it('mapPatternsToToggleState flags a group/* glob as fullToggle', function() {
+    $state = $this->service->mapPatternsToToggleState(['resave/*'], []);
+
+    expect($state['groups']['resave']['fullToggle'])->toBeTrue();
+    // Every action in the group reads as allowed under the glob.
+    expect($state['groups']['resave']['allowedCount'])
+        ->toBe($state['groups']['resave']['totalCount']);
+    foreach ($state['groups']['resave']['actions'] as $action) {
+        expect($action['allowed'])->toBeTrue();
+    }
+});
+
+it('mapPatternsToToggleState flags an exact id without fullToggle', function() {
+    $state = $this->service->mapPatternsToToggleState(['resave/entries'], []);
+
+    expect($state['groups']['resave']['fullToggle'])->toBeFalse();
+    expect($state['groups']['resave']['allowedCount'])->toBe(1);
+
+    $entries = array_values(array_filter(
+        $state['groups']['resave']['actions'],
+        static fn(array $a): bool => $a['id'] === 'resave/entries',
+    ));
+    expect($entries[0]['allowed'])->toBeTrue();
+});
+
+it('mapPatternsToToggleState routes unknown content patterns to contentCustomPatterns', function() {
+    $state = $this->service->mapPatternsToToggleState([
+        'resave/ent*',                 // glob that is not `resave/*`
+        'no-such-plugin/do-thing',     // route for a since-removed plugin
+        'resave/*',                    // recognised group glob
+    ], []);
+
+    expect($state['contentCustomPatterns'])->toContain('resave/ent*');
+    expect($state['contentCustomPatterns'])->toContain('no-such-plugin/do-thing');
+    expect($state['contentCustomPatterns'])->not->toContain('resave/*');
+    expect($state['groups']['resave']['fullToggle'])->toBeTrue();
+});
+
+it('mapPatternsToToggleState maps the bare gc default to its group, not custom patterns', function() {
+    // `gc` (default-action alias) is a known bare action id, so the
+    // shipped default `gc` pattern must light up the gc group's bare
+    // action rather than falling into custom patterns.
+    $state = $this->service->mapPatternsToToggleState(['gc'], []);
+
+    expect($state['contentCustomPatterns'])->not->toContain('gc');
+    expect($state['groups'])->toHaveKey('gc');
+
+    $bare = array_values(array_filter(
+        $state['groups']['gc']['actions'],
+        static fn(array $a): bool => $a['id'] === 'gc',
+    ));
+    expect($bare[0]['allowed'])->toBeTrue();
+});
+
+it('mapPatternsToToggleState resolves admin groups from the admin bucket only', function() {
+    // `migrate/*` is admin-level. Passing it in the CONTENT bucket must
+    // NOT toggle the migrate group — a content pattern can never light up
+    // an admin route. It falls into contentCustomPatterns instead.
+    $contentOnly = $this->service->mapPatternsToToggleState(['migrate/*'], []);
+    expect($contentOnly['groups']['migrate']['fullToggle'])->toBeFalse();
+    expect($contentOnly['contentCustomPatterns'])->toContain('migrate/*');
+
+    // In the ADMIN bucket it toggles the migrate group as expected.
+    $adminBucket = $this->service->mapPatternsToToggleState([], ['migrate/*']);
+    expect($adminBucket['groups']['migrate']['fullToggle'])->toBeTrue();
+    expect($adminBucket['adminCustomPatterns'])->not->toContain('migrate/*');
+});
+
+it('patternsFromToggleState collapses a full content group to a single glob', function() {
+    $patterns = $this->service->patternsFromToggleState(
+        fullGroups: ['resave' => '1'],
+        actionIds: ['resave/entries' => '1'],   // redundant under the glob
+        customPatterns: [],
+        adminLevel: false,
+    );
+
+    expect($patterns)->toContain('resave/*');
+    // The exact id is dropped because the group glob already covers it.
+    expect($patterns)->not->toContain('resave/entries');
+});
+
+it('patternsFromToggleState emits the bare handle for a bare-only group', function() {
+    // `up` is admin-level (its only route is the bare `up`). A full
+    // toggle must emit `up`, not `up/*` — `up/*` never fnmatches `up`.
+    $patterns = $this->service->patternsFromToggleState(
+        fullGroups: ['up' => '1'],
+        actionIds: [],
+        customPatterns: [],
+        adminLevel: true,
+    );
+
+    expect($patterns)->toContain('up');
+    expect($patterns)->not->toContain('up/*');
+});
+
+it('patternsFromToggleState emits exact ids for a partial group', function() {
+    $patterns = $this->service->patternsFromToggleState(
+        fullGroups: [],
+        actionIds: ['resave/entries' => '1'],
+        customPatterns: [],
+        adminLevel: false,
+    );
+
+    expect($patterns)->toContain('resave/entries');
+    expect($patterns)->not->toContain('resave/*');
+});
+
+it('patternsFromToggleState refuses to fold a cross-bucket group', function() {
+    // Posting the admin `migrate` group into the CONTENT fold (adminLevel
+    // false) must drop it — the security boundary: a content save can
+    // never surface an admin route into the always-admitted bucket.
+    $patterns = $this->service->patternsFromToggleState(
+        fullGroups: ['migrate' => '1'],
+        actionIds: ['migrate/up' => '1'],
+        customPatterns: [],
+        adminLevel: false,
+    );
+
+    expect($patterns)->not->toContain('migrate/*');
+    expect($patterns)->not->toContain('migrate/up');
+    expect($patterns)->toBe([]);
+});
+
+it('patternsFromToggleState passes custom patterns through verbatim', function() {
+    $patterns = $this->service->patternsFromToggleState(
+        fullGroups: [],
+        actionIds: [],
+        customPatterns: ['resave/ent*', 'no-such-plugin/do-thing'],
+        adminLevel: false,
+    );
+
+    expect($patterns)->toContain('resave/ent*');
+    expect($patterns)->toContain('no-such-plugin/do-thing');
+});
+
+it('patternsFromToggleState ignores unknown group and action ids', function() {
+    $patterns = $this->service->patternsFromToggleState(
+        fullGroups: ['ghost-group' => '1'],
+        actionIds: ['ghost-group/ghost-action' => '1'],
+        customPatterns: [],
+        adminLevel: false,
+    );
+
+    expect($patterns)->toBe([]);
+});
+
+it('content toggle state survives a full round-trip', function() {
+    // Forward: content patterns → toggle state.
+    $original = ['cache/*', 'resave/entries', 'resave/ent*'];
+    $state = $this->service->mapPatternsToToggleState($original, []);
+
+    // Reconstruct the POST payload the browser would submit from the
+    // content groups only.
+    $fullGroups = [];
+    $actionIds = [];
+    foreach ($state['groups'] as $handle => $group) {
+        if ($group['adminLevel']) {
+            continue;
+        }
+        if ($group['fullToggle']) {
+            $fullGroups[$handle] = '1';
+            continue;
+        }
+        foreach ($group['actions'] as $action) {
+            if ($action['allowed']) {
+                $actionIds[$action['id']] = '1';
+            }
+        }
+    }
+
+    // Inverse: toggle state → patterns.
+    $roundTripped = $this->service->patternsFromToggleState(
+        $fullGroups,
+        $actionIds,
+        $state['contentCustomPatterns'],
+        adminLevel: false,
+    );
+
+    sort($original);
+    sort($roundTripped);
+    expect($roundTripped)->toBe($original);
+});
+
+it('admin toggle state round-trips the bare-handle group', function() {
+    // `up` (bare-only, admin-level) must survive map → fold as `up`.
+    $original = ['up', 'migrate/*'];
+    $state = $this->service->mapPatternsToToggleState([], $original);
+
+    $fullGroups = [];
+    $actionIds = [];
+    foreach ($state['groups'] as $handle => $group) {
+        if (!$group['adminLevel']) {
+            continue;
+        }
+        if ($group['fullToggle']) {
+            $fullGroups[$handle] = '1';
+            continue;
+        }
+        foreach ($group['actions'] as $action) {
+            if ($action['allowed']) {
+                $actionIds[$action['id']] = '1';
+            }
+        }
+    }
+
+    $roundTripped = $this->service->patternsFromToggleState(
+        $fullGroups,
+        $actionIds,
+        $state['adminCustomPatterns'],
+        adminLevel: true,
+    );
+
+    sort($original);
+    sort($roundTripped);
+    expect($roundTripped)->toBe($original);
+});
+
 it('pruneExpired caps the per-call delete count at PRUNE_BATCH_LIMIT', function() {
     // Insert one row beyond the cap directly so the test doesn't take
     // 15000 round-trips through the validating ::save() path. The cap

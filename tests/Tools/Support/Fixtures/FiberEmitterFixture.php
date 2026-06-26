@@ -78,6 +78,41 @@ final class FiberEmitterFixture extends Component
     }
 
     /**
+     * Fire `EVENT_ROW` until cancelled, then — inside the catch block —
+     * fire ONE MORE `EVENT_ROW` before returning. Models a wrapped
+     * service whose cancellation catch path emits another event (and so
+     * suspends the Fiber again) before unwinding. This is the exact
+     * scenario that, under a break-on-cancel bridge, would leave the
+     * Fiber suspended and leak the class-level listener.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function runThenEmitOnCancel(int $iterations): string
+    {
+        try {
+            for ($i = 1; $i <= $iterations; $i++) {
+                $event = new FiberEmitterFixtureEvent();
+                $event->position = $i;
+                $event->total = $iterations;
+                $this->trigger(self::EVENT_ROW, $event);
+            }
+        } catch (QueryAbortedException) {
+            $this->aborted = true;
+
+            // Fire one more event from inside the catch path. The
+            // bridge's handler suspends the Fiber on this frame; a
+            // break-on-cancel bridge would never resume past it.
+            $cleanup = new FiberEmitterFixtureEvent();
+            $cleanup->position = -1;
+            $cleanup->total = $iterations;
+            $this->trigger(self::EVENT_ROW, $cleanup);
+        }
+
+        return "done:{$iterations}";
+    }
+
+    /**
      * Fire two rows then throw an uncaught `RuntimeException`. Used to
      * verify the bridge re-throws blocking-call failures rather than
      * swallowing them.

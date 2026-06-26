@@ -1,0 +1,189 @@
+{% extends "cortex/_cp/_layout" %}
+
+{# =========================================================================
+   Cortex Tokens tab — VueAdminTable of live bearer tokens + Garnish.Slideout
+   for "+ New token" issuance.
+
+   Bearer tokens authenticate the Streamable HTTP transport. They are
+   admin-issued; the plaintext is revealed exactly once at issuance (in
+   the slideout) and is never retrievable again — only the SHA-256 hash
+   is stored. Sub-gate 9.5 reuses the VueAdminTable + Garnish.Slideout
+   pattern locked by Allowlist (9.2).
+
+   Data path:
+     - Table data : GET  cortex/settings/tokens-table-data    → JSON {pagination, data}
+     - Slideout   : GET  cortex/settings/token-issue-slideout → JSON {html, headHtml, bodyHtml}
+     - Issue      : POST cortex/settings/issue-token          → JSON {token, model, message}
+     - Revoke     : POST cortex/settings/revoke-token (VueAdminTable
+                                                deleteAction) → JSON {message}
+
+   The row shape is locked in `SettingsController::_serializeTokenRow`:
+   `{id, name, tokenPrefix, user, expiresAt, lastUsedAt, dateCreated}`.
+   ========================================================================= #}
+
+{% set selectedSubnavItem = 'tokens' %}
+
+{% do view.registerTranslations('cortex', [
+    'Are you sure you want to revoke the token “{name}”?',
+    'Created',
+    'Expires',
+    'Issue token',
+    'Last used',
+    'Name',
+    'Never',
+    'No tokens issued yet.',
+    'Revoke token',
+    'Search tokens',
+    'Token issued.',
+    'Token prefix',
+    'Token revoked.',
+    'User',
+    'expired',
+]) %}
+
+{% block content %}
+    <p class="light">
+        {{ 'Bearer credentials for the Streamable HTTP transport. Issued by an administrator; the plaintext is shown once at issuance and cannot be retrieved afterwards.'|t('cortex') }}
+    </p>
+
+    <div id="cortex-tokens-vue-admin-table"></div>
+{% endblock %}
+
+{% js %}
+    (function() {
+        var tableContainer = '#cortex-tokens-vue-admin-table';
+
+        function renderNameCell(value) {
+            if (!value) {
+                return '<span class="light">—</span>';
+            }
+            return Craft.escapeHtml(value);
+        }
+
+        function renderTokenPrefixCell(value) {
+            if (!value) {
+                return '<span class="light">—</span>';
+            }
+            return '<code class="cortex-token-prefix">' + Craft.escapeHtml(value) + '…</code>';
+        }
+
+        function renderUserCell(value) {
+            if (!value) {
+                return '<span class="light">—</span>';
+            }
+            var label = Craft.escapeHtml(value.label || '');
+            if (value.cpEditUrl) {
+                return '<a href="' + Craft.escapeHtml(value.cpEditUrl) + '">' + label + '</a>';
+            }
+            return label;
+        }
+
+        function renderExpiresCell(value, row) {
+            if (!value) {
+                return '<span class="light">' + Craft.t('cortex', 'Never') + '</span>';
+            }
+
+            var expiresAt = new Date(value);
+            var formatted = Craft.formatDate(expiresAt, 'short');
+            if (expiresAt < new Date()) {
+                return (
+                    '<span style="opacity:0.55">' +
+                    Craft.escapeHtml(formatted) +
+                    ' <span class="light">(' + Craft.t('cortex', 'expired') + ')</span>' +
+                    '</span>'
+                );
+            }
+            return Craft.escapeHtml(formatted);
+        }
+
+        function renderLastUsedCell(value) {
+            if (!value) {
+                return '<span class="light">' + Craft.t('cortex', 'Never') + '</span>';
+            }
+            var d = new Date(value);
+            return Craft.escapeHtml(Craft.formatDate(d, 'short'));
+        }
+
+        function renderDateCreatedCell(value) {
+            if (!value) {
+                return '';
+            }
+            var d = new Date(value);
+            return Craft.escapeHtml(Craft.formatDate(d, 'short'));
+        }
+
+        var columns = [
+            {
+                name: 'name',
+                title: Craft.t('cortex', 'Name'),
+                sortField: 'name',
+                callback: renderNameCell,
+            },
+            {
+                name: 'tokenPrefix',
+                title: Craft.t('cortex', 'Token prefix'),
+                callback: renderTokenPrefixCell,
+            },
+            {
+                name: 'user',
+                title: Craft.t('cortex', 'User'),
+                callback: renderUserCell,
+            },
+            {
+                name: 'expiresAt',
+                title: Craft.t('cortex', 'Expires'),
+                sortField: 'expiresAt',
+                callback: renderExpiresCell,
+            },
+            {
+                name: 'lastUsedAt',
+                title: Craft.t('cortex', 'Last used'),
+                sortField: 'lastUsedAt',
+                callback: renderLastUsedCell,
+            },
+            {
+                name: 'dateCreated',
+                title: Craft.t('cortex', 'Created'),
+                sortField: 'dateCreated',
+                callback: renderDateCreatedCell,
+            },
+        ];
+
+        var adminTable = new Craft.VueAdminTable({
+            container: tableContainer,
+            columns: columns,
+            tableDataEndpoint: 'cortex/settings/tokens-table-data',
+            deleteAction: 'cortex/settings/revoke-token',
+            deleteConfirmationMessage: Craft.t('cortex', 'Are you sure you want to revoke the token “{name}”?'),
+            deleteSuccessMessage: Craft.t('cortex', 'Token revoked.'),
+            emptyMessage: Craft.t('cortex', 'No tokens issued yet.'),
+            search: true,
+            searchPlaceholder: Craft.t('cortex', 'Search tokens'),
+            buttons: [
+                {
+                    label: Craft.t('cortex', 'Issue token'),
+                    icon: 'plus',
+                    href: '#cortex-tokens-issue',
+                    enabled: function() { return true; },
+                },
+            ],
+        });
+
+        // Anchor-based trigger — the `href` set on the VueAdminTable
+        // button renders as `<a href="#...">`. We listen for clicks on
+        // that exact href so the handler is locale-proof (label-text
+        // matching would break under a non-English CP).
+        document.addEventListener('click', function(event) {
+            var target = event.target.closest('a[href="#cortex-tokens-issue"]');
+            if (!target) {
+                return;
+            }
+            event.preventDefault();
+            window.Cortex.openTokenIssuanceSlideout(adminTable);
+        });
+
+        // Expose the table so the slideout can call .reload() after a
+        // successful issuance. Per-tab scope only.
+        window.cortexTokensTable = adminTable;
+    })();
+{% endjs %}

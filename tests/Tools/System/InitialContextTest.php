@@ -28,13 +28,27 @@ it('appears first in tools/list so fresh agents see it first', function() {
     expect($payload[0]['name'])->toBe('get_initial_context');
 });
 
-it('returns craft / sites / sections / elementTypes / skillPrompts / exec / allowlist / hints', function() {
+it('returns craft / cortex / sites / sections / elementTypes / skillPrompts / exec / allowlist / hints', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys([
-        'craft', 'sites', 'sections', 'elementTypes',
+        'craft', 'cortex', 'sites', 'sections', 'elementTypes',
         'skillPrompts', 'exec', 'allowlist', 'hints',
     ]);
+});
+
+it('exposes the active Cortex edition under cortex.edition (Gate 9.7)', function() {
+    // Distinct from `craft.edition` (the CMS tier) — agents read this
+    // to know whether write tools / the HTTP transport exist here.
+    $result = $this->tool->execute([]);
+    expect($result['cortex'])->toHaveKey('edition', Cortex::getInstance()->edition);
+
+    cortex_with_edition(Cortex::EDITION_PRO, function() {
+        expect($this->tool->execute([])['cortex']['edition'])->toBe('pro');
+    });
+    cortex_with_edition(Cortex::EDITION_FREE, function() {
+        expect($this->tool->execute([])['cortex']['edition'])->toBe('free');
+    });
 });
 
 it('exposes the running Craft version and primary site handle under craft.*', function() {

@@ -53,11 +53,30 @@ class _CortexOauthRequest
         private readonly string $rawBody = '',
         array $headers = [],
         private readonly string $absoluteUrl = 'https://test.invalid/oauth/authorize',
+        private readonly string $userIp = '203.0.113.7',
+        private readonly bool $csrfValid = true,
     ) {
         $this->headers = new HeaderCollection();
         foreach ($headers as $name => $value) {
             $this->headers->set($name, $value);
         }
+    }
+
+    /**
+     * Mirror `craft\web\Request::validateCsrfToken()` — safe methods
+     * always pass; unsafe methods return the harness's `csrfValid` flag.
+     */
+    public function validateCsrfToken(): bool
+    {
+        if (in_array(strtoupper($this->method), ['GET', 'HEAD', 'OPTIONS'], true)) {
+            return true;
+        }
+        return $this->csrfValid;
+    }
+
+    public function getUserIP(): string
+    {
+        return $this->userIp;
     }
 
     public function getMethod(): string
@@ -139,6 +158,18 @@ class _CortexOauthControllerHarness extends OauthController
         $this->response = new Response();
         return $this;
     }
+
+    /**
+     * Drive `beforeAction()` against a synthetic action so the
+     * `httpEnabled` kill switch and IP throttle on
+     * `AbstractOauthController` fire in tests. Returns the gate's
+     * boolean; the response slot carries the populated 503 / 429 when
+     * it short-circuits.
+     */
+    public function runBeforeAction(string $actionId = 'authorize'): bool
+    {
+        return $this->beforeAction(new \yii\base\Action($actionId, $this));
+    }
 }
 
 /**
@@ -155,6 +186,8 @@ function _cortex_oauth_request(
     string $rawBody = '',
     array $headers = [],
     string $url = 'https://test.invalid/oauth/authorize',
+    string $userIp = '203.0.113.7',
+    bool $csrfValid = true,
 ): _CortexOauthControllerHarness {
     $controller = new _CortexOauthControllerHarness('oauth', Cortex::getInstance());
     $controller->withRequest(new _CortexOauthRequest(
@@ -164,6 +197,8 @@ function _cortex_oauth_request(
         rawBody: $rawBody,
         headers: $headers,
         absoluteUrl: $url,
+        userIp: $userIp,
+        csrfValid: $csrfValid,
     ));
     $controller->withFreshResponse();
     return $controller;
@@ -188,9 +223,24 @@ beforeEach(function() {
     expect($admin)->not->toBeNull();
     $this->admin = $admin;
     $this->userId = (int) $admin->id;
+
+    $settings = Cortex::getInstance()->getSettings();
+    $this->originalHttpEnabled = $settings->httpEnabled;
+    // The OAuth surface is gated behind `httpEnabled` on
+    // `AbstractOauthController`. Enable it for the action-level tests
+    // that exercise the flow; the kill-switch tests flip it off
+    // explicitly and drive `beforeAction()` directly.
+    $settings->httpEnabled = true;
+
+    // OAuth serves the Pro-only HTTP transport (Gate 9.7) — pin Pro
+    // for the file; the dedicated Free-edition test flips it inline.
+    $this->originalEdition = Cortex::getInstance()->edition;
+    Cortex::getInstance()->edition = Cortex::EDITION_PRO;
 });
 
 afterEach(function() {
+    Cortex::getInstance()->edition = $this->originalEdition;
+    Cortex::getInstance()->getSettings()->httpEnabled = $this->originalHttpEnabled;
     OauthClientRecord::deleteAll(['like', 'clientName', '_test_/%', false]);
     OauthCodeRecord::deleteAll(['like', 'clientId', '%', false]);
     OauthTokenRecord::deleteAll(['like', 'clientId', '%', false]);
@@ -295,6 +345,45 @@ it('GET /oauth/authorize rejects plain PKCE with an OAuth error redirect', funct
     expect($response->statusCode)->not->toBe(200);
 });
 
+it('HTML-escapes a script payload in the consent-screen client name', function() {
+    // Regression: a DCR-registered `client_name` is rendered into the
+    // consent screen. The lead paragraph interpolates it inside a
+    // `<span>` and pipes the result through `|raw`, so the client name
+    // MUST be HTML-escaped at that boundary or an attacker who can
+    // register a client (anonymous when DCR is enabled) lands stored
+    // XSS in any logged-in CP user's session on GET, before approval.
+    //
+    // The full consent GET cannot be driven through the Pest harness —
+    // the template's `craft.app.request.csrfToken` needs a web request,
+    // and the bootstrap leaves a console request bound (same constraint
+    // documented for the login-redirect path above). So this renders
+    // the actual vulnerable line lifted verbatim from the template file
+    // through Craft's Twig view: if the `|e` escape is ever dropped, the
+    // raw payload reappears and this fails.
+    $template = file_get_contents(
+        dirname(__DIR__, 2) . '/src/templates/oauth/authorize.twig',
+    );
+    expect($template)->toBeString();
+
+    $line = null;
+    foreach (explode("\n", (string) $template) as $candidate) {
+        if (str_contains($candidate, 'is requesting access to your Craft account')) {
+            $line = trim($candidate);
+            break;
+        }
+    }
+    expect($line)->not->toBeNull();
+
+    $rendered = Craft::$app->getView()->renderString(
+        (string) $line,
+        ['clientName' => '<script>alert(1)</script>'],
+    );
+
+    expect($rendered)
+        ->not->toContain('<script>alert(1)</script>')
+        ->toContain('&lt;script&gt;');
+});
+
 it('POST /oauth/authorize with approve=0 surfaces an access_denied error', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
@@ -326,6 +415,50 @@ it('POST /oauth/authorize with approve=0 surfaces an access_denied error', funct
     $location = $response->headers->get('Location');
     expect($location)->toContain('error=access_denied');
 });
+
+// -----------------------------------------------------------------------------
+// /oauth/authorize — CSRF on the consent POST
+// -----------------------------------------------------------------------------
+
+it('rejects the authorize consent POST when the CSRF token is invalid', function() {
+    Craft::$app->getUser()->setIdentity($this->admin);
+
+    $controller = _cortex_oauth_request(
+        method: 'POST',
+        bodyParams: ['approve' => '1'],
+        url: 'https://test.invalid/oauth/authorize',
+        csrfValid: false,
+    );
+
+    expect(fn() => $controller->runBeforeAction('authorize'))
+        ->toThrow(\yii\web\BadRequestHttpException::class);
+});
+
+it('allows the authorize consent POST through beforeAction with a valid CSRF token', function() {
+    Craft::$app->getUser()->setIdentity($this->admin);
+
+    $controller = _cortex_oauth_request(
+        method: 'POST',
+        bodyParams: ['approve' => '1'],
+        url: 'https://test.invalid/oauth/authorize',
+        csrfValid: true,
+    );
+
+    expect($controller->runBeforeAction('authorize'))->toBeTrue();
+});
+
+it('leaves token / register / revoke CSRF-exempt in beforeAction', function(string $actionId) {
+    // No CSRF token, POST — these anonymous token-proof endpoints must
+    // still pass beforeAction (the consent POST is the only CSRF-gated
+    // action). httpEnabled is true via beforeEach.
+    $controller = _cortex_oauth_request(
+        method: 'POST',
+        url: "https://test.invalid/oauth/{$actionId}",
+        csrfValid: false,
+    );
+
+    expect($controller->runBeforeAction($actionId))->toBeTrue();
+})->with(['token', 'register', 'revoke']);
 
 // -----------------------------------------------------------------------------
 // /oauth/token + full PKCE round-trip
@@ -549,4 +682,124 @@ it('POST /oauth/revoke flips the dateRevoked on a known refresh token', function
 
     $fresh = OauthTokenRecord::findOne($record->id);
     expect($fresh->dateRevoked)->not->toBeNull();
+});
+
+// -----------------------------------------------------------------------------
+// httpEnabled kill switch — every OAuth action returns 503 when off
+// -----------------------------------------------------------------------------
+
+dataset('oauth endpoints', [
+    'authorize' => ['GET', 'https://test.invalid/oauth/authorize'],
+    'token' => ['POST', 'https://test.invalid/oauth/token'],
+    'register' => ['POST', 'https://test.invalid/oauth/register'],
+    'revoke' => ['POST', 'https://test.invalid/oauth/revoke'],
+]);
+
+it('returns 503 from beforeAction when httpEnabled is false', function(string $method, string $url) {
+    Cortex::getInstance()->getSettings()->httpEnabled = false;
+
+    $controller = _cortex_oauth_request(method: $method, url: $url);
+    $proceeded = $controller->runBeforeAction();
+
+    expect($proceeded)->toBeFalse();
+    expect($controller->response->statusCode)->toBe(503);
+    expect($controller->response->data)->toHaveKey('error');
+})->with('oauth endpoints');
+
+it('does not fire the 503 gate in beforeAction when httpEnabled is true', function() {
+    Craft::$app->getUser()->setIdentity($this->admin);
+    Cortex::getInstance()->getSettings()->httpEnabled = true;
+
+    $controller = _cortex_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/token');
+    $controller->runBeforeAction();
+
+    // The kill switch did not populate a 503 — parent::beforeAction()
+    // owns whatever status follows.
+    expect($controller->response->statusCode)->not->toBe(503);
+});
+
+// -----------------------------------------------------------------------------
+// Pro edition gate (Gate 9.7) — every OAuth action returns 403 on Free
+// -----------------------------------------------------------------------------
+
+it('returns 403 from beforeAction on a Free install', function(string $method, string $url) {
+    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+
+    $controller = _cortex_oauth_request(method: $method, url: $url);
+    $proceeded = $controller->runBeforeAction();
+
+    expect($proceeded)->toBeFalse();
+    expect($controller->response->statusCode)->toBe(403);
+    expect($controller->response->data)
+        ->toHaveKey('error', 'The HTTP transport requires the Cortex Pro edition.');
+})->with('oauth endpoints');
+
+// -----------------------------------------------------------------------------
+// IP throttle — anonymous /oauth/register, /token, /revoke are 429'd
+// -----------------------------------------------------------------------------
+
+it('429s anonymous /oauth/register from the same IP after the burst is exhausted', function() {
+    $settings = Cortex::getInstance()->getSettings();
+    $settings->httpEnabled = true;
+    // Tight burst so the loop trips fast; refill 1/sec so a single
+    // tight loop can't be saved by an accrued refill.
+    $originalBurst = $settings->rateLimitBurst;
+    $originalRate = $settings->rateLimitPerSecond;
+    $settings->rateLimitBurst = 3;
+    $settings->rateLimitPerSecond = 1;
+
+    $ip = '198.51.100.42';
+    Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ip);
+
+    try {
+        $blocked = false;
+        // Burst is 3; the 4th request inside the same wall-clock second
+        // must trip the throttle.
+        for ($i = 0; $i < 5; $i++) {
+            $controller = _cortex_oauth_request(
+                method: 'POST',
+                url: 'https://test.invalid/oauth/register',
+                userIp: $ip,
+            );
+            $proceeded = $controller->runBeforeAction('register');
+            if (!$proceeded && $controller->response->statusCode === 429) {
+                $blocked = true;
+                expect($controller->response->headers->get('Retry-After'))->not->toBeNull();
+                break;
+            }
+        }
+        expect($blocked)->toBeTrue();
+    } finally {
+        Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ip);
+        $settings->rateLimitBurst = $originalBurst;
+        $settings->rateLimitPerSecond = $originalRate;
+    }
+});
+
+it('does not throttle a different IP sharing the same window', function() {
+    $settings = Cortex::getInstance()->getSettings();
+    $settings->httpEnabled = true;
+    $originalBurst = $settings->rateLimitBurst;
+    $settings->rateLimitBurst = 1;
+
+    $ipA = '198.51.100.10';
+    $ipB = '198.51.100.11';
+    Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipA);
+    Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipB);
+
+    try {
+        // Drain IP A's single-token bucket.
+        $a = _cortex_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/register', userIp: $ipA);
+        expect($a->runBeforeAction('register'))->toBeTrue();
+        $a2 = _cortex_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/register', userIp: $ipA);
+        expect($a2->runBeforeAction('register'))->toBeFalse();
+
+        // IP B still has its own full bucket.
+        $b = _cortex_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/register', userIp: $ipB);
+        expect($b->runBeforeAction('register'))->toBeTrue();
+    } finally {
+        Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipA);
+        Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipB);
+        $settings->rateLimitBurst = $originalBurst;
+    }
 });

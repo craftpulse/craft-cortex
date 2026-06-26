@@ -1,0 +1,17 @@
+{% extends "cortex/_cp/_layout" %}
+
+{# =========================================================================
+   Cortex Connection tab — placeholder.
+
+   Real content (auto-detected MCP endpoint URL + per-client config
+   snippets for Claude Desktop, ChatGPT Desktop, Cursor with
+   copy-to-clipboard) lands in Gate 9.4. 9.1 ships only the tab
+   placeholder so the tabbed lineage compiles.
+   ========================================================================= #}
+
+{% set selectedSubnavItem = 'connection' %}
+
+{% block content %}
+    {# placeholder — built in 9.4 #}
+    <p class="light">{{ 'The Connection tab is coming soon.'|t('cortex') }}</p>
+{% endblock %}

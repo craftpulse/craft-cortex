@@ -23,13 +23,13 @@ beforeEach(function() {
 // initialize
 // -----------------------------------------------------------------------------
 
-it('responds to initialize with the pinned protocol version + serverInfo', function() {
+it('responds to initialize with the latest protocol version + serverInfo', function() {
     $response = $this->server->dispatch([
         'jsonrpc' => '2.0',
         'id' => 1,
         'method' => 'initialize',
         'params' => [
-            'protocolVersion' => '2025-06-18',
+            'protocolVersion' => Server::PROTOCOL_VERSION,
             'capabilities' => new stdClass(),
             'clientInfo' => ['name' => 'pest', 'version' => '0'],
         ],
@@ -43,6 +43,41 @@ it('responds to initialize with the pinned protocol version + serverInfo', funct
         ->and($response['result']['serverInfo']['name'])->toBe(Server::SERVER_NAME)
         ->and($response['result']['serverInfo']['version'])->toBe(Server::SERVER_VERSION)
         ->and($response['result']['capabilities'])->toHaveKeys(['tools', 'resources', 'prompts']);
+});
+
+it('echoes a supported older protocol version back to the client verbatim', function() {
+    // Spec: "if the server supports the requested protocol version, it
+    // MUST respond with the same version." 2025-06-18 stays negotiable
+    // so existing clients keep working after the 2025-11-25 bump.
+    $response = $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2025-06-18',
+            'capabilities' => new stdClass(),
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+
+    expect($response['result']['protocolVersion'])->toBe('2025-06-18');
+});
+
+it('falls back to the latest protocol version when the client requests an unsupported one', function() {
+    // Spec: "otherwise, the server MUST respond with another protocol
+    // version it supports" — the latest, here.
+    $response = $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => '2024-01-01',
+            'capabilities' => new stdClass(),
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+
+    expect($response['result']['protocolVersion'])->toBe(Server::PROTOCOL_VERSION);
 });
 
 /**
@@ -374,6 +409,28 @@ it('rejects a stdio-only tool when dispatched on the HTTP transport', function()
     expect($response['error']['code'])->toBe(Server::ERR_METHOD_NOT_FOUND);
     expect($response['error']['message'])->toContain('stdio-only');
     expect($response['error']['message'])->toContain('craft_exec');
+});
+
+it('omits stdio-only tools from tools/list on the HTTP transport (Gate 9.7)', function() {
+    // Advertising a tool every call to which is hard-rejected just
+    // burns the LLM's tool-selection budget. The list filter is UX;
+    // the tools/call reject above stays the security boundary.
+    $httpServer = new Server(Server::TRANSPORT_HTTP);
+
+    $httpNames = array_column(
+        $httpServer->dispatch(['jsonrpc' => '2.0', 'id' => 10, 'method' => 'tools/list'])['result']['tools'],
+        'name',
+    );
+    $stdioNames = array_column(
+        $this->server->dispatch(['jsonrpc' => '2.0', 'id' => 11, 'method' => 'tools/list'])['result']['tools'],
+        'name',
+    );
+
+    expect($httpNames)->not->toContain('craft_exec');
+    expect($stdioNames)->toContain('craft_exec');
+    // craft_exec is the only stdio-only tool — the lists differ by
+    // exactly that entry.
+    expect(count($stdioNames) - count($httpNames))->toBe(1);
 });
 
 it('does not reject stdio-only tools on the stdio transport', function() {

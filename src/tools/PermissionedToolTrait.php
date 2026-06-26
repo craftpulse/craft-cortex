@@ -58,9 +58,11 @@ trait PermissionedToolTrait
 
     /**
      * Walk the permissions returned by `_requiredPermissions($arguments)`
-     * and assert the current user holds every one. Throws
-     * `ToolException` on the first miss with the Gate 8 standard
-     * JSON-RPC `-32002` envelope shape.
+     * and assert the current user holds every one. Throws a plain
+     * `ToolException` on the first miss; the dispatcher renders it as a
+     * successful JSON-RPC response carrying the MCP tool-error envelope
+     * (`{content: [{type: text, text}], isError: true}`) — there is no
+     * `-32002` code in this path.
      *
      * Skip rules (defense in depth — both stdio and admin paths
      * bypass):

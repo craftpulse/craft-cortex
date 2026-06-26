@@ -6,11 +6,13 @@ use Craft;
 use craft\elements\User;
 use craftpulse\cortex\Cortex;
 use craftpulse\cortex\events\LogCallEvent;
+use craftpulse\cortex\tools\ContextAwareToolInterface;
 use craftpulse\cortex\tools\StreamableToolInterface;
 use craftpulse\cortex\tools\support\AttributeReader;
 use craftpulse\cortex\tools\support\CancellationToken;
 use craftpulse\cortex\tools\support\InvocationContext;
 use craftpulse\cortex\tools\support\InvocationLogger;
+use craftpulse\cortex\tools\support\SecretRedactor;
 use craftpulse\cortex\tools\ToolException;
 use craftpulse\cortex\tools\ToolInterface;
 use Generator;
@@ -26,7 +28,8 @@ use yii\base\Event;
  * null for notifications). Transports adapt I/O (line-delimited JSON
  * for stdio, request/response bodies for HTTP) and call `dispatch()`.
  *
- * Spec target: 2025-06-18.
+ * Spec target: MCP 2025-11-25 (latest), negotiating 2025-06-18 for
+ * older clients — see `SUPPORTED_PROTOCOL_VERSIONS`.
  * =========================================================================
  *
  * @author Craftpulse
@@ -37,7 +40,41 @@ class Server
     // Constants
     // =========================================================================
 
-    public const PROTOCOL_VERSION = '2025-06-18';
+    /**
+     * Latest MCP protocol revision this server speaks. Advertised in
+     * the `initialize` response when the client requests this version
+     * or a version we don't recognise (per the spec's "respond with
+     * the latest version supported by the server" rule).
+     *
+     * @since 5.0.0
+     */
+    public const PROTOCOL_VERSION = '2025-11-25';
+
+    /**
+     * Every MCP protocol revision this server can negotiate, newest
+     * first. The dispatcher echoes the client's requested version when
+     * it appears here (spec: "if the server supports the requested
+     * protocol version, it MUST respond with the same version") and
+     * falls back to `PROTOCOL_VERSION` otherwise. The HTTP transport's
+     * `MCP-Protocol-Version` header is validated against this same set.
+     *
+     * 2025-11-25 and 2025-06-18 are wire-compatible for cortex's
+     * surface — the 2025-11-25 deltas that touch a server are version
+     * negotiation (handled here), the HTTP-403-on-bad-Origin rule
+     * (already enforced in `McpController::_passesOrigin`), and
+     * SEP-1303 "input-validation errors are tool-execution errors, not
+     * protocol errors" (already cortex's behaviour: tool-level failures
+     * return `isError: true` envelopes, never JSON-RPC error codes).
+     * The remaining 2025-11-25 additions (icons, OIDC discovery, CIMD,
+     * tasks, elicitation) are optional capabilities cortex does not
+     * advertise, so honouring them is not required to speak the
+     * revision.
+     *
+     * @var string[]
+     *
+     * @since 5.0.0
+     */
+    public const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18'];
 
     public const SERVER_NAME = 'cortex';
 
@@ -211,9 +248,10 @@ class Server
     /**
      * @param string $transport `Server::TRANSPORT_STDIO` (default) or
      *                          `Server::TRANSPORT_HTTP`. Set per
-     *                          transport adapter — only the stdio
-     *                          adapter ships today; the HTTP adapter
-     *                          will land in a future release.
+     *                          transport adapter — the stdio adapter is
+     *                          `console/controllers/ServeController`,
+     *                          the HTTP adapter is
+     *                          `controllers/McpController`.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -551,7 +589,7 @@ class Server
         }
 
         return [
-            'protocolVersion' => self::PROTOCOL_VERSION,
+            'protocolVersion' => $this->_negotiateProtocolVersion($params['protocolVersion'] ?? null),
             'capabilities' => [
                 'tools' => new \stdClass(),
                 'resources' => new \stdClass(),
@@ -565,6 +603,28 @@ class Server
     }
 
     /**
+     * Resolve the protocol version to advertise in the `initialize`
+     * response. Per MCP lifecycle version negotiation: echo the
+     * client's requested version when this server supports it, else
+     * respond with the latest version this server supports.
+     *
+     * A missing or non-string request value falls back to the latest —
+     * a malformed handshake still gets a usable version rather than an
+     * error, matching the lenient posture the rest of the dispatcher
+     * takes toward client input.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _negotiateProtocolVersion(mixed $requested): string
+    {
+        if (is_string($requested) && in_array($requested, self::SUPPORTED_PROTOCOL_VERSIONS, true)) {
+            return $requested;
+        }
+        return self::PROTOCOL_VERSION;
+    }
+
+    /**
      * Build the `tools/list` payload. On the HTTP transport with a
      * resolved user, route through `Tools::asListPayloadFor($user)` so
      * each tool's `filterFor()` / `inputSchemaFor()` hooks fire — Pro
@@ -574,6 +634,12 @@ class Server
      * resolves to `null` and the call goes to `asListPayloadFor(null)`,
      * which by locked invariant equals the legacy `asListPayload()`.
      *
+     * Off-stdio, stdio-only tools (`craft_exec`) are dropped from the
+     * list as well (Gate 9.7): advertising a tool every call to which
+     * is hard-rejected just burns the LLM's tool-selection budget. The
+     * `tools/call` reject in `_resolveToolCall()` remains the security
+     * boundary — this filter is UX, defense stays in depth.
+     *
      * @return array<string,mixed>
      *
      * @author Craftpulse
@@ -581,8 +647,21 @@ class Server
      */
     private function _toolsList(): array
     {
+        $tools = Cortex::getInstance()->tools->asListPayloadFor($this->_resolveUser());
+
+        if ($this->_transport !== self::TRANSPORT_STDIO) {
+            $registry = Cortex::getInstance()->tools;
+            $tools = array_values(array_filter(
+                $tools,
+                static function(array $entry) use ($registry): bool {
+                    $tool = $registry->getByName((string) ($entry['name'] ?? ''));
+                    return $tool === null || !AttributeReader::isStdioOnly($tool);
+                },
+            ));
+        }
+
         return [
-            'tools' => Cortex::getInstance()->tools->asListPayloadFor($this->_resolveUser()),
+            'tools' => $tools,
         ];
     }
 
@@ -730,6 +809,15 @@ class Server
 
         $context = $this->_invocationContext($id);
 
+        // Hand the dispatch context to non-streaming tools that need it
+        // inside `execute()` (transport-dependent gating, etc.). The
+        // context carries the real `$_transport` — never inferred from
+        // a proxy. Streaming tools receive their context via `stream()`
+        // instead, so this opt-in covers only the `execute()` path.
+        if ($tool instanceof ContextAwareToolInterface) {
+            $tool->setInvocationContext($context);
+        }
+
         $startNs = hrtime(true);
         try {
             $result = $tool->execute($arguments);
@@ -747,8 +835,11 @@ class Server
         // Serialize the tool result for the audit log's response excerpt.
         // The wire payload to the MCP client is built separately by
         // `_toolResultEnvelope()` and is unaffected by this — the
-        // excerpt is for forensics only.
-        $responsePayload = (string) json_encode($result, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        // excerpt is for forensics only. Belt-and-suspenders redaction
+        // of secret-keyed result fields before they land in the
+        // persisted excerpt, so any future HTTP-reachable tool that
+        // doesn't redact its own result is still covered.
+        $responsePayload = (string) json_encode(SecretRedactor::redactArray($result), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         InvocationLogger::logCall($name, $arguments, null, $this->_elapsedMs($startNs), $context, $responsePayload);
 
         return $this->_successResponse($id, $this->_toolResultEnvelope($tool, $result));
@@ -941,7 +1032,11 @@ class Server
             // return their terminal payload.
             $finalResult = ['mode' => 'streamed', 'note' => 'Streamable tool generator finished without an explicit return.'];
         }
-        $responsePayload = (string) json_encode($finalResult, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+        // Redact secret-keyed fields in the persisted excerpt only — the
+        // wire envelope below is built separately from the unredacted
+        // `$finalResult`, preserving the locked "execute() drains stream()
+        // for identical terminal envelope" invariant.
+        $responsePayload = (string) json_encode(SecretRedactor::redactArray($finalResult), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         InvocationLogger::logCall($name, $arguments, null, $this->_elapsedMs($startNs), $context, $responsePayload);
 
         yield $this->_successResponse($id, $this->_toolResultEnvelope($tool, $finalResult));

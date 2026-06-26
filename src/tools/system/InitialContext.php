@@ -27,7 +27,7 @@ use craftpulse\cortex\tools\support\Schema;
  *
  * This tool returns one consolidated payload covering exactly that
  * orientation surface — Craft version + edition + environment, the
- * primary site, a thin sites/sections/element-types index, the eight
+ * primary site, a thin sites/sections/element-types index, the
  * bundled skill prompts so the model knows the moat-content exists,
  * the `craft_exec` posture (enabled / dry-run-default), and the
  * effective command allowlist. It is the tool a fresh model should
@@ -96,6 +96,9 @@ class InitialContext extends AbstractTool
                 'devMode' => Schema::boolean()->required(),
                 'primarySiteHandle' => Schema::string()->required(),
             ])->required(),
+            'cortex' => Schema::object([
+                'edition' => Schema::string()->required(),
+            ])->required()->description('The active Cortex edition (`free` or `pro`). Pro adds the write tools, the Skill element, and the Streamable HTTP transport; on `free`, plan around the read-only stdio surface.'),
             'sites' => Schema::array(Schema::object([
                 'handle' => Schema::string()->required(),
                 'name' => Schema::string()->required(),
@@ -150,6 +153,12 @@ class InitialContext extends AbstractTool
                 'environment' => Craft::$app->env,
                 'devMode' => Craft::$app->getConfig()->getGeneral()->devMode,
                 'primarySiteHandle' => $sitesService->getPrimarySite()->handle,
+            ],
+            // The PLUGIN edition, distinct from `craft.edition` above —
+            // the agent needs it to know whether write tools and the
+            // HTTP transport exist on this install (Gate 9.7).
+            'cortex' => [
+                'edition' => Cortex::getInstance()->edition,
             ],
             'sites' => array_map(
                 static fn(Site $s): array => [

@@ -150,37 +150,46 @@ class RateLimiter extends Component
      */
     public function consume(int $userId, int $cost = 1): RateLimitStatus
     {
-        $state = $this->_loadAndRefill($userId);
-
-        if ($state['tokens'] < $cost) {
-            // Not enough tokens — surface the pre-consume snapshot
-            // (which already reflects refill up to `now`) and throw.
-            // Persist the refilled state so the next call doesn't
-            // re-walk the same refill arc from a stale `lastRefillAt`.
-            $this->_save($userId, $state);
-            throw new RateLimitExceededException(
-                $this->_buildExhaustedStatus($state['tokens'], $cost),
-            );
-        }
-
-        $state['tokens'] -= $cost;
-        $this->_save($userId, $state);
-
-        return $this->_buildAvailableStatus($state['tokens']);
+        return $this->_consume($userId, $cost);
     }
 
     /**
-     * Non-consuming read of what `consume()` WOULD return without
-     * mutating the bucket. Useful for pre-flight checks in tests; the
-     * controller uses `consume()` (atomic) in production. The bucket
-     * is still walked forward to `now` for refill accuracy, but the
-     * walk is not persisted — successive `check()` calls return the
-     * same shape until something actually consumes.
+     * Token-bucket consume against an arbitrary string key rather than
+     * a Craft user id. Backs the IP-keyed throttle on the unauthenticated
+     * OAuth endpoints (`/oauth/register`, `/oauth/token`,
+     * `/oauth/revoke`), which precede authentication and so cannot key
+     * by user id. Callers namespace the key themselves
+     * (e.g. `oauth:ip:<ip>`); the prefix below keeps it from colliding
+     * with the user-keyed buckets. Shares the same bucket math, burst,
+     * and refill rate as the per-user limiter.
+     *
+     * @throws RateLimitExceededException When the bucket lacks `$cost`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function consumeKey(string $key, int $cost = 1): RateLimitStatus
+    {
+        return $this->_consume($key, $cost);
+    }
+
+    /**
+     * Non-persisting introspection / pre-flight ONLY. Walks the bucket
+     * forward to `now` for refill accuracy but never writes the result
+     * back, so successive `check()` calls each re-walk the refill arc
+     * from the last persisted `lastRefillAt` and report progressively
+     * more available tokens than a real `consume()` would.
+     *
+     * Never use `check()` as an admission gate: because it doesn't
+     * persist, a `check()`-then-act flow double-counts refill against
+     * the subsequent `consume()` and lets more requests through than
+     * the bucket should permit. The atomic admission path is
+     * `consume()` — which refills, deducts, and persists in one step.
+     * `check()` exists for read-only headroom inspection and test
+     * pre-flight assertions, nothing more.
      *
      * Returns a `RateLimitStatus` with the bucket's available tokens
-     * floor'd to int. Throws if the bucket lacks enough for `$cost`
-     * — same contract as `consume()` so callers can use `check()` as
-     * a dry-run gate before deciding whether to consume.
+     * floor'd to int. Throws if the bucket lacks enough for `$cost`.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -231,8 +240,55 @@ class RateLimiter extends Component
         $this->_cache()->delete($this->_cacheKey($userId));
     }
 
+    /**
+     * Reset an arbitrary string-keyed bucket back to full capacity.
+     * Companion to `clear()` for the `consumeKey()` surface — used by
+     * tests that need to start the IP-keyed throttle from a known
+     * state.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function clearKey(string $key): void
+    {
+        $this->_cache()->delete($this->_cacheKey($key));
+    }
+
     // Private Methods
     // =========================================================================
+
+    /**
+     * Shared token-bucket consume keyed by either a Craft user id or
+     * an arbitrary string. Refills the bucket since `lastRefillAt`,
+     * attempts to deduct `$cost` tokens, persists the resulting state,
+     * and returns the post-consume status. Throws when the bucket
+     * lacks enough tokens.
+     *
+     * @throws RateLimitExceededException When the bucket lacks `$cost`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _consume(int|string $key, int $cost): RateLimitStatus
+    {
+        $state = $this->_loadAndRefill($key);
+
+        if ($state['tokens'] < $cost) {
+            // Not enough tokens — surface the pre-consume snapshot
+            // (which already reflects refill up to `now`) and throw.
+            // Persist the refilled state so the next call doesn't
+            // re-walk the same refill arc from a stale `lastRefillAt`.
+            $this->_save($key, $state);
+            throw new RateLimitExceededException(
+                $this->_buildExhaustedStatus($state['tokens'], $cost),
+            );
+        }
+
+        $state['tokens'] -= $cost;
+        $this->_save($key, $state);
+
+        return $this->_buildAvailableStatus($state['tokens']);
+    }
 
     /**
      * Build a `RateLimitStatus` for a bucket that has at least one
@@ -287,14 +343,14 @@ class RateLimiter extends Component
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _loadAndRefill(int $userId): array
+    private function _loadAndRefill(int|string $key): array
     {
         $burst = (float) $this->_burst();
         $refillRate = $this->_refillRate();
         $now = ($this->_now)();
         $nowTs = (float) $now->getTimestamp() + ((float) $now->format('u') / 1_000_000);
 
-        $cached = $this->_cache()->get($this->_cacheKey($userId));
+        $cached = $this->_cache()->get($this->_cacheKey($key));
         if (!is_array($cached) || !isset($cached['tokens'], $cached['lastRefillAt'])) {
             // Fresh bucket — start at burst capacity.
             return [
@@ -327,13 +383,13 @@ class RateLimiter extends Component
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _save(int $userId, array $state): void
+    private function _save(int|string $key, array $state): void
     {
         // TTL = ceiling of refill-to-full time, with a floor of 60s
         // so a tight refill rate doesn't churn the cache.
         $refillToFullSeconds = (int) ceil($this->_burst() / max($this->_refillRate(), 0.0001));
         $ttl = max($refillToFullSeconds, 60);
-        $this->_cache()->set($this->_cacheKey($userId), $state, $ttl);
+        $this->_cache()->set($this->_cacheKey($key), $state, $ttl);
     }
 
     /**
@@ -358,12 +414,18 @@ class RateLimiter extends Component
     }
 
     /**
+     * Build the cache key for a bucket. A bare int is a Craft user id;
+     * a string is an arbitrary caller-namespaced key (e.g. an IP-keyed
+     * OAuth throttle). The shared prefix keeps both under one
+     * namespace so the existing user-keyed format
+     * (`cortex:ratelimit:user:<id>`) is preserved unchanged.
+     *
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _cacheKey(int $userId): string
+    private function _cacheKey(int|string $key): string
     {
-        return self::CACHE_KEY_PREFIX . $userId;
+        return self::CACHE_KEY_PREFIX . $key;
     }
 
     /**

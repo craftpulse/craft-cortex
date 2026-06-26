@@ -3,6 +3,7 @@
 namespace craftpulse\cortex\tools\support;
 
 use Craft;
+use RuntimeException;
 use Throwable;
 
 /**
@@ -47,11 +48,25 @@ class ConsoleRunner
      * @param array<string,mixed> $params
      * @return array{route: string, exitCode: int|null, output: string, error: ?string}
      *
+     * @throws RuntimeException if a capture is already in flight — the
+     *                          static `StdoutCaptureFilter` buffer is
+     *                          single-flight, so a nested run would clear
+     *                          the outer dispatch's buffer mid-capture.
+     *
      * @author Craftpulse
      * @since  5.0.0
      */
     public static function run(string $route, array $params = []): array
     {
+        // Single-flight invariant: the filter's static `$capturing` /
+        // `$buffer` can hold exactly one capture at a time. Nothing nests
+        // today (stdio serves one request at a time), but a future
+        // command-running tool that recursed into `runAction()` would
+        // silently corrupt the outer capture. Fail loud instead.
+        if (StdoutCaptureFilter::$capturing) {
+            throw new RuntimeException('ConsoleRunner::run() is not re-entrant: a stdout capture is already in flight.');
+        }
+
         self::_register();
 
         StdoutCaptureFilter::$buffer = '';

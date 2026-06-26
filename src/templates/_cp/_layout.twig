@@ -1,0 +1,31 @@
+{# =========================================================================
+   Cortex CP shared layout.
+
+   Parent template for every screen in the Cortex CP section (Settings,
+   Temporary grants, Tokens, Activity, Connection). Extends `_layouts/cp`
+   directly per locked decision 1 + cp.md §"Tabbed Settings Pages" — the
+   plugin owns the full template lineage.
+
+   The Gate 9 CP rework replaced the in-page tab bar with Craft's standard
+   global-sidebar subnav (`Cortex::getCpNavItem()`). Subtemplates set
+   `selectedSubnavItem` to the subnav key Craft should highlight — one of
+   `settings`, `grants`, `tokens`, `activity`, `connection` — and override
+   `{% block content %}` with their body. The subnav itself is rendered by
+   Craft from the section nav item; this template no longer paints tabs.
+
+   Per locked decision 6 the only plugin-side asset bundle Gate 9 ships is
+   `CortexCpAsset` — registered here so every screen inherits it without
+   per-template duplication.
+   ========================================================================= #}
+
+{% extends "_layouts/cp" %}
+
+{% do view.registerAssetBundle("craftpulse\\cortex\\web\\assets\\cp\\CortexCpAsset") %}
+
+{% set title = 'Cortex'|t('cortex') %}
+{% set selectedSubnavItem = selectedSubnavItem ?? 'settings' %}
+{% set docTitle = (selectedSubnavItem)|capitalize ~ ' - Cortex' %}
+
+{% block content %}
+    {# Default content block — every concrete screen overrides this. #}
+{% endblock %}

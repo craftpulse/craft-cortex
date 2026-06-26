@@ -37,7 +37,9 @@ use craftpulse\cortex\resources\SkillResource;
 use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_skilltest_' . bin2hex(random_bytes(4)) . '_';
+    // Slug-shaped so handles satisfy Skill::HANDLE_PATTERN
+    // (lowercase letters, digits, single hyphens).
+    $this->fixturePrefix = 'cortex-skilltest-' . bin2hex(random_bytes(4)) . '-';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -59,7 +61,7 @@ afterEach(function() {
         ->status(null)
         ->trashed(null)
         ->site('*')
-        ->andWhere(['like', 'cortex_skills.handle', '__cortex_skilltest_%', false])
+        ->andWhere(['like', 'cortex_skills.handle', 'cortex-skilltest-%', false])
         ->all();
     foreach ($rows as $row) {
         Craft::$app->getElements()->deleteElement($row, hardDelete: true);

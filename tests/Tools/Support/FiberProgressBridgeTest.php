@@ -124,6 +124,60 @@ it('shortcuts on cancellation via $fiber->throw and re-engages the host catch-bl
     expect($gen->getReturn())->toBe('done:10');
 });
 
+it('drains the fiber to termination on cancel when the catch path re-suspends, never leaking the listener', function() {
+    $emitter = new FiberEmitterFixture();
+    $bridge = new FiberProgressBridge(
+        FiberEmitterFixture::class,
+        FiberEmitterFixture::EVENT_ROW,
+        static fn(object $event) => $event instanceof FiberEmitterFixtureEvent
+            ? ['progress' => $event->position, 'total' => $event->total]
+            : null,
+        // The wrapped service emits one more event from inside its
+        // QueryAbortedException catch block — suspending the Fiber again
+        // after the cancel throw. A break-on-cancel bridge would abandon
+        // the Fiber here and leak the listener.
+        static fn() => $emitter->runThenEmitOnCancel(10),
+        new QueryAbortedException(),
+    );
+
+    // Cancel after the second yielded frame.
+    $emitted = 0;
+    $shouldCancel = static function() use (&$emitted): bool {
+        return $emitted >= 2;
+    };
+
+    $gen = $bridge->run($shouldCancel);
+    $frames = [];
+    while ($gen->valid()) {
+        $frames[] = $gen->current();
+        $emitted++;
+        $gen->next();
+    }
+
+    // (a) The generator completed without error and surfaced the host's
+    // post-unwind return value.
+    expect($emitter->aborted)->toBeTrue();
+    expect($gen->getReturn())->toBe('done:10');
+
+    // (b) The class-level listener is gone — the Fiber's `finally`
+    // ran during the post-cancel drain. Firing the event again must NOT
+    // re-enter the (now-terminated) Fiber, which would raise a
+    // `FiberError`; assert no handler is registered and no throw.
+    expect(Event::hasHandlers(FiberEmitterFixture::class, FiberEmitterFixture::EVENT_ROW))->toBeFalse();
+    $postRun = new FiberEmitterFixtureEvent();
+    $postRun->position = 99;
+    $postRun->total = 10;
+    expect(static fn() => $emitter->trigger(FiberEmitterFixture::EVENT_ROW, $postRun))
+        ->not->toThrow(\Throwable::class);
+
+    // (c) Only the two pre-cancel frames were yielded onward — the
+    // catch-path emit (position -1) and the post-run emit (position 99)
+    // never reached the consumer.
+    expect($frames)->toHaveCount(2);
+    expect($frames[0]['progress'])->toBe(1);
+    expect($frames[1]['progress'])->toBe(2);
+});
+
 it('skips emit when eventToFrame returns null', function() {
     $emitter = new FiberEmitterFixture();
     $bridge = new FiberProgressBridge(
