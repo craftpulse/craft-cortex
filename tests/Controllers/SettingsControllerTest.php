@@ -23,9 +23,9 @@
 
 use Craft;
 use craft\web\Controller;
-use craftpulse\cortex\controllers\SettingsController;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\services\Allowlist;
+use craftpulse\herald\controllers\SettingsController;
+use craftpulse\herald\Herald;
+use craftpulse\herald\services\Allowlist;
 use yii\base\Exception;
 use yii\web\Response;
 
@@ -39,7 +39,7 @@ use yii\web\Response;
  * short-circuit. Lets the action body run against a console-bootstrapped
  * Craft without standing up a full web request stack.
  */
-class _CortexSettingsControllerHarness extends SettingsController
+class _HeraldSettingsControllerHarness extends SettingsController
 {
     /** @var array<string,mixed> */
     public array $body = [];
@@ -70,7 +70,7 @@ class _CortexSettingsControllerHarness extends SettingsController
     public function withBody(array $body): self
     {
         $this->body = $body;
-        $this->request = new _CortexSettingsControllerRequest($body);
+        $this->request = new _HeraldSettingsControllerRequest($body);
         $this->response = new \yii\web\Response();
         $this->response->formatters[\yii\web\Response::FORMAT_JSON] = \yii\web\JsonResponseFormatter::class;
         return $this;
@@ -80,7 +80,7 @@ class _CortexSettingsControllerHarness extends SettingsController
 /**
  * Tiny request stub — just enough for the controller's two actions.
  */
-class _CortexSettingsControllerRequest
+class _HeraldSettingsControllerRequest
 {
     public bool $isCpRequest = true;
 
@@ -130,14 +130,14 @@ class _CortexSettingsControllerRequest
 /**
  * Allowlist stub that always throws on add/remove.
  */
-class _CortexThrowingAllowlist extends Allowlist
+class _HeraldThrowingAllowlist extends Allowlist
 {
     public function add(
         string $pattern,
         ?int $userId = null,
         ?string $note = null,
         ?int $ttlSeconds = null,
-    ): \craftpulse\cortex\records\RuntimeOverride {
+    ): \craftpulse\herald\records\RuntimeOverride {
         throw new Exception('boom: add failed');
     }
 
@@ -151,7 +151,7 @@ class _CortexThrowingAllowlist extends Allowlist
  * Records `setError` / `setNotice` flashes so tests can read them
  * without standing up a full web session.
  */
-class _CortexFlashSession
+class _HeraldFlashSession
 {
     /** @var array<string,mixed> */
     public array $flashes = [];
@@ -179,15 +179,15 @@ class _CortexFlashSession
  * Replacing `Yii::$app` is the simplest way to intercept
  * `Craft::$app->getSession()` without subclassing Craft's bootstrap.
  */
-class _CortexAppProxy
+class _HeraldAppProxy
 {
     public function __construct(
         public \craft\console\Application $delegate,
-        public _CortexFlashSession $sessionStub,
+        public _HeraldFlashSession $sessionStub,
     ) {
     }
 
-    public function getSession(): _CortexFlashSession
+    public function getSession(): _HeraldFlashSession
     {
         return $this->sessionStub;
     }
@@ -246,15 +246,15 @@ it('ships the _cp/settings tab template', function() {
 
 beforeEach(function() {
     // Swap the Plugin's `allowlist` component for the throwing stub.
-    $this->originalAllowlist = Cortex::getInstance()->allowlist;
-    Cortex::getInstance()->set('allowlist', new _CortexThrowingAllowlist());
+    $this->originalAllowlist = Herald::getInstance()->allowlist;
+    Herald::getInstance()->set('allowlist', new _HeraldThrowingAllowlist());
 
     // Swap Yii::$app for a proxy that delegates everything but
     // `getSession()` (which would otherwise throw on a console app)
     // to the live application.
-    $this->flashSession = new _CortexFlashSession();
+    $this->flashSession = new _HeraldFlashSession();
     $this->originalApp = \Yii::$app;
-    \Yii::$app = new _CortexAppProxy($this->originalApp, $this->flashSession);
+    \Yii::$app = new _HeraldAppProxy($this->originalApp, $this->flashSession);
 
     // Snapshot the count of in-flight log messages so we can read just
     // the ones the action under test adds.
@@ -264,27 +264,27 @@ beforeEach(function() {
 afterEach(function() {
     // Restore the original Yii::$app and the plugin's allowlist.
     \Yii::$app = $this->originalApp;
-    Cortex::getInstance()->set('allowlist', $this->originalAllowlist);
+    Herald::getInstance()->set('allowlist', $this->originalAllowlist);
 });
 
 /**
  * Pull every log message added since the test started, filtered to the
- * `cortex` category.
+ * `herald` category.
  *
  * @return array<int,array{0:mixed,1:int,2:string,3:float}>
  */
-function _cortexCapturedCortexLogs(int $countBefore): array
+function _heraldCapturedHeraldLogs(int $countBefore): array
 {
     $all = Craft::getLogger()->messages;
     $new = array_slice($all, $countBefore);
     return array_values(array_filter(
         $new,
-        static fn(array $entry): bool => ($entry[2] ?? null) === 'cortex',
+        static fn(array $entry): bool => ($entry[2] ?? null) === 'herald',
     ));
 }
 
 it('actionAddOverride catches allowlist exceptions, returns 400 JSON, and logs', function() {
-    $controller = new _CortexSettingsControllerHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldSettingsControllerHarness('settings', Herald::getInstance());
     $controller->withBody([
         'pattern' => 'foo/*',
         'note' => null,
@@ -298,14 +298,14 @@ it('actionAddOverride catches allowlist exceptions, returns 400 JSON, and logs',
 
     expect($response->data)->toBeArray()->toHaveKey('message', 'Could not add grant.');
 
-    $cortexEntries = _cortexCapturedCortexLogs($this->logCountBefore);
-    expect($cortexEntries)->not->toBeEmpty();
-    $messages = array_map(static fn(array $entry): string => (string) $entry[0], $cortexEntries);
+    $heraldEntries = _heraldCapturedHeraldLogs($this->logCountBefore);
+    expect($heraldEntries)->not->toBeEmpty();
+    $messages = array_map(static fn(array $entry): string => (string) $entry[0], $heraldEntries);
     expect(implode("\n", $messages))->toContain('boom: add failed');
 });
 
 it('actionRemoveOverride catches allowlist exceptions, returns 400 JSON, and logs', function() {
-    $controller = new _CortexSettingsControllerHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldSettingsControllerHarness('settings', Herald::getInstance());
     $controller->withBody(['id' => 123]);
 
     $response = $controller->actionRemoveOverride();
@@ -315,8 +315,8 @@ it('actionRemoveOverride catches allowlist exceptions, returns 400 JSON, and log
 
     expect($response->data)->toBeArray()->toHaveKey('message', 'Could not remove override.');
 
-    $cortexEntries = _cortexCapturedCortexLogs($this->logCountBefore);
-    expect($cortexEntries)->not->toBeEmpty();
-    $messages = array_map(static fn(array $entry): string => (string) $entry[0], $cortexEntries);
+    $heraldEntries = _heraldCapturedHeraldLogs($this->logCountBefore);
+    expect($heraldEntries)->not->toBeEmpty();
+    $messages = array_map(static fn(array $entry): string => (string) $entry[0], $heraldEntries);
     expect(implode("\n", $messages))->toContain('boom: remove failed');
 });

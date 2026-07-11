@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\resources;
+namespace craftpulse\herald\resources;
 
 /**
  * =========================================================================

@@ -14,11 +14,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('search_skills');
+    $this->tool = Herald::getInstance()->tools->getByName('search_skills');
 });
 
 it('is registered on the tool registry', function() {
@@ -152,7 +152,7 @@ it('throws on unknown mode', function() {
 })->throws(ToolException::class, 'Unknown mode');
 
 it('appears in the registry tools/list payload with annotations', function() {
-    $payload = Cortex::getInstance()->tools->asListPayload();
+    $payload = Herald::getInstance()->tools->asListPayload();
     $entry = collect($payload)->firstWhere('name', 'search_skills');
 
     expect($entry)->not->toBeNull();

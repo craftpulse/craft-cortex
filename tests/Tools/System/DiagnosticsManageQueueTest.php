@@ -31,9 +31,9 @@ use craft\elements\User;
 use craft\helpers\Db;
 use craft\queue\jobs\Announcement;
 use craft\queue\Queue;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\system\Diagnostics;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\system\Diagnostics;
+use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
 // Setup
@@ -46,7 +46,7 @@ beforeEach(function() {
     Craft::$app->getUser()->setIdentity($admin);
     $this->admin = $admin;
 
-    $this->fixturePrefix = '__cortex_mq_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_mq_' . bin2hex(random_bytes(4)) . '_';
 });
 
 afterEach(function() {
@@ -60,7 +60,7 @@ afterEach(function() {
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _cortex_diag_tool(): Diagnostics
+function _herald_diag_tool(): Diagnostics
 {
     return new Diagnostics();
 }
@@ -70,7 +70,7 @@ function _cortex_diag_tool(): Diagnostics
  * return its row id (the queue's `id` column, stringified — Craft's
  * `Queue` API takes ids as strings).
  */
-function _cortex_diag_push(string $heading): string
+function _herald_diag_push(string $heading): string
 {
     $queue = Craft::$app->getQueue();
     expect($queue)->toBeInstanceOf(Queue::class);
@@ -89,7 +89,7 @@ function _cortex_diag_push(string $heading): string
  * a worker. Mirrors what `Queue::handleError()` writes after a job
  * throws.
  */
-function _cortex_diag_mark_failed(string $jobId): void
+function _herald_diag_mark_failed(string $jobId): void
 {
     Db::update(
         Table::QUEUE,
@@ -107,15 +107,15 @@ it('inputSchemaFor(null) returns the Free enum on Free (edition gate beats stdio
     // regardless of caller (including stdio); the schema mirrors that
     // so an LLM is never advertised a type the runtime would reject.
     // Pro-install stdio still sees the full enum (next test).
-    $schema = _cortex_diag_tool()->inputSchemaFor(null);
+    $schema = _herald_diag_tool()->inputSchemaFor(null);
     expect($schema['properties']['type']['enum'])->toBe([
         'logs', 'last_error', 'deprecations', 'queue', 'project_config_diff',
     ]);
 });
 
 it('inputSchemaFor(null) returns the full static enum on Pro (stdio invariant)', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_diag_tool()->inputSchemaFor(null);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_diag_tool()->inputSchemaFor(null);
         expect($schema['properties']['type']['enum'])->toBe([
             'logs', 'last_error', 'deprecations', 'queue', 'project_config_diff', 'manage_queue',
         ]);
@@ -129,7 +129,7 @@ it('inputSchemaFor(null) returns the full static enum on Pro (stdio invariant)',
 it('inputSchemaFor on Free hides manage_queue from admins (HTTP path)', function() {
     // Free-edition HTTP callers don't see manage_queue regardless of
     // permission — the type doesn't exist on this install.
-    $schema = _cortex_diag_tool()->inputSchemaFor($this->admin);
+    $schema = _herald_diag_tool()->inputSchemaFor($this->admin);
     expect($schema['properties']['type']['enum'])->toBe([
         'logs', 'last_error', 'deprecations', 'queue', 'project_config_diff',
     ]);
@@ -140,8 +140,8 @@ it('inputSchemaFor on Free hides manage_queue from admins (HTTP path)', function
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor on Pro returns the full enum for admins', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_diag_tool()->inputSchemaFor($this->admin);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_diag_tool()->inputSchemaFor($this->admin);
         expect($schema['properties']['type']['enum'])->toBe([
             'logs', 'last_error', 'deprecations', 'queue', 'project_config_diff', 'manage_queue',
         ]);
@@ -150,7 +150,7 @@ it('inputSchemaFor on Pro returns the full enum for admins', function() {
 
 it('inputSchemaFor on Pro hides manage_queue from users without utility:queue-manager', function() {
     $user = new User();
-    $user->username = '__cortex_mq_noperm_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_mq_noperm_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -159,8 +159,8 @@ it('inputSchemaFor on Pro hides manage_queue from users without utility:queue-ma
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
-            $schema = _cortex_diag_tool()->inputSchemaFor($user);
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
+            $schema = _herald_diag_tool()->inputSchemaFor($user);
             expect($schema['properties']['type']['enum'])->toBe([
                 'logs', 'last_error', 'deprecations', 'queue', 'project_config_diff',
             ]);
@@ -172,7 +172,7 @@ it('inputSchemaFor on Pro hides manage_queue from users without utility:queue-ma
 
 it('inputSchemaFor on Pro exposes manage_queue to users with utility:queue-manager', function() {
     $user = new User();
-    $user->username = '__cortex_mq_perm_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_mq_perm_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     if (!Craft::$app->getElements()->saveElement($user)) {
@@ -186,10 +186,10 @@ it('inputSchemaFor on Pro exposes manage_queue to users with utility:queue-manag
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
             $reloaded = Craft::$app->getUsers()->getUserById((int) $user->id);
             expect($reloaded)->toBeInstanceOf(User::class);
-            $schema = _cortex_diag_tool()->inputSchemaFor($reloaded);
+            $schema = _herald_diag_tool()->inputSchemaFor($reloaded);
             expect($schema['properties']['type']['enum'])->toBe([
                 'logs', 'last_error', 'deprecations', 'queue', 'project_config_diff', 'manage_queue',
             ]);
@@ -204,26 +204,26 @@ it('inputSchemaFor on Pro exposes manage_queue to users with utility:queue-manag
 // -----------------------------------------------------------------------------
 
 it('manage_queue throws when action is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_diag_tool()->execute(['type' => 'manage_queue']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_diag_tool()->execute(['type' => 'manage_queue']);
     });
 })->throws(ToolException::class, '`action` is required');
 
 it('manage_queue throws when action is unknown', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_diag_tool()->execute(['type' => 'manage_queue', 'action' => 'cancel']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_diag_tool()->execute(['type' => 'manage_queue', 'action' => 'cancel']);
     });
 })->throws(ToolException::class, '`action` is required');
 
 it('manage_queue retry throws when jobId is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_diag_tool()->execute(['type' => 'manage_queue', 'action' => 'retry']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_diag_tool()->execute(['type' => 'manage_queue', 'action' => 'retry']);
     });
 })->throws(ToolException::class, '`jobId` is required');
 
 it('manage_queue release throws when jobId is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_diag_tool()->execute(['type' => 'manage_queue', 'action' => 'release']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_diag_tool()->execute(['type' => 'manage_queue', 'action' => 'release']);
     });
 })->throws(ToolException::class, '`jobId` is required');
 
@@ -232,8 +232,8 @@ it('manage_queue release throws when jobId is missing', function() {
 // -----------------------------------------------------------------------------
 
 it('manage_queue release deletes the row and returns the post-action envelope', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $jobId = _cortex_diag_push($this->fixturePrefix . 'release-target');
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $jobId = _herald_diag_push($this->fixturePrefix . 'release-target');
 
         // Sanity: row exists.
         $before = (int) (new \craft\db\Query())
@@ -242,7 +242,7 @@ it('manage_queue release deletes the row and returns the post-action envelope', 
             ->count();
         expect($before)->toBe(1);
 
-        $result = _cortex_diag_tool()->execute([
+        $result = _herald_diag_tool()->execute([
             'type' => 'manage_queue',
             'action' => 'release',
             'jobId' => $jobId,
@@ -266,9 +266,9 @@ it('manage_queue release deletes the row and returns the post-action envelope', 
 });
 
 it('manage_queue retry clears the failed state for a previously-failed job', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $jobId = _cortex_diag_push($this->fixturePrefix . 'retry-target');
-        _cortex_diag_mark_failed($jobId);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $jobId = _herald_diag_push($this->fixturePrefix . 'retry-target');
+        _herald_diag_mark_failed($jobId);
 
         // Sanity: row is flagged failed.
         $row = (new \craft\db\Query())
@@ -278,7 +278,7 @@ it('manage_queue retry clears the failed state for a previously-failed job', fun
         expect($row)->not->toBeFalse();
         expect((bool) $row['fail'])->toBeTrue();
 
-        $result = _cortex_diag_tool()->execute([
+        $result = _herald_diag_tool()->execute([
             'type' => 'manage_queue',
             'action' => 'retry',
             'jobId' => $jobId,
@@ -299,15 +299,15 @@ it('manage_queue retry clears the failed state for a previously-failed job', fun
 });
 
 it('manage_queue retry_all clears all failed rows on the channel', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $ids = [];
         for ($i = 0; $i < 3; $i++) {
-            $jobId = _cortex_diag_push($this->fixturePrefix . "retry-all-{$i}");
-            _cortex_diag_mark_failed($jobId);
+            $jobId = _herald_diag_push($this->fixturePrefix . "retry-all-{$i}");
+            _herald_diag_mark_failed($jobId);
             $ids[] = $jobId;
         }
 
-        $result = _cortex_diag_tool()->execute([
+        $result = _herald_diag_tool()->execute([
             'type' => 'manage_queue',
             'action' => 'retry_all',
         ]);
@@ -328,16 +328,16 @@ it('manage_queue retry_all clears all failed rows on the channel', function() {
 });
 
 it('manage_queue release_all wipes the channel and reports the delta', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $ids = [];
         for ($i = 0; $i < 4; $i++) {
-            $ids[] = _cortex_diag_push($this->fixturePrefix . "release-all-{$i}");
+            $ids[] = _herald_diag_push($this->fixturePrefix . "release-all-{$i}");
         }
 
         $before = (int) (new \craft\db\Query())->from(Table::QUEUE)->count();
         expect($before)->toBeGreaterThanOrEqual(4);
 
-        $result = _cortex_diag_tool()->execute([
+        $result = _herald_diag_tool()->execute([
             'type' => 'manage_queue',
             'action' => 'release_all',
         ]);
@@ -357,7 +357,7 @@ it('manage_queue release_all wipes the channel and reports the delta', function(
 
 it('manage_queue throws permission-denied with the locked rich-format message for non-permitted users', function() {
     $user = new User();
-    $user->username = '__cortex_mq_denied_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_mq_denied_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -366,14 +366,14 @@ it('manage_queue throws permission-denied with the locked rich-format message fo
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
-            $jobId = _cortex_diag_push($this->fixturePrefix . 'denied-target');
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
+            $jobId = _herald_diag_push($this->fixturePrefix . 'denied-target');
 
             Craft::$app->getUser()->setIdentity($user);
 
             $caught = null;
             try {
-                _cortex_diag_tool()->execute([
+                _herald_diag_tool()->execute([
                     'type' => 'manage_queue',
                     'action' => 'release',
                     'jobId' => $jobId,
@@ -398,5 +398,5 @@ it('manage_queue throws permission-denied with the locked rich-format message fo
 // -----------------------------------------------------------------------------
 
 it('manage_queue throws "unavailable on this edition" on a Free install', function() {
-    _cortex_diag_tool()->execute(['type' => 'manage_queue', 'action' => 'retry_all']);
+    _herald_diag_tool()->execute(['type' => 'manage_queue', 'action' => 'retry_all']);
 })->throws(ToolException::class, 'unavailable on this edition');

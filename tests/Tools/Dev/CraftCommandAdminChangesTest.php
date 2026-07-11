@@ -19,10 +19,10 @@
  *     `allowAdminChanges` is true.
  *   - Audit-log fidelity: a rejected admin-level invocation is
  *     still surfaced as a `ToolException`, which the Gate 7.5
- *     `EVENT_LOG_CALL` listener writes to `cortex_invocations`
+ *     `EVENT_LOG_CALL` listener writes to `herald_invocations`
  *     with `kind=tool_error` + `errorClass=ToolException`.
  *
- * Uses the `cortex_with_admin_changes()` helper from `tests/Pest.php`
+ * Uses the `herald_with_admin_changes()` helper from `tests/Pest.php`
  * to flip the flag with a clean restore on success or exception. Use
  * of `make/section` (an invalid Yii route) and `migrate/up` (a no-op
  * on the playground) keeps actual dispatch cheap — the test cares
@@ -33,14 +33,14 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\records\Invocation as InvocationRecord;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\support\InvocationLogger;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\records\Invocation as InvocationRecord;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\InvocationLogger;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('craft_command');
+    $this->tool = Herald::getInstance()->tools->getByName('craft_command');
 });
 
 // -----------------------------------------------------------------------------
@@ -48,7 +48,7 @@ beforeEach(function() {
 // -----------------------------------------------------------------------------
 
 it('admits migrate/up when allowAdminChanges is true', function() {
-    cortex_with_admin_changes(true, function() {
+    herald_with_admin_changes(true, function() {
         $result = $this->tool->execute([
             'mode' => 'run',
             'command' => 'migrate/up',
@@ -61,7 +61,7 @@ it('admits migrate/up when allowAdminChanges is true', function() {
 });
 
 it('admits make/section when allowAdminChanges is true', function() {
-    cortex_with_admin_changes(true, function() {
+    herald_with_admin_changes(true, function() {
         // `make/section` is an invalid Yii route — the allowlist pattern
         // `make/*` admits it, then ConsoleRunner reports the missing
         // sub-command. The tool does NOT throw a ToolException
@@ -82,7 +82,7 @@ it('admits make/section when allowAdminChanges is true', function() {
 // -----------------------------------------------------------------------------
 
 it('rejects migrate/up when allowAdminChanges is false, naming the config flag', function() {
-    cortex_with_admin_changes(false, function() {
+    herald_with_admin_changes(false, function() {
         try {
             $this->tool->execute([
                 'mode' => 'run',
@@ -98,7 +98,7 @@ it('rejects migrate/up when allowAdminChanges is false, naming the config flag',
 });
 
 it('rejects make/section when allowAdminChanges is false, naming the config flag', function() {
-    cortex_with_admin_changes(false, function() {
+    herald_with_admin_changes(false, function() {
         try {
             $this->tool->execute([
                 'mode' => 'run',
@@ -117,7 +117,7 @@ it('rejects make/section when allowAdminChanges is false, naming the config flag
 // -----------------------------------------------------------------------------
 
 it('still admits resave/entries when allowAdminChanges is false', function() {
-    cortex_with_admin_changes(false, function() {
+    herald_with_admin_changes(false, function() {
         $result = $this->tool->execute([
             'mode' => 'run',
             'command' => 'resave/entries',
@@ -131,7 +131,7 @@ it('still admits resave/entries when allowAdminChanges is false', function() {
 });
 
 it('still admits cache/flush when allowAdminChanges is false', function() {
-    cortex_with_admin_changes(false, function() {
+    herald_with_admin_changes(false, function() {
         $result = $this->tool->execute([
             'mode' => 'run',
             'command' => 'cache/flush',
@@ -148,8 +148,8 @@ it('still admits cache/flush when allowAdminChanges is false', function() {
 // -----------------------------------------------------------------------------
 
 it('Allowlist::getEffective() includes admin commands when allowAdminChanges is true', function() {
-    cortex_with_admin_changes(true, function() {
-        $effective = Cortex::getInstance()->allowlist->getEffective();
+    herald_with_admin_changes(true, function() {
+        $effective = Herald::getInstance()->allowlist->getEffective();
 
         // Content-level patterns are always in.
         expect($effective)->toContain('resave/*');
@@ -164,8 +164,8 @@ it('Allowlist::getEffective() includes admin commands when allowAdminChanges is 
 });
 
 it('Allowlist::getEffective() excludes admin commands when allowAdminChanges is false', function() {
-    cortex_with_admin_changes(false, function() {
-        $effective = Cortex::getInstance()->allowlist->getEffective();
+    herald_with_admin_changes(false, function() {
+        $effective = Herald::getInstance()->allowlist->getEffective();
 
         // Content-level patterns are always in.
         expect($effective)->toContain('resave/*');
@@ -180,13 +180,13 @@ it('Allowlist::getEffective() excludes admin commands when allowAdminChanges is 
 });
 
 it('craft_command mode=list reflects the effective allowlist in both states', function() {
-    cortex_with_admin_changes(true, function() {
+    herald_with_admin_changes(true, function() {
         $result = $this->tool->execute(['mode' => 'list']);
         expect($result['patterns'])->toContain('migrate/*');
         expect($result['patterns'])->toContain('resave/*');
     });
 
-    cortex_with_admin_changes(false, function() {
+    herald_with_admin_changes(false, function() {
         $result = $this->tool->execute(['mode' => 'list']);
         expect($result['patterns'])->not->toContain('migrate/*');
         expect($result['patterns'])->toContain('resave/*');
@@ -200,10 +200,10 @@ it('craft_command mode=list reflects the effective allowlist in both states', fu
 it('an admin-changes-denied ToolException audit-logs with kind=tool_error', function() {
     // Drive the same path the HTTP dispatcher takes: catch the
     // ToolException, hand it to InvocationLogger::logCall with an
-    // HTTP context, then read back the `cortex_invocations` row the
-    // Cortex::init()-wired listener wrote.
+    // HTTP context, then read back the `herald_invocations` row the
+    // Herald::init()-wired listener wrote.
     $caught = null;
-    cortex_with_admin_changes(false, function() use (&$caught) {
+    herald_with_admin_changes(false, function() use (&$caught) {
         try {
             $this->tool->execute([
                 'mode' => 'run',

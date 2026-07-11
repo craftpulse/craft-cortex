@@ -22,16 +22,16 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\console\controllers\ServeController;
-use craftpulse\cortex\mcp\Server;
+use craftpulse\herald\console\controllers\ServeController;
+use craftpulse\herald\mcp\Server;
 
 /**
  * Build a `ServeController` wired to a throwaway console module so its
  * constructor doesn't choke outside a real console request.
  */
-function _cortex_serve_controller(): ServeController
+function _herald_serve_controller(): ServeController
 {
-    return new ServeController('cortex/serve', Craft::$app);
+    return new ServeController('herald/serve', Craft::$app);
 }
 
 /**
@@ -39,7 +39,7 @@ function _cortex_serve_controller(): ServeController
  *
  * @param array<int,mixed> $args
  */
-function _cortex_invoke(ServeController $controller, string $method, array $args): mixed
+function _herald_invoke(ServeController $controller, string $method, array $args): mixed
 {
     $ref = new ReflectionMethod($controller, $method);
     $ref->setAccessible(true);
@@ -52,11 +52,11 @@ function _cortex_invoke(ServeController $controller, string $method, array $args
  *
  * @return array<string,mixed>|null
  */
-function _cortex_handle_line(string $line): ?array
+function _herald_handle_line(string $line): ?array
 {
-    $controller = _cortex_serve_controller();
+    $controller = _herald_serve_controller();
     $server = new Server(Server::TRANSPORT_STDIO);
-    return _cortex_invoke($controller, '_handleLine', [$server, $line]);
+    return _herald_invoke($controller, '_handleLine', [$server, $line]);
 }
 
 /**
@@ -65,15 +65,15 @@ function _cortex_handle_line(string $line): ?array
  *
  * @return array<int,array{0:string,1:bool}>
  */
-function _cortex_read_all(string $raw, int $maxBytes): array
+function _herald_read_all(string $raw, int $maxBytes): array
 {
     $stream = fopen('php://temp', 'r+');
     fwrite($stream, $raw);
     rewind($stream);
 
-    $controller = _cortex_serve_controller();
+    $controller = _herald_serve_controller();
     $out = [];
-    while (($read = _cortex_invoke($controller, '_readMessage', [$stream, $maxBytes])) !== null) {
+    while (($read = _herald_invoke($controller, '_readMessage', [$stream, $maxBytes])) !== null) {
         $out[] = $read;
     }
     fclose($stream);
@@ -85,7 +85,7 @@ function _cortex_read_all(string $raw, int $maxBytes): array
 // -----------------------------------------------------------------------------
 
 it('returns one JSON-RPC response for one valid request line', function() {
-    $response = _cortex_handle_line(json_encode([
+    $response = _herald_handle_line(json_encode([
         'jsonrpc' => '2.0',
         'id' => 7,
         'method' => 'ping',
@@ -98,12 +98,12 @@ it('returns one JSON-RPC response for one valid request line', function() {
 });
 
 it('skips a blank line with no output', function() {
-    expect(_cortex_handle_line(''))->toBeNull();
-    expect(_cortex_handle_line("   \t  "))->toBeNull();
+    expect(_herald_handle_line(''))->toBeNull();
+    expect(_herald_handle_line("   \t  "))->toBeNull();
 });
 
 it('returns -32700 on malformed JSON', function() {
-    $response = _cortex_handle_line('{ this is not json ');
+    $response = _herald_handle_line('{ this is not json ');
 
     expect($response)->toBeArray()
         ->and($response['id'])->toBeNull()
@@ -111,7 +111,7 @@ it('returns -32700 on malformed JSON', function() {
 });
 
 it('returns -32600 on a non-object JSON value', function() {
-    $response = _cortex_handle_line('42');
+    $response = _herald_handle_line('42');
 
     expect($response)->toBeArray()
         ->and($response['id'])->toBeNull()
@@ -120,7 +120,7 @@ it('returns -32600 on a non-object JSON value', function() {
 });
 
 it('emits no response line for a notification (no id)', function() {
-    $response = _cortex_handle_line(json_encode([
+    $response = _herald_handle_line(json_encode([
         'jsonrpc' => '2.0',
         'method' => 'notifications/initialized',
     ]));
@@ -135,7 +135,7 @@ it('emits no response line for a notification (no id)', function() {
 it('reads consecutive newline-delimited messages', function() {
     // `_readMessage` returns the raw line (newline included); the
     // trailing-whitespace strip happens downstream in `_handleLine`.
-    $reads = _cortex_read_all("alpha\nbeta\n", 1024);
+    $reads = _herald_read_all("alpha\nbeta\n", 1024);
 
     expect($reads)->toHaveCount(2)
         ->and($reads[0])->toBe(["alpha\n", false])
@@ -143,7 +143,7 @@ it('reads consecutive newline-delimited messages', function() {
 });
 
 it('surfaces a trailing newline-less final line at EOF', function() {
-    $reads = _cortex_read_all('only-line-no-newline', 1024);
+    $reads = _herald_read_all('only-line-no-newline', 1024);
 
     expect($reads)->toHaveCount(1)
         ->and($reads[0])->toBe(['only-line-no-newline', false]);
@@ -151,7 +151,7 @@ it('surfaces a trailing newline-less final line at EOF', function() {
 
 it('flags an oversized line and keeps the next message clean', function() {
     $huge = str_repeat('x', 200);
-    $reads = _cortex_read_all($huge . "\n" . "small\n", 64);
+    $reads = _herald_read_all($huge . "\n" . "small\n", 64);
 
     expect($reads)->toHaveCount(2)
         ->and($reads[0][1])->toBeTrue()   // oversized
@@ -163,11 +163,11 @@ it('drives the cap into a -32600 via the same path actionIndex uses', function()
     // Mirror actionIndex's oversized branch: an oversized read yields a
     // -32600, and the following message parses normally.
     $huge = str_repeat('y', 500);
-    $reads = _cortex_read_all($huge . "\n" . json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'ping']) . "\n", 128);
+    $reads = _herald_read_all($huge . "\n" . json_encode(['jsonrpc' => '2.0', 'id' => 1, 'method' => 'ping']) . "\n", 128);
 
     expect($reads[0][1])->toBeTrue();
 
-    $response = _cortex_handle_line($reads[1][0]);
+    $response = _herald_handle_line($reads[1][0]);
     expect($response['id'])->toBe(1)
         ->and($response)->toHaveKey('result');
 });

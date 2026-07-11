@@ -1,8 +1,8 @@
 <?php
 
-namespace craftpulse\cortex\events;
+namespace craftpulse\herald\events;
 
-use craftpulse\cortex\prompts\PromptInterface;
+use craftpulse\herald\prompts\PromptInterface;
 use yii\base\Event;
 
 /**
@@ -10,7 +10,7 @@ use yii\base\Event;
  * Fired by `services/Prompts` after building the bundled prompt registry.
  *
  * Third-party plugins listen to this event and append their own
- * `PromptInterface` instances to `$prompts` to extend the cortex prompt
+ * `PromptInterface` instances to `$prompts` to extend the herald prompt
  * surface — typically to ship plugin-specific MCP prompts that pair
  * with their tools and resources.
  *
@@ -22,8 +22,8 @@ use yii\base\Event;
  * Example:
  *
  * ```php
- * use craftpulse\cortex\events\RegisterPromptsEvent;
- * use craftpulse\cortex\services\Prompts;
+ * use craftpulse\herald\events\RegisterPromptsEvent;
+ * use craftpulse\herald\services\Prompts;
  * use yii\base\Event;
  *
  * Event::on(

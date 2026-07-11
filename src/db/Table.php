@@ -1,12 +1,12 @@
 <?php
 
-namespace craftpulse\cortex\db;
+namespace craftpulse\herald\db;
 
 /**
  * =========================================================================
- * Database table-name constants for cortex.
+ * Database table-name constants for herald.
  *
- * Matches the canonical Craft pattern (`craft\db\Table`) so cortex's
+ * Matches the canonical Craft pattern (`craft\db\Table`) so herald's
  * own queries reference table names through a single source of truth
  * rather than scattering string literals.
  * =========================================================================
@@ -19,25 +19,25 @@ final class Table
     /**
      * Runtime allowlist override entries — admin-editable allowlist
      * patterns that auto-expire. Project-config defaults +
-     * `config/cortex.php` overrides remain the canonical source; this
+     * `config/herald.php` overrides remain the canonical source; this
      * table layers temporary additions on top.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public const RUNTIME_OVERRIDES = '{{%cortex_runtime_overrides}}';
+    public const RUNTIME_OVERRIDES = '{{%herald_runtime_overrides}}';
 
     /**
      * Admin-issued bearer tokens bound to a Craft user. Only the SHA-
      * 256 hash of the plaintext is stored; the plaintext is surfaced
-     * once at issuance by `cortex/token/issue` and never returned
+     * once at issuance by `herald/token/issue` and never returned
      * again by any service method. Soft-delete via `dateDeleted`
      * keeps the lookup index small while preserving audit history.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public const TOKENS = '{{%cortex_tokens}}';
+    public const TOKENS = '{{%herald_tokens}}';
 
     /**
      * OAuth 2.1 clients registered via RFC 7591 Dynamic Client
@@ -49,7 +49,7 @@ final class Table
      * @author Craftpulse
      * @since  5.0.0
      */
-    public const OAUTH_CLIENTS = '{{%cortex_oauth_clients}}';
+    public const OAUTH_CLIENTS = '{{%herald_oauth_clients}}';
 
     /**
      * One-shot authorization codes minted by the `/oauth/authorize`
@@ -64,7 +64,7 @@ final class Table
      * @author Craftpulse
      * @since  5.0.0
      */
-    public const OAUTH_CODES = '{{%cortex_oauth_codes}}';
+    public const OAUTH_CODES = '{{%herald_oauth_codes}}';
 
     /**
      * OAuth access and refresh tokens. `tokenType` discriminates the
@@ -78,7 +78,7 @@ final class Table
      * @author Craftpulse
      * @since  5.0.0
      */
-    public const OAUTH_TOKENS = '{{%cortex_oauth_tokens}}';
+    public const OAUTH_TOKENS = '{{%herald_oauth_tokens}}';
 
     /**
      * HTTP-transport tool-invocation audit log. One row per
@@ -94,7 +94,7 @@ final class Table
      * @author Craftpulse
      * @since  5.0.0
      */
-    public const INVOCATIONS = '{{%cortex_invocations}}';
+    public const INVOCATIONS = '{{%herald_invocations}}';
 
     /**
      * Custom-skill element instances — author-able overrides for the
@@ -108,5 +108,5 @@ final class Table
      * @author Craftpulse
      * @since  5.0.0
      */
-    public const SKILLS = '{{%cortex_skills}}';
+    public const SKILLS = '{{%herald_skills}}';
 }

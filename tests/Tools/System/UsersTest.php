@@ -26,7 +26,7 @@
  *
  * Fixture strategy: Director Fury (`nfury`) is the read-only target
  * for list / get / PII assertions. Mutation tests create throwaway
- * users with prefix `__cortex_userstest_<hex>_`; afterEach hard-
+ * users with prefix `__herald_userstest_<hex>_`; afterEach hard-
  * deletes them by username LIKE.
  *
  * **SEQUENTIAL ONLY** — create / update modes call
@@ -40,18 +40,18 @@
  */
 
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\system\Users;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\system\Users;
+use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_userstest_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_userstest_' . bin2hex(random_bytes(4)) . '_';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -92,7 +92,7 @@ afterEach(function() {
  * `Server::TRANSPORT_HTTP` to exercise the un-elevated refusal, and
  * `elevated: true` to exercise the WS2 elevated-HTTP allowance.
  */
-function _cortex_users_tool(string $transport = Server::TRANSPORT_STDIO, bool $elevated = false): Users
+function _herald_users_tool(string $transport = Server::TRANSPORT_STDIO, bool $elevated = false): Users
 {
     $tool = new Users();
     $tool->setInvocationContext(new InvocationContext(transport: $transport, elevated: $elevated));
@@ -104,7 +104,7 @@ function _cortex_users_tool(string $transport = Server::TRANSPORT_STDIO, bool $e
  * Create a throwaway user. Returns null on save failure so the test
  * can skip with the validation errors.
  */
-function _cortex_users_user(string $prefix, string $suffix = 'user', array $overrides = []): ?User
+function _herald_users_user(string $prefix, string $suffix = 'user', array $overrides = []): ?User
 {
     $user = new User();
     $user->username = $prefix . $suffix;
@@ -129,11 +129,11 @@ function _cortex_users_user(string $prefix, string $suffix = 'user', array $over
 // -----------------------------------------------------------------------------
 
 it('is NOT registered on Free installs', function() {
-    expect(Cortex::getInstance()->tools->getByName('users'))->toBeNull();
+    expect(Herald::getInstance()->tools->getByName('users'))->toBeNull();
 
     $names = array_map(
         static fn(array $entry): string => $entry['name'],
-        Cortex::getInstance()->tools->asListPayload(),
+        Herald::getInstance()->tools->asListPayload(),
     );
     expect($names)->not->toContain('users');
 });
@@ -141,7 +141,7 @@ it('is NOT registered on Free installs', function() {
 it('shouldRegister() returns true on Pro and false on Free', function() {
     expect(Users::shouldRegister())->toBeFalse();
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect(Users::shouldRegister())->toBeTrue();
     });
 });
@@ -151,14 +151,14 @@ it('shouldRegister() returns true on Pro and false on Free', function() {
 // -----------------------------------------------------------------------------
 
 it('throws ToolException when mode is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_users_tool()->execute([]);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_users_tool()->execute([]);
     });
 })->throws(ToolException::class);
 
 it('throws ToolException on unknown mode', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_users_tool()->execute(['mode' => 'frobnicate']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_users_tool()->execute(['mode' => 'frobnicate']);
     });
 })->throws(ToolException::class);
 
@@ -167,26 +167,26 @@ it('throws ToolException on unknown mode', function() {
 // -----------------------------------------------------------------------------
 
 it('filterFor(null) returns true — stdio is trusted', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_users_tool()->filterFor(null))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_users_tool()->filterFor(null))->toBeTrue();
     });
 });
 
 it('filterFor returns true for admin users', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect($this->admin)->toBeInstanceOf(User::class);
-        expect(_cortex_users_tool()->filterFor($this->admin))->toBeTrue();
+        expect(_herald_users_tool()->filterFor($this->admin))->toBeTrue();
     });
 });
 
 it('filterFor returns false for users without viewUsers permission', function() {
-    $user = _cortex_users_user($this->fixturePrefix, 'no_perms');
+    $user = _herald_users_user($this->fixturePrefix, 'no_perms');
     if ($user === null) {
         $this->markTestSkipped('Could not create unprivileged fixture user.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
-        expect(_cortex_users_tool()->filterFor($user))->toBeFalse();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
+        expect(_herald_users_tool()->filterFor($user))->toBeFalse();
     });
 });
 
@@ -195,16 +195,16 @@ it('filterFor returns false for users without viewUsers permission', function() 
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor returns the full mode enum for admins', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_users_tool()->inputSchemaFor($this->admin);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_users_tool()->inputSchemaFor($this->admin);
         expect($schema['properties']['mode']['enum'])
             ->toBe(['list', 'get', 'create', 'update', 'delete']);
     });
 });
 
 it('inputSchemaFor returns the full mode enum for stdio (null user)', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_users_tool()->inputSchemaFor(null);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_users_tool()->inputSchemaFor(null);
         expect($schema['properties']['mode']['enum'])
             ->toBe(['list', 'get', 'create', 'update', 'delete']);
     });
@@ -215,8 +215,8 @@ it('inputSchemaFor returns the full mode enum for stdio (null user)', function()
 // -----------------------------------------------------------------------------
 
 it('list mode returns paginated users with PII visible to admin', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_users_tool()->execute([
             'mode' => 'list',
             'limit' => 50,
         ]);
@@ -239,8 +239,8 @@ it('list mode finds Director Fury via search', function() {
         $this->markTestSkipped('Director Fury not seeded in this playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_users_tool()->execute([
             'mode' => 'list',
             'search' => 'Fury',
         ]);
@@ -252,8 +252,8 @@ it('list mode finds Director Fury via search', function() {
 });
 
 it('list mode admin filter narrows to admin users', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_users_tool()->execute([
             'mode' => 'list',
             'admin' => true,
         ]);
@@ -297,10 +297,10 @@ it('viewUsers-only caller never receives email/unverifiedEmail/lockout fields on
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
             Craft::$app->getUser()->setIdentity($caller);
 
-            $result = _cortex_users_tool()->execute([
+            $result = _herald_users_tool()->execute([
                 'mode' => 'get',
                 'id' => $this->fury->id,
             ]);
@@ -328,7 +328,7 @@ it('editUsers caller sees email and lockout but not passwordResetRequired', func
         $this->markTestSkipped('Director Fury not seeded.');
     }
 
-    $caller = _cortex_users_user($this->fixturePrefix, 'editorperm');
+    $caller = _herald_users_user($this->fixturePrefix, 'editorperm');
     if ($caller === null) {
         $this->markTestSkipped('Could not create editUsers caller.');
     }
@@ -338,10 +338,10 @@ it('editUsers caller sees email and lockout but not passwordResetRequired', func
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
             Craft::$app->getUser()->setIdentity($caller);
 
-            $result = _cortex_users_tool()->execute([
+            $result = _herald_users_tool()->execute([
                 'mode' => 'get',
                 'id' => $this->fury->id,
             ]);
@@ -360,7 +360,7 @@ it('administrateUsers caller additionally sees passwordResetRequired', function(
         $this->markTestSkipped('Director Fury not seeded.');
     }
 
-    $caller = _cortex_users_user($this->fixturePrefix, 'admincaller');
+    $caller = _herald_users_user($this->fixturePrefix, 'admincaller');
     if ($caller === null) {
         $this->markTestSkipped('Could not create administrateUsers caller.');
     }
@@ -370,10 +370,10 @@ it('administrateUsers caller additionally sees passwordResetRequired', function(
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
             Craft::$app->getUser()->setIdentity($caller);
 
-            $result = _cortex_users_tool()->execute([
+            $result = _herald_users_tool()->execute([
                 'mode' => 'get',
                 'id' => $this->fury->id,
             ]);
@@ -395,8 +395,8 @@ it('custom fields are omitted when the allowlist is empty (default)', function()
         $this->markTestSkipped('Director Fury not seeded.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_users_tool()->execute([
             'mode' => 'get',
             'id' => $this->fury->id,
         ]);
@@ -410,7 +410,7 @@ it('a handle on the allowlist appears in the serialised fields envelope', functi
         $this->markTestSkipped('Director Fury not seeded.');
     }
 
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $originalAllowlist = $settings->userCustomFieldAllowlist;
     // Flip the allowlist on a non-existent handle so the serialiser
     // walks the list but `getFieldValue()` throws → caught by the
@@ -419,11 +419,11 @@ it('a handle on the allowlist appears in the serialised fields envelope', functi
     // populates the `fields` array (with non-existent handles
     // silently dropped by the try-catch around getFieldValue, which
     // is the desired behaviour).
-    $settings->userCustomFieldAllowlist = ['__cortex_userstest_nonexistent'];
+    $settings->userCustomFieldAllowlist = ['__herald_userstest_nonexistent'];
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() {
-            $result = _cortex_users_tool()->execute([
+        herald_with_edition(Herald::EDITION_PRO, function() {
+            $result = _herald_users_tool()->execute([
                 'mode' => 'get',
                 'id' => $this->fury->id,
             ]);
@@ -450,8 +450,8 @@ it('get mode resolves by id', function() {
         $this->markTestSkipped('Director Fury not seeded.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_users_tool()->execute([
             'mode' => 'get',
             'id' => $this->fury->id,
         ]);
@@ -464,8 +464,8 @@ it('get mode resolves by uid', function() {
         $this->markTestSkipped('Director Fury not seeded.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_users_tool()->execute([
             'mode' => 'get',
             'uid' => $this->fury->uid,
         ]);
@@ -478,8 +478,8 @@ it('get mode resolves by email', function() {
         $this->markTestSkipped('Director Fury not seeded.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_users_tool()->execute([
             'mode' => 'get',
             'email' => $this->fury->email,
         ]);
@@ -495,8 +495,8 @@ it('get mode resolves by email case-insensitively on MySQL', function() {
         $this->markTestSkipped('Email case-insensitivity is a MySQL-only contract.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_users_tool()->execute([
             'mode' => 'get',
             'email' => strtoupper((string) $this->fury->email),
         ]);
@@ -509,8 +509,8 @@ it('get mode resolves by username', function() {
         $this->markTestSkipped('Director Fury not seeded.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_users_tool()->execute([
             'mode' => 'get',
             'username' => $this->fury->username,
         ]);
@@ -519,14 +519,14 @@ it('get mode resolves by username', function() {
 });
 
 it('get mode throws when no lookup key is supplied', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_users_tool()->execute(['mode' => 'get']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_users_tool()->execute(['mode' => 'get']);
     });
 })->throws(ToolException::class);
 
 it('get mode throws when the user does not exist', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_users_tool()->execute([
             'mode' => 'get',
             'email' => 'does-not-exist-' . bin2hex(random_bytes(4)) . '@example.invalid',
         ]);
@@ -538,8 +538,8 @@ it('get mode throws when the user does not exist', function() {
 // -----------------------------------------------------------------------------
 
 it('create mode round-trips a new user as admin', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_users_tool()->execute([
             'mode' => 'create',
             'email' => $this->fixturePrefix . 'created@example.test',
             'username' => $this->fixturePrefix . 'created',
@@ -557,8 +557,8 @@ it('create mode round-trips a new user as admin', function() {
 });
 
 it('create with admin=true succeeds for admin caller', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_users_tool()->execute([
             'mode' => 'create',
             'email' => $this->fixturePrefix . 'newadmin@example.test',
             'username' => $this->fixturePrefix . 'newadmin',
@@ -571,7 +571,7 @@ it('create with admin=true succeeds for admin caller', function() {
 });
 
 it('create with admin=true throws ToolException for non-admin caller (admin-promotion refusal)', function() {
-    $caller = _cortex_users_user($this->fixturePrefix, 'registrant');
+    $caller = _herald_users_user($this->fixturePrefix, 'registrant');
     if ($caller === null) {
         $this->markTestSkipped('Could not create registrant caller.');
     }
@@ -581,12 +581,12 @@ it('create with admin=true throws ToolException for non-admin caller (admin-prom
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
             Craft::$app->getUser()->setIdentity($caller);
 
             $caught = null;
             try {
-                _cortex_users_tool()->execute([
+                _herald_users_tool()->execute([
                     'mode' => 'create',
                     'email' => $this->fixturePrefix . 'shouldfail@example.test',
                     'username' => $this->fixturePrefix . 'shouldfail',
@@ -605,13 +605,13 @@ it('create with admin=true throws ToolException for non-admin caller (admin-prom
 });
 
 it('create with duplicate email returns validation envelope', function() {
-    $existing = _cortex_users_user($this->fixturePrefix, 'dupe');
+    $existing = _herald_users_user($this->fixturePrefix, 'dupe');
     if ($existing === null) {
         $this->markTestSkipped('Could not seed duplicate-email fixture.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($existing) {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($existing) {
+        $result = _herald_users_tool()->execute([
             'mode' => 'create',
             'email' => $existing->email,
             'username' => $this->fixturePrefix . 'dupe_2',
@@ -624,7 +624,7 @@ it('create with duplicate email returns validation envelope', function() {
 });
 
 it('create throws ToolException when caller lacks registerUsers', function() {
-    $caller = _cortex_users_user($this->fixturePrefix, 'noregister');
+    $caller = _herald_users_user($this->fixturePrefix, 'noregister');
     if ($caller === null) {
         $this->markTestSkipped('Could not create caller.');
     }
@@ -634,12 +634,12 @@ it('create throws ToolException when caller lacks registerUsers', function() {
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
             Craft::$app->getUser()->setIdentity($caller);
 
             $caught = null;
             try {
-                _cortex_users_tool()->execute([
+                _herald_users_tool()->execute([
                     'mode' => 'create',
                     'email' => $this->fixturePrefix . 'norights@example.test',
                     'username' => $this->fixturePrefix . 'norights',
@@ -657,8 +657,8 @@ it('create throws ToolException when caller lacks registerUsers', function() {
 });
 
 it('create idempotency cache returns the same envelope on the second call', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $tool = _cortex_users_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $tool = _herald_users_tool();
         $key = 'idem_' . bin2hex(random_bytes(8));
         $args = [
             'mode' => 'create',
@@ -685,13 +685,13 @@ it('create idempotency cache returns the same envelope on the second call', func
 // -----------------------------------------------------------------------------
 
 it('update mode mutates a user as admin and persists changes', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'updateable');
+    $target = _herald_users_user($this->fixturePrefix, 'updateable');
     if ($target === null) {
         $this->markTestSkipped('Could not create update target.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($target) {
+        $result = _herald_users_tool()->execute([
             'mode' => 'update',
             'id' => $target->id,
             'firstName' => 'Renamed',
@@ -714,7 +714,7 @@ it('update refuses a non-admin caller editing an admin target (admin-protection 
         $this->markTestSkipped('Need a known admin target for the admin-protection regression.');
     }
 
-    $caller = _cortex_users_user($this->fixturePrefix, 'editorbutnoadmin');
+    $caller = _herald_users_user($this->fixturePrefix, 'editorbutnoadmin');
     if ($caller === null) {
         $this->markTestSkipped('Could not create editUsers caller.');
     }
@@ -724,12 +724,12 @@ it('update refuses a non-admin caller editing an admin target (admin-protection 
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
             Craft::$app->getUser()->setIdentity($caller);
 
             $caught = null;
             try {
-                _cortex_users_tool()->execute([
+                _herald_users_tool()->execute([
                     'mode' => 'update',
                     'id' => $this->admin->id,
                     'firstName' => 'CompromiseAttempt',
@@ -748,8 +748,8 @@ it('update refuses a non-admin caller editing an admin target (admin-protection 
 });
 
 it('update with admin=true refuses a non-admin caller (admin-promotion refusal on update)', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'promotionTarget');
-    $caller = _cortex_users_user($this->fixturePrefix, 'editorWantsAdmin');
+    $target = _herald_users_user($this->fixturePrefix, 'promotionTarget');
+    $caller = _herald_users_user($this->fixturePrefix, 'editorWantsAdmin');
     if ($target === null || $caller === null) {
         $this->markTestSkipped('Could not create fixtures.');
     }
@@ -759,12 +759,12 @@ it('update with admin=true refuses a non-admin caller (admin-promotion refusal o
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller, $target) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller, $target) {
             Craft::$app->getUser()->setIdentity($caller);
 
             $caught = null;
             try {
-                _cortex_users_tool()->execute([
+                _herald_users_tool()->execute([
                     'mode' => 'update',
                     'id' => $target->id,
                     'admin' => true,
@@ -786,8 +786,8 @@ it('update with admin=true refuses a non-admin caller (admin-promotion refusal o
 // -----------------------------------------------------------------------------
 
 it('update with active=true refuses a non-admin caller without administrateUsers', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'activationtarget');
-    $caller = _cortex_users_user($this->fixturePrefix, 'noadministrate');
+    $target = _herald_users_user($this->fixturePrefix, 'activationtarget');
+    $caller = _herald_users_user($this->fixturePrefix, 'noadministrate');
     if ($target === null || $caller === null) {
         $this->markTestSkipped('Could not create fixtures.');
     }
@@ -797,12 +797,12 @@ it('update with active=true refuses a non-admin caller without administrateUsers
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller, $target) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller, $target) {
             Craft::$app->getUser()->setIdentity($caller);
 
             $caught = null;
             try {
-                _cortex_users_tool()->execute([
+                _herald_users_tool()->execute([
                     'mode' => 'update',
                     'id' => $target->id,
                     'active' => true,
@@ -820,7 +820,7 @@ it('update with active=true refuses a non-admin caller without administrateUsers
 });
 
 it('update with newPassword on self passes the sensitive-field gate without administrateUsers', function() {
-    $self = _cortex_users_user($this->fixturePrefix, 'selfpw');
+    $self = _herald_users_user($this->fixturePrefix, 'selfpw');
     if ($self === null) {
         $this->markTestSkipped('Could not create self user.');
     }
@@ -833,12 +833,12 @@ it('update with newPassword on self passes the sensitive-field gate without admi
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($self) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($self) {
             Craft::$app->getUser()->setIdentity($self);
 
             $caught = null;
             try {
-                _cortex_users_tool()->execute([
+                _herald_users_tool()->execute([
                     'mode' => 'update',
                     'id' => $self->id,
                     'newPassword' => 'NewSecurePassword!42',
@@ -866,8 +866,8 @@ it('update with newPassword on self passes the sensitive-field gate without admi
 });
 
 it('update with newPassword on non-self refuses without administrateUsers', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'pwtarget');
-    $caller = _cortex_users_user($this->fixturePrefix, 'pwcaller');
+    $target = _herald_users_user($this->fixturePrefix, 'pwtarget');
+    $caller = _herald_users_user($this->fixturePrefix, 'pwcaller');
     if ($target === null || $caller === null) {
         $this->markTestSkipped('Could not create fixtures.');
     }
@@ -877,12 +877,12 @@ it('update with newPassword on non-self refuses without administrateUsers', func
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller, $target) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller, $target) {
             Craft::$app->getUser()->setIdentity($caller);
 
             $caught = null;
             try {
-                _cortex_users_tool()->execute([
+                _herald_users_tool()->execute([
                     'mode' => 'update',
                     'id' => $target->id,
                     'newPassword' => 'ResetByOtherUser!42',
@@ -904,7 +904,7 @@ it('update with newPassword on non-self refuses without administrateUsers', func
 // -----------------------------------------------------------------------------
 
 it('update against a trashed user surfaces a restore hint message', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'trashed');
+    $target = _herald_users_user($this->fixturePrefix, 'trashed');
     if ($target === null) {
         $this->markTestSkipped('Could not create trashed-update target.');
     }
@@ -912,10 +912,10 @@ it('update against a trashed user surfaces a restore hint message', function() {
     $id = (int) $target->id;
     Craft::$app->getElements()->deleteElement($target);
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($id) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($id) {
         $caught = null;
         try {
-            _cortex_users_tool()->execute([
+            _herald_users_tool()->execute([
                 'mode' => 'update',
                 'id' => $id,
                 'firstName' => 'WouldUntrash',
@@ -935,14 +935,14 @@ it('update against a trashed user surfaces a restore hint message', function() {
 // -----------------------------------------------------------------------------
 
 it('delete soft-deletes a user by default; the row reappears via trashed()', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'softdelete');
+    $target = _herald_users_user($this->fixturePrefix, 'softdelete');
     if ($target === null) {
         $this->markTestSkipped('Could not create soft-delete target.');
     }
     $id = (int) $target->id;
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($id) {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($id) {
+        $result = _herald_users_tool()->execute([
             'mode' => 'delete',
             'id' => $id,
         ]);
@@ -961,14 +961,14 @@ it('delete soft-deletes a user by default; the row reappears via trashed()', fun
 });
 
 it('delete with hardDelete=true removes the row entirely', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'harddelete');
+    $target = _herald_users_user($this->fixturePrefix, 'harddelete');
     if ($target === null) {
         $this->markTestSkipped('Could not create hard-delete target.');
     }
     $id = (int) $target->id;
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($id) {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($id) {
+        $result = _herald_users_tool()->execute([
             'mode' => 'delete',
             'id' => $id,
             'hardDelete' => true,
@@ -980,14 +980,14 @@ it('delete with hardDelete=true removes the row entirely', function() {
 });
 
 it('delete with transferContentTo records the recipient in the envelope', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'transferfrom');
-    $recipient = _cortex_users_user($this->fixturePrefix, 'transferto');
+    $target = _herald_users_user($this->fixturePrefix, 'transferfrom');
+    $recipient = _herald_users_user($this->fixturePrefix, 'transferto');
     if ($target === null || $recipient === null) {
         $this->markTestSkipped('Could not create transfer fixtures.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target, $recipient) {
-        $result = _cortex_users_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($target, $recipient) {
+        $result = _herald_users_tool()->execute([
             'mode' => 'delete',
             'id' => $target->id,
             'transferContentTo' => $recipient->id,
@@ -999,7 +999,7 @@ it('delete with transferContentTo records the recipient in the envelope', functi
 });
 
 it('delete refuses a non-admin caller targeting an admin user', function() {
-    $caller = _cortex_users_user($this->fixturePrefix, 'wouldDeleteAdmin');
+    $caller = _herald_users_user($this->fixturePrefix, 'wouldDeleteAdmin');
     if ($caller === null) {
         $this->markTestSkipped('Could not create caller.');
     }
@@ -1009,12 +1009,12 @@ it('delete refuses a non-admin caller targeting an admin user', function() {
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
             Craft::$app->getUser()->setIdentity($caller);
 
             $caught = null;
             try {
-                _cortex_users_tool()->execute([
+                _herald_users_tool()->execute([
                     'mode' => 'delete',
                     'id' => $this->admin->id,
                 ]);
@@ -1031,8 +1031,8 @@ it('delete refuses a non-admin caller targeting an admin user', function() {
 });
 
 it('delete refuses a caller without deleteUsers', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'nodeleterights');
-    $caller = _cortex_users_user($this->fixturePrefix, 'nodelete');
+    $target = _herald_users_user($this->fixturePrefix, 'nodeleterights');
+    $caller = _herald_users_user($this->fixturePrefix, 'nodelete');
     if ($target === null || $caller === null) {
         $this->markTestSkipped('Could not create fixtures.');
     }
@@ -1042,12 +1042,12 @@ it('delete refuses a caller without deleteUsers', function() {
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller, $target) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller, $target) {
             Craft::$app->getUser()->setIdentity($caller);
 
             $caught = null;
             try {
-                _cortex_users_tool()->execute([
+                _herald_users_tool()->execute([
                     'mode' => 'delete',
                     'id' => $target->id,
                 ]);
@@ -1068,15 +1068,15 @@ it('delete refuses a caller without deleteUsers', function() {
 // -----------------------------------------------------------------------------
 
 it('refuses newPassword on update over un-elevated HTTP', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'httppw');
+    $target = _herald_users_user($this->fixturePrefix, 'httppw');
     if ($target === null) {
         $this->markTestSkipped('Could not seed target.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($target) {
         $caught = null;
         try {
-            _cortex_users_tool(Server::TRANSPORT_HTTP)->execute([
+            _herald_users_tool(Server::TRANSPORT_HTTP)->execute([
                 'mode' => 'update',
                 'id' => $target->id,
                 'newPassword' => 'RefusedOverHttp!42',
@@ -1093,15 +1093,15 @@ it('refuses newPassword on update over un-elevated HTTP', function() {
 });
 
 it('refuses email change on update over un-elevated HTTP', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'httpemail');
+    $target = _herald_users_user($this->fixturePrefix, 'httpemail');
     if ($target === null) {
         $this->markTestSkipped('Could not seed target.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($target) {
         $caught = null;
         try {
-            _cortex_users_tool(Server::TRANSPORT_HTTP)->execute([
+            _herald_users_tool(Server::TRANSPORT_HTTP)->execute([
                 'mode' => 'update',
                 'id' => $target->id,
                 'email' => $this->fixturePrefix . 'changed@example.test',
@@ -1116,10 +1116,10 @@ it('refuses email change on update over un-elevated HTTP', function() {
 });
 
 it('refuses admin grant on create over un-elevated HTTP', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $caught = null;
         try {
-            _cortex_users_tool(Server::TRANSPORT_HTTP)->execute([
+            _herald_users_tool(Server::TRANSPORT_HTTP)->execute([
                 'mode' => 'create',
                 'email' => $this->fixturePrefix . 'httpadmin@example.test',
                 'username' => $this->fixturePrefix . 'httpadmin',
@@ -1135,12 +1135,12 @@ it('refuses admin grant on create over un-elevated HTTP', function() {
 });
 
 it('fails closed and refuses a credential mutation when no transport context was injected', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'noctx');
+    $target = _herald_users_user($this->fixturePrefix, 'noctx');
     if ($target === null) {
         $this->markTestSkipped('Could not seed target.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($target) {
         // No setInvocationContext() call — transport indeterminate.
         $tool = new Users();
 
@@ -1161,13 +1161,13 @@ it('fails closed and refuses a credential mutation when no transport context was
 });
 
 it('allows a newPassword mutation over ELEVATED HTTP (WS2)', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'httpelev');
+    $target = _herald_users_user($this->fixturePrefix, 'httpelev');
     if ($target === null) {
         $this->markTestSkipped('Could not seed target.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
-        $result = _cortex_users_tool(Server::TRANSPORT_HTTP, elevated: true)->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($target) {
+        $result = _herald_users_tool(Server::TRANSPORT_HTTP, elevated: true)->execute([
             'mode' => 'update',
             'id' => $target->id,
             'newPassword' => 'AllowedWhenElevated!42',
@@ -1180,13 +1180,13 @@ it('allows a newPassword mutation over ELEVATED HTTP (WS2)', function() {
 });
 
 it('allows the same newPassword mutation over the stdio transport', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'stdiopw');
+    $target = _herald_users_user($this->fixturePrefix, 'stdiopw');
     if ($target === null) {
         $this->markTestSkipped('Could not seed target.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
-        $result = _cortex_users_tool(Server::TRANSPORT_STDIO)->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($target) {
+        $result = _herald_users_tool(Server::TRANSPORT_STDIO)->execute([
             'mode' => 'update',
             'id' => $target->id,
             'newPassword' => 'AllowedOverStdio!42',
@@ -1199,13 +1199,13 @@ it('allows the same newPassword mutation over the stdio transport', function() {
 });
 
 it('allows an admin grant on update over the stdio transport', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'stdioadmin');
+    $target = _herald_users_user($this->fixturePrefix, 'stdioadmin');
     if ($target === null) {
         $this->markTestSkipped('Could not seed target.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
-        $result = _cortex_users_tool(Server::TRANSPORT_STDIO)->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($target) {
+        $result = _herald_users_tool(Server::TRANSPORT_STDIO)->execute([
             'mode' => 'update',
             'id' => $target->id,
             'admin' => true,
@@ -1217,13 +1217,13 @@ it('allows an admin grant on update over the stdio transport', function() {
 });
 
 it('still allows a non-sensitive update over the HTTP transport', function() {
-    $target = _cortex_users_user($this->fixturePrefix, 'httpsafe');
+    $target = _herald_users_user($this->fixturePrefix, 'httpsafe');
     if ($target === null) {
         $this->markTestSkipped('Could not seed target.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($target) {
-        $result = _cortex_users_tool(Server::TRANSPORT_HTTP)->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($target) {
+        $result = _herald_users_tool(Server::TRANSPORT_HTTP)->execute([
             'mode' => 'update',
             'id' => $target->id,
             'firstName' => 'Renamed',
@@ -1241,10 +1241,10 @@ it('does not refuse a non-sensitive create over the HTTP transport', function() 
     // the transport gate. It may still come back as a validation
     // envelope (Craft requires an email), but it must NOT be the
     // transport-refusal message — that is the contract under test.
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $caught = null;
         try {
-            _cortex_users_tool(Server::TRANSPORT_HTTP)->execute([
+            _herald_users_tool(Server::TRANSPORT_HTTP)->execute([
                 'mode' => 'create',
                 'username' => $this->fixturePrefix . 'httpcreate',
                 'firstName' => 'Http',

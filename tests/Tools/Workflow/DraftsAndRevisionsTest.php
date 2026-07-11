@@ -15,11 +15,11 @@
  */
 
 use craft\elements\Entry;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('drafts_and_revisions');
+    $this->tool = Herald::getInstance()->tools->getByName('drafts_and_revisions');
 });
 
 // -----------------------------------------------------------------------------
@@ -127,7 +127,7 @@ it('compare returns zero differences when comparing an entry to itself', functio
 // -----------------------------------------------------------------------------
 
 it('appears in the registry tools/list payload with annotations', function() {
-    $payload = Cortex::getInstance()->tools->asListPayload();
+    $payload = Herald::getInstance()->tools->asListPayload();
 
     $entry = collect($payload)->firstWhere('name', 'drafts_and_revisions');
     expect($entry)->not->toBeNull();

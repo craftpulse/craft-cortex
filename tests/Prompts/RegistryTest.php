@@ -9,8 +9,8 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\prompts\PromptInterface;
+use craftpulse\herald\Herald;
+use craftpulse\herald\prompts\PromptInterface;
 
 it('registers all ten skill-backed prompts with the planned MCP names', function() {
     $expected = [
@@ -26,7 +26,7 @@ it('registers all ten skill-backed prompts with the planned MCP names', function
         'craftcms_cloud',
     ];
 
-    $prompts = Cortex::getInstance()->prompts;
+    $prompts = Herald::getInstance()->prompts;
 
     expect($prompts->getCount())->toBe(count($expected));
 
@@ -38,13 +38,13 @@ it('registers all ten skill-backed prompts with the planned MCP names', function
 });
 
 it('returns null for unknown prompt names', function() {
-    expect(Cortex::getInstance()->prompts->getByName('nope'))->toBeNull();
+    expect(Herald::getInstance()->prompts->getByName('nope'))->toBeNull();
 });
 
 it('builds a spec-shaped prompts/list payload', function() {
-    $payload = Cortex::getInstance()->prompts->asListPayload();
+    $payload = Herald::getInstance()->prompts->asListPayload();
 
-    expect($payload)->toBeArray()->toHaveCount(Cortex::getInstance()->prompts->getCount());
+    expect($payload)->toBeArray()->toHaveCount(Herald::getInstance()->prompts->getCount());
 
     foreach ($payload as $item) {
         expect($item)
@@ -56,7 +56,7 @@ it('builds a spec-shaped prompts/list payload', function() {
 });
 
 it('omits the arguments key from list entries when a prompt has none', function() {
-    foreach (Cortex::getInstance()->prompts->asListPayload() as $item) {
+    foreach (Herald::getInstance()->prompts->asListPayload() as $item) {
         // The bundled registry ships only argumentless prompts —
         // assert the spec-optional `arguments` key is absent rather
         // than present-but-empty.
@@ -65,7 +65,7 @@ it('omits the arguments key from list entries when a prompt has none', function(
 });
 
 it('exposes every prompt with a non-empty description', function() {
-    foreach (Cortex::getInstance()->prompts->getAll() as $prompt) {
+    foreach (Herald::getInstance()->prompts->getAll() as $prompt) {
         expect($prompt->getDescription())
             ->toBeString()
             ->not->toBeEmpty();

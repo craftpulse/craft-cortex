@@ -2,7 +2,7 @@
 
 /**
  * =========================================================================
- * Pest configuration for Cortex.
+ * Pest configuration for Herald.
  *
  * Wires up:
  *   - The base TestCase used by every test (PHPUnit\Framework\TestCase by
@@ -16,7 +16,7 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 use PHPUnit\Framework\TestCase;
 
 uses(TestCase::class)->in(__DIR__);
@@ -73,7 +73,7 @@ expect()->extend('toBeMcpErrorEnvelope', function() {
  * @param array<string,mixed> $envelope
  * @return array<int|string,mixed>
  */
-function cortex_unwrap(array $envelope): array
+function herald_unwrap(array $envelope): array
 {
     expect($envelope)->toBeMcpSuccessEnvelope();
 
@@ -87,13 +87,13 @@ function cortex_unwrap(array $envelope): array
 }
 
 /**
- * Run a callable with `Cortex::getInstance()->edition` temporarily set
+ * Run a callable with `Herald::getInstance()->edition` temporarily set
  * to the given handle, then restore both the original edition and the
  * project-config `muteEvents` flag in a `finally` block so a thrown
  * exception inside the callback can't leave the plugin in a Pro state
  * for a subsequent test.
  *
- * Mutates `Cortex::getInstance()->edition` directly — Craft owns the
+ * Mutates `Herald::getInstance()->edition` directly — Craft owns the
  * project-config storage for the edition handle and would otherwise
  * fire `EVENT_BEFORE_APPLY_PLUGIN_SETTINGS` on every assignment, so
  * the mute is required around the flip to prevent listener re-entry
@@ -107,9 +107,9 @@ function cortex_unwrap(array $envelope): array
  * @param callable(): T $fn
  * @return T
  */
-function cortex_with_edition(string $edition, callable $fn): mixed
+function herald_with_edition(string $edition, callable $fn): mixed
 {
-    $plugin = Cortex::getInstance();
+    $plugin = Herald::getInstance();
     $original = $plugin->edition;
     $projectConfig = Craft::$app->getProjectConfig();
     $originalMute = $projectConfig->muteEvents;
@@ -128,32 +128,32 @@ function cortex_with_edition(string $edition, callable $fn): mixed
 /**
  * Run a callable on a Pro-edition install with the tool registry
  * rebuilt so Pro tools resolve through `Tools::getByNameFor()` /
- * `Server::dispatch()`. Wraps `cortex_with_edition()` because flipping
+ * `Server::dispatch()`. Wraps `herald_with_edition()` because flipping
  * `$plugin->edition` alone is not enough: the registry was built at
  * boot via `shouldRegister()` and does not auto-rebuild on edition
  * change. Production never sees a mid-process edition flip; this
  * helper is test-only.
  *
  * Use for boundary / integration tests that need the dispatcher to
- * route to Pro tools. For per-tool tests, `cortex_with_edition()` +
+ * route to Pro tools. For per-tool tests, `herald_with_edition()` +
  * direct instantiation is cheaper and avoids the rebuild cost.
  *
  * @template T
  * @param callable(): T $fn
  * @return T
  */
-function cortex_with_pro_registry(callable $fn): mixed
+function herald_with_pro_registry(callable $fn): mixed
 {
-    return cortex_with_edition(Cortex::EDITION_PRO, function() use ($fn) {
-        $original = Cortex::getInstance()->tools;
-        $fresh = new \craftpulse\cortex\services\Tools();
+    return herald_with_edition(Herald::EDITION_PRO, function() use ($fn) {
+        $original = Herald::getInstance()->tools;
+        $fresh = new \craftpulse\herald\services\Tools();
         $fresh->init();
-        Cortex::getInstance()->set('tools', $fresh);
+        Herald::getInstance()->set('tools', $fresh);
 
         try {
             return $fn();
         } finally {
-            Cortex::getInstance()->set('tools', $original);
+            Herald::getInstance()->set('tools', $original);
         }
     });
 }
@@ -174,7 +174,7 @@ function cortex_with_pro_registry(callable $fn): mixed
  * @param callable(): T $fn
  * @return T
  */
-function cortex_with_admin_changes(bool $allow, callable $fn): mixed
+function herald_with_admin_changes(bool $allow, callable $fn): mixed
 {
     $generalConfig = Craft::$app->getConfig()->getGeneral();
     $original = $generalConfig->allowAdminChanges;
@@ -197,7 +197,7 @@ function cortex_with_admin_changes(bool $allow, callable $fn): mixed
  * @param callable(): T $fn
  * @return array{0: T, 1: int}
  */
-function cortex_count_queries(callable $fn): array
+function herald_count_queries(callable $fn): array
 {
     $db = Craft::$app->getDb();
     $logTarget = Yii::getLogger();

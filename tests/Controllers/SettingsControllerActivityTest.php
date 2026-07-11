@@ -11,13 +11,13 @@
  *   - `actionActivityRow`        — redacted-detail slideout payload.
  *
  * The headline invariant is the fail-closed permission scope: an admin
- * sees every row; a non-admin granted `cortex:viewActivity` sees ONLY
+ * sees every row; a non-admin granted `herald:viewActivity` sees ONLY
  * their own rows, and cannot widen the result by posting a foreign
  * `filters[userId]`. The harness no-ops the permission gate, so scoping
  * is asserted against the controller's own identity-driven logic — the
  * thing that actually protects the data.
  *
- * Tests bypass HTTP plumbing via the `_CortexActivityHarness` subclass.
+ * Tests bypass HTTP plumbing via the `_HeraldActivityHarness` subclass.
  * Real CP smoke lives in the gate-9.3 manual verification step.
  *
  * Activity actions never write to project config — safe to run under
@@ -30,10 +30,10 @@
 
 use craft\elements\User;
 use craft\web\View;
-use craftpulse\cortex\controllers\SettingsController;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\db\Table;
-use craftpulse\cortex\records\Invocation as InvocationRecord;
+use craftpulse\herald\controllers\SettingsController;
+use craftpulse\herald\db\Table;
+use craftpulse\herald\Herald;
+use craftpulse\herald\records\Invocation as InvocationRecord;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
 
@@ -43,13 +43,13 @@ use yii\web\Response;
 
 /**
  * SettingsController subclass that bypasses HTTP plumbing — mirrors
- * `_CortexTokensHarness`. `requirePermission` / `requireAcceptsJson` /
+ * `_HeraldTokensHarness`. `requirePermission` / `requireAcceptsJson` /
  * `requirePostRequest` short-circuit so the action body runs against a
  * console-bootstrapped Craft. The scoping logic reads the live
  * `Craft::$app->getUser()->getIdentity()`, so tests set the identity
  * directly rather than relying on the (no-op'd) permission gate.
  */
-class _CortexActivityHarness extends SettingsController
+class _HeraldActivityHarness extends SettingsController
 {
     /** @var array<string,mixed> */
     public array $params = [];
@@ -72,14 +72,14 @@ class _CortexActivityHarness extends SettingsController
     public function withParams(array $params): self
     {
         $this->params = $params;
-        $this->request = new _CortexActivityRequest($params);
+        $this->request = new _HeraldActivityRequest($params);
         $this->response = new \yii\web\Response();
         $this->response->formatters[\yii\web\Response::FORMAT_JSON] = \yii\web\JsonResponseFormatter::class;
         return $this;
     }
 }
 
-class _CortexActivityRequest
+class _HeraldActivityRequest
 {
     public bool $isCpRequest = true;
 
@@ -124,7 +124,7 @@ class _CortexActivityRequest
 /**
  * Resolve the seeded admin user.
  */
-function _cortexActivityAdmin(): User
+function _heraldActivityAdmin(): User
 {
     $user = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -136,7 +136,7 @@ function _cortexActivityAdmin(): User
  * Create (or resolve) a saved non-admin user with a stable username so the
  * row-scoping tests have a real user id to bind invocation rows to.
  */
-function _cortexActivityNonAdmin(string $handle): User
+function _heraldActivityNonAdmin(string $handle): User
 {
     $existing = Craft::$app->getUsers()->getUserByUsernameOrEmail($handle);
     if ($existing instanceof User) {
@@ -145,7 +145,7 @@ function _cortexActivityNonAdmin(string $handle): User
 
     $user = new User();
     $user->username = $handle;
-    $user->email = $handle . '@cortex-activity.test';
+    $user->email = $handle . '@herald-activity.test';
     $user->admin = false;
     $saved = Craft::$app->getElements()->saveElement($user, false);
     expect($saved)->toBeTrue();
@@ -153,12 +153,12 @@ function _cortexActivityNonAdmin(string $handle): User
 }
 
 /**
- * Insert one `cortex_invocations` row through the service writer (which
+ * Insert one `herald_invocations` row through the service writer (which
  * only persists `http`-transport rows — exactly the Activity surface).
  *
  * @param array<string,mixed> $overrides
  */
-function _cortexSeedInvocation(array $overrides = []): InvocationRecord
+function _heraldSeedInvocation(array $overrides = []): InvocationRecord
 {
     $entry = array_merge([
         'transport' => 'http',
@@ -171,7 +171,7 @@ function _cortexSeedInvocation(array $overrides = []): InvocationRecord
         'client' => 'claude-desktop',
     ], $overrides);
 
-    $record = Cortex::getInstance()->invocations->record($entry);
+    $record = Herald::getInstance()->invocations->record($entry);
     expect($record)->not->toBeNull();
     return $record;
 }
@@ -179,17 +179,17 @@ function _cortexSeedInvocation(array $overrides = []): InvocationRecord
 beforeEach(function() {
     Craft::$app->getDb()->createCommand()->delete(Table::INVOCATIONS)->execute();
     // Leave whatever identity a prior test set in a known state.
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
 
     // The Activity tab is a Pro surface (Gate 9.7) — pin Pro for the
     // file so `_requirePro()` doesn't 403 every case; the dedicated
     // Free-edition test flips it back inline.
-    $this->originalEdition = Cortex::getInstance()->edition;
-    Cortex::getInstance()->edition = Cortex::EDITION_PRO;
+    $this->originalEdition = Herald::getInstance()->edition;
+    Herald::getInstance()->edition = Herald::EDITION_PRO;
 });
 
 afterEach(function() {
-    Cortex::getInstance()->edition = $this->originalEdition;
+    Herald::getInstance()->edition = $this->originalEdition;
 });
 
 afterAll(function() {
@@ -208,9 +208,9 @@ it('declares the Activity endpoints', function() {
 });
 
 it('every Activity action is Pro-gated — 403 on Free (Gate 9.7)', function(string $method, array $params) {
-    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+    Herald::getInstance()->edition = Herald::EDITION_FREE;
 
-    $controller = new _CortexActivityHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldActivityHarness('settings', Herald::getInstance());
     $controller->withParams($params);
 
     // `_requirePro()` is private, so the harness's permission no-ops
@@ -224,9 +224,9 @@ it('every Activity action is Pro-gated — 403 on Free (Gate 9.7)', function(str
 ]);
 
 it('actionConnection is Pro-gated — 403 on Free (Gate 9.7)', function() {
-    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+    Herald::getInstance()->edition = Herald::EDITION_FREE;
 
-    $controller = new _CortexActivityHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldActivityHarness('settings', Herald::getInstance());
     $controller->withParams([]);
 
     expect(fn() => $controller->actionConnection())
@@ -241,7 +241,7 @@ it('the activity detail slideout partial compiles and renders the redacted colum
     // way. The full-page index template is browser-smoke-verified per
     // the gate-9.3 plan (it depends on `_layouts/cp`, which needs a web
     // request the console harness cannot supply).
-    $html = Craft::$app->getView()->renderTemplate('cortex/_cp/_activity-detail-slideout', [
+    $html = Craft::$app->getView()->renderTemplate('herald/_cp/_activity-detail-slideout', [
         'row' => [
             'id' => 1,
             'toolName' => 'entry',
@@ -261,7 +261,7 @@ it('the activity detail slideout partial compiles and renders the redacted colum
     ], View::TEMPLATE_MODE_CP);
 
     expect($html)->toBeString()
-        ->toContain('cortex-payload')      // payload dump rendered
+        ->toContain('herald-payload')      // payload dump rendered
         ->toContain('[redacted]')          // already-redacted args shown verbatim
         ->toContain('list');               // mode surfaced
 });
@@ -271,11 +271,11 @@ it('the activity detail slideout partial compiles and renders the redacted colum
 // -----------------------------------------------------------------------------
 
 it('actionActivityTableData returns the locked {pagination, data} contract', function() {
-    _cortexSeedInvocation();
-    _cortexSeedInvocation(['tool' => 'asset']);
+    _heraldSeedInvocation();
+    _heraldSeedInvocation(['tool' => 'asset']);
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams([])
         ->actionActivityTableData();
 
@@ -287,10 +287,10 @@ it('actionActivityTableData returns the locked {pagination, data} contract', fun
 });
 
 it('actionActivityTableData data[0] keys equal the locked tuple exactly', function() {
-    _cortexSeedInvocation();
+    _heraldSeedInvocation();
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams([])
         ->actionActivityTableData();
 
@@ -311,10 +311,10 @@ it('actionActivityTableData data[0] keys equal the locked tuple exactly', functi
 });
 
 it('actionActivityTableData never surfaces redacted payload columns in the table', function() {
-    _cortexSeedInvocation();
+    _heraldSeedInvocation();
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams([])
         ->actionActivityTableData();
 
@@ -325,10 +325,10 @@ it('actionActivityTableData never surfaces redacted payload columns in the table
 });
 
 it('actionActivityTableData extracts the mode from redacted args', function() {
-    _cortexSeedInvocation(['args' => json_encode(['mode' => 'create', 'secret' => '[redacted]'])]);
+    _heraldSeedInvocation(['args' => json_encode(['mode' => 'create', 'secret' => '[redacted]'])]);
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams([])
         ->actionActivityTableData();
 
@@ -340,16 +340,16 @@ it('actionActivityTableData extracts the mode from redacted args', function() {
 // -----------------------------------------------------------------------------
 
 it('admin sees rows for every user', function() {
-    $admin = _cortexActivityAdmin();
-    $userA = _cortexActivityNonAdmin('cortex-activity-a');
-    $userB = _cortexActivityNonAdmin('cortex-activity-b');
+    $admin = _heraldActivityAdmin();
+    $userA = _heraldActivityNonAdmin('herald-activity-a');
+    $userB = _heraldActivityNonAdmin('herald-activity-b');
 
-    _cortexSeedInvocation(['user' => (int) $userA->id]);
-    _cortexSeedInvocation(['user' => (int) $userB->id]);
-    _cortexSeedInvocation(['user' => null]);
+    _heraldSeedInvocation(['user' => (int) $userA->id]);
+    _heraldSeedInvocation(['user' => (int) $userB->id]);
+    _heraldSeedInvocation(['user' => null]);
 
     Craft::$app->getUser()->setIdentity($admin);
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams([])
         ->actionActivityTableData();
 
@@ -357,16 +357,16 @@ it('admin sees rows for every user', function() {
 });
 
 it('non-admin sees only their own rows', function() {
-    $userA = _cortexActivityNonAdmin('cortex-activity-a');
-    $userB = _cortexActivityNonAdmin('cortex-activity-b');
+    $userA = _heraldActivityNonAdmin('herald-activity-a');
+    $userB = _heraldActivityNonAdmin('herald-activity-b');
 
-    _cortexSeedInvocation(['user' => (int) $userA->id]);
-    _cortexSeedInvocation(['user' => (int) $userA->id]);
-    _cortexSeedInvocation(['user' => (int) $userB->id]);
-    _cortexSeedInvocation(['user' => null]);
+    _heraldSeedInvocation(['user' => (int) $userA->id]);
+    _heraldSeedInvocation(['user' => (int) $userA->id]);
+    _heraldSeedInvocation(['user' => (int) $userB->id]);
+    _heraldSeedInvocation(['user' => null]);
 
     Craft::$app->getUser()->setIdentity($userA);
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams([])
         ->actionActivityTableData();
 
@@ -377,16 +377,16 @@ it('non-admin sees only their own rows', function() {
 });
 
 it('non-admin cannot widen scope via a foreign filters[userId]', function() {
-    $userA = _cortexActivityNonAdmin('cortex-activity-a');
-    $userB = _cortexActivityNonAdmin('cortex-activity-b');
+    $userA = _heraldActivityNonAdmin('herald-activity-a');
+    $userB = _heraldActivityNonAdmin('herald-activity-b');
 
-    _cortexSeedInvocation(['user' => (int) $userA->id]);
-    _cortexSeedInvocation(['user' => (int) $userB->id]);
-    _cortexSeedInvocation(['user' => (int) $userB->id]);
+    _heraldSeedInvocation(['user' => (int) $userA->id]);
+    _heraldSeedInvocation(['user' => (int) $userB->id]);
+    _heraldSeedInvocation(['user' => (int) $userB->id]);
 
     // userA attempts to view userB's rows by spoofing the filter.
     Craft::$app->getUser()->setIdentity($userA);
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams(['filters' => ['userId' => (int) $userB->id]])
         ->actionActivityTableData();
 
@@ -402,11 +402,11 @@ it('non-admin cannot widen scope via a foreign filters[userId]', function() {
 // -----------------------------------------------------------------------------
 
 it('filters by kind', function() {
-    _cortexSeedInvocation(['kind' => 'success']);
-    _cortexSeedInvocation(['kind' => 'tool_error', 'error_class' => 'RuntimeException', 'error_message' => 'boom']);
+    _heraldSeedInvocation(['kind' => 'success']);
+    _heraldSeedInvocation(['kind' => 'tool_error', 'error_class' => 'RuntimeException', 'error_message' => 'boom']);
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams(['filters' => ['kind' => 'tool_error']])
         ->actionActivityTableData();
 
@@ -415,11 +415,11 @@ it('filters by kind', function() {
 });
 
 it('filters by toolName', function() {
-    _cortexSeedInvocation(['tool' => 'entry']);
-    _cortexSeedInvocation(['tool' => 'asset']);
+    _heraldSeedInvocation(['tool' => 'entry']);
+    _heraldSeedInvocation(['tool' => 'asset']);
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams(['filters' => ['toolName' => 'entry']])
         ->actionActivityTableData();
 
@@ -428,8 +428,8 @@ it('filters by toolName', function() {
 });
 
 it('filters by date range', function() {
-    $old = _cortexSeedInvocation(['tool' => 'old']);
-    $new = _cortexSeedInvocation(['tool' => 'new']);
+    $old = _heraldSeedInvocation(['tool' => 'old']);
+    $new = _heraldSeedInvocation(['tool' => 'new']);
 
     // Backdate the first row a week.
     Craft::$app->getDb()->createCommand()->update(
@@ -438,8 +438,8 @@ it('filters by date range', function() {
         ['id' => $old->id],
     )->execute();
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams(['filters' => ['from' => (new DateTime('-1 day'))->format('Y-m-d')]])
         ->actionActivityTableData();
 
@@ -448,11 +448,11 @@ it('filters by date range', function() {
 });
 
 it('search matches the tool name', function() {
-    _cortexSeedInvocation(['tool' => 'entry']);
-    _cortexSeedInvocation(['tool' => 'asset']);
+    _heraldSeedInvocation(['tool' => 'entry']);
+    _heraldSeedInvocation(['tool' => 'asset']);
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams(['search' => 'ent'])
         ->actionActivityTableData();
 
@@ -461,8 +461,8 @@ it('search matches the tool name', function() {
 });
 
 it('defaults to dateCreated DESC', function() {
-    $first = _cortexSeedInvocation(['tool' => 'first']);
-    $second = _cortexSeedInvocation(['tool' => 'second']);
+    $first = _heraldSeedInvocation(['tool' => 'first']);
+    $second = _heraldSeedInvocation(['tool' => 'second']);
 
     Craft::$app->getDb()->createCommand()->update(
         Table::INVOCATIONS,
@@ -470,8 +470,8 @@ it('defaults to dateCreated DESC', function() {
         ['id' => $first->id],
     )->execute();
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams([])
         ->actionActivityTableData();
 
@@ -483,11 +483,11 @@ it('defaults to dateCreated DESC', function() {
 // -----------------------------------------------------------------------------
 
 it('admin can view any row detail', function() {
-    $userA = _cortexActivityNonAdmin('cortex-activity-a');
-    $row = _cortexSeedInvocation(['user' => (int) $userA->id]);
+    $userA = _heraldActivityNonAdmin('herald-activity-a');
+    $row = _heraldSeedInvocation(['user' => (int) $userA->id]);
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams(['id' => (int) $row->id])
         ->actionActivityRow();
 
@@ -497,11 +497,11 @@ it('admin can view any row detail', function() {
 });
 
 it('non-admin can view their own row detail', function() {
-    $userA = _cortexActivityNonAdmin('cortex-activity-a');
-    $row = _cortexSeedInvocation(['user' => (int) $userA->id]);
+    $userA = _heraldActivityNonAdmin('herald-activity-a');
+    $row = _heraldSeedInvocation(['user' => (int) $userA->id]);
 
     Craft::$app->getUser()->setIdentity($userA);
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams(['id' => (int) $row->id])
         ->actionActivityRow();
 
@@ -515,10 +515,10 @@ it('row detail survives a truncated (non-JSON) response excerpt', function() {
     // `Json::decode` throw (a truncated excerpt 500'd the slideout in
     // the gate-9 browser smoke).
     $truncated = substr(json_encode(['data' => "multi\nline value", 'big' => str_repeat('x', 50)]), 0, 40);
-    $row = _cortexSeedInvocation(['response_excerpt' => $truncated]);
+    $row = _heraldSeedInvocation(['response_excerpt' => $truncated]);
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams(['id' => (int) $row->id])
         ->actionActivityRow();
 
@@ -527,38 +527,38 @@ it('row detail survives a truncated (non-JSON) response excerpt', function() {
 });
 
 it('non-admin requesting a foreign row gets 404, not 403', function() {
-    $userA = _cortexActivityNonAdmin('cortex-activity-a');
-    $userB = _cortexActivityNonAdmin('cortex-activity-b');
-    $foreign = _cortexSeedInvocation(['user' => (int) $userB->id]);
+    $userA = _heraldActivityNonAdmin('herald-activity-a');
+    $userB = _heraldActivityNonAdmin('herald-activity-b');
+    $foreign = _heraldSeedInvocation(['user' => (int) $userB->id]);
 
     Craft::$app->getUser()->setIdentity($userA);
 
     expect(function() use ($foreign) {
-        (new _CortexActivityHarness('settings', Cortex::getInstance()))
+        (new _HeraldActivityHarness('settings', Herald::getInstance()))
             ->withParams(['id' => (int) $foreign->id])
             ->actionActivityRow();
     })->toThrow(NotFoundHttpException::class);
 });
 
 it('missing row id throws 404', function() {
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
 
     expect(function() {
-        (new _CortexActivityHarness('settings', Cortex::getInstance()))
+        (new _HeraldActivityHarness('settings', Herald::getInstance()))
             ->withParams(['id' => 999999])
             ->actionActivityRow();
     })->toThrow(NotFoundHttpException::class);
 });
 
 it('error row detail includes the error class and message', function() {
-    $row = _cortexSeedInvocation([
+    $row = _heraldSeedInvocation([
         'kind' => 'tool_error',
         'error_class' => 'RuntimeException',
         'error_message' => 'something exploded',
     ]);
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams(['id' => (int) $row->id])
         ->actionActivityRow();
 
@@ -567,13 +567,13 @@ it('error row detail includes the error class and message', function() {
 });
 
 it('cancelled row detail surfaces the cancellation reason from errorMessage', function() {
-    $row = _cortexSeedInvocation([
+    $row = _heraldSeedInvocation([
         'kind' => 'cancelled',
         'error_message' => 'client disconnected',
     ]);
 
-    Craft::$app->getUser()->setIdentity(_cortexActivityAdmin());
-    $response = (new _CortexActivityHarness('settings', Cortex::getInstance()))
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
         ->withParams(['id' => (int) $row->id])
         ->actionActivityRow();
 

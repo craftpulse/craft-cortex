@@ -27,16 +27,16 @@
 
 use craft\elements\Entry as EntryElement;
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
-use craftpulse\cortex\tools\workflow\DraftsAndRevisions;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
+use craftpulse\herald\tools\workflow\DraftsAndRevisions;
 
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_dar_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_dar_' . bin2hex(random_bytes(4)) . '_';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -64,12 +64,12 @@ afterEach(function() {
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _cortex_dar_tool(): DraftsAndRevisions
+function _herald_dar_tool(): DraftsAndRevisions
 {
     return new DraftsAndRevisions();
 }
 
-function _cortex_dar_section(): ?\craft\models\Section
+function _herald_dar_section(): ?\craft\models\Section
 {
     return Craft::$app->getEntries()->getSectionByHandle('heroes')
         ?? Craft::$app->getEntries()->getSectionByHandle('teams');
@@ -84,13 +84,13 @@ it('inputSchemaFor(null) returns the Free enum on Free (edition gate beats stdio
     // regardless of caller (including stdio); the schema mirrors that
     // so an LLM is never advertised a mode the runtime would reject.
     // Pro-install stdio still sees the full enum (next test).
-    $schema = _cortex_dar_tool()->inputSchemaFor(null);
+    $schema = _herald_dar_tool()->inputSchemaFor(null);
     expect($schema['properties']['mode']['enum'])->toBe(['list_drafts', 'list_revisions', 'compare']);
 });
 
 it('inputSchemaFor(null) returns the full static enum on Pro (stdio invariant)', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_dar_tool()->inputSchemaFor(null);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_dar_tool()->inputSchemaFor(null);
         expect($schema['properties']['mode']['enum'])->toBe([
             'list_drafts', 'list_revisions', 'compare', 'apply', 'discard',
         ]);
@@ -104,7 +104,7 @@ it('inputSchemaFor(null) returns the full static enum on Pro (stdio invariant)',
 it('inputSchemaFor on Free returns the Free enum for admins (HTTP path)', function() {
     // Admin or not, Free-edition HTTP callers don't see Pro modes —
     // the modes don't exist on this install regardless of permission.
-    $schema = _cortex_dar_tool()->inputSchemaFor($this->admin);
+    $schema = _herald_dar_tool()->inputSchemaFor($this->admin);
     expect($schema['properties']['mode']['enum'])->toBe(['list_drafts', 'list_revisions', 'compare']);
 });
 
@@ -113,8 +113,8 @@ it('inputSchemaFor on Free returns the Free enum for admins (HTTP path)', functi
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor on Pro returns the full enum for admins', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_dar_tool()->inputSchemaFor($this->admin);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_dar_tool()->inputSchemaFor($this->admin);
         expect($schema['properties']['mode']['enum'])->toBe([
             'list_drafts', 'list_revisions', 'compare', 'apply', 'discard',
         ]);
@@ -123,7 +123,7 @@ it('inputSchemaFor on Pro returns the full enum for admins', function() {
 
 it('inputSchemaFor on Pro hides the Pro modes from users without saveEntries on any section', function() {
     $user = new User();
-    $user->username = '__cortex_dar_noperm_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_dar_noperm_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -132,8 +132,8 @@ it('inputSchemaFor on Pro hides the Pro modes from users without saveEntries on 
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
-            $schema = _cortex_dar_tool()->inputSchemaFor($user);
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
+            $schema = _herald_dar_tool()->inputSchemaFor($user);
             expect($schema['properties']['mode']['enum'])->toBe(['list_drafts', 'list_revisions', 'compare']);
         });
     } finally {
@@ -142,13 +142,13 @@ it('inputSchemaFor on Pro hides the Pro modes from users without saveEntries on 
 });
 
 it('inputSchemaFor on Pro exposes the Pro modes to users with at least one saveEntries permission', function() {
-    $section = _cortex_dar_section();
+    $section = _herald_dar_section();
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
     $user = new User();
-    $user->username = '__cortex_dar_save_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_dar_save_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     if (!Craft::$app->getElements()->saveElement($user)) {
@@ -165,13 +165,13 @@ it('inputSchemaFor on Pro exposes the Pro modes to users with at least one saveE
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
             // Re-fetch the user so the freshly-saved permission rows are
             // visible to `can()` — `User::can()` caches on the live
             // instance otherwise.
             $reloaded = Craft::$app->getUsers()->getUserById((int) $user->id);
             expect($reloaded)->toBeInstanceOf(User::class);
-            $schema = _cortex_dar_tool()->inputSchemaFor($reloaded);
+            $schema = _herald_dar_tool()->inputSchemaFor($reloaded);
             expect($schema['properties']['mode']['enum'])->toBe([
                 'list_drafts', 'list_revisions', 'compare', 'apply', 'discard',
             ]);
@@ -186,12 +186,12 @@ it('inputSchemaFor on Pro exposes the Pro modes to users with at least one saveE
 // -----------------------------------------------------------------------------
 
 it('apply mode applies the draft to its canonical and returns the locked envelope shape', function() {
-    $section = _cortex_dar_section();
+    $section = _herald_dar_section();
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
         $entryType = Craft::$app->getEntries()->getEntryTypeByHandle('hero')
             ?? Craft::$app->getEntries()->getEntryTypesBySectionId((int) $section->id)[0] ?? null;
         if ($entryType === null) {
@@ -219,7 +219,7 @@ it('apply mode applies the draft to its canonical and returns the locked envelop
 
         $draftId = (int) $draft->id;
 
-        $result = _cortex_dar_tool()->execute([
+        $result = _herald_dar_tool()->execute([
             'mode' => 'apply',
             'id' => $draftId,
         ]);
@@ -240,14 +240,14 @@ it('apply mode applies the draft to its canonical and returns the locked envelop
 });
 
 it('apply mode throws when no draft id/uid is supplied', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_dar_tool()->execute(['mode' => 'apply']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_dar_tool()->execute(['mode' => 'apply']);
     });
 })->throws(ToolException::class);
 
 it('apply mode throws when the draft id does not resolve', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_dar_tool()->execute(['mode' => 'apply', 'id' => 99999999]);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_dar_tool()->execute(['mode' => 'apply', 'id' => 99999999]);
     });
 })->throws(ToolException::class);
 
@@ -256,7 +256,7 @@ it('apply mode throws when the draft id does not resolve', function() {
 // -----------------------------------------------------------------------------
 
 it('apply mode throws permission-denied with the locked rich-format message for non-permitted users', function() {
-    $section = _cortex_dar_section();
+    $section = _herald_dar_section();
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
@@ -282,7 +282,7 @@ it('apply mode throws permission-denied with the locked rich-format message for 
     );
 
     $user = new User();
-    $user->username = '__cortex_dar_denied_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_dar_denied_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -291,12 +291,12 @@ it('apply mode throws permission-denied with the locked rich-format message for 
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($draft, $user, $section) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($draft, $user, $section) {
             Craft::$app->getUser()->setIdentity($user);
 
             $caught = null;
             try {
-                _cortex_dar_tool()->execute([
+                _herald_dar_tool()->execute([
                     'mode' => 'apply',
                     'id' => (int) $draft->id,
                 ]);
@@ -320,12 +320,12 @@ it('apply mode throws permission-denied with the locked rich-format message for 
 // -----------------------------------------------------------------------------
 
 it('discard mode hard-deletes the draft and leaves the canonical untouched', function() {
-    $section = _cortex_dar_section();
+    $section = _herald_dar_section();
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
         $entryType = Craft::$app->getEntries()->getEntryTypeByHandle('hero')
             ?? Craft::$app->getEntries()->getEntryTypesBySectionId((int) $section->id)[0] ?? null;
         if ($entryType === null) {
@@ -348,7 +348,7 @@ it('discard mode hard-deletes the draft and leaves the canonical untouched', fun
         $draftId = (int) $draft->id;
         $canonicalTitle = $canonical->title;
 
-        $result = _cortex_dar_tool()->execute([
+        $result = _herald_dar_tool()->execute([
             'mode' => 'discard',
             'id' => $draftId,
         ]);
@@ -378,7 +378,7 @@ it('discard mode hard-deletes the draft and leaves the canonical untouched', fun
 });
 
 it('discard mode throws permission-denied with the locked rich-format message', function() {
-    $section = _cortex_dar_section();
+    $section = _herald_dar_section();
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
@@ -404,7 +404,7 @@ it('discard mode throws permission-denied with the locked rich-format message', 
     );
 
     $user = new User();
-    $user->username = '__cortex_dar_discard_denied_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_dar_discard_denied_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -413,12 +413,12 @@ it('discard mode throws permission-denied with the locked rich-format message', 
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($draft, $user, $section) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($draft, $user, $section) {
             Craft::$app->getUser()->setIdentity($user);
 
             $caught = null;
             try {
-                _cortex_dar_tool()->execute([
+                _herald_dar_tool()->execute([
                     'mode' => 'discard',
                     'id' => (int) $draft->id,
                 ]);
@@ -443,9 +443,9 @@ it('discard mode throws permission-denied with the locked rich-format message', 
 
 it('apply throws "mode unavailable on this edition" on a Free install', function() {
     // Default edition in tests is Free — no wrapper needed.
-    _cortex_dar_tool()->execute(['mode' => 'apply', 'id' => 1]);
+    _herald_dar_tool()->execute(['mode' => 'apply', 'id' => 1]);
 })->throws(ToolException::class, 'unavailable on this edition');
 
 it('discard throws "mode unavailable on this edition" on a Free install', function() {
-    _cortex_dar_tool()->execute(['mode' => 'discard', 'id' => 1]);
+    _herald_dar_tool()->execute(['mode' => 'discard', 'id' => 1]);
 })->throws(ToolException::class, 'unavailable on this edition');

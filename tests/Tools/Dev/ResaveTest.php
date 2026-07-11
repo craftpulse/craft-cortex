@@ -5,11 +5,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('resave');
+    $this->tool = Herald::getInstance()->tools->getByName('resave');
 });
 
 it('throws when type is missing', function() {
@@ -56,7 +56,7 @@ it('returns the unified terminal envelope shape from execute()', function() {
 });
 
 it('exposes destructiveHint and idempotentHint annotations', function() {
-    $annotations = \craftpulse\cortex\tools\support\AttributeReader::annotationsFor($this->tool);
+    $annotations = \craftpulse\herald\tools\support\AttributeReader::annotationsFor($this->tool);
     expect($annotations)->toHaveKey('destructiveHint', true);
     expect($annotations)->toHaveKey('idempotentHint', true);
 });

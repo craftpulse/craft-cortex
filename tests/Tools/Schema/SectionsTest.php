@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('sections');
+    $this->tool = Herald::getInstance()->tools->getByName('sections');
 });
 
 it('lists all sections with the expected per-section shape', function() {
@@ -52,5 +52,5 @@ it('returns a single section when handle is passed', function() {
 });
 
 it('throws ToolException for an unknown section handle', function() {
-    $this->tool->execute(['handle' => '__cortex_no_such_section__']);
+    $this->tool->execute(['handle' => '__herald_no_such_section__']);
 })->throws(ToolException::class);

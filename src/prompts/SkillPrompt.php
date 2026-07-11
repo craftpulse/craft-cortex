@@ -1,8 +1,8 @@
 <?php
 
-namespace craftpulse\cortex\prompts;
+namespace craftpulse\herald\prompts;
 
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 use Michtio\CraftCmsClaudeSkills\Skills;
 
 /**
@@ -119,9 +119,9 @@ class SkillPrompt extends AbstractPrompt
         // Consult the Skills service for an element-stored override
         // first; fall through to the bundled filesystem reader when
         // none exists. Same fall-through contract as `SkillResource::read()`.
-        $element = Cortex::getInstance()->skills->getByHandle($this->_skill);
+        $element = Herald::getInstance()->skills->getByHandle($this->_skill);
         $text = $element !== null
-            ? Cortex::getInstance()->skills->synthesizeContent($element)
+            ? Herald::getInstance()->skills->synthesizeContent($element)
             : Skills::content($this->_skill);
 
         return [

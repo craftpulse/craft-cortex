@@ -1,13 +1,13 @@
 {
-    "name": "craftpulse/craft-cortex",
+    "name": "craftpulse/craft-herald",
     "description": "MCP (Model Context Protocol) server for Craft CMS 5. Exposes Craft internals to AI agents over stdio (Free) and Streamable HTTP (Pro).",
     "type": "craft-plugin",
     "license": "proprietary",
     "support": {
         "email": "support@craftpulse.com",
-        "issues": "https://github.com/craftpulse/craft-cortex/issues",
-        "source": "https://github.com/craftpulse/craft-cortex",
-        "docs": "https://github.com/craftpulse/craft-cortex"
+        "issues": "https://github.com/craftpulse/craft-herald/issues",
+        "source": "https://github.com/craftpulse/craft-herald",
+        "docs": "https://github.com/craftpulse/craft-herald"
     },
     "authors": [
         {
@@ -42,12 +42,12 @@
     },
     "autoload": {
         "psr-4": {
-            "craftpulse\\cortex\\": "src/"
+            "craftpulse\\herald\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "craftpulse\\cortex\\tests\\": "tests/"
+            "craftpulse\\herald\\tests\\": "tests/"
         }
     },
     "config": {
@@ -62,15 +62,15 @@
         "check-cs": "ecs check",
         "fix-cs": "ecs check --fix",
         "phpstan": "phpstan analyse --memory-limit=1G",
-        "test": "@php vendor/bin/pest --configuration=vendor/craftpulse/craft-cortex/phpunit.xml.dist"
+        "test": "@php vendor/bin/pest --configuration=vendor/craftpulse/craft-herald/phpunit.xml.dist"
     },
     "extra": {
-        "name": "Cortex",
-        "handle": "cortex",
+        "name": "Herald MCP",
+        "handle": "herald",
         "developer": "Craftpulse",
         "developerUrl": "https://craftpulse.com",
-        "documentationUrl": "https://github.com/craftpulse/craft-cortex",
-        "changelogUrl": "https://raw.githubusercontent.com/craftpulse/craft-cortex/develop-v5/CHANGELOG.md",
-        "class": "craftpulse\\cortex\\Cortex"
+        "documentationUrl": "https://github.com/craftpulse/craft-herald",
+        "changelogUrl": "https://raw.githubusercontent.com/craftpulse/craft-herald/develop-v5/CHANGELOG.md",
+        "class": "craftpulse\\herald\\Herald"
     }
 }

@@ -12,7 +12,7 @@
  *   - `notifications/cancelled` arriving mid-stream flips the
  *     `CancellationToken` and the running tool short-circuits with a
  *     `notifications/cancelled` terminal envelope.
- *   - Exactly one `cortex_invocations` row per stream completion (not
+ *   - Exactly one `herald_invocations` row per stream completion (not
  *     per frame). Cancellation surfaces as a `kind=cancelled` row.
  *
  * The fixture `_streaming_test` lives in
@@ -25,12 +25,12 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\events\RegisterToolsEvent;
-use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\services\Tools;
-use craftpulse\cortex\tests\Tools\Fixtures\StreamingFixtureTool;
-use craftpulse\cortex\tools\support\InvocationLogger;
+use craftpulse\herald\events\RegisterToolsEvent;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
+use craftpulse\herald\services\Tools;
+use craftpulse\herald\tests\Tools\Fixtures\StreamingFixtureTool;
+use craftpulse\herald\tools\support\InvocationLogger;
 use yii\base\Event;
 
 // -----------------------------------------------------------------------------
@@ -42,17 +42,17 @@ use yii\base\Event;
  * streaming fixture registered. Returns the original service so the
  * caller can restore it in a `finally` block.
  */
-function _cortex_streaming_register_fixture(): array
+function _herald_streaming_register_fixture(): array
 {
     $listener = static function(RegisterToolsEvent $event): void {
         $event->tools[] = new StreamingFixtureTool();
     };
     Event::on(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
 
-    $original = Cortex::getInstance()->tools;
+    $original = Herald::getInstance()->tools;
     $fresh = new Tools();
     $fresh->init();
-    Cortex::getInstance()->set('tools', $fresh);
+    Herald::getInstance()->set('tools', $fresh);
 
     return [$original, $listener];
 }
@@ -60,10 +60,10 @@ function _cortex_streaming_register_fixture(): array
 /**
  * Restore the plugin's tools service and detach the per-test listener.
  */
-function _cortex_streaming_restore_fixture(array $context): void
+function _herald_streaming_restore_fixture(array $context): void
 {
     [$original, $listener] = $context;
-    Cortex::getInstance()->set('tools', $original);
+    Herald::getInstance()->set('tools', $original);
     Event::off(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
 }
 
@@ -74,7 +74,7 @@ function _cortex_streaming_restore_fixture(array $context): void
  *
  * @return array<int,array<string,mixed>>
  */
-function _cortex_drain_streaming(Generator $gen): array
+function _herald_drain_streaming(Generator $gen): array
 {
     return iterator_to_array($gen, preserve_keys: false);
 }
@@ -84,12 +84,12 @@ function _cortex_drain_streaming(Generator $gen): array
 // -----------------------------------------------------------------------------
 
 it('a streamable tool yields N notifications/progress frames + one terminal tools/call response', function() {
-    $ctx = _cortex_streaming_register_fixture();
+    $ctx = _herald_streaming_register_fixture();
 
     try {
         $server = new Server(Server::TRANSPORT_HTTP);
         $server->setSessionId('sess-7.7-success');
-        $frames = _cortex_drain_streaming($server->dispatchStreaming([
+        $frames = _herald_drain_streaming($server->dispatchStreaming([
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'tools/call',
@@ -125,7 +125,7 @@ it('a streamable tool yields N notifications/progress frames + one terminal tool
             ->toContain('"done": true')
             ->toContain('"progress": 3');
     } finally {
-        _cortex_streaming_restore_fixture($ctx);
+        _herald_streaming_restore_fixture($ctx);
     }
 });
 
@@ -140,7 +140,7 @@ it('a non-streamable tool dispatched via dispatchStreaming() collapses to a sing
     // dispatch would have produced.
     $server = new Server(Server::TRANSPORT_HTTP);
     $server->setSessionId('sess-7.7-degrade');
-    $frames = _cortex_drain_streaming($server->dispatchStreaming([
+    $frames = _herald_drain_streaming($server->dispatchStreaming([
         'jsonrpc' => '2.0',
         'id' => 1,
         'method' => 'tools/call',
@@ -160,7 +160,7 @@ it('a non-streamable tool dispatched via dispatchStreaming() collapses to a sing
 // -----------------------------------------------------------------------------
 
 it('notifications/cancelled mid-stream flips the token and the tool short-circuits with a cancelled envelope', function() {
-    $ctx = _cortex_streaming_register_fixture();
+    $ctx = _herald_streaming_register_fixture();
 
     try {
         $sessionId = 'sess-7.7-cancel';
@@ -177,7 +177,7 @@ it('notifications/cancelled mid-stream flips the token and the tool short-circui
 
         $server = new Server(Server::TRANSPORT_HTTP);
         $server->setSessionId($sessionId);
-        $frames = _cortex_drain_streaming($server->dispatchStreaming([
+        $frames = _herald_drain_streaming($server->dispatchStreaming([
             'jsonrpc' => '2.0',
             'id' => $requestId,
             'method' => 'tools/call',
@@ -202,7 +202,7 @@ it('notifications/cancelled mid-stream flips the token and the tool short-circui
         // Cleanup the cache slot so it doesn't leak into other tests.
         Craft::$app->getCache()->delete($cancelKey);
     } finally {
-        _cortex_streaming_restore_fixture($ctx);
+        _herald_streaming_restore_fixture($ctx);
     }
 });
 
@@ -242,20 +242,20 @@ it('notifications/cancelled with a matching requestId arrives via dispatch() and
 // One audit row per stream completion (not per frame)
 // -----------------------------------------------------------------------------
 
-it('a streamed tools/call writes exactly one cortex_invocations row with kind=success', function() {
-    $ctx = _cortex_streaming_register_fixture();
+it('a streamed tools/call writes exactly one herald_invocations row with kind=success', function() {
+    $ctx = _herald_streaming_register_fixture();
 
     try {
         $sessionId = 'sess-7.7-audit-success';
 
         // Defense against cross-run pollution: drop any stale rows
         // matching this test's deterministic session id.
-        \craftpulse\cortex\records\Invocation::deleteAll(['sessionId' => $sessionId]);
+        \craftpulse\herald\records\Invocation::deleteAll(['sessionId' => $sessionId]);
 
         $server = new Server(Server::TRANSPORT_HTTP);
         $server->setUserId(1);
         $server->setSessionId($sessionId);
-        $frames = _cortex_drain_streaming($server->dispatchStreaming([
+        $frames = _herald_drain_streaming($server->dispatchStreaming([
             'jsonrpc' => '2.0',
             'id' => 1,
             'method' => 'tools/call',
@@ -268,7 +268,7 @@ it('a streamed tools/call writes exactly one cortex_invocations row with kind=su
 
         expect($frames)->toHaveCount(4);
 
-        $rows = \craftpulse\cortex\records\Invocation::find()
+        $rows = \craftpulse\herald\records\Invocation::find()
             ->where(['toolName' => '_streaming_test', 'sessionId' => $sessionId])
             ->all();
 
@@ -279,14 +279,14 @@ it('a streamed tools/call writes exactly one cortex_invocations row with kind=su
         expect($rows[0]->durationMs)->toBeGreaterThanOrEqual(0);
         expect($rows[0]->transport)->toBe('http');
 
-        \craftpulse\cortex\records\Invocation::deleteAll(['id' => $rows[0]->id]);
+        \craftpulse\herald\records\Invocation::deleteAll(['id' => $rows[0]->id]);
     } finally {
-        _cortex_streaming_restore_fixture($ctx);
+        _herald_streaming_restore_fixture($ctx);
     }
 });
 
-it('a cancelled stream writes exactly one cortex_invocations row with kind=cancelled', function() {
-    $ctx = _cortex_streaming_register_fixture();
+it('a cancelled stream writes exactly one herald_invocations row with kind=cancelled', function() {
+    $ctx = _herald_streaming_register_fixture();
 
     try {
         $sessionId = 'sess-7.7-audit-cancel';
@@ -295,7 +295,7 @@ it('a cancelled stream writes exactly one cortex_invocations row with kind=cance
         // Defense against cross-run pollution: drop any stale rows
         // matching this test's deterministic session id before
         // asserting.
-        \craftpulse\cortex\records\Invocation::deleteAll(['sessionId' => $sessionId]);
+        \craftpulse\herald\records\Invocation::deleteAll(['sessionId' => $sessionId]);
 
         // Pre-arm the cancellation slot.
         $cancelKey = Server::CANCEL_CACHE_KEY_PREFIX . $sessionId . ':' . $requestId;
@@ -314,7 +314,7 @@ it('a cancelled stream writes exactly one cortex_invocations row with kind=cance
             ],
         ]), preserve_keys: false);
 
-        $rows = \craftpulse\cortex\records\Invocation::find()
+        $rows = \craftpulse\herald\records\Invocation::find()
             ->where(['toolName' => '_streaming_test', 'sessionId' => $sessionId])
             ->all();
 
@@ -327,10 +327,10 @@ it('a cancelled stream writes exactly one cortex_invocations row with kind=cance
         expect($rows[0]->errorClass)->toBeNull();
         expect($rows[0]->errorMessage)->toBeNull();
 
-        \craftpulse\cortex\records\Invocation::deleteAll(['id' => $rows[0]->id]);
+        \craftpulse\herald\records\Invocation::deleteAll(['id' => $rows[0]->id]);
         Craft::$app->getCache()->delete($cancelKey);
     } finally {
-        _cortex_streaming_restore_fixture($ctx);
+        _herald_streaming_restore_fixture($ctx);
     }
 });
 
@@ -351,7 +351,7 @@ it('a cancelled stream writes exactly one cortex_invocations row with kind=cance
 // the complement to this in-process test.
 
 it('Server::getInFlightCancellationToken() exposes the running streaming token mid-loop', function() {
-    $ctx = _cortex_streaming_register_fixture();
+    $ctx = _herald_streaming_register_fixture();
 
     try {
         $server = new Server(Server::TRANSPORT_HTTP);
@@ -385,18 +385,18 @@ it('Server::getInFlightCancellationToken() exposes the running streaming token m
         // dispatch on the same `Server` instance.
         expect($server->getInFlightCancellationToken())->toBeNull();
     } finally {
-        _cortex_streaming_restore_fixture($ctx);
+        _herald_streaming_restore_fixture($ctx);
     }
 });
 
 it('flipping the in-flight token mid-stream surfaces kind=cancelled with the cancellation reason', function() {
-    $ctx = _cortex_streaming_register_fixture();
+    $ctx = _herald_streaming_register_fixture();
 
     try {
         $sessionId = 'sess-7.7.5-disconnect';
 
         // Defense against cross-run pollution.
-        \craftpulse\cortex\records\Invocation::deleteAll(['sessionId' => $sessionId]);
+        \craftpulse\herald\records\Invocation::deleteAll(['sessionId' => $sessionId]);
 
         $server = new Server(Server::TRANSPORT_HTTP);
         $server->setUserId(1);
@@ -451,7 +451,7 @@ it('flipping the in-flight token mid-stream surfaces kind=cancelled with the can
         expect($token->getReason())->toBe('client disconnected');
 
         // Exactly one audit row, with `kind=cancelled`.
-        $rows = \craftpulse\cortex\records\Invocation::find()
+        $rows = \craftpulse\herald\records\Invocation::find()
             ->where(['toolName' => '_streaming_test', 'sessionId' => $sessionId])
             ->all();
 
@@ -460,8 +460,8 @@ it('flipping the in-flight token mid-stream surfaces kind=cancelled with the can
         expect($rows[0]->errorClass)->toBeNull();
         expect($rows[0]->errorMessage)->toBeNull();
 
-        \craftpulse\cortex\records\Invocation::deleteAll(['id' => $rows[0]->id]);
+        \craftpulse\herald\records\Invocation::deleteAll(['id' => $rows[0]->id]);
     } finally {
-        _cortex_streaming_restore_fixture($ctx);
+        _herald_streaming_restore_fixture($ctx);
     }
 });

@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\prompts;
+namespace craftpulse\herald\prompts;
 
 /**
  * =========================================================================

@@ -1,21 +1,21 @@
 <?php
 
-namespace craftpulse\cortex\tools\support;
+namespace craftpulse\herald\tools\support;
 
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\events\LogCallEvent;
-use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\events\LogCallEvent;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
+use craftpulse\herald\tools\ToolException;
 use Throwable;
 use yii\base\Event;
 
 /**
  * =========================================================================
- * Per-invocation logger for cortex tool calls.
+ * Per-invocation logger for herald tool calls.
  *
  * Writes a single structured line per tool call to Craft's logger under
- * the `cortex` category. The line shape is locked across transports so
+ * the `herald` category. The line shape is locked across transports so
  * log consumers (operators tailing `storage/logs/web.log`, the Pro
  * audit dashboard, external SIEM forwarders) don't break when HTTP
  * lands. Format:
@@ -40,25 +40,25 @@ use yii\base\Event;
  *     per-request Craft identity).
  *   - `client` — from MCP `initialize`'s `clientInfo.name`; populates
  *     once per session, after handshake.
- *   - `token_id` — `cortex_tokens` row id for bearer-authenticated
+ *   - `token_id` — `herald_tokens` row id for bearer-authenticated
  *     requests; null for stdio and OAuth-authenticated requests.
  *   - `session_id` — `Mcp-Session-Id` header value; null for stdio
  *     and for the `initialize` call.
  *
  * Logger-backed today — operators tail Craft logs to retroactively
- * investigate "what did the LLM do." A DB-backed `cortex_invocations`
+ * investigate "what did the LLM do." A DB-backed `herald_invocations`
  * audit table sits alongside in Gate 7.5; the table consumes the same
  * structured entry array via `EVENT_LOG_CALL` so this class stays the
  * dispatcher's hook point and the DB layer subscribes to the same
  * data.
  *
- * Logger output stays off STDOUT in `cortex/serve` — `ServeController`
+ * Logger output stays off STDOUT in `herald/serve` — `ServeController`
  * caps log levels to error+warning during stdio sessions, so info-level
  * invocation lines go to the configured file targets only and never
  * corrupt the JSON-RPC stream.
  *
  * Round-trip invariant (locked, Gate 7.5 decision 5): every key emitted
- * in the formatted KV line has a matching column on `cortex_invocations`.
+ * in the formatted KV line has a matching column on `herald_invocations`.
  * `response_excerpt` is the one Gate-7.5 addition that extends both the
  * KV line and the DB column — additive on both sides preserves the
  * invariant.
@@ -76,7 +76,7 @@ final class InvocationLogger
      * Log category. Targets can filter on this to route invocation lines
      * to a dedicated file.
      */
-    public const CATEGORY = 'cortex';
+    public const CATEGORY = 'herald';
 
     public const KIND_SUCCESS = 'success';
     public const KIND_TOOL_ERROR = 'tool_error';
@@ -101,8 +101,8 @@ final class InvocationLogger
      * formatted KV line.
      *
      * The Gate-7.5 audit-log writer (`services/Invocations::record()`)
-     * subscribes to this event in `Cortex::init()` to persist a row to
-     * `cortex_invocations` for HTTP-transport invocations. Third-party
+     * subscribes to this event in `Herald::init()` to persist a row to
+     * `herald_invocations` for HTTP-transport invocations. Third-party
      * plugins can subscribe to the same event to mirror the audit
      * trail elsewhere (SIEM forwarders, external observability stacks)
      * without re-implementing the formatter.
@@ -135,7 +135,7 @@ final class InvocationLogger
      * After the Craft logger write, an `EVENT_LOG_CALL` is fired
      * carrying the structured entry array + the formatted KV line.
      * Subscribers persist to alternate audit surfaces (the DB-backed
-     * `cortex_invocations` table is the canonical subscriber).
+     * `herald_invocations` table is the canonical subscriber).
      *
      * @param array<string,mixed> $arguments
      *
@@ -306,7 +306,7 @@ final class InvocationLogger
      */
     private static function _excerptResponse(string $payload): string
     {
-        $plugin = Cortex::getInstance();
+        $plugin = Herald::getInstance();
         $bytes = $plugin !== null ? $plugin->getSettings()->auditResponseExcerptBytes : 2048;
         if (strlen($payload) <= $bytes) {
             return $payload;

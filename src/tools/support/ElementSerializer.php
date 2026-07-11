@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tools\support;
+namespace craftpulse\herald\tools\support;
 
 use craft\base\ElementInterface;
 use craft\elements\db\ElementQuery;

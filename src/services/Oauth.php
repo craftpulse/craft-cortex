@@ -1,22 +1,22 @@
 <?php
 
-namespace craftpulse\cortex\services;
+namespace craftpulse\herald\services;
 
 use Carbon\Carbon;
 use Craft;
 use craft\helpers\App;
 use craft\helpers\StringHelper;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\oauth\repositories\AccessTokenRepository;
-use craftpulse\cortex\oauth\repositories\AuthCodeRepository;
-use craftpulse\cortex\oauth\repositories\ClientRepository;
-use craftpulse\cortex\oauth\repositories\RefreshTokenRepository;
-use craftpulse\cortex\oauth\repositories\ScopeRepository;
-use craftpulse\cortex\records\OauthClient as OauthClientRecord;
-use craftpulse\cortex\records\OauthCode as OauthCodeRecord;
-use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
-use craftpulse\cortex\tools\support\InvocationLogger;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
+use craftpulse\herald\oauth\repositories\AccessTokenRepository;
+use craftpulse\herald\oauth\repositories\AuthCodeRepository;
+use craftpulse\herald\oauth\repositories\ClientRepository;
+use craftpulse\herald\oauth\repositories\RefreshTokenRepository;
+use craftpulse\herald\oauth\repositories\ScopeRepository;
+use craftpulse\herald\records\OauthClient as OauthClientRecord;
+use craftpulse\herald\records\OauthCode as OauthCodeRecord;
+use craftpulse\herald\records\OauthToken as OauthTokenRecord;
+use craftpulse\herald\tools\support\InvocationLogger;
 use DateInterval;
 use Lcobucci\Clock\SystemClock;
 use Lcobucci\JWT\Configuration;
@@ -76,8 +76,8 @@ use yii\base\InvalidConfigException;
  *      add fine-grained scopes via `ScopeRepository` without touching
  *      this service.
  *
- * Key path: `storage/cortex/oauth-keys/{private,public}.key`. The
- * `cortex/oauth/init-keys` console action generates them (0600 on
+ * Key path: `storage/herald/oauth-keys/{private,public}.key`. The
+ * `herald/oauth/init-keys` console action generates them (0600 on
  * private). Service throws `InvalidConfigException` if either is
  * missing — operators run init-keys once per install.
  *
@@ -99,7 +99,7 @@ class Oauth extends Component
      *
      * @since 5.0.0
      */
-    public const KEYS_SUBDIR = 'cortex/oauth-keys';
+    public const KEYS_SUBDIR = 'herald/oauth-keys';
 
     /**
      * Filename for the RSA private key. League's CryptKey expects a
@@ -265,18 +265,18 @@ class Oauth extends Component
 
         Craft::warning(
             sprintf(
-                'cortex OAuth refresh-token theft detected — revoked %d token(s) in family %s. Reason: %s',
+                'herald OAuth refresh-token theft detected — revoked %d token(s) in family %s. Reason: %s',
                 $count,
                 $familyId,
                 $reason,
             ),
-            'cortex.oauth',
+            'herald.oauth',
         );
 
         // Audit row so the Activity dashboard surfaces the security
         // event alongside tool invocations. Soft-write: a DB failure
         // inside the audit path cannot break the revoke response.
-        Cortex::getInstance()->invocations->record([
+        Herald::getInstance()->invocations->record([
             'tool' => '_oauth_token_theft',
             'kind' => InvocationLogger::KIND_SECURITY,
             'duration_ms' => 0,
@@ -338,7 +338,7 @@ class Oauth extends Component
      *
      * @throws InvalidConfigException When the JWT key pair is
      *                                missing — operators run
-     *                                `cortex/oauth/init-keys` once per
+     *                                `herald/oauth/init-keys` once per
      *                                install.
      *
      * @author Craftpulse
@@ -350,7 +350,7 @@ class Oauth extends Component
             return $this->_authorizationServer;
         }
 
-        $settings = Cortex::getInstance()->getSettings();
+        $settings = Herald::getInstance()->getSettings();
         $accessTtl = new DateInterval($settings->oauthAccessTokenTtl);
         $refreshTtl = new DateInterval($settings->oauthRefreshTokenTtl);
 
@@ -415,7 +415,7 @@ class Oauth extends Component
      *
      * Audience binding: the caller (`McpController::beforeAction()`)
      * checks `audience === <mcp endpoint url>` after this method
-     * returns. Cortex does *not* enforce a specific audience inside
+     * returns. Herald does *not* enforce a specific audience inside
      * the service because the controller knows the canonical endpoint
      * URL — keeping that check at the boundary lets unit tests vary
      * the audience without monkey-patching.
@@ -467,7 +467,7 @@ class Oauth extends Component
             // string per the array contract.
             Craft::warning(
                 'OAuth access token presented without a `cid` claim. Token jti=' . $jti,
-                'cortex.oauth',
+                'herald.oauth',
             );
             $rawClientId = '';
         }
@@ -500,7 +500,7 @@ class Oauth extends Component
      */
     public function elevationCacheKey(int $userId): string
     {
-        return 'cortex:elevation:' . hash('sha256', (string) $userId);
+        return 'herald:elevation:' . hash('sha256', (string) $userId);
     }
 
     /**
@@ -519,7 +519,7 @@ class Oauth extends Component
         if ($cache === null) {
             return;
         }
-        $ttl = Cortex::getInstance()->getSettings()->elevationTtl;
+        $ttl = Herald::getInstance()->getSettings()->elevationTtl;
         $cache->set($this->elevationCacheKey($userId), true, $ttl);
     }
 
@@ -597,7 +597,7 @@ class Oauth extends Component
         $scope = '';
         if (isset($payload['scope']) && is_string($payload['scope'])) {
             $requested = preg_split('/\s+/', trim($payload['scope']), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-            $scope = implode(' ', Cortex::getInstance()->scopes->filterKnown($requested));
+            $scope = implode(' ', Herald::getInstance()->scopes->filterKnown($requested));
         }
 
         $record = new OauthClientRecord();
@@ -611,7 +611,7 @@ class Oauth extends Component
         // dev install. The authorize + token flows reject an
         // unapproved client until an admin approves it on the Clients
         // CP screen.
-        $record->approved = Cortex::getInstance()->getSettings()->dcrAutoApprove;
+        $record->approved = Herald::getInstance()->getSettings()->dcrAutoApprove;
         $record->clientSecretHash = $secretHash;
 
         if (!$record->save()) {
@@ -719,7 +719,7 @@ class Oauth extends Component
      * present, and returns whether a row was actually updated.
      *
      * Per spec, an unknown token returns success too — `revoke()`'s
-     * boolean is for cortex internal use, not for shaping the HTTP
+     * boolean is for herald internal use, not for shaping the HTTP
      * response. The controller always returns 200.
      *
      * @author Craftpulse
@@ -752,10 +752,10 @@ class Oauth extends Component
      * Prune dead OAuth rows during Craft's gc sweep. Deletes:
      *
      *   - authorization codes whose `expiresAt` has passed
-     *     (`cortex_oauth_codes`), and
+     *     (`herald_oauth_codes`), and
      *   - access / refresh tokens that are either expired (`expiresAt`
      *     in the past) or revoked (`dateRevoked` set)
-     *     (`cortex_oauth_tokens`).
+     *     (`herald_oauth_tokens`).
      *
      * Both deletes are fail-closed-safe. Every repository
      * (`AccessTokenRepository`, `AuthCodeRepository`,
@@ -808,7 +808,7 @@ class Oauth extends Component
         $path = $this->_keysDir() . DIRECTORY_SEPARATOR . self::PRIVATE_KEY_FILE;
         if (!is_file($path)) {
             throw new InvalidConfigException(sprintf(
-                'OAuth private key not found at %s. Run `craft cortex/oauth/init-keys` to generate.',
+                'OAuth private key not found at %s. Run `craft herald/oauth/init-keys` to generate.',
                 $path,
             ));
         }
@@ -828,7 +828,7 @@ class Oauth extends Component
         $path = $this->_keysDir() . DIRECTORY_SEPARATOR . self::PUBLIC_KEY_FILE;
         if (!is_file($path)) {
             throw new InvalidConfigException(sprintf(
-                'OAuth public key not found at %s. Run `craft cortex/oauth/init-keys` to generate.',
+                'OAuth public key not found at %s. Run `craft herald/oauth/init-keys` to generate.',
                 $path,
             ));
         }
@@ -853,7 +853,7 @@ class Oauth extends Component
 
     /**
      * Resolve the JWT keys directory. Builds it from
-     * `Craft::$app->getPath()->getStoragePath()` + the cortex
+     * `Craft::$app->getPath()->getStoragePath()` + the herald
      * subdir.
      *
      * @author Craftpulse
@@ -885,14 +885,14 @@ class Oauth extends Component
 
         if ($seed === '') {
             throw new InvalidConfigException(
-                'Craft security key is not configured; cortex OAuth cannot derive an encryption key. Set CRAFT_SECURITY_KEY in .env.',
+                'Craft security key is not configured; herald OAuth cannot derive an encryption key. Set CRAFT_SECURITY_KEY in .env.',
             );
         }
 
         // 32 bytes derived via HMAC-SHA256 of a stable label against
         // the security key — keeps it deterministic across processes
         // without storing a second secret.
-        return base64_encode(hash_hmac('sha256', 'cortex:oauth:enc', $seed, true));
+        return base64_encode(hash_hmac('sha256', 'herald:oauth:enc', $seed, true));
     }
 
     /**

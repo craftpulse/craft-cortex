@@ -25,25 +25,25 @@
  */
 
 use Carbon\Carbon;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\records\Invocation as InvocationRecord;
-use craftpulse\cortex\records\Token as TokenRecord;
-use craftpulse\cortex\services\Invocations;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\support\InvocationLogger;
+use craftpulse\herald\Herald;
+use craftpulse\herald\records\Invocation as InvocationRecord;
+use craftpulse\herald\records\Token as TokenRecord;
+use craftpulse\herald\services\Invocations;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\InvocationLogger;
 
 beforeEach(function() {
-    $this->service = Cortex::getInstance()->invocations;
+    $this->service = Herald::getInstance()->invocations;
 
     // Real user + token ids so the FK constraints on
-    // `cortex_invocations.userId` / `.tokenId` don't trip the
+    // `herald_invocations.userId` / `.tokenId` don't trip the
     // happy-path tests.
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
     expect($admin)->not->toBeNull();
     $this->userId = (int) $admin->id;
 
-    $issued = Cortex::getInstance()->tokens->issue($this->userId, '_test_/invocations-bearer');
+    $issued = Herald::getInstance()->tokens->issue($this->userId, '_test_/invocations-bearer');
     $this->tokenId = (int) $issued['model']->id;
 });
 
@@ -104,7 +104,7 @@ it('record() persists tool_error rows with the error class/message', function() 
         'session_id' => null,
         'args' => '{}',
         'response_excerpt' => null,
-        'error_class' => 'craftpulse\\cortex\\tools\\ToolException',
+        'error_class' => 'craftpulse\\herald\\tools\\ToolException',
         'error_message' => 'Command not in allowlist',
     ];
 
@@ -112,7 +112,7 @@ it('record() persists tool_error rows with the error class/message', function() 
 
     expect($record)->not->toBeNull();
     expect($record->kind)->toBe('tool_error');
-    expect($record->errorClass)->toBe('craftpulse\\cortex\\tools\\ToolException');
+    expect($record->errorClass)->toBe('craftpulse\\herald\\tools\\ToolException');
     expect($record->errorMessage)->toBe('Command not in allowlist');
 });
 
@@ -187,7 +187,7 @@ it('record() catches DB exceptions and returns null without re-throwing', functi
 // -----------------------------------------------------------------------------
 
 it('prune() returns 0 and deletes nothing when retention is null', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $original = $settings->auditRetentionDays;
     $settings->auditRetentionDays = null;
 
@@ -213,7 +213,7 @@ it('prune() returns 0 and deletes nothing when retention is null', function() {
 });
 
 it('prune() deletes rows older than the retention window', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $original = $settings->auditRetentionDays;
     $settings->auditRetentionDays = 30;
 
@@ -258,7 +258,7 @@ it('prune() deletes rows older than the retention window', function() {
 });
 
 it('prune() does not delete rows newer than the retention window', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $original = $settings->auditRetentionDays;
     $settings->auditRetentionDays = 7;
 
@@ -364,11 +364,11 @@ it('record() round-trip parity — DB row reconstitutes byte-equal KV line', fun
 // find() — fluent query
 // -----------------------------------------------------------------------------
 
-it('find() returns an InvocationQuery bound to the cortex_invocations table', function() {
+it('find() returns an InvocationQuery bound to the herald_invocations table', function() {
     $query = $this->service->find();
 
-    expect($query)->toBeInstanceOf(\craftpulse\cortex\db\InvocationQuery::class);
-    expect($query->from)->toBe([\craftpulse\cortex\db\Table::INVOCATIONS]);
+    expect($query)->toBeInstanceOf(\craftpulse\herald\db\InvocationQuery::class);
+    expect($query->from)->toBe([\craftpulse\herald\db\Table::INVOCATIONS]);
 });
 
 it('find() filters compose — toolName + kind + userId resolve to the right rows', function() {
@@ -484,5 +484,5 @@ it('find() null filters are no-ops so optional UI filters chain cleanly', functi
 // -----------------------------------------------------------------------------
 
 it('is registered on the plugin as the `invocations` component', function() {
-    expect(Cortex::getInstance()->invocations)->toBeInstanceOf(Invocations::class);
+    expect(Herald::getInstance()->invocations)->toBeInstanceOf(Invocations::class);
 });

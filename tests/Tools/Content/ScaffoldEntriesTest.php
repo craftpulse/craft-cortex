@@ -10,7 +10,7 @@
  * progress-frame cadence, and the cancellation contract.
  *
  * Fixture strategy: every test scaffolds into the playground's
- * `minorHeroes` channel under the `__cortex_scaftest_{hex}_` title
+ * `minorHeroes` channel under the `__herald_scaftest_{hex}_` title
  * prefix; `afterEach()` hard-deletes everything under the prefix.
  * =========================================================================
  *
@@ -20,18 +20,18 @@
 
 use craft\elements\Entry as EntryElement;
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\content\ScaffoldEntries;
-use craftpulse\cortex\tools\support\CancellationToken;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\content\ScaffoldEntries;
+use craftpulse\herald\tools\support\CancellationToken;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_scaftest_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_scaftest_' . bin2hex(random_bytes(4)) . '_';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -67,7 +67,7 @@ afterEach(function() {
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _cortex_scaffold_tool(): ScaffoldEntries
+function _herald_scaffold_tool(): ScaffoldEntries
 {
     return new ScaffoldEntries();
 }
@@ -75,7 +75,7 @@ function _cortex_scaffold_tool(): ScaffoldEntries
 /**
  * @return array{0: list<array<string,mixed>>, 1: array<string,mixed>}
  */
-function _cortex_scaffold_drain(Generator $gen): array
+function _herald_scaffold_drain(Generator $gen): array
 {
     $frames = [];
     while ($gen->valid()) {
@@ -92,23 +92,23 @@ function _cortex_scaffold_drain(Generator $gen): array
 // -----------------------------------------------------------------------------
 
 it('is NOT registered on Free installs', function() {
-    expect(Cortex::getInstance()->tools->getByName('scaffold_entries'))->toBeNull();
+    expect(Herald::getInstance()->tools->getByName('scaffold_entries'))->toBeNull();
     $names = array_map(
         static fn(array $entry): string => $entry['name'],
-        Cortex::getInstance()->tools->asListPayload(),
+        Herald::getInstance()->tools->asListPayload(),
     );
     expect($names)->not->toContain('scaffold_entries');
 });
 
 it('shouldRegister() returns true on Pro and false on Free', function() {
     expect(ScaffoldEntries::shouldRegister())->toBeFalse();
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect(ScaffoldEntries::shouldRegister())->toBeTrue();
     });
 });
 
 it('implements StreamableToolInterface', function() {
-    expect(_cortex_scaffold_tool())->toBeInstanceOf(\craftpulse\cortex\tools\StreamableToolInterface::class);
+    expect(_herald_scaffold_tool())->toBeInstanceOf(\craftpulse\herald\tools\StreamableToolInterface::class);
 });
 
 // -----------------------------------------------------------------------------
@@ -116,20 +116,20 @@ it('implements StreamableToolInterface', function() {
 // -----------------------------------------------------------------------------
 
 it('filterFor(null) returns true — stdio is trusted', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_scaffold_tool()->filterFor(null))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_scaffold_tool()->filterFor(null))->toBeTrue();
     });
 });
 
 it('filterFor returns true for admin users', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_scaffold_tool()->filterFor($this->admin))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_scaffold_tool()->filterFor($this->admin))->toBeTrue();
     });
 });
 
 it('filterFor returns false for users with no saveEntries permissions', function() {
     $user = new User();
-    $user->username = '__cortex_scaf_noperms_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_scaf_noperms_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -137,8 +137,8 @@ it('filterFor returns false for users with no saveEntries permissions', function
         $this->markTestSkipped('Could not create fixture user.');
     }
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
-            expect(_cortex_scaffold_tool()->filterFor($user))->toBeFalse();
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
+            expect(_herald_scaffold_tool()->filterFor($user))->toBeFalse();
         });
     } finally {
         Craft::$app->getElements()->deleteElement($user, hardDelete: true);
@@ -150,8 +150,8 @@ it('filterFor returns false for users with no saveEntries permissions', function
 // -----------------------------------------------------------------------------
 
 it('rejects missing sectionUid with a top-level error', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_scaffold_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_scaffold_tool()->execute([
             'count' => 1,
             'entryTypeUid' => $this->entryType->uid,
             'template' => ['title' => $this->fixturePrefix . '{n}'],
@@ -162,8 +162,8 @@ it('rejects missing sectionUid with a top-level error', function() {
 });
 
 it('rejects missing template.title with a top-level error', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_scaffold_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_scaffold_tool()->execute([
             'count' => 1,
             'sectionUid' => $this->section->uid,
             'entryTypeUid' => $this->entryType->uid,
@@ -175,8 +175,8 @@ it('rejects missing template.title with a top-level error', function() {
 });
 
 it('rejects an unknown sectionUid', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_scaffold_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_scaffold_tool()->execute([
             'count' => 1,
             'sectionUid' => '__not_a_real_uid_x9z__',
             'entryTypeUid' => $this->entryType->uid,
@@ -188,14 +188,14 @@ it('rejects an unknown sectionUid', function() {
 });
 
 it('rejects an entry type not assigned to the target section', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         // Borrow the hero entry type — it's NOT assigned to
         // minorHeroes.
         $foreign = Craft::$app->getEntries()->getEntryTypeByHandle('hero');
         if ($foreign === null) {
             $this->markTestSkipped('No `hero` entry type in playground.');
         }
-        $result = _cortex_scaffold_tool()->execute([
+        $result = _herald_scaffold_tool()->execute([
             'count' => 1,
             'sectionUid' => $this->section->uid,
             'entryTypeUid' => $foreign->uid,
@@ -211,8 +211,8 @@ it('rejects an entry type not assigned to the target section', function() {
 // -----------------------------------------------------------------------------
 
 it('throws when count exceeds the row cap without force', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_scaffold_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_scaffold_tool()->execute([
             'count' => ScaffoldEntries::ROW_CAP + 1,
             'sectionUid' => $this->section->uid,
             'entryTypeUid' => $this->entryType->uid,
@@ -226,11 +226,11 @@ it('throws when count exceeds the row cap without force', function() {
 // -----------------------------------------------------------------------------
 
 it('creates N entries with `{n:04d}` zero-padded titles', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $count = 5;
         $template = $this->fixturePrefix . '{n:04d}';
 
-        $result = _cortex_scaffold_tool()->execute([
+        $result = _herald_scaffold_tool()->execute([
             'count' => $count,
             'sectionUid' => $this->section->uid,
             'entryTypeUid' => $this->entryType->uid,
@@ -255,11 +255,11 @@ it('creates N entries with `{n:04d}` zero-padded titles', function() {
 });
 
 it('substitutes `{n}` without zero-padding', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $count = 3;
         $template = $this->fixturePrefix . '{n}';
 
-        $result = _cortex_scaffold_tool()->execute([
+        $result = _herald_scaffold_tool()->execute([
             'count' => $count,
             'sectionUid' => $this->section->uid,
             'entryTypeUid' => $this->entryType->uid,
@@ -275,8 +275,8 @@ it('substitutes `{n}` without zero-padding', function() {
 });
 
 it('substitutes slug template independently of title template', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_scaffold_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_scaffold_tool()->execute([
             'count' => 2,
             'sectionUid' => $this->section->uid,
             'entryTypeUid' => $this->entryType->uid,
@@ -300,16 +300,16 @@ it('substitutes slug template independently of title template', function() {
 // -----------------------------------------------------------------------------
 
 it('stream() yields one progress frame per progressInterval rows', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $count = 4;
-        $gen = _cortex_scaffold_tool()->stream([
+        $gen = _herald_scaffold_tool()->stream([
             'count' => $count,
             'sectionUid' => $this->section->uid,
             'entryTypeUid' => $this->entryType->uid,
             'progressInterval' => 1,
             'template' => ['title' => $this->fixturePrefix . '{n:03d}'],
         ], new InvocationContext());
-        [$frames, $return] = _cortex_scaffold_drain($gen);
+        [$frames, $return] = _herald_scaffold_drain($gen);
 
         expect($frames)->toHaveCount($count);
         $previous = -1;
@@ -323,7 +323,7 @@ it('stream() yields one progress frame per progressInterval rows', function() {
 });
 
 it('stream() short-circuits on a pre-armed cancellation token', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $count = 10;
         $callCount = 0;
         $token = new CancellationToken(static function() use (&$callCount): bool {
@@ -332,14 +332,14 @@ it('stream() short-circuits on a pre-armed cancellation token', function() {
         });
         $ctx = new InvocationContext(cancellationToken: $token);
 
-        $gen = _cortex_scaffold_tool()->stream([
+        $gen = _herald_scaffold_tool()->stream([
             'count' => $count,
             'sectionUid' => $this->section->uid,
             'entryTypeUid' => $this->entryType->uid,
             'progressInterval' => 1,
             'template' => ['title' => $this->fixturePrefix . '{n:03d}'],
         ], $ctx);
-        [, $return] = _cortex_scaffold_drain($gen);
+        [, $return] = _herald_scaffold_drain($gen);
 
         expect($return['cancelled'])->toBeTrue();
         expect($return['processed'])->toBeLessThan($count);
@@ -351,10 +351,10 @@ it('stream() short-circuits on a pre-armed cancellation token', function() {
 // -----------------------------------------------------------------------------
 
 it('idempotency cache returns the cached envelope on a second call with the same key', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $key = 'scaf_idem_' . bin2hex(random_bytes(4));
 
-        $first = _cortex_scaffold_tool()->execute([
+        $first = _herald_scaffold_tool()->execute([
             'count' => 2,
             'sectionUid' => $this->section->uid,
             'entryTypeUid' => $this->entryType->uid,
@@ -363,7 +363,7 @@ it('idempotency cache returns the cached envelope on a second call with the same
         ]);
         expect($first['succeeded'])->toBe(2);
 
-        $second = _cortex_scaffold_tool()->execute([
+        $second = _herald_scaffold_tool()->execute([
             'count' => 2,
             'sectionUid' => $this->section->uid,
             'entryTypeUid' => $this->entryType->uid,

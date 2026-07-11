@@ -1,11 +1,11 @@
 <?php
 
-namespace craftpulse\cortex\console\controllers;
+namespace craftpulse\herald\console\controllers;
 
 use craft\console\Controller;
 use craft\log\MonologTarget;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\mcp\Server;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
 use Monolog\Handler\StreamHandler;
 use Throwable;
 use Yii;
@@ -111,7 +111,7 @@ class ServeController extends Controller
 
         stream_set_blocking($stdin, true);
 
-        $maxBytes = Cortex::getInstance()->getSettings()->stdioMaxMessageBytes;
+        $maxBytes = Herald::getInstance()->getSettings()->stdioMaxMessageBytes;
 
         while (!$this->_shouldStop && ($read = $this->_readMessage($stdin, $maxBytes)) !== null) {
             [$line, $oversized] = $read;

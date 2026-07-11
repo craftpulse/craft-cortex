@@ -6,11 +6,11 @@
  */
 
 use craft\elements\Entry;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('entries');
+    $this->tool = Herald::getInstance()->tools->getByName('entries');
 });
 
 it('returns an entries list with pagination metadata', function() {
@@ -86,7 +86,7 @@ it('stubs relational fields when `with` is not supplied (no N+1)', function() {
         $this->markTestSkipped('No entries in playground.');
     }
 
-    [$result] = cortex_count_queries(fn() => $this->tool->execute(['limit' => 5]));
+    [$result] = herald_count_queries(fn() => $this->tool->execute(['limit' => 5]));
 
     foreach ($result['entries'] as $entry) {
         foreach ($entry['fields'] as $value) {

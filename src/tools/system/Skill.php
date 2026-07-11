@@ -1,26 +1,26 @@
 <?php
 
-namespace craftpulse\cortex\tools\system;
+namespace craftpulse\herald\tools\system;
 
 use Craft;
 use craft\elements\User;
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\elements\Skill as SkillElement;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\IdempotencyTrait;
-use craftpulse\cortex\tools\PermissionedToolTrait;
-use craftpulse\cortex\tools\ProToolTrait;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\elements\Skill as SkillElement;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\IdempotencyTrait;
+use craftpulse\herald\tools\PermissionedToolTrait;
+use craftpulse\herald\tools\ProToolTrait;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
 
 /**
  * =========================================================================
  * `skill` Pro tool — list / get / create / update / delete element-stored
- * Cortex Skills (Gate 8.6).
+ * Herald Skills (Gate 8.6).
  *
  * Five modes dispatched off the `mode` argument:
  *
@@ -43,9 +43,9 @@ use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
  *                handle is the natural key. Mirror the `address`
  *                ownership-change refusal pattern.
  *   - `delete` — soft-delete by default; `hardDelete: true` removes the
- *                row entirely (FK CASCADE wipes `cortex_skills`).
+ *                row entirely (FK CASCADE wipes `herald_skills`).
  *
- * Permission contract — `manageCortexSkills` (global, no per-instance
+ * Permission contract — `manageHeraldSkills` (global, no per-instance
  * ACL). Admins always pass; non-admins pass when granted the
  * permission. The element's `canSave / canDelete / canView /
  * canDuplicate` overrides resolve to the same permission; the mode
@@ -53,7 +53,7 @@ use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
  * in-depth.
  *
  * Idempotency: `idempotencyKey` is server-side dedup for `create` and
- * `update`. Cache prefix `cortex:skill:idem:`. TTL 24h. Skipped on
+ * `update`. Cache prefix `herald:skill:idem:`. TTL 24h. Skipped on
  * stdio.
  *
  * Bundled-skills repo portability: the bundled corpus loads from
@@ -72,7 +72,7 @@ use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
  */
 #[IsDestructive]
 #[IsIdempotent(false)]
-#[Title('Skill — list / get / create / update / delete (Cortex skills)')]
+#[Title('Skill — list / get / create / update / delete (Herald skills)')]
 class Skill extends AbstractTool
 {
     use IdempotencyTrait;
@@ -101,7 +101,7 @@ class Skill extends AbstractTool
      *
      * @since 5.0.0
      */
-    public const IDEMPOTENCY_CACHE_PREFIX = 'cortex:skill:idem:';
+    public const IDEMPOTENCY_CACHE_PREFIX = 'herald:skill:idem:';
 
     /**
      * Source filter values for `list` mode. `all` is the default.
@@ -134,7 +134,7 @@ class Skill extends AbstractTool
      */
     public static function getDescription(): string
     {
-        return 'Write tool for Cortex skill elements. Modes: list / get / create / update / ' .
+        return 'Write tool for Herald skill elements. Modes: list / get / create / update / ' .
             'delete. Skills are markdown documents addressable by handle; element-stored ' .
             'skills override bundled `michtio/craftcms-claude-skills` skills on handle ' .
             'collision (see locked decision 2 of Gate 8.6). list returns the merged ' .
@@ -142,7 +142,7 @@ class Skill extends AbstractTool
             'source=bundled / element / all (default all). create requires handle + title; ' .
             'update accepts id / uid / handle but rejects handle changes (natural-key ' .
             'invariant). delete soft-deletes by default; hardDelete=true removes the row ' .
-            'entirely and cascades the cortex_skills FK. Permission: manageCortexSkills ' .
+            'entirely and cascades the herald_skills FK. Permission: manageHeraldSkills ' .
             '(global, no per-instance ACL). idempotencyKey caches the result for 24h.';
     }
 
@@ -186,7 +186,7 @@ class Skill extends AbstractTool
                 ->description('list mode: filter by row provenance. Default `all`.'),
 
             // Mode-specific flags.
-            'hardDelete' => Schema::boolean()->description('delete only: when true, removes the row entirely (FK CASCADE wipes the cortex_skills row). Default false.'),
+            'hardDelete' => Schema::boolean()->description('delete only: when true, removes the row entirely (FK CASCADE wipes the herald_skills row). Default false.'),
 
             // Idempotency.
             'idempotencyKey' => Schema::string()
@@ -199,7 +199,7 @@ class Skill extends AbstractTool
      * @inheritdoc
      *
      * stdio is trusted; admins always pass; non-admins need
-     * `manageCortexSkills`. Mirrors `Address::filterFor()` shape.
+     * `manageHeraldSkills`. Mirrors `Address::filterFor()` shape.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -263,7 +263,7 @@ class Skill extends AbstractTool
 
     /**
      * Permission gate — every mutating mode requires
-     * `manageCortexSkills`. Read modes (`list` / `get`) skip the
+     * `manageHeraldSkills`. Read modes (`list` / `get`) skip the
      * mutation gate but still consult `filterFor()` for whole-tool
      * visibility upstream.
      *
@@ -322,7 +322,7 @@ class Skill extends AbstractTool
     private function _list(array $arguments): array
     {
         $source = $this->_source($arguments);
-        $rows = Cortex::getInstance()->skills->getMergedCorpus('skill');
+        $rows = Herald::getInstance()->skills->getMergedCorpus('skill');
 
         if ($source !== self::SOURCE_ALL) {
             $rows = array_values(array_filter(
@@ -394,7 +394,7 @@ class Skill extends AbstractTool
             throw new ToolException('skill: `id`, `uid`, or `handle` is required.');
         }
 
-        $rows = Cortex::getInstance()->skills->getMergedCorpus('skill');
+        $rows = Herald::getInstance()->skills->getMergedCorpus('skill');
         foreach ($rows as $row) {
             if (($row['skill'] ?? null) === $handle) {
                 return [
@@ -453,7 +453,7 @@ class Skill extends AbstractTool
 
         $caller = Craft::$app->getUser()->getIdentity();
         if ($caller !== null && !Craft::$app->getElements()->canSave($element, $caller)) {
-            throw new ToolException('skill: create denied — caller cannot save Cortex skills.');
+            throw new ToolException('skill: create denied — caller cannot save Herald skills.');
         }
 
         if (!Craft::$app->getElements()->saveElement($element, runValidation: true)) {
@@ -525,7 +525,7 @@ class Skill extends AbstractTool
 
     /**
      * Delete-mode dispatch. Soft-deletes by default; `hardDelete: true`
-     * removes the row entirely (FK CASCADE wipes `cortex_skills`).
+     * removes the row entirely (FK CASCADE wipes `herald_skills`).
      *
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
@@ -767,7 +767,7 @@ class Skill extends AbstractTool
      */
     private function _serializeElement(SkillElement $element): array
     {
-        $service = Cortex::getInstance()->skills;
+        $service = Herald::getInstance()->skills;
         $handle = (string) ($element->handle ?? '');
         return [
             'source' => self::SOURCE_ELEMENT,
@@ -799,7 +799,7 @@ class Skill extends AbstractTool
         $handle = (string) ($row['skill'] ?? '');
 
         if (($row['source'] ?? null) === self::SOURCE_ELEMENT) {
-            $element = Cortex::getInstance()->skills->getByHandle($handle);
+            $element = Herald::getInstance()->skills->getByHandle($handle);
             if ($element !== null) {
                 return $this->_serializeElement($element);
             }

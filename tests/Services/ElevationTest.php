@@ -14,12 +14,12 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\mcp\Server;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
 
 it('mints an elevation marker bound to a Craft user id', function() {
     $userId = random_int(1_000_000, 9_000_000);
-    $oauth = Cortex::getInstance()->oauth;
+    $oauth = Herald::getInstance()->oauth;
 
     expect($oauth->isElevated($userId))->toBeFalse();
 
@@ -34,7 +34,7 @@ it('mints an elevation marker bound to a Craft user id', function() {
 it('elevation is bound per-user — a different user id is not elevated', function() {
     $userA = random_int(1_000_000, 4_000_000);
     $userB = random_int(5_000_000, 9_000_000);
-    $oauth = Cortex::getInstance()->oauth;
+    $oauth = Herald::getInstance()->oauth;
 
     $oauth->grantElevation($userA);
 
@@ -46,9 +46,9 @@ it('elevation is bound per-user — a different user id is not elevated', functi
 
 it('the elevation cache key is a hash of the user id (no raw id leak)', function() {
     $userId = 1234567;
-    $key = Cortex::getInstance()->oauth->elevationCacheKey($userId);
+    $key = Herald::getInstance()->oauth->elevationCacheKey($userId);
 
-    expect($key)->toContain('cortex:elevation:')
+    expect($key)->toContain('herald:elevation:')
         ->and($key)->not->toContain((string) $userId);
 });
 
@@ -57,7 +57,7 @@ it('elevation does NOT unlock craft_exec over the HTTP transport', function() {
     // craft_exec. Elevation compensates for the missing HTTP re-auth on
     // credential / content operations — it never crosses the code-
     // execution transport boundary.
-    cortex_with_pro_registry(function(): void {
+    herald_with_pro_registry(function(): void {
         $server = new Server(Server::TRANSPORT_HTTP);
         $server->setElevated(true);
 

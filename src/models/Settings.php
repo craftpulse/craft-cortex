@@ -1,25 +1,25 @@
 <?php
 
-namespace craftpulse\cortex\models;
+namespace craftpulse\herald\models;
 
 use Craft;
 use craft\base\Model;
-use craftpulse\cortex\services\Allowlist;
+use craftpulse\herald\services\Allowlist;
 use DateInterval;
 use Throwable;
 
 /**
  * =========================================================================
- * Cortex plugin settings.
+ * Herald plugin settings.
  *
- * Loaded by Craft from `plugins.cortex.settings.*` in project config and
- * merged with overrides from `config/cortex.php`. The settings model is
+ * Loaded by Craft from `plugins.herald.settings.*` in project config and
+ * merged with overrides from `config/herald.php`. The settings model is
  * the single source of truth for tool-level configuration that should
  * sync across environments — currently the `craft_command` allowlist
  * and `craft_exec` toggles.
  *
  * Runtime overrides (admin-editable, auto-expiring) live in the
- * `cortex_runtime_overrides` DB table and are layered on top at lookup
+ * `herald_runtime_overrides` DB table and are layered on top at lookup
  * time, driven by the CP settings UI.
  * =========================================================================
  *
@@ -38,7 +38,7 @@ class Settings extends Model
      *               `allowAdminChanges` — these routes touch content,
      *               caches, queues, mail, or other non-schema state.
      *               Override via project config or
-     *               `config/cortex.php`.
+     *               `config/herald.php`.
      *
      *               Pre-Gate-8.1 this array also carried the admin-
      *               level patterns (`migrate/*`, `make/*`, etc.).
@@ -75,11 +75,11 @@ class Settings extends Model
      *               `ToolException` (surfaced as an `isError: true`
      *               tool-result envelope) naming `allowAdminChanges`
      *               as the reason. The rejection still writes a
-     *               `cortex_invocations` row with `kind=tool_error`
+     *               `herald_invocations` row with `kind=tool_error`
      *               so the audit trail captures the boundary attempt.
      *
      *               Override via project config or
-     *               `config/cortex.php` to tighten the admin-level
+     *               `config/herald.php` to tighten the admin-level
      *               surface per environment.
      *
      *               The default mirrors
@@ -102,7 +102,7 @@ class Settings extends Model
      *               permission. Field-layout-designer hiding is UX-
      *               only; values are still accessible via
      *               `getFieldValue()` regardless of layout config.
-     *               Defense in depth requires Cortex providing its
+     *               Defense in depth requires Herald providing its
      *               own gate — mirrors the command-allowlist
      *               pattern.
      *
@@ -140,13 +140,13 @@ class Settings extends Model
      *          stored but no longer count toward the effective
      *          allowlist; expired rows are pruned during Craft's gc
      *          cycle (see `Allowlist::pruneExpired()` wired to
-     *          `Gc::EVENT_RUN` in `Cortex::init()`).
+     *          `Gc::EVENT_RUN` in `Herald::init()`).
      */
     public int $runtimeOverrideTtl = 604800;
 
     /**
      * @var bool Whether the HTTP transport (`POST/GET/DELETE
-     *          /cortex/mcp`) accepts requests. Defaults to false: the
+     *          /herald/mcp`) accepts requests. Defaults to false: the
      *          HTTP transport is opt-in, so a default install exposes
      *          only the trusted local stdio transport. It is also the
      *          kill switch — with this flag false, the MCP, OAuth, and
@@ -193,7 +193,7 @@ class Settings extends Model
 
     /**
      * @var int|null Default TTL (in seconds) applied to a new bearer
-     *               token when `cortex/token/issue` is invoked without
+     *               token when `herald/token/issue` is invoked without
      *               an explicit `--ttl=<seconds>` flag. Null (the
      *               default) means tokens have no expiry — admin-
      *               issued credentials live until revoked. Operators
@@ -264,7 +264,7 @@ class Settings extends Model
 
     /**
      * @var int Number of bytes of the (post-redaction) JSON-encoded tool
-     *          response to persist in `cortex_invocations.responseExcerpt`.
+     *          response to persist in `herald_invocations.responseExcerpt`.
      *          The DB column is `text`, so values up to 65535 fit; the
      *          default 2048 keeps the audit table footprint small while
      *          surfacing enough payload for forensics. The full response
@@ -274,7 +274,7 @@ class Settings extends Model
     public int $auditResponseExcerptBytes = 2048;
 
     /**
-     * @var int|null Retention window (in days) for `cortex_invocations`
+     * @var int|null Retention window (in days) for `herald_invocations`
      *               rows. Null (the default) means audit history is
      *               retained forever — a regulatory-friendly posture
      *               that punts the eviction decision to operators with
@@ -307,7 +307,7 @@ class Settings extends Model
      * @var int Burst capacity for the per-user HTTP rate limiter — the
      *          maximum tokens a single Craft user's bucket can hold at
      *          any one time. Each authenticated POST to
-     *          `/cortex/mcp` consumes one token; refills accrue at
+     *          `/herald/mcp` consumes one token; refills accrue at
      *          `$rateLimitPerSecond` tokens per second. Default 60
      *          covers a multi-tool LLM conversation turn without
      *          throttling interactive use, while bounding a runaway
@@ -376,7 +376,7 @@ class Settings extends Model
             new DateInterval($value);
         } catch (Throwable) {
             $this->addError($attribute, Craft::t(
-                'cortex',
+                'herald',
                 '“{value}” is not a valid ISO-8601 duration (e.g. PT1H, P30D).',
                 ['value' => $value],
             ));

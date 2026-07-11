@@ -1,8 +1,8 @@
 <?php
 
-namespace craftpulse\cortex\resources;
+namespace craftpulse\herald\resources;
 
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 use Michtio\CraftCmsClaudeSkills\Skills;
 
 /**
@@ -133,9 +133,9 @@ class SkillResource extends AbstractResource
             // element-stored skill exists for this handle, synthesize
             // the override bytestream. Otherwise fall through to the
             // bundled filesystem reader.
-            $element = Cortex::getInstance()->skills->getByHandle($this->_skill);
+            $element = Herald::getInstance()->skills->getByHandle($this->_skill);
             $text = $element !== null
-                ? Cortex::getInstance()->skills->synthesizeContent($element)
+                ? Herald::getInstance()->skills->synthesizeContent($element)
                 : Skills::content($this->_skill);
         }
 

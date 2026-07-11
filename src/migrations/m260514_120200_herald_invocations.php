@@ -1,14 +1,14 @@
 <?php
 
-namespace craftpulse\cortex\migrations;
+namespace craftpulse\herald\migrations;
 
 use craft\db\Migration;
 use craft\db\Table as CraftTable;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Gate 7.5 migration — creates the `cortex_invocations` audit-log table.
+ * Gate 7.5 migration — creates the `herald_invocations` audit-log table.
  *
  * One row per authenticated HTTP-transport `tools/call`. stdio
  * invocations write to Craft's KV log only and never persist a row here
@@ -34,12 +34,12 @@ use craftpulse\cortex\db\Table;
  *   - `userId` → `users(id)` SET NULL. A deleted user shouldn't take
  *     their audit history with them — the row stays for forensics,
  *     the `userId` slot just goes null.
- *   - `tokenId` → `cortex_tokens(id)` SET NULL. Same rationale —
+ *   - `tokenId` → `herald_tokens(id)` SET NULL. Same rationale —
  *     revoking a token shouldn't lose the audit trail of what it did
  *     while it was live.
  *
- * `tokenId` references `cortex_tokens(id)` only. OAuth tokens
- * (`cortex_oauth_tokens`) are NOT correlated via FK because we have
+ * `tokenId` references `herald_tokens(id)` only. OAuth tokens
+ * (`herald_oauth_tokens`) are NOT correlated via FK because we have
  * two source tables — `tokenId` carries the bearer-row id when
  * authentication was via long-lived bearer; OAuth-authenticated
  * invocations leave `tokenId` null and the OAuth correlation lives
@@ -54,7 +54,7 @@ use craftpulse\cortex\db\Table;
  * @author Craftpulse
  * @since  5.0.0
  */
-class m260514_120200_cortex_invocations extends Migration
+class m260514_120200_herald_invocations extends Migration
 {
     // Public Methods
     // =========================================================================
@@ -111,7 +111,7 @@ class m260514_120200_cortex_invocations extends Migration
         );
 
         // tokenId FK — SET NULL on token delete (preserve audit history).
-        // The `cortex_tokens` table soft-deletes via `dateDeleted` so
+        // The `herald_tokens` table soft-deletes via `dateDeleted` so
         // the FK rarely fires; the SET NULL is defensive against future
         // hard-delete sweeps or operator-driven cleanups.
         $this->addForeignKey(

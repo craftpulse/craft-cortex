@@ -2,9 +2,9 @@
 
 /**
  * =========================================================================
- * Cortex configuration reference.
+ * Herald configuration reference.
  *
- * Copy this file to your Craft project's `config/cortex.php` to override
+ * Copy this file to your Craft project's `config/herald.php` to override
  * the defaults baked into `Settings` and the project-config layer. Craft
  * loads this file automatically and merges values into the plugin
  * settings model at boot.
@@ -15,16 +15,16 @@
  * keys (e.g. `production`, `staging`, `dev`) override the wildcard.
  *
  * Precedence (highest -> lowest):
- *   1. `config/cortex.php` environment-specific keys
- *   2. `config/cortex.php` wildcard (`*`) keys
- *   3. Project config — `plugins.cortex.settings.*`
+ *   1. `config/herald.php` environment-specific keys
+ *   2. `config/herald.php` wildcard (`*`) keys
+ *   3. Project config — `plugins.herald.settings.*`
  *   4. Defaults from `models/Settings`
  *
  * Runtime DB overrides (admin-issued via the CP, auto-expiring) layer
  * on top of `allowedCommands` only — they don't override
  * `adminLevelCommands`, the toggles, or TTL config. To grant a
  * normally-admin-level pattern at runtime, extend `allowedCommands`
- * directly via project config or `config/cortex.php` for the target
+ * directly via project config or `config/herald.php` for the target
  * environment.
  * =========================================================================
  *
@@ -87,7 +87,7 @@ return [
          * with JSON-RPC code `-32002` and an error message naming
          * `allowAdminChanges` as the reason. The rejection is still
          * audit-logged so the boundary attempt survives in
-         * `cortex_invocations`.
+         * `herald_invocations`.
          *
          * Tighten this list per environment when you want a stricter
          * posture than the defaults provide — e.g. drop `make/*` on
@@ -118,7 +118,7 @@ return [
          *
          * Craft 5 has no native per-field-value permission; field-
          * layout-designer hiding is UX-only. Defense in depth
-         * requires Cortex providing its own gate — this allowlist is
+         * requires Herald providing its own gate — this allowlist is
          * the gate. Native user attributes (id, username, email,
          * etc.) are NOT subject to this allowlist; per-permission
          * gates handle them. Only custom-field values are gated here.
@@ -178,7 +178,7 @@ return [
         // ---------------------------------------------------------------------
 
         /**
-         * Whether the HTTP transport (`POST/GET/DELETE /cortex/mcp`)
+         * Whether the HTTP transport (`POST/GET/DELETE /herald/mcp`)
          * accepts requests. Defaults to false so production installs
          * stay off until per-user filtering (sub-gate 7.4) and bearer-
          * token auth (sub-gates 7.2 / 7.3) land. With this flag false,
@@ -316,7 +316,7 @@ return [
 
         /**
          * Default TTL (in seconds) applied to a new bearer token issued
-         * via `cortex/token/issue` when no explicit `--ttl=<seconds>`
+         * via `herald/token/issue` when no explicit `--ttl=<seconds>`
          * flag is passed. Null (the default) means tokens never expire
          * — admin-issued credentials live until revoked. Set this to
          * e.g. 2592000 (30 days) to force a regular rotation cadence
@@ -333,7 +333,7 @@ return [
 
         /**
          * Number of bytes of the (post-redaction) JSON-encoded tool
-         * response persisted to `cortex_invocations.responseExcerpt`.
+         * response persisted to `herald_invocations.responseExcerpt`.
          * The DB column is `text`, so values up to 65535 fit; the
          * default 2048 keeps the audit table footprint small while
          * surfacing enough payload for forensics. The full response
@@ -345,7 +345,7 @@ return [
         // 'auditResponseExcerptBytes' => 2048,
 
         /**
-         * Retention window (in days) for `cortex_invocations` rows.
+         * Retention window (in days) for `herald_invocations` rows.
          * Null (the default) means audit history is retained forever
          * — the compliance-friendly default that punts the eviction
          * decision to operators with local-policy knowledge. Set
@@ -363,7 +363,7 @@ return [
         /**
          * Burst capacity for the per-user HTTP rate limiter — the
          * maximum tokens a single Craft user's bucket can hold. Each
-         * authenticated POST to `/cortex/mcp` consumes one token;
+         * authenticated POST to `/herald/mcp` consumes one token;
          * refills accrue at `rateLimitPerSecond` per second.
          * Default 60 covers a multi-tool LLM conversation turn without
          * throttling interactive use, while bounding a runaway agent

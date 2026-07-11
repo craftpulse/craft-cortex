@@ -1,16 +1,16 @@
 <?php
 
-namespace craftpulse\cortex\records;
+namespace craftpulse\herald\records;
 
 use craft\db\ActiveRecord;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Active record for the `cortex_runtime_overrides` table.
+ * Active record for the `herald_runtime_overrides` table.
  *
  * Each row is an admin-issued allowlist pattern that layers on top of
- * the project-config / `config/cortex.php` defaults. Patterns auto-
+ * the project-config / `config/herald.php` defaults. Patterns auto-
  * expire (default 7 days, configurable via `Settings::$runtimeOverrideTtl`)
  * so transient grants don't accumulate. Cleanup runs inline during
  * Craft's gc sweep via `Allowlist::pruneExpired()`.

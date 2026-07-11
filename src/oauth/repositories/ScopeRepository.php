@@ -1,9 +1,9 @@
 <?php
 
-namespace craftpulse\cortex\oauth\repositories;
+namespace craftpulse\herald\oauth\repositories;
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\oauth\entities\ScopeEntity;
+use craftpulse\herald\Herald;
+use craftpulse\herald\oauth\entities\ScopeEntity;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Entities\ScopeEntityInterface;
 use League\OAuth2\Server\Repositories\ScopeRepositoryInterface;
@@ -12,7 +12,7 @@ use League\OAuth2\Server\Repositories\ScopeRepositoryInterface;
  * =========================================================================
  * League adapter — `ScopeRepositoryInterface`.
  *
- * Cortex's scope vocabulary is the capability set owned by the `Scopes`
+ * Herald's scope vocabulary is the capability set owned by the `Scopes`
  * service (`content:read`, `content:write`, `assets:write`,
  * `schema:read`, `system:read`, `users:read`, `users:write`). The
  * legacy coarse `read` / `write`
@@ -26,7 +26,7 @@ use League\OAuth2\Server\Repositories\ScopeRepositoryInterface;
  *
  * `finalizeScopes()` is the per-request rewrite hook: league calls it
  * with the scopes the client requested + the grant type + the client
- * entity + the user. Cortex expands any legacy coarse scope to its
+ * entity + the user. Herald expands any legacy coarse scope to its
  * capability cluster here so the issued token carries fine-grained
  * scopes from the moment it's minted.
  * =========================================================================
@@ -43,7 +43,7 @@ class ScopeRepository implements ScopeRepositoryInterface
      * Back-compat alias for the capability scope vocabulary. Callers
      * that still reference the constant resolve the live `Scopes`
      * service list; the constant itself is kept for the legacy
-     * `read` / `write` shorthand. Prefer `Cortex::getInstance()->scopes->all()`
+     * `read` / `write` shorthand. Prefer `Herald::getInstance()->scopes->all()`
      * in new code.
      *
      * @var string[]
@@ -71,7 +71,7 @@ class ScopeRepository implements ScopeRepositoryInterface
      */
     public function getScopeEntityByIdentifier(string $identifier): ?ScopeEntityInterface
     {
-        if ($identifier === '' || !Cortex::getInstance()->scopes->isKnown($identifier)) {
+        if ($identifier === '' || !Herald::getInstance()->scopes->isKnown($identifier)) {
             return null;
         }
 
@@ -102,7 +102,7 @@ class ScopeRepository implements ScopeRepositoryInterface
             $scopes,
         );
 
-        $expanded = Cortex::getInstance()->scopes->expandLegacyScopes($identifiers);
+        $expanded = Herald::getInstance()->scopes->expandLegacyScopes($identifiers);
 
         $finalized = [];
         foreach ($expanded as $identifier) {

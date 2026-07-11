@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\oauth\entities;
+namespace craftpulse\herald\oauth\entities;
 
 use League\OAuth2\Server\Entities\Traits\EntityTrait;
 use League\OAuth2\Server\Entities\UserEntityInterface;

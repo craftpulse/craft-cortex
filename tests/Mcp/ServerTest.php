@@ -11,9 +11,9 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
+use craftpulse\herald\tools\AbstractTool;
 
 beforeEach(function() {
     $this->server = new Server();
@@ -88,12 +88,12 @@ it('falls back to the latest protocol version when the client requests an unsupp
  *
  * @return string|null the matched log line, or null if nothing was logged
  */
-function _cortex_last_audit_line(): ?string
+function _herald_last_audit_line(): ?string
 {
     $messages = Craft::getLogger()->messages;
     for ($i = count($messages) - 1; $i >= 0; $i--) {
         $entry = $messages[$i];
-        if (($entry[2] ?? null) !== \craftpulse\cortex\tools\support\InvocationLogger::CATEGORY) {
+        if (($entry[2] ?? null) !== \craftpulse\herald\tools\support\InvocationLogger::CATEGORY) {
             continue;
         }
         $text = (string) $entry[0];
@@ -126,7 +126,7 @@ it('stamps the captured clientInfo.name into the audit-log line', function() {
         'params' => ['name' => 'sections'],
     ]);
 
-    expect(_cortex_last_audit_line())->toContain('client=claude-code');
+    expect(_herald_last_audit_line())->toContain('client=claude-code');
 });
 
 it('renders client=- in the audit log when initialize omits clientInfo', function() {
@@ -147,7 +147,7 @@ it('renders client=- in the audit log when initialize omits clientInfo', functio
         'params' => ['name' => 'sections'],
     ]);
 
-    expect(_cortex_last_audit_line())->toContain('client=-');
+    expect(_herald_last_audit_line())->toContain('client=-');
 });
 
 it('clears a previously-captured client name when a re-handshake omits clientInfo', function() {
@@ -183,7 +183,7 @@ it('clears a previously-captured client name when a re-handshake omits clientInf
         'params' => ['name' => 'sections'],
     ]);
 
-    expect(_cortex_last_audit_line())->toContain('client=-');
+    expect(_herald_last_audit_line())->toContain('client=-');
 });
 
 // -----------------------------------------------------------------------------
@@ -211,7 +211,7 @@ it('returns the registry as tools/list', function() {
     ]);
 
     expect($response['result'])->toHaveKey('tools');
-    expect($response['result']['tools'])->toHaveCount(Cortex::getInstance()->tools->getCount());
+    expect($response['result']['tools'])->toHaveCount(Herald::getInstance()->tools->getCount());
 
     foreach ($response['result']['tools'] as $tool) {
         expect($tool)->toBeMcpToolListItem();
@@ -236,7 +236,7 @@ it('wraps tool output in an MCP success envelope on tools/call', function() {
     expect($response)->toHaveKey('result');
     expect($response['result'])->toBeMcpSuccessEnvelope();
 
-    $unwrapped = cortex_unwrap($response['result']);
+    $unwrapped = herald_unwrap($response['result']);
     expect($unwrapped)->toHaveKey('count');
 });
 
@@ -275,7 +275,7 @@ it('dual-emits structuredContent when the tool declares an outputSchema', functi
     expect($response['result'])->toHaveKey('structuredContent');
 
     $structured = $response['result']['structuredContent'];
-    $text = cortex_unwrap($response['result']);
+    $text = herald_unwrap($response['result']);
 
     expect($structured)->toBe($text);
     expect($structured)->toHaveKeys(['craft', 'php', 'db', 'sites', 'license']);
@@ -288,14 +288,14 @@ it('returns an isError envelope when a tool throws ToolException', function() {
         'method' => 'tools/call',
         'params' => [
             'name' => 'sections',
-            'arguments' => ['handle' => '__cortex_no_such_section__'],
+            'arguments' => ['handle' => '__herald_no_such_section__'],
         ],
     ]);
 
     expect($response)->toHaveKey('result');
     expect($response['result'])->toBeMcpErrorEnvelope();
     expect($response['result']['content'][0]['text'])
-        ->toContain('__cortex_no_such_section__');
+        ->toContain('__herald_no_such_section__');
 });
 
 // -----------------------------------------------------------------------------
@@ -372,7 +372,7 @@ it('setUserId() is request-scoped — separate Server instances do not share use
         'method' => 'tools/call',
         'params' => ['name' => 'sections'],
     ]);
-    $aLine = _cortex_last_audit_line();
+    $aLine = _herald_last_audit_line();
     expect($aLine)->toContain('user=101');
 
     $b->dispatch([
@@ -381,7 +381,7 @@ it('setUserId() is request-scoped — separate Server instances do not share use
         'method' => 'tools/call',
         'params' => ['name' => 'sections'],
     ]);
-    $bLine = _cortex_last_audit_line();
+    $bLine = _herald_last_audit_line();
     expect($bLine)->toContain('user=202');
     // Confirm the second dispatch produced a different line — same
     // text would mean we accidentally read the cached one from `$a`.
@@ -457,7 +457,7 @@ it('returns -32603 with a generic message when a tool throws an unexpected excep
     // full message via Craft::error and return a generic wire envelope
     // so the exception text never reaches the caller.
     $secret = '__SECRET_DB_CONNECTION_STRING__';
-    $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event) use ($secret): void {
+    $listener = function(\craftpulse\herald\events\RegisterToolsEvent $event) use ($secret): void {
         $event->tools[] = new class($secret) extends AbstractTool {
             public function __construct(private string $secret)
             {
@@ -480,17 +480,17 @@ it('returns -32603 with a generic message when a tool throws an unexpected excep
         };
     };
     \yii\base\Event::on(
-        \craftpulse\cortex\services\Tools::class,
-        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        \craftpulse\herald\services\Tools::class,
+        \craftpulse\herald\services\Tools::EVENT_REGISTER_TOOLS,
         $listener,
     );
 
     // Swap the plugin's `tools` service for a freshly-built one so the
     // listener fires and the dispatcher sees the fixture tool.
-    $originalTools = Cortex::getInstance()->tools;
-    $freshTools = new \craftpulse\cortex\services\Tools();
+    $originalTools = Herald::getInstance()->tools;
+    $freshTools = new \craftpulse\herald\services\Tools();
     $freshTools->init();
-    Cortex::getInstance()->set('tools', $freshTools);
+    Herald::getInstance()->set('tools', $freshTools);
 
     try {
         $response = $this->server->dispatch([
@@ -509,10 +509,10 @@ it('returns -32603 with a generic message when a tool throws an unexpected excep
             ->toContain('_throwing_test_tool')
             ->not->toContain($secret);
     } finally {
-        Cortex::getInstance()->set('tools', $originalTools);
+        Herald::getInstance()->set('tools', $originalTools);
         \yii\base\Event::off(
-            \craftpulse\cortex\services\Tools::class,
-            \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+            \craftpulse\herald\services\Tools::class,
+            \craftpulse\herald\services\Tools::EVENT_REGISTER_TOOLS,
             $listener,
         );
     }
@@ -537,7 +537,7 @@ it('returns the prompt registry as prompts/list', function() {
     $response = $this->server->dispatch(['jsonrpc' => '2.0', 'id' => 20, 'method' => 'prompts/list']);
 
     expect($response['result'])->toHaveKey('prompts');
-    expect($response['result']['prompts'])->toHaveCount(Cortex::getInstance()->prompts->getCount());
+    expect($response['result']['prompts'])->toHaveCount(Herald::getInstance()->prompts->getCount());
 
     foreach ($response['result']['prompts'] as $entry) {
         expect($entry)
@@ -601,7 +601,7 @@ it('returns the resource registry as resources/list', function() {
     $response = $this->server->dispatch(['jsonrpc' => '2.0', 'id' => 30, 'method' => 'resources/list']);
 
     expect($response['result'])->toHaveKey('resources');
-    expect($response['result']['resources'])->toHaveCount(Cortex::getInstance()->resources->getCount());
+    expect($response['result']['resources'])->toHaveCount(Herald::getInstance()->resources->getCount());
 
     foreach ($response['result']['resources'] as $entry) {
         expect($entry)
@@ -688,8 +688,8 @@ it('responds to ping with an empty result', function() {
 // -----------------------------------------------------------------------------
 
 it('eagerly consumes a Generator-returning tool and surfaces the return value', function() {
-    $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event): void {
-        $event->tools[] = new class() extends \craftpulse\cortex\tools\AbstractTool {
+    $listener = function(\craftpulse\herald\events\RegisterToolsEvent $event): void {
+        $event->tools[] = new class() extends \craftpulse\herald\tools\AbstractTool {
             public static function getName(): string
             {
                 return '_fake_streaming_tool';
@@ -709,15 +709,15 @@ it('eagerly consumes a Generator-returning tool and surfaces the return value', 
         };
     };
     \yii\base\Event::on(
-        \craftpulse\cortex\services\Tools::class,
-        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        \craftpulse\herald\services\Tools::class,
+        \craftpulse\herald\services\Tools::EVENT_REGISTER_TOOLS,
         $listener,
     );
 
-    $originalTools = Cortex::getInstance()->tools;
-    $freshTools = new \craftpulse\cortex\services\Tools();
+    $originalTools = Herald::getInstance()->tools;
+    $freshTools = new \craftpulse\herald\services\Tools();
     $freshTools->init();
-    Cortex::getInstance()->set('tools', $freshTools);
+    Herald::getInstance()->set('tools', $freshTools);
 
     try {
         // Drive the Generator path through the public dispatch() surface
@@ -738,10 +738,10 @@ it('eagerly consumes a Generator-returning tool and surfaces the return value', 
             ->toContain('"done": true')
             ->toContain('"count": 2');
     } finally {
-        Cortex::getInstance()->set('tools', $originalTools);
+        Herald::getInstance()->set('tools', $originalTools);
         \yii\base\Event::off(
-            \craftpulse\cortex\services\Tools::class,
-            \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+            \craftpulse\herald\services\Tools::class,
+            \craftpulse\herald\services\Tools::EVENT_REGISTER_TOOLS,
             $listener,
         );
     }
@@ -752,8 +752,8 @@ it('eagerly consumes a Generator-returning tool and surfaces the return value', 
 // -----------------------------------------------------------------------------
 
 it('reads a templated resource when no concrete URI matches', function() {
-    $listener = function(\craftpulse\cortex\events\RegisterResourcesEvent $event): void {
-        $event->resources[] = new class() implements \craftpulse\cortex\resources\ResourceTemplateInterface {
+    $listener = function(\craftpulse\herald\events\RegisterResourcesEvent $event): void {
+        $event->resources[] = new class() implements \craftpulse\herald\resources\ResourceTemplateInterface {
             public function getUriTemplate(): string
             {
                 return '_fake://entries/{id}';
@@ -789,14 +789,14 @@ it('reads a templated resource when no concrete URI matches', function() {
         };
     };
     \yii\base\Event::on(
-        \craftpulse\cortex\services\Resources::class,
-        \craftpulse\cortex\services\Resources::EVENT_REGISTER_RESOURCES,
+        \craftpulse\herald\services\Resources::class,
+        \craftpulse\herald\services\Resources::EVENT_REGISTER_RESOURCES,
         $listener,
     );
 
     try {
         // Build a fresh service so the listener fires.
-        $service = new \craftpulse\cortex\services\Resources();
+        $service = new \craftpulse\herald\services\Resources();
         $service->init();
         $match = $service->matchTemplate('_fake://entries/42');
         expect($match)->not->toBeNull();
@@ -811,15 +811,15 @@ it('reads a templated resource when no concrete URI matches', function() {
         ]);
     } finally {
         \yii\base\Event::off(
-            \craftpulse\cortex\services\Resources::class,
-            \craftpulse\cortex\services\Resources::EVENT_REGISTER_RESOURCES,
+            \craftpulse\herald\services\Resources::class,
+            \craftpulse\herald\services\Resources::EVENT_REGISTER_RESOURCES,
             $listener,
         );
     }
 });
 
 it('matchTemplate returns null when no template matches', function() {
-    $service = new \craftpulse\cortex\services\Resources();
+    $service = new \craftpulse\herald\services\Resources();
     $service->init();
     expect($service->matchTemplate('_unknown://nothing'))->toBeNull();
 });
@@ -832,7 +832,7 @@ it('tools/list over HTTP omits a tool whose filterFor returns false for the reso
     // Register a stub tool that only the null-user (stdio) caller sees.
     // The HTTP path resolves the bound userId to a real User and the
     // stub returns false for it, so the tool drops out of tools/list.
-    $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event): void {
+    $listener = function(\craftpulse\herald\events\RegisterToolsEvent $event): void {
         $event->tools[] = new class() extends AbstractTool {
             public static function getName(): string
             {
@@ -856,15 +856,15 @@ it('tools/list over HTTP omits a tool whose filterFor returns false for the reso
         };
     };
     \yii\base\Event::on(
-        \craftpulse\cortex\services\Tools::class,
-        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        \craftpulse\herald\services\Tools::class,
+        \craftpulse\herald\services\Tools::EVENT_REGISTER_TOOLS,
         $listener,
     );
 
-    $originalTools = Cortex::getInstance()->tools;
-    $freshTools = new \craftpulse\cortex\services\Tools();
+    $originalTools = Herald::getInstance()->tools;
+    $freshTools = new \craftpulse\herald\services\Tools();
     $freshTools->init();
-    Cortex::getInstance()->set('tools', $freshTools);
+    Herald::getInstance()->set('tools', $freshTools);
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -891,10 +891,10 @@ it('tools/list over HTTP omits a tool whose filterFor returns false for the reso
         $stdioNames = array_column($stdioResponse['result']['tools'], 'name');
         expect($stdioNames)->toContain('_test_/stdio-only-filter');
     } finally {
-        Cortex::getInstance()->set('tools', $originalTools);
+        Herald::getInstance()->set('tools', $originalTools);
         \yii\base\Event::off(
-            \craftpulse\cortex\services\Tools::class,
-            \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+            \craftpulse\herald\services\Tools::class,
+            \craftpulse\herald\services\Tools::EVENT_REGISTER_TOOLS,
             $listener,
         );
     }
@@ -904,7 +904,7 @@ it('tools/call over HTTP rejects a tool whose filterFor returns false as Unknown
     // A non-admin user (null-user-only stub) tries to call the tool
     // through the HTTP path. The dispatcher must fail closed —
     // indistinguishable from "tool not registered" on the wire.
-    $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event): void {
+    $listener = function(\craftpulse\herald\events\RegisterToolsEvent $event): void {
         $event->tools[] = new class() extends AbstractTool {
             public static function getName(): string
             {
@@ -928,15 +928,15 @@ it('tools/call over HTTP rejects a tool whose filterFor returns false as Unknown
         };
     };
     \yii\base\Event::on(
-        \craftpulse\cortex\services\Tools::class,
-        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        \craftpulse\herald\services\Tools::class,
+        \craftpulse\herald\services\Tools::EVENT_REGISTER_TOOLS,
         $listener,
     );
 
-    $originalTools = Cortex::getInstance()->tools;
-    $freshTools = new \craftpulse\cortex\services\Tools();
+    $originalTools = Herald::getInstance()->tools;
+    $freshTools = new \craftpulse\herald\services\Tools();
     $freshTools->init();
-    Cortex::getInstance()->set('tools', $freshTools);
+    Herald::getInstance()->set('tools', $freshTools);
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -966,18 +966,18 @@ it('tools/call over HTTP rejects a tool whose filterFor returns false as Unknown
         expect($stdioResponse)->toHaveKey('result');
         expect($stdioResponse['result'])->toHaveKey('isError', false);
     } finally {
-        Cortex::getInstance()->set('tools', $originalTools);
+        Herald::getInstance()->set('tools', $originalTools);
         \yii\base\Event::off(
-            \craftpulse\cortex\services\Tools::class,
-            \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+            \craftpulse\herald\services\Tools::class,
+            \craftpulse\herald\services\Tools::EVENT_REGISTER_TOOLS,
             $listener,
         );
     }
 });
 
 it('falls back to the last yielded value when a Generator has no explicit return', function() {
-    $listener = function(\craftpulse\cortex\events\RegisterToolsEvent $event): void {
-        $event->tools[] = new class() extends \craftpulse\cortex\tools\AbstractTool {
+    $listener = function(\craftpulse\herald\events\RegisterToolsEvent $event): void {
+        $event->tools[] = new class() extends \craftpulse\herald\tools\AbstractTool {
             public static function getName(): string
             {
                 return '_fake_streaming_no_return';
@@ -996,15 +996,15 @@ it('falls back to the last yielded value when a Generator has no explicit return
         };
     };
     \yii\base\Event::on(
-        \craftpulse\cortex\services\Tools::class,
-        \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+        \craftpulse\herald\services\Tools::class,
+        \craftpulse\herald\services\Tools::EVENT_REGISTER_TOOLS,
         $listener,
     );
 
-    $originalTools = Cortex::getInstance()->tools;
-    $freshTools = new \craftpulse\cortex\services\Tools();
+    $originalTools = Herald::getInstance()->tools;
+    $freshTools = new \craftpulse\herald\services\Tools();
     $freshTools->init();
-    Cortex::getInstance()->set('tools', $freshTools);
+    Herald::getInstance()->set('tools', $freshTools);
 
     try {
         $response = $this->server->dispatch([
@@ -1020,10 +1020,10 @@ it('falls back to the last yielded value when a Generator has no explicit return
         expect($response['result'])->toHaveKey('isError', false);
         expect($response['result']['content'][0]['text'])->toContain('"done": true');
     } finally {
-        Cortex::getInstance()->set('tools', $originalTools);
+        Herald::getInstance()->set('tools', $originalTools);
         \yii\base\Event::off(
-            \craftpulse\cortex\services\Tools::class,
-            \craftpulse\cortex\services\Tools::EVENT_REGISTER_TOOLS,
+            \craftpulse\herald\services\Tools::class,
+            \craftpulse\herald\services\Tools::EVENT_REGISTER_TOOLS,
             $listener,
         );
     }

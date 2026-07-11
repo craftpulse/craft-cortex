@@ -1,13 +1,13 @@
 <?php
 
-namespace craftpulse\cortex\records;
+namespace craftpulse\herald\records;
 
 use craft\db\ActiveRecord;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Active record for `cortex_oauth_tokens`.
+ * Active record for `herald_oauth_tokens`.
  *
  * One row per access or refresh token. `tokenType` discriminates:
  *

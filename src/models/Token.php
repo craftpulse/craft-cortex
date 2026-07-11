@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\models;
+namespace craftpulse\herald\models;
 
 use Craft;
 use craft\base\Model;
@@ -10,7 +10,7 @@ use craft\elements\User;
  * =========================================================================
  * Bearer-token model.
  *
- * Thin model wrapping the `cortex_tokens` Record. Carries the validated
+ * Thin model wrapping the `herald_tokens` Record. Carries the validated
  * attributes the service layer (`services/Tokens`) uses to operate on
  * a token and surfaces a `getUser()` helper for the HTTP transport to
  * resolve the bound Craft user without a second `getIdentity()` round-
@@ -37,7 +37,7 @@ class Token extends Model
 
     /**
      * @var string Human-readable identifier surfaced in the CP listing
-     *             and the `cortex/token/list` console output. Free
+     *             and the `herald/token/list` console output. Free
      *             text up to 64 chars; not used for lookup.
      */
     public string $name = '';

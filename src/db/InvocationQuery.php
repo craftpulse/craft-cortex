@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\db;
+namespace craftpulse\herald\db;
 
 use craft\db\Query;
 use craft\helpers\Db;
@@ -8,7 +8,7 @@ use DateTimeInterface;
 
 /**
  * =========================================================================
- * Fluent query against the `cortex_invocations` audit-log table.
+ * Fluent query against the `herald_invocations` audit-log table.
  *
  * Returns associative-array rows shaped like the `Invocation` Record. CP
  * dashboards (Gate 9) and Plugin Store consumers compose filters with
@@ -16,7 +16,7 @@ use DateTimeInterface;
  * execute. Single source of truth for the table name — every caller
  * routes through here so the column list stays uniform.
  *
- * Use `Cortex::getInstance()->invocations->find()` to instantiate. The
+ * Use `Herald::getInstance()->invocations->find()` to instantiate. The
  * service is the canonical entry point; direct instantiation works but
  * misses any future memoization / scope decoration the service layer
  * may add.
@@ -40,7 +40,7 @@ class InvocationQuery extends Query
     /**
      * @inheritdoc
      *
-     * Binds the query to the `cortex_invocations` table and projects
+     * Binds the query to the `herald_invocations` table and projects
      * every column. Callers narrow with `select()` when they want a
      * lean payload.
      *
@@ -230,7 +230,7 @@ class InvocationQuery extends Query
 
     /**
      * Return the distinct, alphabetised list of `toolName` values across
-     * the whole `cortex_invocations` table. Feeds the Activity tab's tool
+     * the whole `herald_invocations` table. Feeds the Activity tab's tool
      * filter dropdown (Gate 9.3). `toolName` is an indexed column so the
      * `DISTINCT` scan stays cheap; this method is called once per
      * `actionActivity` render.

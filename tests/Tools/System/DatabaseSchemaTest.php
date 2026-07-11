@@ -6,10 +6,10 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('database_schema');
+    $this->tool = Herald::getInstance()->tools->getByName('database_schema');
 });
 
 it('returns full schema by default', function() {

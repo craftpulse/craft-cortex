@@ -42,16 +42,16 @@ use craft\elements\Asset;
 use craft\elements\Entry as EntryElement;
 use craft\elements\User;
 use craft\helpers\Db;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
-use craftpulse\cortex\tools\workflow\Audit;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
+use craftpulse\herald\tools\workflow\Audit;
 
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_audfx_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_audfx_' . bin2hex(random_bytes(4)) . '_';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -93,22 +93,22 @@ afterEach(function() {
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _cortex_audfx_tool(): Audit
+function _herald_audfx_tool(): Audit
 {
     return new Audit();
 }
 
-function _cortex_audfx_section_heroes(): ?\craft\models\Section
+function _herald_audfx_section_heroes(): ?\craft\models\Section
 {
     return Craft::$app->getEntries()->getSectionByHandle('heroes');
 }
 
-function _cortex_audfx_section_minor(): ?\craft\models\Section
+function _herald_audfx_section_minor(): ?\craft\models\Section
 {
     return Craft::$app->getEntries()->getSectionByHandle('minorHeroes');
 }
 
-function _cortex_audfx_volume(): ?\craft\models\Volume
+function _herald_audfx_volume(): ?\craft\models\Volume
 {
     $volumes = Craft::$app->getVolumes()->getAllVolumes();
     return $volumes[0] ?? null;
@@ -117,7 +117,7 @@ function _cortex_audfx_volume(): ?\craft\models\Volume
 /**
  * @param string $sortOrderSentinel Use a high-numbered sentinel (9001 / 9002) so afterEach() can wipe stragglers.
  */
-function _cortex_audfx_seed_broken_relation(int $sourceId, int $fieldId, int $sortOrderSentinel = 9001): int
+function _herald_audfx_seed_broken_relation(int $sourceId, int $fieldId, int $sortOrderSentinel = 9001): int
 {
     // Pick a target id that doesn't exist in the elements table. Use a
     // very high id so the chance of a collision is effectively zero.
@@ -145,9 +145,9 @@ function _cortex_audfx_seed_broken_relation(int $sourceId, int $fieldId, int $so
  *
  * Returns the asset id, or null if seeding failed.
  */
-function _cortex_audfx_seed_unused_asset(string $titlePrefix): ?int
+function _herald_audfx_seed_unused_asset(string $titlePrefix): ?int
 {
-    $volume = _cortex_audfx_volume();
+    $volume = _herald_audfx_volume();
     if ($volume === null) {
         return null;
     }
@@ -176,13 +176,13 @@ function _cortex_audfx_seed_unused_asset(string $titlePrefix): ?int
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor(null) returns the Free enum on Free', function() {
-    $schema = _cortex_audfx_tool()->inputSchemaFor(null);
+    $schema = _herald_audfx_tool()->inputSchemaFor(null);
     expect($schema['properties']['mode']['enum'])->toBe(['relations', 'unused_assets', 'propagation']);
 });
 
 it('inputSchemaFor(null) returns the full static enum on Pro', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_audfx_tool()->inputSchemaFor(null);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_audfx_tool()->inputSchemaFor(null);
         expect($schema['properties']['mode']['enum'])->toBe([
             'relations', 'unused_assets', 'propagation',
             'fix_relations', 'prune_unused_assets', 'repair_propagation',
@@ -195,7 +195,7 @@ it('inputSchemaFor(null) returns the full static enum on Pro', function() {
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor on Free returns the Free enum for admins (HTTP path)', function() {
-    $schema = _cortex_audfx_tool()->inputSchemaFor($this->admin);
+    $schema = _herald_audfx_tool()->inputSchemaFor($this->admin);
     expect($schema['properties']['mode']['enum'])->toBe(['relations', 'unused_assets', 'propagation']);
 });
 
@@ -204,8 +204,8 @@ it('inputSchemaFor on Free returns the Free enum for admins (HTTP path)', functi
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor on Pro exposes all Pro modes to admins', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_audfx_tool()->inputSchemaFor($this->admin);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_audfx_tool()->inputSchemaFor($this->admin);
         expect($schema['properties']['mode']['enum'])->toBe([
             'relations', 'unused_assets', 'propagation',
             'fix_relations', 'prune_unused_assets', 'repair_propagation',
@@ -215,7 +215,7 @@ it('inputSchemaFor on Pro exposes all Pro modes to admins', function() {
 
 it('inputSchemaFor on Pro hides Pro modes from users without any save permission', function() {
     $user = new User();
-    $user->username = '__cortex_audfx_noperm_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_audfx_noperm_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -224,9 +224,9 @@ it('inputSchemaFor on Pro hides Pro modes from users without any save permission
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
             $reloaded = Craft::$app->getUsers()->getUserById((int) $user->id);
-            $schema = _cortex_audfx_tool()->inputSchemaFor($reloaded);
+            $schema = _herald_audfx_tool()->inputSchemaFor($reloaded);
             expect($schema['properties']['mode']['enum'])->toBe(['relations', 'unused_assets', 'propagation']);
         });
     } finally {
@@ -239,7 +239,7 @@ it('inputSchemaFor on Pro hides Pro modes from users without any save permission
 // -----------------------------------------------------------------------------
 
 it('fix_relations deletes the broken relation rows and returns per-row outcomes', function() {
-    $section = _cortex_audfx_section_heroes();
+    $section = _herald_audfx_section_heroes();
     if ($section === null) {
         $this->markTestSkipped('No `heroes` section in playground.');
     }
@@ -252,10 +252,10 @@ it('fix_relations deletes the broken relation rows and returns per-row outcomes'
         $this->markTestSkipped('No `heroImage` field available.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($hero, $heroImageField) {
-        _cortex_audfx_seed_broken_relation((int) $hero->id, (int) $heroImageField->id, 9001);
+    herald_with_edition(Herald::EDITION_PRO, function() use ($hero, $heroImageField) {
+        _herald_audfx_seed_broken_relation((int) $hero->id, (int) $heroImageField->id, 9001);
 
-        $result = _cortex_audfx_tool()->execute([
+        $result = _herald_audfx_tool()->execute([
             'mode' => 'fix_relations',
             'limit' => 200,
         ]);
@@ -271,7 +271,7 @@ it('fix_relations deletes the broken relation rows and returns per-row outcomes'
         expect($myRow['deletedRelationCount'])->toBe(1);
 
         // Re-run: the row is gone, so a second pass either skips or simply doesn't see it.
-        $reRun = _cortex_audfx_tool()->execute(['mode' => 'fix_relations', 'limit' => 200]);
+        $reRun = _herald_audfx_tool()->execute(['mode' => 'fix_relations', 'limit' => 200]);
         $myReRunRow = collect($reRun['results'])->firstWhere('sourceId', (int) $hero->id);
         // Either the row isn't visited (success) or it shows up missing — both prove idempotency.
         expect($myReRunRow === null || ($myReRunRow['kind'] ?? 'failure') !== 'success' || $myReRunRow['fieldId'] !== (int) $heroImageField->id)->toBeTrue();
@@ -283,8 +283,8 @@ it('fix_relations deletes the broken relation rows and returns per-row outcomes'
 // -----------------------------------------------------------------------------
 
 it('fix_relations skips rows whose source section the caller cannot save (mixed sources)', function() {
-    $heroes = _cortex_audfx_section_heroes();
-    $minor = _cortex_audfx_section_minor();
+    $heroes = _herald_audfx_section_heroes();
+    $minor = _herald_audfx_section_minor();
     if ($heroes === null || $minor === null) {
         $this->markTestSkipped('Both `heroes` and `minorHeroes` sections required.');
     }
@@ -299,7 +299,7 @@ it('fix_relations skips rows whose source section the caller cannot save (mixed 
     }
 
     $user = new User();
-    $user->username = '__cortex_audfx_minor_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_audfx_minor_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     if (!Craft::$app->getElements()->saveElement($user)) {
@@ -316,15 +316,15 @@ it('fix_relations skips rows whose source section the caller cannot save (mixed 
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($hero, $minorEntry, $heroImageField, $user, $heroes) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($hero, $minorEntry, $heroImageField, $user, $heroes) {
             // Seed two broken rows — one from each section.
-            _cortex_audfx_seed_broken_relation((int) $hero->id, (int) $heroImageField->id, 9001);
-            _cortex_audfx_seed_broken_relation((int) $minorEntry->id, (int) $heroImageField->id, 9002);
+            _herald_audfx_seed_broken_relation((int) $hero->id, (int) $heroImageField->id, 9001);
+            _herald_audfx_seed_broken_relation((int) $minorEntry->id, (int) $heroImageField->id, 9002);
 
             $reloaded = Craft::$app->getUsers()->getUserById((int) $user->id);
             Craft::$app->getUser()->setIdentity($reloaded);
 
-            $result = _cortex_audfx_tool()->execute(['mode' => 'fix_relations', 'limit' => 200]);
+            $result = _herald_audfx_tool()->execute(['mode' => 'fix_relations', 'limit' => 200]);
 
             $heroRow = collect($result['results'])->firstWhere('sourceId', (int) $hero->id);
             $minorRow = collect($result['results'])->firstWhere('sourceId', (int) $minorEntry->id);
@@ -344,7 +344,7 @@ it('fix_relations skips rows whose source section the caller cannot save (mixed 
 });
 
 it('fix_relations skips rows whose source element is soft-deleted (missing path)', function() {
-    $section = _cortex_audfx_section_heroes();
+    $section = _herald_audfx_section_heroes();
     $heroImageField = Craft::$app->getFields()->getFieldByHandle('heroImage');
     $entryTypes = $section !== null ? Craft::$app->getEntries()->getEntryTypesBySectionId((int) $section->id) : [];
     $entryType = $entryTypes[0] ?? null;
@@ -365,8 +365,8 @@ it('fix_relations skips rows whose source element is soft-deleted (missing path)
     }
     $sourceId = (int) $fixture->id;
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($sourceId, $heroImageField) {
-        _cortex_audfx_seed_broken_relation($sourceId, (int) $heroImageField->id, 9001);
+    herald_with_edition(Herald::EDITION_PRO, function() use ($sourceId, $heroImageField) {
+        _herald_audfx_seed_broken_relation($sourceId, (int) $heroImageField->id, 9001);
 
         // Soft-delete (NOT hard) so the relation row's FK to elements
         // doesn't cascade. The element row stays — only dateDeleted
@@ -375,7 +375,7 @@ it('fix_relations skips rows whose source element is soft-deleted (missing path)
         expect($stillThere)->toBeInstanceOf(EntryElement::class);
         Craft::$app->getElements()->deleteElement($stillThere, hardDelete: false);
 
-        $result = _cortex_audfx_tool()->execute(['mode' => 'fix_relations', 'limit' => 200]);
+        $result = _herald_audfx_tool()->execute(['mode' => 'fix_relations', 'limit' => 200]);
 
         $row = collect($result['results'])->firstWhere('sourceId', $sourceId);
         expect($row)->not->toBeNull();
@@ -389,18 +389,18 @@ it('fix_relations skips rows whose source element is soft-deleted (missing path)
 // -----------------------------------------------------------------------------
 
 it('prune_unused_assets hard-deletes the orphan asset and aggregates sizeFreed', function() {
-    $volume = _cortex_audfx_volume();
+    $volume = _herald_audfx_volume();
     if ($volume === null) {
         $this->markTestSkipped('No volume available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($volume) {
-        $assetId = _cortex_audfx_seed_unused_asset($this->fixturePrefix);
+    herald_with_edition(Herald::EDITION_PRO, function() use ($volume) {
+        $assetId = _herald_audfx_seed_unused_asset($this->fixturePrefix);
         if ($assetId === null) {
             $this->markTestSkipped('Could not seed orphan asset.');
         }
 
-        $result = _cortex_audfx_tool()->execute(['mode' => 'prune_unused_assets', 'limit' => 200]);
+        $result = _herald_audfx_tool()->execute(['mode' => 'prune_unused_assets', 'limit' => 200]);
 
         $myRow = collect($result['results'])->firstWhere('id', $assetId);
         // The orphan asset should show up in the results — either succeeded
@@ -416,13 +416,13 @@ it('prune_unused_assets hard-deletes the orphan asset and aggregates sizeFreed',
 });
 
 it('prune_unused_assets skips assets in volumes the caller cannot delete from', function() {
-    $volume = _cortex_audfx_volume();
+    $volume = _herald_audfx_volume();
     if ($volume === null) {
         $this->markTestSkipped('No volume available in playground.');
     }
 
     $user = new User();
-    $user->username = '__cortex_audfx_nodel_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_audfx_nodel_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     if (!Craft::$app->getElements()->saveElement($user)) {
@@ -435,8 +435,8 @@ it('prune_unused_assets skips assets in volumes the caller cannot delete from', 
     );
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($volume, $user) {
-            $assetId = _cortex_audfx_seed_unused_asset($this->fixturePrefix);
+        herald_with_edition(Herald::EDITION_PRO, function() use ($volume, $user) {
+            $assetId = _herald_audfx_seed_unused_asset($this->fixturePrefix);
             if ($assetId === null) {
                 $this->markTestSkipped('Could not seed orphan asset.');
             }
@@ -444,7 +444,7 @@ it('prune_unused_assets skips assets in volumes the caller cannot delete from', 
             $reloaded = Craft::$app->getUsers()->getUserById((int) $user->id);
             Craft::$app->getUser()->setIdentity($reloaded);
 
-            $result = _cortex_audfx_tool()->execute(['mode' => 'prune_unused_assets', 'limit' => 200]);
+            $result = _herald_audfx_tool()->execute(['mode' => 'prune_unused_assets', 'limit' => 200]);
             $myRow = collect($result['results'])->firstWhere('id', $assetId);
             expect($myRow)->not->toBeNull();
             expect($myRow['kind'])->toBe('skipped');
@@ -462,8 +462,8 @@ it('prune_unused_assets skips assets in volumes the caller cannot delete from', 
 // -----------------------------------------------------------------------------
 
 it('repair_propagation runs the loop and returns the envelope shape (no gaps on single-site)', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_audfx_tool()->execute(['mode' => 'repair_propagation', 'limit' => 10]);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_audfx_tool()->execute(['mode' => 'repair_propagation', 'limit' => 10]);
 
         expect($result)->toHaveKeys([
             'success', 'mode', 'total', 'processed', 'succeeded', 'failed', 'skipped', 'globalCapReached', 'results',
@@ -481,13 +481,13 @@ it('repair_propagation runs the loop and returns the envelope shape (no gaps on 
 // -----------------------------------------------------------------------------
 
 it('fix_relations throws "mode unavailable on this edition" on Free', function() {
-    _cortex_audfx_tool()->execute(['mode' => 'fix_relations']);
+    _herald_audfx_tool()->execute(['mode' => 'fix_relations']);
 })->throws(ToolException::class, 'unavailable on this edition');
 
 it('prune_unused_assets throws "mode unavailable on this edition" on Free', function() {
-    _cortex_audfx_tool()->execute(['mode' => 'prune_unused_assets']);
+    _herald_audfx_tool()->execute(['mode' => 'prune_unused_assets']);
 })->throws(ToolException::class, 'unavailable on this edition');
 
 it('repair_propagation throws "mode unavailable on this edition" on Free', function() {
-    _cortex_audfx_tool()->execute(['mode' => 'repair_propagation']);
+    _herald_audfx_tool()->execute(['mode' => 'repair_propagation']);
 })->throws(ToolException::class, 'unavailable on this edition');

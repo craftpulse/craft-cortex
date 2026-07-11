@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\oauth\repositories;
+namespace craftpulse\herald\oauth\repositories;
 
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Entities\UserEntityInterface;
@@ -11,7 +11,7 @@ use League\OAuth2\Server\Repositories\UserRepositoryInterface;
  * League adapter — `UserRepositoryInterface`.
  *
  * League invokes `getUserEntityByUserCredentials()` only for the
- * Password grant — cortex doesn't enable that grant, so the method
+ * Password grant — herald doesn't enable that grant, so the method
  * unconditionally returns null. If a deployment somehow enabled
  * Password grant against this repository, the returned null causes
  * league to throw `OAuthServerException::invalidGrant` and reject
@@ -33,7 +33,7 @@ class UserRepository implements UserRepositoryInterface
     /**
      * @inheritdoc
      *
-     * Cortex does not enable Password grant. Returning null forces
+     * Herald does not enable Password grant. Returning null forces
      * league to throw `invalidGrant` if the grant ever leaks through.
      *
      * @author Craftpulse

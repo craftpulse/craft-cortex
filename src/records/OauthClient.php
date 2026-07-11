@@ -1,15 +1,15 @@
 <?php
 
-namespace craftpulse\cortex\records;
+namespace craftpulse\herald\records;
 
 use craft\db\ActiveRecord;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Active record for `cortex_oauth_clients`.
+ * Active record for `herald_oauth_clients`.
  *
- * One row per OAuth 2.1 client registered with the cortex install.
+ * One row per OAuth 2.1 client registered with the herald install.
  * Created by `Oauth::registerClient()` (RFC 7591 DCR) or seeded out-
  * of-band. Public clients (`isPublic = 1`) authenticate via PKCE only;
  * confidential clients store a `password_hash`-derived secret in

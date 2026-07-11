@@ -18,7 +18,7 @@
  *     get silently dropped (already covered by `UsersTest`; not
  *     duplicated here).
  *
- * Setup seeds a real custom field (`__cortex_allowlist_test`) on the
+ * Setup seeds a real custom field (`__herald_allowlist_test`) on the
  * User field layout via `Fields::saveField()` + `Users::saveLayout()`.
  * The User field layout is project-config-stored — muting PC events
  * during the save stalls the `Fields::saveLayout()` chain that
@@ -52,8 +52,8 @@ use craft\fieldlayoutelements\CustomField;
 use craft\fields\PlainText;
 use craft\models\FieldLayout;
 use craft\models\FieldLayoutTab;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\system\Users;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\system\Users;
 
 // -----------------------------------------------------------------------------
 // Setup — seed a real custom field on the User field layout
@@ -77,9 +77,9 @@ beforeEach(function() {
     // / underscores allowed. Field saves write to project config; we
     // don't mute because the User layout save below also goes through
     // PC and the two writes need to land cleanly in the same epoch.
-    $this->testFieldHandle = 'cortexAlwlTest' . bin2hex(random_bytes(3));
+    $this->testFieldHandle = 'heraldAlwlTest' . bin2hex(random_bytes(3));
     $field = new PlainText();
-    $field->name = 'Cortex Allowlist Test';
+    $field->name = 'Herald Allowlist Test';
     $field->handle = $this->testFieldHandle;
     if (!Craft::$app->getFields()->saveField($field)) {
         $this->markTestSkipped('Could not save the test custom field: ' . json_encode($field->getErrors()));
@@ -106,7 +106,7 @@ beforeEach(function() {
     }
     $tabs = $layout->getTabs();
     if ($tabs === []) {
-        $tab = new FieldLayoutTab(['name' => 'Cortex Test', 'layout' => $layout]);
+        $tab = new FieldLayoutTab(['name' => 'Herald Test', 'layout' => $layout]);
         $tab->setElements([new CustomField($this->testField)]);
         $layout->setTabs([$tab]);
     } else {
@@ -123,13 +123,13 @@ beforeEach(function() {
     $this->testLayout = $layout;
 
     // Snapshot original allowlist; tests will mutate then restore.
-    $this->originalAllowlist = Cortex::getInstance()->getSettings()->userCustomFieldAllowlist;
+    $this->originalAllowlist = Herald::getInstance()->getSettings()->userCustomFieldAllowlist;
 });
 
 afterEach(function() {
     // Restore the allowlist setting.
     if (isset($this->originalAllowlist)) {
-        Cortex::getInstance()->getSettings()->userCustomFieldAllowlist = $this->originalAllowlist;
+        Herald::getInstance()->getSettings()->userCustomFieldAllowlist = $this->originalAllowlist;
     }
 
     // Restore admin identity.
@@ -167,7 +167,7 @@ afterEach(function() {
  *
  * @param string[] $permissions
  */
-function _cortex_allowlist_caller(string $prefix, array $permissions): ?UserElement
+function _herald_allowlist_caller(string $prefix, array $permissions): ?UserElement
 {
     $caller = new UserElement();
     $caller->username = $prefix . '_' . bin2hex(random_bytes(3));
@@ -185,7 +185,7 @@ function _cortex_allowlist_caller(string $prefix, array $permissions): ?UserElem
  * Hand-rolled instantiation of the Users tool — sidesteps the boot-time
  * registry gate (Pro tool absent on Free installs).
  */
-function _cortex_allowlist_users_tool(): Users
+function _herald_allowlist_users_tool(): Users
 {
     return new Users();
 }
@@ -195,11 +195,11 @@ function _cortex_allowlist_users_tool(): Users
 // -----------------------------------------------------------------------------
 
 it('default empty allowlist hides custom fields from an admin caller', function() {
-    Cortex::getInstance()->getSettings()->userCustomFieldAllowlist = [];
+    Herald::getInstance()->getSettings()->userCustomFieldAllowlist = [];
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         Craft::$app->getUser()->setIdentity($this->admin);
-        $result = _cortex_allowlist_users_tool()->execute([
+        $result = _herald_allowlist_users_tool()->execute([
             'mode' => 'get',
             'id' => $this->fury->id,
         ]);
@@ -208,17 +208,17 @@ it('default empty allowlist hides custom fields from an admin caller', function(
 });
 
 it('default empty allowlist hides custom fields from an editUsers caller', function() {
-    $caller = _cortex_allowlist_caller('cxa_edit', ['viewusers', 'editusers']);
+    $caller = _herald_allowlist_caller('cxa_edit', ['viewusers', 'editusers']);
     if ($caller === null) {
         $this->markTestSkipped('Could not create editUsers caller.');
     }
 
-    Cortex::getInstance()->getSettings()->userCustomFieldAllowlist = [];
+    Herald::getInstance()->getSettings()->userCustomFieldAllowlist = [];
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
             Craft::$app->getUser()->setIdentity($caller);
-            $result = _cortex_allowlist_users_tool()->execute([
+            $result = _herald_allowlist_users_tool()->execute([
                 'mode' => 'get',
                 'id' => $this->fury->id,
             ]);
@@ -230,17 +230,17 @@ it('default empty allowlist hides custom fields from an editUsers caller', funct
 });
 
 it('default empty allowlist hides custom fields from a viewUsers-only caller', function() {
-    $caller = _cortex_allowlist_caller('cxa_view', ['viewusers']);
+    $caller = _herald_allowlist_caller('cxa_view', ['viewusers']);
     if ($caller === null) {
         $this->markTestSkipped('Could not create viewUsers caller.');
     }
 
-    Cortex::getInstance()->getSettings()->userCustomFieldAllowlist = [];
+    Herald::getInstance()->getSettings()->userCustomFieldAllowlist = [];
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
             Craft::$app->getUser()->setIdentity($caller);
-            $result = _cortex_allowlist_users_tool()->execute([
+            $result = _herald_allowlist_users_tool()->execute([
                 'mode' => 'get',
                 'id' => $this->fury->id,
             ]);
@@ -252,11 +252,11 @@ it('default empty allowlist hides custom fields from a viewUsers-only caller', f
 });
 
 it('default empty allowlist hides custom fields from stdio (null user)', function() {
-    Cortex::getInstance()->getSettings()->userCustomFieldAllowlist = [];
+    Herald::getInstance()->getSettings()->userCustomFieldAllowlist = [];
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         Craft::$app->getUser()->setIdentity(null);
-        $result = _cortex_allowlist_users_tool()->execute([
+        $result = _herald_allowlist_users_tool()->execute([
             'mode' => 'get',
             'id' => $this->fury->id,
         ]);
@@ -269,11 +269,11 @@ it('default empty allowlist hides custom fields from stdio (null user)', functio
 // -----------------------------------------------------------------------------
 
 it('allowlist with the test handle surfaces it to an admin caller', function() {
-    Cortex::getInstance()->getSettings()->userCustomFieldAllowlist = [$this->testFieldHandle];
+    Herald::getInstance()->getSettings()->userCustomFieldAllowlist = [$this->testFieldHandle];
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         Craft::$app->getUser()->setIdentity($this->admin);
-        $result = _cortex_allowlist_users_tool()->execute([
+        $result = _herald_allowlist_users_tool()->execute([
             'mode' => 'get',
             'id' => $this->fury->id,
         ]);
@@ -282,17 +282,17 @@ it('allowlist with the test handle surfaces it to an admin caller', function() {
 });
 
 it('allowlist with the test handle surfaces it to an editUsers caller', function() {
-    $caller = _cortex_allowlist_caller('cxa_edit', ['viewusers', 'editusers']);
+    $caller = _herald_allowlist_caller('cxa_edit', ['viewusers', 'editusers']);
     if ($caller === null) {
         $this->markTestSkipped('Could not create editUsers caller.');
     }
 
-    Cortex::getInstance()->getSettings()->userCustomFieldAllowlist = [$this->testFieldHandle];
+    Herald::getInstance()->getSettings()->userCustomFieldAllowlist = [$this->testFieldHandle];
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
             Craft::$app->getUser()->setIdentity($caller);
-            $result = _cortex_allowlist_users_tool()->execute([
+            $result = _herald_allowlist_users_tool()->execute([
                 'mode' => 'get',
                 'id' => $this->fury->id,
             ]);
@@ -304,17 +304,17 @@ it('allowlist with the test handle surfaces it to an editUsers caller', function
 });
 
 it('allowlist with the test handle surfaces it to a viewUsers-only caller', function() {
-    $caller = _cortex_allowlist_caller('cxa_view', ['viewusers']);
+    $caller = _herald_allowlist_caller('cxa_view', ['viewusers']);
     if ($caller === null) {
         $this->markTestSkipped('Could not create viewUsers caller.');
     }
 
-    Cortex::getInstance()->getSettings()->userCustomFieldAllowlist = [$this->testFieldHandle];
+    Herald::getInstance()->getSettings()->userCustomFieldAllowlist = [$this->testFieldHandle];
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
             Craft::$app->getUser()->setIdentity($caller);
-            $result = _cortex_allowlist_users_tool()->execute([
+            $result = _herald_allowlist_users_tool()->execute([
                 'mode' => 'get',
                 'id' => $this->fury->id,
             ]);
@@ -326,7 +326,7 @@ it('allowlist with the test handle surfaces it to a viewUsers-only caller', func
 });
 
 it('allowlist with the test handle surfaces it to stdio (null user)', function() {
-    Cortex::getInstance()->getSettings()->userCustomFieldAllowlist = [$this->testFieldHandle];
+    Herald::getInstance()->getSettings()->userCustomFieldAllowlist = [$this->testFieldHandle];
 
     // Sanity check: the field should actually be on the user layout
     // we just saved. If not, the test setup didn't work and the
@@ -336,9 +336,9 @@ it('allowlist with the test handle surfaces it to stdio (null user)', function()
     $handles = array_map(static fn($f) => $f->handle, $layout->getCustomFields());
     expect($handles)->toContain($this->testFieldHandle);
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         Craft::$app->getUser()->setIdentity(null);
-        $result = _cortex_allowlist_users_tool()->execute([
+        $result = _herald_allowlist_users_tool()->execute([
             'mode' => 'get',
             'id' => $this->fury->id,
         ]);
@@ -353,11 +353,11 @@ it('allowlist with the test handle surfaces it to stdio (null user)', function()
 it('allowlist with a different handle never surfaces the test handle, regardless of caller', function() {
     // Pick a handle that's NOT on the layout. The allowlist is set
     // to that handle only; the test handle MUST be absent.
-    Cortex::getInstance()->getSettings()->userCustomFieldAllowlist = ['__cortex_nonexistent_handle'];
+    Herald::getInstance()->getSettings()->userCustomFieldAllowlist = ['__herald_nonexistent_handle'];
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         Craft::$app->getUser()->setIdentity($this->admin);
-        $result = _cortex_allowlist_users_tool()->execute([
+        $result = _herald_allowlist_users_tool()->execute([
             'mode' => 'get',
             'id' => $this->fury->id,
         ]);
@@ -370,23 +370,23 @@ it('native PII gating is unaffected by the custom-field allowlist', function() {
     // `editUsers` still controls whether `email` / `invalidLoginCount`
     // are visible. Cross-check by setting the allowlist and walking
     // both permission tiers.
-    Cortex::getInstance()->getSettings()->userCustomFieldAllowlist = [$this->testFieldHandle];
+    Herald::getInstance()->getSettings()->userCustomFieldAllowlist = [$this->testFieldHandle];
 
-    $viewOnly = _cortex_allowlist_caller('cxa_pii_view', ['viewusers']);
+    $viewOnly = _herald_allowlist_caller('cxa_pii_view', ['viewusers']);
     if ($viewOnly === null) {
         $this->markTestSkipped('Could not create viewUsers caller.');
     }
-    $editAlso = _cortex_allowlist_caller('cxa_pii_edit', ['viewusers', 'editusers']);
+    $editAlso = _herald_allowlist_caller('cxa_pii_edit', ['viewusers', 'editusers']);
     if ($editAlso === null) {
         Craft::$app->getElements()->deleteElement($viewOnly, hardDelete: true);
         $this->markTestSkipped('Could not create editUsers caller.');
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($viewOnly, $editAlso) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($viewOnly, $editAlso) {
             // viewUsers — no email.
             Craft::$app->getUser()->setIdentity($viewOnly);
-            $viewResult = _cortex_allowlist_users_tool()->execute([
+            $viewResult = _herald_allowlist_users_tool()->execute([
                 'mode' => 'get',
                 'id' => $this->fury->id,
             ]);
@@ -396,7 +396,7 @@ it('native PII gating is unaffected by the custom-field allowlist', function() {
 
             // editUsers — email visible.
             Craft::$app->getUser()->setIdentity($editAlso);
-            $editResult = _cortex_allowlist_users_tool()->execute([
+            $editResult = _herald_allowlist_users_tool()->execute([
                 'mode' => 'get',
                 'id' => $this->fury->id,
             ]);

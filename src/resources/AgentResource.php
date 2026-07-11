@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\resources;
+namespace craftpulse\herald\resources;
 
 use Michtio\CraftCmsClaudeSkills\Skills;
 
@@ -11,7 +11,7 @@ use Michtio\CraftCmsClaudeSkills\Skills;
  * One instance per bundled agent in `michtio/craftcms-claude-skills`'s
  * `agents/` directory. Agent files are markdown with YAML frontmatter
  * declaring `name` and `description` — Claude Code's native shape.
- * Cortex surfaces them as MCP resources under the
+ * Herald surfaces them as MCP resources under the
  * `craft-skills://agents/<name>` URI scheme so other MCP clients can
  * read the same authored expertise even though they don't natively
  * recognise the agent concept.

@@ -16,7 +16,7 @@
  */
 
 use craft\log\MonologTarget;
-use craftpulse\cortex\console\controllers\ServeController;
+use craftpulse\herald\console\controllers\ServeController;
 use Monolog\Handler\RotatingFileHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Level;
@@ -28,13 +28,13 @@ use Psr\Log\LogLevel;
  *
  * @param array<int,\Monolog\Handler\HandlerInterface> $handlers
  */
-function _cortex_target_with_handlers(array $handlers): MonologTarget
+function _herald_target_with_handlers(array $handlers): MonologTarget
 {
     return new MonologTarget([
-        'name' => 'cortex-test',
+        'name' => 'herald-test',
         'level' => LogLevel::WARNING,
         'logger' => static function() use ($handlers): \Monolog\Logger {
-            $logger = new \Monolog\Logger('cortex-test');
+            $logger = new \Monolog\Logger('herald-test');
             $logger->setHandlers($handlers);
             return $logger;
         },
@@ -47,12 +47,12 @@ function _cortex_target_with_handlers(array $handlers): MonologTarget
  *
  * @param array<int,MonologTarget> $targets
  */
-function _cortex_run_redirect(array $targets): void
+function _herald_run_redirect(array $targets): void
 {
     $original = Yii::$app->log->targets;
     Yii::$app->log->targets = $targets;
     try {
-        $controller = new ServeController('cortex/serve', Craft::$app);
+        $controller = new ServeController('herald/serve', Craft::$app);
         $ref = new ReflectionMethod($controller, '_redirectStdoutLogHandlers');
         $ref->setAccessible(true);
         $ref->invoke($controller);
@@ -62,11 +62,11 @@ function _cortex_run_redirect(array $targets): void
 }
 
 it('re-points a stdout StreamHandler to stderr', function() {
-    $target = _cortex_target_with_handlers([
+    $target = _herald_target_with_handlers([
         new StreamHandler('php://stdout', Level::Warning, false),
     ]);
 
-    _cortex_run_redirect([$target]);
+    _herald_run_redirect([$target]);
 
     $handlers = $target->getLogger()->getHandlers();
     expect($handlers)->toHaveCount(1)
@@ -81,10 +81,10 @@ it('re-points a stdout StreamHandler to stderr', function() {
 });
 
 it('leaves a file handler untouched (default file-logging mode)', function() {
-    $fileHandler = new RotatingFileHandler('/tmp/cortex-test.log', 5, Level::Warning);
-    $target = _cortex_target_with_handlers([$fileHandler]);
+    $fileHandler = new RotatingFileHandler('/tmp/herald-test.log', 5, Level::Warning);
+    $target = _herald_target_with_handlers([$fileHandler]);
 
-    _cortex_run_redirect([$target]);
+    _herald_run_redirect([$target]);
 
     $handlers = $target->getLogger()->getHandlers();
     expect($handlers)->toHaveCount(1)
@@ -92,14 +92,14 @@ it('leaves a file handler untouched (default file-logging mode)', function() {
 });
 
 it('re-points only the stdout handler in a mixed handler stack', function() {
-    $fileHandler = new RotatingFileHandler('/tmp/cortex-test.log', 5, Level::Warning);
-    $target = _cortex_target_with_handlers([
+    $fileHandler = new RotatingFileHandler('/tmp/herald-test.log', 5, Level::Warning);
+    $target = _herald_target_with_handlers([
         new StreamHandler('php://stderr', Level::Warning, false),
         new StreamHandler('php://stdout', Level::Info, false),
         $fileHandler,
     ]);
 
-    _cortex_run_redirect([$target]);
+    _herald_run_redirect([$target]);
 
     $handlers = $target->getLogger()->getHandlers();
     $urls = array_map(

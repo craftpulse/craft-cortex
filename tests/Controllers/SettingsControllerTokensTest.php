@@ -17,7 +17,7 @@
  * `[id, name, tokenPrefix, user, expiresAt, lastUsedAt, dateCreated]` is
  * architecture-invariant; drift breaks the table silently.
  *
- * Tests bypass HTTP plumbing via the `_CortexTokensHarness` subclass.
+ * Tests bypass HTTP plumbing via the `_HeraldTokensHarness` subclass.
  * Real CP smoke lives in the gate-9.5 manual verification step.
  *
  * Token actions never write to project config, so this file is safe to
@@ -28,9 +28,9 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\controllers\SettingsController;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\controllers\SettingsController;
+use craftpulse\herald\db\Table;
+use craftpulse\herald\Herald;
 use yii\web\Response;
 
 // -----------------------------------------------------------------------------
@@ -39,11 +39,11 @@ use yii\web\Response;
 
 /**
  * SettingsController subclass that bypasses HTTP plumbing — mirrors
- * `_CortexAllowlistHarness`. `requireAdmin` / `requireAcceptsJson` /
+ * `_HeraldAllowlistHarness`. `requireAdmin` / `requireAcceptsJson` /
  * `requirePostRequest` short-circuit so the action body runs against a
  * console-bootstrapped Craft.
  */
-class _CortexTokensHarness extends SettingsController
+class _HeraldTokensHarness extends SettingsController
 {
     /** @var array<string,mixed> */
     public array $params = [];
@@ -69,7 +69,7 @@ class _CortexTokensHarness extends SettingsController
     public function withParams(array $params): self
     {
         $this->params = $params;
-        $this->request = new _CortexTokensRequest($params);
+        $this->request = new _HeraldTokensRequest($params);
         $this->response = new \yii\web\Response();
         $this->response->formatters[\yii\web\Response::FORMAT_JSON] = \yii\web\JsonResponseFormatter::class;
         return $this;
@@ -82,7 +82,7 @@ class _CortexTokensHarness extends SettingsController
  * Clients test, so the admin-only posture on issue / revoke is genuinely
  * exercised (MAJOR 5) rather than asserted by inspection.
  */
-class _CortexTokensRealAdminHarness extends SettingsController
+class _HeraldTokensRealAdminHarness extends SettingsController
 {
     public function requirePostRequest(): void
     {
@@ -97,14 +97,14 @@ class _CortexTokensRealAdminHarness extends SettingsController
      */
     public function withParams(array $params): self
     {
-        $this->request = new _CortexTokensRequest($params);
+        $this->request = new _HeraldTokensRequest($params);
         $this->response = new \yii\web\Response();
         $this->response->formatters[\yii\web\Response::FORMAT_JSON] = \yii\web\JsonResponseFormatter::class;
         return $this;
     }
 }
 
-class _CortexTokensRequest
+class _HeraldTokensRequest
 {
     public bool $isCpRequest = true;
 
@@ -160,7 +160,7 @@ class _CortexTokensRequest
  * Resolve a real user to bind issued tokens to. The playground seeds an
  * admin under one of these handles.
  */
-function _cortexTokenTestUser(): craft\elements\User
+function _heraldTokenTestUser(): craft\elements\User
 {
     $user = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -179,12 +179,12 @@ beforeEach(function() {
     // The Tokens tab is a Pro surface (Gate 9.7) — pin Pro for the
     // file so `_requirePro()` doesn't 403 every case; the dedicated
     // Free-edition test flips it back inline.
-    $this->originalEdition = Cortex::getInstance()->edition;
-    Cortex::getInstance()->edition = Cortex::EDITION_PRO;
+    $this->originalEdition = Herald::getInstance()->edition;
+    Herald::getInstance()->edition = Herald::EDITION_PRO;
 });
 
 afterEach(function() {
-    Cortex::getInstance()->edition = $this->originalEdition;
+    Herald::getInstance()->edition = $this->originalEdition;
 });
 
 afterAll(function() {
@@ -206,9 +206,9 @@ it('declares the Tokens endpoints', function() {
 });
 
 it('every Tokens action is Pro-gated — 403 on Free (Gate 9.7)', function(string $method, array $params) {
-    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+    Herald::getInstance()->edition = Herald::EDITION_FREE;
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams($params);
 
     // `_requirePro()` is private, so the harness's `requireAdmin`
@@ -240,7 +240,7 @@ it('issue / revoke deny a non-admin via the REAL requireAdmin gate', function(st
         Craft::$app->getUser()->setIdentity($nonAdmin);
         expect(Craft::$app->getUser()->getIsAdmin())->toBeFalse();
 
-        $controller = new _CortexTokensRealAdminHarness('settings', Cortex::getInstance());
+        $controller = new _HeraldTokensRealAdminHarness('settings', Herald::getInstance());
         $controller->withParams($params);
 
         expect(fn() => $controller->{$method}())
@@ -284,12 +284,12 @@ it('actionTokenIssueSlideout returns {html, headHtml, bodyHtml} with the view JS
 // -----------------------------------------------------------------------------
 
 it('actionTokensTableData returns the locked {pagination, data} contract', function() {
-    $user = _cortexTokenTestUser();
-    Cortex::getInstance()->tokens->issue((int) $user->id, 'one', 3600);
-    Cortex::getInstance()->tokens->issue((int) $user->id, 'two', 3600);
-    Cortex::getInstance()->tokens->issue((int) $user->id, 'three', null);
+    $user = _heraldTokenTestUser();
+    Herald::getInstance()->tokens->issue((int) $user->id, 'one', 3600);
+    Herald::getInstance()->tokens->issue((int) $user->id, 'two', 3600);
+    Herald::getInstance()->tokens->issue((int) $user->id, 'three', null);
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams([]);
 
     $response = $controller->actionTokensTableData();
@@ -302,10 +302,10 @@ it('actionTokensTableData returns the locked {pagination, data} contract', funct
 });
 
 it('actionTokensTableData data[0] keys equal the locked tuple exactly', function() {
-    $user = _cortexTokenTestUser();
-    Cortex::getInstance()->tokens->issue((int) $user->id, 'shape', 3600);
+    $user = _heraldTokenTestUser();
+    Herald::getInstance()->tokens->issue((int) $user->id, 'shape', 3600);
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams([]);
     $response = $controller->actionTokensTableData();
 
@@ -322,10 +322,10 @@ it('actionTokensTableData data[0] keys equal the locked tuple exactly', function
 });
 
 it('actionTokensTableData never leaks the plaintext or its hash', function() {
-    $user = _cortexTokenTestUser();
-    Cortex::getInstance()->tokens->issue((int) $user->id, 'secret', 3600);
+    $user = _heraldTokenTestUser();
+    Herald::getInstance()->tokens->issue((int) $user->id, 'secret', 3600);
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams([]);
     $response = $controller->actionTokensTableData();
 
@@ -337,10 +337,10 @@ it('actionTokensTableData never leaks the plaintext or its hash', function() {
 });
 
 it('actionTokensTableData serialises the bound user', function() {
-    $user = _cortexTokenTestUser();
-    Cortex::getInstance()->tokens->issue((int) $user->id, 'attributed', 3600);
+    $user = _heraldTokenTestUser();
+    Herald::getInstance()->tokens->issue((int) $user->id, 'attributed', 3600);
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams([]);
     $response = $controller->actionTokensTableData();
 
@@ -351,10 +351,10 @@ it('actionTokensTableData serialises the bound user', function() {
 });
 
 it('actionTokensTableData handles a never-expiring token (expiresAt null)', function() {
-    $user = _cortexTokenTestUser();
-    Cortex::getInstance()->tokens->issue((int) $user->id, 'forever', null);
+    $user = _heraldTokenTestUser();
+    Herald::getInstance()->tokens->issue((int) $user->id, 'forever', null);
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams([]);
     $response = $controller->actionTokensTableData();
 
@@ -364,12 +364,12 @@ it('actionTokensTableData handles a never-expiring token (expiresAt null)', func
 });
 
 it('actionTokensTableData search filters by name substring', function() {
-    $user = _cortexTokenTestUser();
-    Cortex::getInstance()->tokens->issue((int) $user->id, 'claude-desktop', 3600);
-    Cortex::getInstance()->tokens->issue((int) $user->id, 'cursor', 3600);
-    Cortex::getInstance()->tokens->issue((int) $user->id, 'chatgpt', 3600);
+    $user = _heraldTokenTestUser();
+    Herald::getInstance()->tokens->issue((int) $user->id, 'claude-desktop', 3600);
+    Herald::getInstance()->tokens->issue((int) $user->id, 'cursor', 3600);
+    Herald::getInstance()->tokens->issue((int) $user->id, 'chatgpt', 3600);
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams(['search' => 'claude']);
     $response = $controller->actionTokensTableData();
 
@@ -378,11 +378,11 @@ it('actionTokensTableData search filters by name substring', function() {
 });
 
 it('actionTokensTableData sort name DESC reverses default order', function() {
-    $user = _cortexTokenTestUser();
-    Cortex::getInstance()->tokens->issue((int) $user->id, 'alpha', 3600);
-    Cortex::getInstance()->tokens->issue((int) $user->id, 'zulu', 3600);
+    $user = _heraldTokenTestUser();
+    Herald::getInstance()->tokens->issue((int) $user->id, 'alpha', 3600);
+    Herald::getInstance()->tokens->issue((int) $user->id, 'zulu', 3600);
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams(['sort.0.field' => 'name', 'sort.0.direction' => 'desc']);
     $response = $controller->actionTokensTableData();
 
@@ -391,12 +391,12 @@ it('actionTokensTableData sort name DESC reverses default order', function() {
 });
 
 it('actionTokensTableData pagination respects per_page', function() {
-    $user = _cortexTokenTestUser();
+    $user = _heraldTokenTestUser();
     for ($i = 1; $i <= 5; $i++) {
-        Cortex::getInstance()->tokens->issue((int) $user->id, "tok-{$i}", 3600);
+        Herald::getInstance()->tokens->issue((int) $user->id, "tok-{$i}", 3600);
     }
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams(['per_page' => 2, 'page' => 1]);
     $response = $controller->actionTokensTableData();
 
@@ -411,9 +411,9 @@ it('actionTokensTableData pagination respects per_page', function() {
 // -----------------------------------------------------------------------------
 
 it('actionIssueToken returns the plaintext once and creates a row', function() {
-    $user = _cortexTokenTestUser();
+    $user = _heraldTokenTestUser();
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams([
         'userId' => (int) $user->id,
         'name' => 'integration-test',
@@ -430,13 +430,13 @@ it('actionIssueToken returns the plaintext once and creates a row', function() {
     expect($plaintext)->toBeString()->not->toBe('');
 
     // Row landed in the DB.
-    $row = Cortex::getInstance()->tokens->getAll();
+    $row = Herald::getInstance()->tokens->getAll();
     expect($row)->toHaveCount(1);
     expect($row[0]->name)->toBe('integration-test');
 
     // The plaintext authenticates — lookup resolves the freshly-issued
     // model, proving the response is the live credential.
-    $looked = Cortex::getInstance()->tokens->lookup($plaintext);
+    $looked = Herald::getInstance()->tokens->lookup($plaintext);
     expect($looked)->not->toBeNull();
     expect($looked->name)->toBe('integration-test');
 
@@ -453,9 +453,9 @@ it('actionIssueToken returns the plaintext once and creates a row', function() {
 });
 
 it('actionIssueToken auto-names the token when name is omitted', function() {
-    $user = _cortexTokenTestUser();
+    $user = _heraldTokenTestUser();
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams(['userId' => (int) $user->id]);
 
     $response = $controller->actionIssueToken();
@@ -465,9 +465,9 @@ it('actionIssueToken auto-names the token when name is omitted', function() {
 });
 
 it('actionIssueToken accepts the elementSelect array form for userId', function() {
-    $user = _cortexTokenTestUser();
+    $user = _heraldTokenTestUser();
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     // The `elementSelectField` macro posts `userId[]`.
     $controller->withParams(['userId' => [(int) $user->id], 'name' => 'array-form']);
 
@@ -478,7 +478,7 @@ it('actionIssueToken accepts the elementSelect array form for userId', function(
 });
 
 it('actionIssueToken missing user returns 400', function() {
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams(['name' => 'no-user']);
 
     $response = $controller->actionIssueToken();
@@ -492,14 +492,14 @@ it('actionIssueToken missing user returns 400', function() {
 // -----------------------------------------------------------------------------
 
 it('actionRevokeToken soft-deletes the row and invalidates the plaintext', function() {
-    $user = _cortexTokenTestUser();
-    $issued = Cortex::getInstance()->tokens->issue((int) $user->id, 'doomed', 3600);
+    $user = _heraldTokenTestUser();
+    $issued = Herald::getInstance()->tokens->issue((int) $user->id, 'doomed', 3600);
     $plaintext = $issued['token'];
 
     // Sanity — the token authenticates before revocation.
-    expect(Cortex::getInstance()->tokens->lookup($plaintext))->not->toBeNull();
+    expect(Herald::getInstance()->tokens->lookup($plaintext))->not->toBeNull();
 
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams(['id' => (int) $issued['model']->id]);
 
     $response = $controller->actionRevokeToken();
@@ -508,12 +508,12 @@ it('actionRevokeToken soft-deletes the row and invalidates the plaintext', funct
     expect($response->statusCode)->toBe(200);
 
     // Subsequent lookup of the same plaintext fails.
-    expect(Cortex::getInstance()->tokens->lookup($plaintext))->toBeNull();
-    expect(Cortex::getInstance()->tokens->getAll())->toBeArray()->toBeEmpty();
+    expect(Herald::getInstance()->tokens->lookup($plaintext))->toBeNull();
+    expect(Herald::getInstance()->tokens->getAll())->toBeArray()->toBeEmpty();
 });
 
 it('actionRevokeToken unknown id returns 404', function() {
-    $controller = new _CortexTokensHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     $controller->withParams(['id' => 999999]);
 
     $response = $controller->actionRevokeToken();

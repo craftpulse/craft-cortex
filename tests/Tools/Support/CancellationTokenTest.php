@@ -15,8 +15,8 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\tools\support\CancellationToken;
-use craftpulse\cortex\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\CancellationToken;
+use craftpulse\herald\tools\support\InvocationContext;
 
 it('starts unfired', function() {
     $token = new CancellationToken();

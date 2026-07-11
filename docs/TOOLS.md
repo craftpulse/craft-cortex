@@ -1,14 +1,14 @@
-# Cortex Tools
+# Herald Tools
 
-Auto-generated reference for the cortex MCP tool surface. Run
-`ddev craft cortex/docs/tools` to refresh.
+Auto-generated reference for the herald MCP tool surface. Run
+`ddev craft herald/docs/tools` to refresh.
 
 - **Total tools:** 33
 - **Generated:** 2026-06-10T08:12:17-07:00
 
 ## `get_initial_context`
 
-Bootstrap snapshot for an AI agent picking up a fresh conversation against this Craft install. Returns Craft version + edition + environment, the primary site handle, a thin sites/sections/element-types index, the bundled cortex skill prompts (the moat content the LLM should consult when authoring against Craft), the `craft_exec` posture, and the effective command allowlist. Call this first — it replaces three or four orientation tool calls with one.
+Bootstrap snapshot for an AI agent picking up a fresh conversation against this Craft install. Returns Craft version + edition + environment, the primary site handle, a thin sites/sections/element-types index, the bundled herald skill prompts (the moat content the LLM should consult when authoring against Craft), the `craft_exec` posture, and the effective command allowlist. Call this first — it replaces three or four orientation tool calls with one.
 
 **Annotations:**
 
@@ -146,7 +146,7 @@ Bootstrap snapshot for an AI agent picking up a fresh conversation against this 
         },
         "skillPrompts": {
             "type": "array",
-            "description": "Bundled cortex prompts that return authored Craft expertise. Invoke `prompts/get` with one of these names when authoring against Craft.",
+            "description": "Bundled herald prompts that return authored Craft expertise. Invoke `prompts/get` with one of these names when authoring against Craft.",
             "items": {
                 "type": "object",
                 "properties": {
@@ -1501,7 +1501,7 @@ The full Craft permissions tree (built-in + plugin-registered) and the user-grou
 
 ## `search_skills`
 
-Full-text search across the bundled craft-skills corpus — 10 skills, their reference deep-dives, and 6 Claude Code agents. `mode: "search"` (default) returns ranked matches with a snippet and the resource URI for follow-up reads; `mode: "topics"` enumerates the corpus without scoring. Filter `kind` to `skill` / `reference` / `agent` to narrow. Element-stored Cortex skills override bundled ones by handle and are included in the merged corpus.
+Full-text search across the bundled craft-skills corpus — 10 skills, their reference deep-dives, and 6 Claude Code agents. `mode: "search"` (default) returns ranked matches with a snippet and the resource URI for follow-up reads; `mode: "topics"` enumerates the corpus without scoring. Filter `kind` to `skill` / `reference` / `agent` to narrow. Element-stored Herald skills override bundled ones by handle and are included in the merged corpus.
 
 **Annotations:**
 

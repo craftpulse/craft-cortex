@@ -20,18 +20,18 @@
  */
 
 use craft\elements\Entry as EntryElement;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\support\CancellationToken;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\ToolException;
-use craftpulse\cortex\tools\workflow\ImportExport;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\support\CancellationToken;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\ToolException;
+use craftpulse\herald\tools\workflow\ImportExport;
 
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_impstream_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_impstream_' . bin2hex(random_bytes(4)) . '_';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -56,7 +56,7 @@ afterEach(function() {
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _cortex_impstream_tool(): ImportExport
+function _herald_impstream_tool(): ImportExport
 {
     return new ImportExport();
 }
@@ -66,7 +66,7 @@ function _cortex_impstream_tool(): ImportExport
  *
  * @return array{0: list<array<string,mixed>>, 1: array<string,mixed>}
  */
-function _cortex_impstream_drain(Generator $gen): array
+function _herald_impstream_drain(Generator $gen): array
 {
     $frames = [];
     while ($gen->valid()) {
@@ -84,7 +84,7 @@ function _cortex_impstream_drain(Generator $gen): array
  *
  * @return array<string,mixed>
  */
-function _cortex_impstream_envelope(string $titlePrefix, int $n): array
+function _herald_impstream_envelope(string $titlePrefix, int $n): array
 {
     $section = Craft::$app->getEntries()->getSectionByHandle('heroes');
     $entryType = $section !== null ? (Craft::$app->getEntries()->getEntryTypesBySectionId((int) $section->id)[0] ?? null) : null;
@@ -117,10 +117,10 @@ function _cortex_impstream_envelope(string $titlePrefix, int $n): array
 // -----------------------------------------------------------------------------
 
 it('stream(import) yields one progress frame per progressInterval items and returns the envelope', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $envelope = _cortex_impstream_envelope($this->fixturePrefix, 5);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $envelope = _herald_impstream_envelope($this->fixturePrefix, 5);
 
-        $gen = _cortex_impstream_tool()->stream(
+        $gen = _herald_impstream_tool()->stream(
             [
                 'mode' => 'import',
                 'payload' => $envelope,
@@ -128,7 +128,7 @@ it('stream(import) yields one progress frame per progressInterval items and retu
             ],
             new InvocationContext(),
         );
-        [$frames, $terminal] = _cortex_impstream_drain($gen);
+        [$frames, $terminal] = _herald_impstream_drain($gen);
 
         // 5 items × interval 1 = 5 frames.
         expect($frames)->toHaveCount(5);
@@ -153,17 +153,17 @@ it('stream(import) yields one progress frame per progressInterval items and retu
 
 it('stream(import) yields no progress frames for a single-item payload at default interval', function() {
     // total=1, default interval=100 → zero progress frames; terminal only.
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $envelope = _cortex_impstream_envelope($this->fixturePrefix, 1);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $envelope = _herald_impstream_envelope($this->fixturePrefix, 1);
 
-        $gen = _cortex_impstream_tool()->stream(
+        $gen = _herald_impstream_tool()->stream(
             [
                 'mode' => 'import',
                 'payload' => $envelope,
             ],
             new InvocationContext(),
         );
-        [$frames, $terminal] = _cortex_impstream_drain($gen);
+        [$frames, $terminal] = _herald_impstream_drain($gen);
 
         expect($frames)->toBe([]);
         expect($terminal['total'])->toBe(1);
@@ -177,8 +177,8 @@ it('stream(import) yields no progress frames for a single-item payload at defaul
 // -----------------------------------------------------------------------------
 
 it('stream(import) reports cancelled=true when the token flips mid-stream', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $envelope = _cortex_impstream_envelope($this->fixturePrefix, 10);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $envelope = _herald_impstream_envelope($this->fixturePrefix, 10);
 
         $callCount = 0;
         // Flip after the first poll so the loop's mid-iteration check
@@ -189,7 +189,7 @@ it('stream(import) reports cancelled=true when the token flips mid-stream', func
         });
         $ctx = new InvocationContext(cancellationToken: $token);
 
-        $gen = _cortex_impstream_tool()->stream(
+        $gen = _herald_impstream_tool()->stream(
             [
                 'mode' => 'import',
                 'payload' => $envelope,
@@ -197,7 +197,7 @@ it('stream(import) reports cancelled=true when the token flips mid-stream', func
             ],
             $ctx,
         );
-        [, $terminal] = _cortex_impstream_drain($gen);
+        [, $terminal] = _herald_impstream_drain($gen);
 
         expect($terminal['cancelled'])->toBeTrue();
         expect($terminal['success'])->toBeFalse();
@@ -211,19 +211,19 @@ it('stream(import) reports cancelled=true when the token flips mid-stream', func
 // -----------------------------------------------------------------------------
 
 it('execute(import) drains stream() and returns the same terminal envelope shape', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $envelope = _cortex_impstream_envelope($this->fixturePrefix, 3);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $envelope = _herald_impstream_envelope($this->fixturePrefix, 3);
 
-        $viaExecute = _cortex_impstream_tool()->execute([
+        $viaExecute = _herald_impstream_tool()->execute([
             'mode' => 'import',
             'payload' => $envelope,
         ]);
 
-        $gen = _cortex_impstream_tool()->stream(
+        $gen = _herald_impstream_tool()->stream(
             ['mode' => 'import', 'payload' => $envelope],
             new InvocationContext(),
         );
-        [, $viaStream] = _cortex_impstream_drain($gen);
+        [, $viaStream] = _herald_impstream_drain($gen);
 
         expect(array_keys($viaExecute))->toBe(array_keys($viaStream));
         expect($viaExecute['mode'])->toBe('import');
@@ -239,15 +239,15 @@ it('execute(import) drains stream() and returns the same terminal envelope shape
 // -----------------------------------------------------------------------------
 
 it('stream() rejects export mode (not streamable)', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $gen = _cortex_impstream_tool()->stream(['mode' => 'export'], new InvocationContext());
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $gen = _herald_impstream_tool()->stream(['mode' => 'export'], new InvocationContext());
         iterator_to_array($gen);
     });
 })->throws(ToolException::class, 'is not streamable');
 
 it('stream() rejects Pro modes on Free installs', function() {
     $envelope = ['format' => ImportExport::FORMAT_VERSION, 'entries' => []];
-    $gen = _cortex_impstream_tool()->stream(
+    $gen = _herald_impstream_tool()->stream(
         ['mode' => 'import', 'payload' => $envelope],
         new InvocationContext(),
     );

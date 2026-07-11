@@ -1,21 +1,21 @@
 <?php
 
-namespace craftpulse\cortex\tools\content;
+namespace craftpulse\herald\tools\content;
 
 use Craft;
 use craft\elements\Category as CategoryElement;
 use craft\elements\User;
 use craft\models\CategoryGroup;
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\IdempotencyTrait;
-use craftpulse\cortex\tools\PermissionedToolTrait;
-use craftpulse\cortex\tools\ProToolTrait;
-use craftpulse\cortex\tools\support\ElementSerializer;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\IdempotencyTrait;
+use craftpulse\herald\tools\PermissionedToolTrait;
+use craftpulse\herald\tools\ProToolTrait;
+use craftpulse\herald\tools\support\ElementSerializer;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 
 /**
  * =========================================================================
@@ -57,7 +57,7 @@ use craftpulse\cortex\tools\ToolException;
  * Craft normalises per field type at save time.
  *
  * Idempotency contract: `idempotencyKey` is server-side dedup for
- * `create` and `update`. Cache key prefix: `cortex:category:idem:`.
+ * `create` and `update`. Cache key prefix: `herald:category:idem:`.
  * TTL 24h. Skipped on stdio (no per-request identity).
  * =========================================================================
  *
@@ -77,12 +77,12 @@ class Category extends AbstractTool
     // =========================================================================
 
     /**
-     * Idempotency cache key prefix. Mirrors the `cortex:{toolName}:idem:`
+     * Idempotency cache key prefix. Mirrors the `herald:{toolName}:idem:`
      * shape from `Entry`. Consumed by `IdempotencyTrait`.
      *
      * @since 5.0.0
      */
-    public const IDEMPOTENCY_CACHE_PREFIX = 'cortex:category:idem:';
+    public const IDEMPOTENCY_CACHE_PREFIX = 'herald:category:idem:';
 
     // Public Methods
     // =========================================================================

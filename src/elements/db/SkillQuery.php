@@ -1,22 +1,22 @@
 <?php
 
-namespace craftpulse\cortex\elements\db;
+namespace craftpulse\herald\elements\db;
 
 use craft\elements\db\ElementQuery;
 use craft\helpers\Db;
-use craftpulse\cortex\db\Table;
-use craftpulse\cortex\elements\Skill;
+use craftpulse\herald\db\Table;
+use craftpulse\herald\elements\Skill;
 
 /**
  * =========================================================================
- * Element query for Cortex `Skill` elements.
+ * Element query for Herald `Skill` elements.
  *
  * Adds two native filters on top of `ElementQuery`:
  *   - `handle()`       — the natural-key slug (globally unique).
  *   - `description()`  — substring match against the native description
  *                        column.
  *
- * `beforePrepare()` joins the `cortex_skills` table and surfaces the
+ * `beforePrepare()` joins the `herald_skills` table and surfaces the
  * native columns via `addSelect()` so consumers can read `$skill->handle`
  * / `$skill->description` without a second query. The element's body
  * content lives in the PC-stored field layout and is loaded lazily
@@ -82,7 +82,7 @@ class SkillQuery extends ElementQuery
      * Filter by the skill's native description column. Pass a string
      * for substring match, an array for an IN-list, or a `'not'`-
      * prefixed array for negation. The description lives in the
-     * `cortex_skills` table (NOT in the content table) so the filter
+     * `herald_skills` table (NOT in the content table) so the filter
      * runs against the join surface and stays free of content-table
      * scans.
      *
@@ -122,19 +122,19 @@ class SkillQuery extends ElementQuery
         assert($this->subQuery !== null);
 
         $this->query->addSelect([
-            'cortex_skills.handle',
-            'cortex_skills.description',
+            'herald_skills.handle',
+            'herald_skills.description',
         ]);
 
         if ($this->handle !== null) {
-            $handleClause = Db::parseParam('cortex_skills.handle', $this->handle);
+            $handleClause = Db::parseParam('herald_skills.handle', $this->handle);
             if ($handleClause !== null) {
                 $this->subQuery->andWhere($handleClause);
             }
         }
 
         if ($this->description !== null) {
-            $descriptionClause = Db::parseParam('cortex_skills.description', $this->description);
+            $descriptionClause = Db::parseParam('herald_skills.description', $this->description);
             if ($descriptionClause !== null) {
                 $this->subQuery->andWhere($descriptionClause);
             }

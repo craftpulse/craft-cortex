@@ -5,11 +5,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('system_diagnostics');
+    $this->tool = Herald::getInstance()->tools->getByName('system_diagnostics');
 });
 
 it('throws when type is missing', function() {
@@ -44,7 +44,7 @@ it('returns project_config_diff payload', function() {
 });
 
 it('returns logs payload (gracefully handles missing file)', function() {
-    $result = $this->tool->execute(['type' => 'logs', 'channel' => 'cortex_no_such_log']);
+    $result = $this->tool->execute(['type' => 'logs', 'channel' => 'herald_no_such_log']);
 
     expect($result)->toHaveKeys(['type', 'channel', 'path', 'exists', 'entries']);
     expect($result['exists'])->toBeFalse();

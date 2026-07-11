@@ -1,6 +1,6 @@
-# Installing Cortex
+# Installing Herald
 
-This guide walks you through installing Cortex into a Craft CMS 5 project and connecting it to your MCP client.
+This guide walks you through installing Herald into a Craft CMS 5 project and connecting it to your MCP client.
 
 - [Requirements](#requirements)
 - [Install the plugin](#install-the-plugin)
@@ -19,7 +19,7 @@ This guide walks you through installing Cortex into a Craft CMS 5 project and co
 - Craft CMS **5.0.0** or later
 - PHP **8.2** or later
 - Composer
-- An MCP-capable client. Cortex officially supports seven:
+- An MCP-capable client. Herald officially supports seven:
   - Claude Desktop (macOS / Windows / Linux)
   - Claude Code (CLI)
   - Cursor
@@ -40,10 +40,10 @@ This is the easiest path if you're already in the Craft Control Panel.
 
 1. Sign in to your Craft project's Control Panel.
 2. Go to **Settings → Plugin Store**.
-3. Search for **Cortex**.
+3. Search for **Herald**.
 4. Click **Install** in the plugin's modal window.
 
-Craft pulls the package via Composer, runs the install migration, and registers the plugin. You'll see **Cortex** appear under **Settings → Plugins** when it's done.
+Craft pulls the package via Composer, runs the install migration, and registers the plugin. You'll see **Herald** appear under **Settings → Plugins** when it's done.
 
 ### Composer (CLI)
 
@@ -53,55 +53,55 @@ Craft pulls the package via Composer, runs the install migration, and registers 
 
 2. Tell Composer to load the plugin:
 
-        composer require craftpulse/craft-cortex
+        composer require craftpulse/craft-herald
 
 3. Install the plugin via the CLI:
 
-        php craft plugin/install cortex
+        php craft plugin/install herald
 
-   …or, in the Control Panel, go to **Settings → Plugins** and click the **Install** button next to Cortex.
+   …or, in the Control Panel, go to **Settings → Plugins** and click the **Install** button next to Herald.
 
 ### DDEV-based projects
 
 If your local environment runs in [DDEV](https://ddev.com/), use the same commands prefixed with `ddev`:
 
 ```bash
-ddev composer require craftpulse/craft-cortex
-ddev craft plugin/install cortex
+ddev composer require craftpulse/craft-herald
+ddev craft plugin/install herald
 ```
 
-Cortex is DDEV-aware. When you run `ddev craft cortex/install` it auto-detects the DDEV environment (via `IS_DDEV_PROJECT` / `DDEV_PROJECT`) and emits the `docker exec`-form invocation that lets your host-side MCP client reach into the container. You don't need to expose any ports.
+Herald is DDEV-aware. When you run `ddev craft herald/install` it auto-detects the DDEV environment (via `IS_DDEV_PROJECT` / `DDEV_PROJECT`) and emits the `docker exec`-form invocation that lets your host-side MCP client reach into the container. You don't need to expose any ports.
 
 ## Connect your MCP client
 
-Once Cortex is installed, your MCP client needs to know how to talk to it. Cortex provides four console actions for this — listed below in order of decreasing magic:
+Once Herald is installed, your MCP client needs to know how to talk to it. Herald provides four console actions for this — listed below in order of decreasing magic:
 
 | Action | What it does | Where it runs |
 |--------|--------------|---------------|
-| `cortex/install/auto` | Scans the host for installed MCP clients, then for each one prompts to apply Cortex config. The "I installed Cortex, now wire it up everywhere" flow. | **Host only.** Refuses to run from inside a container (DDEV, Docker, Lando, Sail, Podman, LXC, Kubernetes). |
-| `cortex/install/detect` | Scans the host and prints a status table of which clients are installed and configured. Read-only — never writes. | **Host only.** Refuses to run from inside a container. |
-| `cortex/install/apply --client=<name>` | Writes Cortex config to one specific client's config file. Atomic write + timestamped backup. | Anywhere — host or DDEV — but the config path it targets must exist on the running filesystem. |
-| `cortex/install` | Prints copy-paste snippets for every supported client (or just one with `--client=<name>`). Read-only. | Anywhere. |
+| `herald/install/auto` | Scans the host for installed MCP clients, then for each one prompts to apply Herald config. The "I installed Herald, now wire it up everywhere" flow. | **Host only.** Refuses to run from inside a container (DDEV, Docker, Lando, Sail, Podman, LXC, Kubernetes). |
+| `herald/install/detect` | Scans the host and prints a status table of which clients are installed and configured. Read-only — never writes. | **Host only.** Refuses to run from inside a container. |
+| `herald/install/apply --client=<name>` | Writes Herald config to one specific client's config file. Atomic write + timestamped backup. | Anywhere — host or DDEV — but the config path it targets must exist on the running filesystem. |
+| `herald/install` | Prints copy-paste snippets for every supported client (or just one with `--client=<name>`). Read-only. | Anywhere. |
 
-**If you're running Cortex inside a container** (DDEV, plain Docker, Lando, Sail, Podman, LXC, Kubernetes), your container can't see your host's `/Applications`, `~/.cursor`, etc. — so `detect` and `auto` refuse to run there to avoid false negatives. Run them from your host's PHP:
+**If you're running Herald inside a container** (DDEV, plain Docker, Lando, Sail, Podman, LXC, Kubernetes), your container can't see your host's `/Applications`, `~/.cursor`, etc. — so `detect` and `auto` refuse to run there to avoid false negatives. Run them from your host's PHP:
 
 ```bash
-php /path/to/project/craft cortex/install/auto
+php /path/to/project/craft herald/install/auto
 ```
 
-Or stick with the manual snippet form (`ddev craft cortex/install`), which works fine inside DDEV.
+Or stick with the manual snippet form (`ddev craft herald/install`), which works fine inside DDEV.
 
 ### Bearer-token authentication for the HTTP transport
 
-Cortex also exposes an HTTP transport at `POST /cortex/mcp` for clients that don't speak stdio (Claude Desktop's hosted MCP setup, browser-based agents, anything behind a remote agent). The HTTP transport is **disabled by default** — flip `Settings::$httpEnabled = true` in `config/cortex.php` to expose it.
+Herald also exposes an HTTP transport at `POST /herald/mcp` for clients that don't speak stdio (Claude Desktop's hosted MCP setup, browser-based agents, anything behind a remote agent). The HTTP transport is **disabled by default** — flip `Settings::$httpEnabled = true` in `config/herald.php` to expose it.
 
-Once enabled, every request to `/cortex/mcp` must carry `Authorization: Bearer <token>`. Issue a token from the console:
+Once enabled, every request to `/herald/mcp` must carry `Authorization: Bearer <token>`. Issue a token from the console:
 
 ```bash
-ddev craft cortex/token/issue <user> [--name=<name>] [--ttl=<seconds>]
+ddev craft herald/token/issue <user> [--name=<name>] [--ttl=<seconds>]
 ```
 
-The plaintext token prints **exactly once** at issuance — copy it then. Cortex stores only the SHA-256 hash; if you lose the plaintext, revoke the token and issue a fresh one. By default tokens never expire; pass `--ttl=<seconds>` (e.g. `--ttl=2592000` for 30 days) for shorter rotation, or set `Settings::$tokenTtlDefault` for a global default.
+The plaintext token prints **exactly once** at issuance — copy it then. Herald stores only the SHA-256 hash; if you lose the plaintext, revoke the token and issue a fresh one. By default tokens never expire; pass `--ttl=<seconds>` (e.g. `--ttl=2592000` for 30 days) for shorter rotation, or set `Settings::$tokenTtlDefault` for a global default.
 
 Configure your MCP client with:
 
@@ -112,25 +112,25 @@ Authorization: Bearer <plaintext-token>
 Manage tokens with two more actions:
 
 ```bash
-ddev craft cortex/token/list [--user=<email-or-username>]
-ddev craft cortex/token/revoke <id>
+ddev craft herald/token/list [--user=<email-or-username>]
+ddev craft herald/token/revoke <id>
 ```
 
 Revocation is immediate for new requests — in-flight requests on a revoked token complete normally, the next request fails 401.
 
 ### OAuth 2.1 for the HTTP transport (optional, MCP-spec-compliant)
 
-For clients that auto-discover and self-register against a remote MCP server — Claude Desktop's hosted MCP setup, Anthropic's `/.well-known` flow, IDE plugins that ship with OAuth support — Cortex also exposes a full OAuth 2.1 surface: Authorization Code + PKCE (S256), Refresh Token, RFC 7591 Dynamic Client Registration, RFC 7009 token revocation, and RFC 8414 / RFC 9728 discovery metadata.
+For clients that auto-discover and self-register against a remote MCP server — Claude Desktop's hosted MCP setup, Anthropic's `/.well-known` flow, IDE plugins that ship with OAuth support — Herald also exposes a full OAuth 2.1 surface: Authorization Code + PKCE (S256), Refresh Token, RFC 7591 Dynamic Client Registration, RFC 7009 token revocation, and RFC 8414 / RFC 9728 discovery metadata.
 
-The OAuth surface coexists with bearer tokens — both authenticate against the same `cortex/mcp` endpoint, OAuth checked first per RFC 8707 audience binding, bearer as fallback for the long-lived admin-issued credentials.
+The OAuth surface coexists with bearer tokens — both authenticate against the same `herald/mcp` endpoint, OAuth checked first per RFC 8707 audience binding, bearer as fallback for the long-lived admin-issued credentials.
 
 **One-time setup:**
 
 ```bash
-ddev craft cortex/oauth/init-keys
+ddev craft herald/oauth/init-keys
 ```
 
-This generates an RSA 2048-bit key pair at `storage/cortex/oauth-keys/{private,public}.key`. The private key is set to `0600` and signs every JWT access token Cortex issues; the public key verifies them. The pair stays put across deploys (Git ignores `storage/`). Rotating with `--force` invalidates every in-flight access token.
+This generates an RSA 2048-bit key pair at `storage/herald/oauth-keys/{private,public}.key`. The private key is set to `0600` and signs every JWT access token Herald issues; the public key verifies them. The pair stays put across deploys (Git ignores `storage/`). Rotating with `--force` invalidates every in-flight access token.
 
 **Discovery endpoints** (no auth required):
 
@@ -168,9 +168,9 @@ Returns a fresh `client_id` (and `client_secret` if the method is not `none`). D
      code_challenge_method=S256&
      scope=read&
      state=<random>&
-     resource=https://your-site.test/cortex/mcp
+     resource=https://your-site.test/herald/mcp
    ```
-3. The user lands on Cortex's consent screen (Craft CP login required); approving redirects back to `redirect_uri` with `code` and `state`.
+3. The user lands on Herald's consent screen (Craft CP login required); approving redirects back to `redirect_uri` with `code` and `state`.
 4. Exchange the code for tokens:
    ```bash
    curl -X POST https://your-site.test/oauth/token \
@@ -179,18 +179,18 @@ Returns a fresh `client_id` (and `client_secret` if the method is not `none`). D
      -d 'redirect_uri=<same as step 2>' \
      -d 'client_id=<from DCR>' \
      -d 'code_verifier=<original verifier>' \
-     -d 'resource=https://your-site.test/cortex/mcp'
+     -d 'resource=https://your-site.test/herald/mcp'
    ```
 5. Use the resulting access token:
    ```bash
-   curl -X POST https://your-site.test/cortex/mcp \
+   curl -X POST https://your-site.test/herald/mcp \
      -H 'MCP-Protocol-Version: 2025-11-25' \
      -H 'Authorization: Bearer <access_token>' \
      -H 'Content-Type: application/json' \
      -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","clientInfo":{"name":"my-client","version":"1.0"}}}'
    ```
 
-**Audience binding (RFC 8707):** The `resource` parameter on `/authorize` and `/token` ends up in the JWT `aud` claim. Cortex verifies it matches the canonical `cortex/mcp` URL on every request — a token issued for resource A can't be replayed against resource B. Pass `resource=<absolute URL to /cortex/mcp>` on both endpoints.
+**Audience binding (RFC 8707):** The `resource` parameter on `/authorize` and `/token` ends up in the JWT `aud` claim. Herald verifies it matches the canonical `herald/mcp` URL on every request — a token issued for resource A can't be replayed against resource B. Pass `resource=<absolute URL to /herald/mcp>` on both endpoints.
 
 **Token lifetimes** (defaults; configurable via `Settings::$oauthAccessTokenTtl` / `$oauthRefreshTokenTtl`):
 - Access tokens: 1 hour (`PT1H`).
@@ -215,12 +215,12 @@ Per RFC 7009 §2.2 the endpoint returns 200 regardless of whether the token was 
 
 ### Streaming Tools (SSE over HTTP)
 
-Cortex's HTTP transport supports MCP's Streamable HTTP profile — long-running tools can emit progress frames between the original `tools/call` request and its terminal JSON-RPC response, and clients can cancel an in-flight call without dropping the connection. The Free tier ships no streaming tools; the wire is ready for Gate 8's Pro write tools (eager resave, content audit, batch import/export).
+Herald's HTTP transport supports MCP's Streamable HTTP profile — long-running tools can emit progress frames between the original `tools/call` request and its terminal JSON-RPC response, and clients can cancel an in-flight call without dropping the connection. The Free tier ships no streaming tools; the wire is ready for Gate 8's Pro write tools (eager resave, content audit, batch import/export).
 
-**Client opt-in.** Clients request the SSE response by sending `Accept: text/event-stream` on the `tools/call` POST. MCP-spec-compliant clients (Claude Desktop, Claude Code, Cursor) send the SSE Accept by default. Cortex falls back to the JSON response when the header is absent or doesn't mention `text/event-stream`.
+**Client opt-in.** Clients request the SSE response by sending `Accept: text/event-stream` on the `tools/call` POST. MCP-spec-compliant clients (Claude Desktop, Claude Code, Cursor) send the SSE Accept by default. Herald falls back to the JSON response when the header is absent or doesn't mention `text/event-stream`.
 
 ```
-POST /cortex/mcp
+POST /herald/mcp
 Accept: text/event-stream
 Content-Type: application/json
 Authorization: Bearer <token>
@@ -251,7 +251,7 @@ The terminal frame carries the original request id and the `tools/call` result e
 **Cancellation.** Send a JSON-RPC `notifications/cancelled` notification (not a request — no `id` field) referencing the in-flight request id:
 
 ```
-POST /cortex/mcp
+POST /herald/mcp
 Authorization: Bearer <token>
 Mcp-Session-Id: <session-id>
 MCP-Protocol-Version: 2025-11-25
@@ -261,12 +261,12 @@ MCP-Protocol-Version: 2025-11-25
 
 The server flips a cache-backed cancellation flag the running tool observes between yields. Cooperative tools short-circuit and the server emits a terminal `notifications/cancelled` envelope on the SSE stream. Tools that ignore the flag (pure CPU loops without yield checkpoints) cannot be cancelled — the contract is cooperative, not preemptive. The cancellation slot's TTL is one hour: a delayed `notifications/cancelled` arriving after a network blip still flips a running stream.
 
-**Audit logging.** Streamed invocations write exactly one row to `cortex_invocations` per stream completion, not per frame. The `durationMs` column reflects wall-clock from stream start to stream end. Cancellation events surface as `kind=cancelled` rows (distinct from `tool_error`, `internal_error`, and `rate_limited`); `errorClass` / `errorMessage` stay null — cancellation isn't an error.
+**Audit logging.** Streamed invocations write exactly one row to `herald_invocations` per stream completion, not per frame. The `durationMs` column reflects wall-clock from stream start to stream end. Cancellation events surface as `kind=cancelled` rows (distinct from `tool_error`, `internal_error`, and `rate_limited`); `errorClass` / `errorMessage` stay null — cancellation isn't an error.
 
-**Operator smoke test.** A built-in fixture tool — `_streaming_test` — exists for end-to-end SSE health checks. It's gated behind the `CORTEX_STREAMING_FIXTURE=1` env var and never registers in production unless an operator opts in. Flip the env var, restart your PHP-FPM workers, and:
+**Operator smoke test.** A built-in fixture tool — `_streaming_test` — exists for end-to-end SSE health checks. It's gated behind the `HERALD_STREAMING_FIXTURE=1` env var and never registers in production unless an operator opts in. Flip the env var, restart your PHP-FPM workers, and:
 
 ```bash
-curl -N -X POST https://your-site.test/cortex/mcp \
+curl -N -X POST https://your-site.test/herald/mcp \
   -H "Authorization: Bearer $TOKEN" \
   -H "Mcp-Session-Id: $SESSION" \
   -H 'Accept: text/event-stream' \
@@ -279,24 +279,24 @@ Expect: HTTP 200, `Content-Type: text/event-stream`, three progress frames (`pro
 
 ### Auto-detect and apply (fastest)
 
-If you're running Cortex from the host (not inside a container), this is one command:
+If you're running Herald from the host (not inside a container), this is one command:
 
 ```bash
-php craft cortex/install/auto
+php craft herald/install/auto
 ```
 
-Cortex scans your host for installed MCP clients (`/Applications`, `PATH`, `%LOCALAPPDATA%`) and the directories where they store config. For each detected client, you'll see a `[Y/n]` prompt — confirm and Cortex writes the config entry the same way `apply` does (atomic write, timestamped backup, idempotent re-runs). Skip with `n` and move to the next.
+Herald scans your host for installed MCP clients (`/Applications`, `PATH`, `%LOCALAPPDATA%`) and the directories where they store config. For each detected client, you'll see a `[Y/n]` prompt — confirm and Herald writes the config entry the same way `apply` does (atomic write, timestamped backup, idempotent re-runs). Skip with `n` and move to the next.
 
 To preview without writing anything, pair with `--dry-run`:
 
 ```bash
-php craft cortex/install/auto --dry-run
+php craft herald/install/auto --dry-run
 ```
 
 To just see the detection table without applying:
 
 ```bash
-php craft cortex/install/detect
+php craft herald/install/detect
 ```
 
 ### Auto-config writer
@@ -304,24 +304,24 @@ php craft cortex/install/detect
 The fastest path. From your project root:
 
 ```bash
-ddev craft cortex/install/apply --client=claude-desktop --dry-run
+ddev craft herald/install/apply --client=claude-desktop --dry-run
 ```
 
 The `--dry-run` flag prints the target file path and a before / after diff without touching any files. Inspect the diff. If it looks right, re-run without `--dry-run`:
 
 ```bash
-ddev craft cortex/install/apply --client=claude-desktop
+ddev craft herald/install/apply --client=claude-desktop
 ```
 
-Cortex confirms before writing (`y/N`). It then:
+Herald confirms before writing (`y/N`). It then:
 
 1. Backs the existing config up to `<file>.bak.<unix-timestamp>` (only if a file already exists).
 2. Writes the new contents to a sibling temp file.
 3. Atomically renames the temp into place.
 
-If the parent config directory doesn't exist (e.g. you're trying to configure Claude Desktop on a machine without Claude Desktop installed), Cortex refuses with a clear error rather than ghost-creating the directory — that's the canonical "client not installed" signal.
+If the parent config directory doesn't exist (e.g. you're trying to configure Claude Desktop on a machine without Claude Desktop installed), Herald refuses with a clear error rather than ghost-creating the directory — that's the canonical "client not installed" signal.
 
-**Re-runs are idempotent.** If a Cortex entry is already in the file, the action refuses unless you pass `--force`. With `--force`, Cortex makes a fresh backup, replaces the entry, and leaves every other server in the file untouched.
+**Re-runs are idempotent.** If a Herald entry is already in the file, the action refuses unless you pass `--force`. With `--force`, Herald makes a fresh backup, replaces the entry, and leaves every other server in the file untouched.
 
 Supported flags:
 
@@ -329,7 +329,7 @@ Supported flags:
 |------|--------|
 | `--client=<name>` | Required. One of `claude-desktop`, `claude-code`, `cursor`, `continue`, `cline`, `zed`, `windsurf`. |
 | `--dry-run` | Print the target path and would-be diff. Skip the write. Skip the confirm prompt. |
-| `--force` (`-f`) | Overwrite an existing Cortex entry. Default refuses for safety. |
+| `--force` (`-f`) | Overwrite an existing Herald entry. Default refuses for safety. |
 | `--ddev` (`-d`) | Force the DDEV `docker exec` invocation form (auto-detected by default). |
 | `--ddevProject=<name>` | Override the DDEV project name in the docker-exec command. Auto-detected from `DDEV_PROJECT`. |
 
@@ -338,15 +338,15 @@ Supported flags:
 If your client isn't supported by the auto-config writer, or you'd rather copy-paste, use the snippet printer:
 
 ```bash
-ddev craft cortex/install                        # print snippets for all 7 clients
-ddev craft cortex/install --client=claude-desktop  # one client
+ddev craft herald/install                        # print snippets for all 7 clients
+ddev craft herald/install --client=claude-desktop  # one client
 ```
 
-The output includes the client's config file path (per-platform) and the JSON or YAML block to paste in. Reload the client and Cortex shows up.
+The output includes the client's config file path (per-platform) and the JSON or YAML block to paste in. Reload the client and Herald shows up.
 
 ### Per-client configuration
 
-Reference paths Cortex writes to (or prints in the snippet form). The auto-config writer resolves these per-platform; the manual snippets list all three platforms in the output.
+Reference paths Herald writes to (or prints in the snippet form). The auto-config writer resolves these per-platform; the manual snippets list all three platforms in the output.
 
 #### Claude Desktop
 
@@ -362,21 +362,21 @@ Format: top-level `mcpServers` JSON object. Reload Claude Desktop after writing 
 
 #### Claude Code
 
-Config file: project-scoped `.mcp.json` in your project root. Cortex writes it next to your `craft` script.
+Config file: project-scoped `.mcp.json` in your project root. Herald writes it next to your `craft` script.
 
-You can also run `claude mcp add --transport stdio cortex -- <command>` from your project directory — the snippet printer shows the exact command for your environment. The `--` separator is required: it stops Claude Code from parsing the wrapped `docker exec -i`'s `-i` flag as one of its own.
+You can also run `claude mcp add --transport stdio herald -- <command>` from your project directory — the snippet printer shows the exact command for your environment. The `--` separator is required: it stops Claude Code from parsing the wrapped `docker exec -i`'s `-i` flag as one of its own.
 
 #### Cursor
 
-Config file: `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project-scoped). Cortex writes the global form by default. Format: `mcpServers` JSON object.
+Config file: `~/.cursor/mcp.json` (global) or `.cursor/mcp.json` (project-scoped). Herald writes the global form by default. Format: `mcpServers` JSON object.
 
 Cursor watches the file and picks up the change without a restart.
 
 #### Continue.dev
 
-Config file: `~/.continue/mcpServers/cortex.yaml` (standalone block file). Cortex writes a dedicated file rather than mutating your existing `~/.continue/config.yaml` so there's zero risk of clobbering your other Continue config.
+Config file: `~/.continue/mcpServers/herald.yaml` (standalone block file). Herald writes a dedicated file rather than mutating your existing `~/.continue/config.yaml` so there's zero risk of clobbering your other Continue config.
 
-The standalone block format requires three top-level metadata fields (`name`, `version`, `schema: v1`) per [docs.continue.dev/reference](https://docs.continue.dev/reference). Cortex emits all three.
+The standalone block format requires three top-level metadata fields (`name`, `version`, `schema: v1`) per [docs.continue.dev/reference](https://docs.continue.dev/reference). Herald emits all three.
 
 #### Cline
 
@@ -408,11 +408,11 @@ Config file: `~/.codeium/windsurf/mcp_config.json` across all platforms. Format:
 
 ## Verify the connection
 
-In your MCP client, ask the assistant something Cortex can answer, for example:
+In your MCP client, ask the assistant something Herald can answer, for example:
 
 > "List the sections in this Craft project."
 
-The assistant should call the `sections` tool and return a structured list. If your client has a tools / servers panel, you'll see Cortex listed alongside any other MCP servers you've registered.
+The assistant should call the `sections` tool and return a structured list. If your client has a tools / servers panel, you'll see Herald listed alongside any other MCP servers you've registered.
 
 You can also smoke-test the protocol layer with the [DDEV MCP Inspector add-on](https://github.com/michtio/ddev-mcp-inspector):
 
@@ -426,47 +426,47 @@ In the Inspector UI, point at:
 
 - **Transport Type:** STDIO
 - **Command:** `docker`
-- **Arguments:** `exec -i ddev-<project>-web php /var/www/html/craft cortex/serve`
+- **Arguments:** `exec -i ddev-<project>-web php /var/www/html/craft herald/serve`
 
-A successful `initialize` handshake reports `cortex 5.0.0` and the negotiated protocol version — `2025-11-25` (the latest Cortex advertises) when your client requests it, or `2025-06-18` when an older client does. On a Free install `tools/list` returns 33 entries; `prompts/list` returns 10; `resources/list` returns 98.
+A successful `initialize` handshake reports `herald 5.0.0` and the negotiated protocol version — `2025-11-25` (the latest Herald advertises) when your client requests it, or `2025-06-18` when an older client does. On a Free install `tools/list` returns 33 entries; `prompts/list` returns 10; `resources/list` returns 98.
 
 ## Troubleshooting
 
 ### The `apply` command refuses with "config directory not found"
 
-Cortex won't ghost-create config directories — their absence is the canonical "client not installed" signal. Either install the client first, or use the manual snippet form (`cortex/install --client=<name>`) and paste into a config file you create yourself.
+Herald won't ghost-create config directories — their absence is the canonical "client not installed" signal. Either install the client first, or use the manual snippet form (`herald/install --client=<name>`) and paste into a config file you create yourself.
 
 ### `apply` refuses inside a container but my client IS installed (on the host)
 
-If you're running `ddev craft cortex/install/apply` (or any containerised equivalent) from inside a container, the auto-config writer can only see the container's filesystem — not your host's. Your MCP client lives on the host, so its config directory looks "missing" from the container's perspective.
+If you're running `ddev craft herald/install/apply` (or any containerised equivalent) from inside a container, the auto-config writer can only see the container's filesystem — not your host's. Your MCP client lives on the host, so its config directory looks "missing" from the container's perspective.
 
 Two ways to handle it:
 
-1. **`--dry-run` to preview, then copy-paste.** Inside DDEV, run with `--dry-run`. Cortex prints the would-be `AFTER` block including the correct `docker exec` invocation. Copy it into your host MCP client's config file manually.
+1. **`--dry-run` to preview, then copy-paste.** Inside DDEV, run with `--dry-run`. Herald prints the would-be `AFTER` block including the correct `docker exec` invocation. Copy it into your host MCP client's config file manually.
 
-2. **Use the manual snippet form** — `ddev craft cortex/install --client=<name>` — which is designed to be DDEV-friendly and prints the same content with the surrounding context lines.
+2. **Use the manual snippet form** — `ddev craft herald/install --client=<name>` — which is designed to be DDEV-friendly and prints the same content with the surrounding context lines.
 
-### The `apply` command refuses with "Cortex entry already present"
+### The `apply` command refuses with "Herald entry already present"
 
-The action is idempotent by default. Re-run with `--force` to overwrite the existing entry. Cortex makes a fresh backup before writing.
+The action is idempotent by default. Re-run with `--force` to overwrite the existing entry. Herald makes a fresh backup before writing.
 
-### My client doesn't see Cortex after I configured it
+### My client doesn't see Herald after I configured it
 
 1. Reload the client. Most clients pick up config changes on restart, not live.
-2. Check the file your client actually reads. Some editors have multiple config scopes (user / project / workspace) and the client may be looking at a different one. Run `cortex/install --client=<name>` to see the canonical path Cortex writes to.
-3. Check Cortex's invocation. From your project root:
+2. Check the file your client actually reads. Some editors have multiple config scopes (user / project / workspace) and the client may be looking at a different one. Run `herald/install --client=<name>` to see the canonical path Herald writes to.
+3. Check Herald's invocation. From your project root:
 
    ```bash
-   ddev exec /var/www/html/craft cortex/serve --help
+   ddev exec /var/www/html/craft herald/serve --help
    ```
 
-   If `cortex/serve` isn't a recognised action, the plugin isn't installed in the playground / project Cortex is pointing at. Re-run `ddev craft plugin/install cortex`.
+   If `herald/serve` isn't a recognised action, the plugin isn't installed in the playground / project Herald is pointing at. Re-run `ddev craft plugin/install herald`.
 
-4. Check the Craft logs at `storage/logs/web.log` (or `phpstorm.log` / `craft.log`). MCP-level errors land in the `cortex` log channel.
+4. Check the Craft logs at `storage/logs/web.log` (or `phpstorm.log` / `craft.log`). MCP-level errors land in the `herald` log channel.
 
 ### The `docker exec` command in the snippet refers to a project name I don't recognise
 
-Auto-detection uses the `DDEV_PROJECT` env variable. If you're outside a DDEV shell when running `cortex/install`, override it: `ddev craft cortex/install --ddevProject=myproject`.
+Auto-detection uses the `DDEV_PROJECT` env variable. If you're outside a DDEV shell when running `herald/install`, override it: `ddev craft herald/install --ddevProject=myproject`.
 
 ### `craft_exec` only returns "dry-run" output
 
@@ -474,13 +474,13 @@ That's by design. `execDryRunDefault` is `true` by default (one of six security 
 
 ### Continue.dev doesn't pick up the standalone YAML
 
-Continue.dev reads standalone block files from `~/.continue/mcpServers/`. Confirm the file exists at `~/.continue/mcpServers/cortex.yaml` and contains `schema: v1` at the top. If your Continue install is older, it may not read this directory — fall back to the manual snippet and add the entry under `mcpServers:` in your existing `~/.continue/config.yaml`.
+Continue.dev reads standalone block files from `~/.continue/mcpServers/`. Confirm the file exists at `~/.continue/mcpServers/herald.yaml` and contains `schema: v1` at the top. If your Continue install is older, it may not read this directory — fall back to the manual snippet and add the entry under `mcpServers:` in your existing `~/.continue/config.yaml`.
 
 ### Anything else
 
-Open an issue at [github.com/craftpulse/craft-cortex/issues](https://github.com/craftpulse/craft-cortex/issues) — please include:
+Open an issue at [github.com/craftpulse/craft-herald/issues](https://github.com/craftpulse/craft-herald/issues) — please include:
 
 - Your OS and shell
 - The MCP client and its version
-- Output of `ddev craft cortex/install --client=<your client>` so we can see the resolved invocation
-- Any relevant lines from `storage/logs/web.log` (the `cortex` channel)
+- Output of `ddev craft herald/install --client=<your client>` so we can see the resolved invocation
+- Any relevant lines from `storage/logs/web.log` (the `herald` channel)

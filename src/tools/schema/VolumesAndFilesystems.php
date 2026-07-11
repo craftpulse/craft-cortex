@@ -1,13 +1,13 @@
 <?php
 
-namespace craftpulse\cortex\tools\schema;
+namespace craftpulse\herald\tools\schema;
 
 use Craft;
 use craft\base\FsInterface;
 use craft\models\Volume;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\tools\AbstractTool;
 
 /**
  * =========================================================================

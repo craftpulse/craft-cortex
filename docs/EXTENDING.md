@@ -1,8 +1,8 @@
-# Extending Cortex
+# Extending Herald
 
-Cortex is built around a stable, versioned extension surface. Third-party plugins can register their own tools, prompts, and resources and have them appear alongside the bundled ones in `tools/list`, `prompts/list`, and `resources/list`.
+Herald is built around a stable, versioned extension surface. Third-party plugins can register their own tools, prompts, and resources and have them appear alongside the bundled ones in `tools/list`, `prompts/list`, and `resources/list`.
 
-This document covers everything you need to ship an extension. The interfaces, attributes, events, and Schema DSL listed here are part of Cortex's locked public surface — once Phase 1 ships, they don't change without a deprecation cycle or a major version bump.
+This document covers everything you need to ship an extension. The interfaces, attributes, events, and Schema DSL listed here are part of Herald's locked public surface — once Phase 1 ships, they don't change without a deprecation cycle or a major version bump.
 
 - [Quick start](#quick-start)
 - [The generator](#the-generator)
@@ -22,7 +22,7 @@ This document covers everything you need to ship an extension. The interfaces, a
 The fastest path: scaffold a tool with the generator, then register it from your plugin's `init()`.
 
 ```bash
-ddev craft make cortex-tool
+ddev craft make herald-tool
 ```
 
 Answer the prompts (class name, namespace, MCP tool name) and the generator drops a stub class with the right attributes and Schema DSL boilerplate. It also prints the registration snippet for your plugin's `init()`.
@@ -30,8 +30,8 @@ Answer the prompts (class name, namespace, MCP tool name) and the generator drop
 Then in your plugin's main class:
 
 ```php
-use craftpulse\cortex\events\RegisterToolsEvent;
-use craftpulse\cortex\services\Tools;
+use craftpulse\herald\events\RegisterToolsEvent;
+use craftpulse\herald\services\Tools;
 use yii\base\Event;
 
 public function init(): void
@@ -48,14 +48,14 @@ public function init(): void
 }
 ```
 
-That's the whole extension surface. Cortex picks up the tool at boot, validates it implements `ToolInterface`, and exposes it to MCP clients.
+That's the whole extension surface. Herald picks up the tool at boot, validates it implements `ToolInterface`, and exposes it to MCP clients.
 
 ## The generator
 
-Cortex hooks into Craft's `make` command via `craftcms/generator`'s `EVENT_REGISTER_GENERATORS`. Run from any Craft project where Cortex is installed:
+Herald hooks into Craft's `make` command via `craftcms/generator`'s `EVENT_REGISTER_GENERATORS`. Run from any Craft project where Herald is installed:
 
 ```bash
-ddev craft make cortex-tool
+ddev craft make herald-tool
 ```
 
 The generator prompts for:
@@ -66,11 +66,11 @@ The generator prompts for:
 
 It writes a stub class extending `AbstractTool` with the right attributes (`#[IsReadOnly]`, `#[IsIdempotent]`) and a Schema DSL skeleton, plus a `// TODO` comment block telling you exactly where to add your registration. It does NOT auto-register the tool — that's deliberate, so you keep full control over which event listener owns the registration.
 
-`craftcms/generator` is a `require-dev` dependency on Cortex but ships with `craftcms/cms`, so it's always available in dev environments.
+`craftcms/generator` is a `require-dev` dependency on Herald but ships with `craftcms/cms`, so it's always available in dev environments.
 
 ## Registering a tool
 
-A tool is a class implementing `craftpulse\cortex\tools\ToolInterface`. The interface:
+A tool is a class implementing `craftpulse\herald\tools\ToolInterface`. The interface:
 
 ```php
 use craft\elements\User;
@@ -116,11 +116,11 @@ Minimal example:
 
 namespace mywishingwell\plugin\tools;
 
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\support\Schema;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\support\Schema;
 
 #[Title('Get Wish')]
 #[IsReadOnly]
@@ -158,8 +158,8 @@ class GetWish extends AbstractTool
 Register from your plugin's `init()`:
 
 ```php
-use craftpulse\cortex\events\RegisterToolsEvent;
-use craftpulse\cortex\services\Tools;
+use craftpulse\herald\events\RegisterToolsEvent;
+use craftpulse\herald\services\Tools;
 use yii\base\Event;
 
 Event::on(
@@ -171,11 +171,11 @@ Event::on(
 );
 ```
 
-The event fires once during cortex's boot, after the bundled registry is built. Listeners append `ToolInterface` instances to `$event->tools`. **First registration wins** on name collision — bundled cortex tools always trump shadowing attempts. Collisions surface a `Craft::warning()` line on the `cortex` log channel so a third-party author can spot when their tool is being shadowed.
+The event fires once during herald's boot, after the bundled registry is built. Listeners append `ToolInterface` instances to `$event->tools`. **First registration wins** on name collision — bundled herald tools always trump shadowing attempts. Collisions surface a `Craft::warning()` line on the `herald` log channel so a third-party author can spot when their tool is being shadowed.
 
 ## Registering a prompt
 
-Prompts implement `craftpulse\cortex\prompts\PromptInterface`:
+Prompts implement `craftpulse\herald\prompts\PromptInterface`:
 
 ```php
 interface PromptInterface
@@ -192,8 +192,8 @@ interface PromptInterface
 Register on `services\Prompts::EVENT_REGISTER_PROMPTS`:
 
 ```php
-use craftpulse\cortex\events\RegisterPromptsEvent;
-use craftpulse\cortex\services\Prompts;
+use craftpulse\herald\events\RegisterPromptsEvent;
+use craftpulse\herald\services\Prompts;
 
 Event::on(
     Prompts::class,
@@ -208,7 +208,7 @@ Bundled prompts live under the `craftcms_*` namespace. Third-party prompts must 
 
 ## Registering a resource
 
-Resources implement `craftpulse\cortex\resources\ResourceInterface`:
+Resources implement `craftpulse\herald\resources\ResourceInterface`:
 
 ```php
 interface ResourceInterface
@@ -229,7 +229,7 @@ Bundled resources use the `craft-skills://` URI scheme. The `custom-skills://` s
 
 ## Resource templates (dynamic URIs)
 
-For URI families rather than concrete URIs (e.g. "any entry by id"), implement `craftpulse\cortex\resources\ResourceTemplateInterface`:
+For URI families rather than concrete URIs (e.g. "any entry by id"), implement `craftpulse\herald\resources\ResourceTemplateInterface`:
 
 ```php
 interface ResourceTemplateInterface
@@ -245,7 +245,7 @@ interface ResourceTemplateInterface
 
 URI templates use RFC 6570 Level-1 simple substitution: literal characters plus `{name}` placeholders. Example: `craft-element://entries/{id}`.
 
-Register through the same event as concrete resources — `RegisterResourcesEvent::$resources` accepts both `ResourceInterface` and `ResourceTemplateInterface` instances. The Cortex registry routes by `instanceof` at boot.
+Register through the same event as concrete resources — `RegisterResourcesEvent::$resources` accepts both `ResourceInterface` and `ResourceTemplateInterface` instances. The Herald registry routes by `instanceof` at boot.
 
 `matches()` returns the captured-parameter map for a successful match (or null on miss). `read()` is invoked with the same map after the dispatcher confirms a match. Concrete-URI resources are checked first; templates only fire on miss, so a template can't shadow a concrete resource.
 
@@ -253,9 +253,9 @@ Phase 1 ships the interface; no Phase 1 resource implements it. The first concre
 
 ## The Schema DSL
 
-Cortex includes a fluent JSON Schema builder for tool input schemas. It generates the same JSON Schema array MCP clients expect — just nicer to author than raw arrays.
+Herald includes a fluent JSON Schema builder for tool input schemas. It generates the same JSON Schema array MCP clients expect — just nicer to author than raw arrays.
 
-Static entry points on `craftpulse\cortex\tools\support\Schema`:
+Static entry points on `craftpulse\herald\tools\support\Schema`:
 
 | Entry point | Purpose |
 |------------|---------|
@@ -314,7 +314,7 @@ The DSL is part of the locked public surface. Adding new keywords is additive (b
 
 ## Tool annotations (attributes)
 
-Cortex uses PHP 8 attributes to declare MCP tool annotations at the class level. These map to the `annotations` field in `tools/list` per MCP spec 2025-06-18.
+Herald uses PHP 8 attributes to declare MCP tool annotations at the class level. These map to the `annotations` field in `tools/list` per MCP spec 2025-06-18.
 
 | Attribute | MCP key | Default | Purpose |
 |-----------|---------|---------|---------|
@@ -322,7 +322,7 @@ Cortex uses PHP 8 attributes to declare MCP tool annotations at the class level.
 | `#[IsDestructive]` | `destructiveHint` | `true` | Tool may delete or destroy data. |
 | `#[IsIdempotent]` | `idempotentHint` | `true` | Re-running with the same args produces the same effect. |
 | `#[IsOpenWorld]` | `openWorldHint` | `true` | Tool reaches outside the local system (network, etc.). |
-| `#[IsStdioOnly]` | (cortex-specific) | `true` | Tool is rejected on the HTTP transport regardless of token scope. |
+| `#[IsStdioOnly]` | (herald-specific) | `true` | Tool is rejected on the HTTP transport regardless of token scope. |
 | `#[Title('…')]` | `title` | (none) | Human-readable label shown in client UIs. |
 
 Pass `false` to override the default explicitly: `#[IsIdempotent(false)]`. The `Is*` prefix mirrors Laravel MCP's pattern and avoids collision with PHP's `readonly` keyword.
@@ -340,21 +340,21 @@ trait ProToolTrait
 {
     public static function shouldRegister(): bool
     {
-        return Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=');
+        return Herald::getInstance()->is(Herald::EDITION_PRO, '>=');
     }
 }
 ```
 
 Per-user visibility is a *separate* concern, handled per-request by `filterFor()` (and schema-rewriting by `inputSchemaFor()`) — see [the three-method gating contract](#the-three-method-gating-contract) above. The bundled `PermissionedToolTrait` carries the in-`execute()` permission re-check.
 
-A real Pro tool composes both traits. Abridged from `craftpulse\cortex\tools\content\Category`:
+A real Pro tool composes both traits. Abridged from `craftpulse\herald\tools\content\Category`:
 
 ```php
 use craft\elements\User;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\PermissionedToolTrait;
-use craftpulse\cortex\tools\ProToolTrait;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\PermissionedToolTrait;
+use craftpulse\herald\tools\ProToolTrait;
+use craftpulse\herald\tools\ToolException;
 
 class Category extends AbstractTool
 {
@@ -403,7 +403,7 @@ class Category extends AbstractTool
 
 ### Error contract
 
-Cortex distinguishes **protocol errors** from **tool errors**, and they take different wire shapes:
+Herald distinguishes **protocol errors** from **tool errors**, and they take different wire shapes:
 
 - **Protocol errors** — unknown tool name, missing `name`, malformed params — come back as a JSON-RPC error response. The code is `-32602` (Invalid params) for an unknown / hidden tool, `-32601` for an unknown method, `-32600` for a malformed envelope, `-32603` for an internal error. A tool that `filterFor()` hides is indistinguishable from a missing one: `tools/call` against it returns `-32602`, failing closed.
 - **Tool errors** — a `ToolException` thrown from `execute()` (permission denial, bad arguments, not-found) — come back as a **successful** JSON-RPC response carrying the MCP tool-error envelope:
@@ -421,33 +421,33 @@ Cortex distinguishes **protocol errors** from **tool errors**, and they take dif
 
 The locked tool/prompt/resource namespaces:
 
-- **Tool names** — bundled tools follow a deliberate pattern. Listing tools use plural nouns (`sections`, `entries`); multi-mode introspection tools use the most descriptive name (`system_diagnostics`, `content_audit`); workflow tools use combined direction (`drafts_and_revisions`, `import_export`). Action verbs for write tools (`resave`, `clear_caches`). Third-party tools should choose a vendor-prefixed handle (`<vendor>_<purpose>`) to avoid future collisions, especially for additions Cortex itself might make.
+- **Tool names** — bundled tools follow a deliberate pattern. Listing tools use plural nouns (`sections`, `entries`); multi-mode introspection tools use the most descriptive name (`system_diagnostics`, `content_audit`); workflow tools use combined direction (`drafts_and_revisions`, `import_export`). Action verbs for write tools (`resave`, `clear_caches`). Third-party tools should choose a vendor-prefixed handle (`<vendor>_<purpose>`) to avoid future collisions, especially for additions Herald itself might make.
 - **Prompt names** — bundled prompts use the `craftcms_*` prefix (`craftcms_extending`, `craftcms_templates`, …). The `custom_*` prefix is reserved for the Pro custom-skills feature. Third-party plugins should use a plugin-specific prefix (`<vendor>_<purpose>`).
 - **Resource URI schemes** — `craft-skills://` is bundled; `custom-skills://` is reserved. Third-party plugins should use a plugin-specific scheme.
 
 ## Collision behaviour
 
-When a name / URI collides between two registrations, **first registration wins**. Cortex registers bundled tools / prompts / resources before firing the registration events, so third-party plugins cannot shadow built-ins.
+When a name / URI collides between two registrations, **first registration wins**. Herald registers bundled tools / prompts / resources before firing the registration events, so third-party plugins cannot shadow built-ins.
 
-Collisions are not silent. The registry logs `Craft::warning()` on the `cortex` channel:
+Collisions are not silent. The registry logs `Craft::warning()` on the `herald` channel:
 
 ```
-Tool name collision on "sections" — first registration (craftpulse\cortex\tools\schema\Sections) wins; ignoring mywishingwell\plugin\tools\Sections.
+Tool name collision on "sections" — first registration (craftpulse\herald\tools\schema\Sections) wins; ignoring mywishingwell\plugin\tools\Sections.
 ```
 
-If you see this in your logs while developing, rename your tool. Suppressing the collision (e.g. running before bundled tools register) is unsupported — bundled cortex registrations are load-bearing for the tool catalogue.
+If you see this in your logs while developing, rename your tool. Suppressing the collision (e.g. running before bundled tools register) is unsupported — bundled herald registrations are load-bearing for the tool catalogue.
 
 ## Testing your extension
 
-Cortex exposes the same testing helpers it uses internally. The recommended setup: Pest tests against a real Craft instance with Cortex installed.
+Herald exposes the same testing helpers it uses internally. The recommended setup: Pest tests against a real Craft instance with Herald installed.
 
 A minimal test for a custom tool:
 
 ```php
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 
 it('registers and dispatches my custom tool', function () {
-    $tool = Cortex::getInstance()->tools->getByName('get_wish');
+    $tool = Herald::getInstance()->tools->getByName('get_wish');
     expect($tool)->not->toBeNull();
 
     $result = $tool->execute(['wisher' => 'pest']);
@@ -459,7 +459,7 @@ For tools that wrap MCP-spec details (annotations, output schemas), assert again
 
 ```php
 it('appears in the registry with the right annotations', function () {
-    $payload = Cortex::getInstance()->tools->asListPayload();
+    $payload = Herald::getInstance()->tools->asListPayload();
     $entry = collect($payload)->firstWhere('name', 'get_wish');
 
     expect($entry)
@@ -468,4 +468,4 @@ it('appears in the registry with the right annotations', function () {
 });
 ```
 
-If you're testing `craft_command`-allowlist-aware tools or anything stdio-vs-HTTP, the full set of `mcp/Server` test helpers (transport-aware dispatch, error envelopes, etc.) lives in the cortex test suite — your plugin can mimic the patterns there.
+If you're testing `craft_command`-allowlist-aware tools or anything stdio-vs-HTTP, the full set of `mcp/Server` test helpers (transport-aware dispatch, error envelopes, etc.) lives in the herald test suite — your plugin can mimic the patterns there.

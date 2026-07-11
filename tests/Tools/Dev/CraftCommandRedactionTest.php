@@ -7,7 +7,7 @@
  * BLOCKER: `craft_command` is HTTP-reachable (only `craft_exec` carries
  * `#[IsStdioOnly]`). Default allowlist routes (`mailer/test`, `utils/*`)
  * can echo transport / config secrets to stdout, which previously landed
- * verbatim in the persisted `cortex_invocations.response_excerpt` AND on
+ * verbatim in the persisted `herald_invocations.response_excerpt` AND on
  * the wire. These tests lock the two-layer fix:
  *
  *   - TOOL LAYER: `CraftCommand` runs captured stdout/stderr through
@@ -25,13 +25,13 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\events\RegisterToolsEvent;
-use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\records\Invocation as InvocationRecord;
-use craftpulse\cortex\services\Tools;
-use craftpulse\cortex\tests\Tools\Fixtures\SecretEmittingController;
-use craftpulse\cortex\tests\Tools\Fixtures\SecretLeakingTool;
+use craftpulse\herald\events\RegisterToolsEvent;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
+use craftpulse\herald\records\Invocation as InvocationRecord;
+use craftpulse\herald\services\Tools;
+use craftpulse\herald\tests\Tools\Fixtures\SecretEmittingController;
+use craftpulse\herald\tests\Tools\Fixtures\SecretLeakingTool;
 use yii\base\Event;
 
 /**
@@ -42,19 +42,19 @@ use yii\base\Event;
  *
  * @return callable():void
  */
-function _cortex_register_secret_command(): callable
+function _herald_register_secret_command(): callable
 {
     $app = Craft::$app;
-    $hadController = isset($app->controllerMap['cortex-test-secret']);
-    $app->controllerMap['cortex-test-secret'] = SecretEmittingController::class;
+    $hadController = isset($app->controllerMap['herald-test-secret']);
+    $app->controllerMap['herald-test-secret'] = SecretEmittingController::class;
 
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $originalCommands = $settings->allowedCommands;
-    $settings->allowedCommands = array_merge($originalCommands, ['cortex-test-secret/*']);
+    $settings->allowedCommands = array_merge($originalCommands, ['herald-test-secret/*']);
 
     return static function() use ($app, $hadController, $settings, $originalCommands): void {
         if (!$hadController) {
-            unset($app->controllerMap['cortex-test-secret']);
+            unset($app->controllerMap['herald-test-secret']);
         }
         $settings->allowedCommands = $originalCommands;
     };
@@ -65,13 +65,13 @@ function _cortex_register_secret_command(): callable
 // -----------------------------------------------------------------------------
 
 it('redacts KEY=value secrets emitted to stdout in the wire output field', function() {
-    $restore = _cortex_register_secret_command();
+    $restore = _herald_register_secret_command();
 
     try {
-        $tool = Cortex::getInstance()->tools->getByName('craft_command');
+        $tool = Herald::getInstance()->tools->getByName('craft_command');
         $result = $tool->execute([
             'mode' => 'run',
-            'command' => 'cortex-test-secret/emit',
+            'command' => 'herald-test-secret/emit',
         ]);
 
         expect($result)->toHaveKey('output');
@@ -89,7 +89,7 @@ it('redacts KEY=value secrets emitted to stdout in the wire output field', funct
 // -----------------------------------------------------------------------------
 
 it('persists a redacted response_excerpt for a craft_command stdout secret', function() {
-    $restore = _cortex_register_secret_command();
+    $restore = _herald_register_secret_command();
 
     try {
         $before = InvocationRecord::find()->max('[[id]]') ?? 0;
@@ -103,7 +103,7 @@ it('persists a redacted response_excerpt for a craft_command stdout secret', fun
                 'name' => 'craft_command',
                 'arguments' => [
                     'mode' => 'run',
-                    'command' => 'cortex-test-secret/emit',
+                    'command' => 'herald-test-secret/emit',
                 ],
             ],
         ]);
@@ -140,10 +140,10 @@ it('redacts secret-keyed result fields in the persisted excerpt even when the to
     };
     Event::on(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
 
-    $originalTools = Cortex::getInstance()->tools;
+    $originalTools = Herald::getInstance()->tools;
     $fresh = new Tools();
     $fresh->init();
-    Cortex::getInstance()->set('tools', $fresh);
+    Herald::getInstance()->set('tools', $fresh);
 
     try {
         $before = InvocationRecord::find()->max('[[id]]') ?? 0;
@@ -172,7 +172,7 @@ it('redacts secret-keyed result fields in the persisted excerpt even when the to
 
         InvocationRecord::deleteAll(['id' => $row->id]);
     } finally {
-        Cortex::getInstance()->set('tools', $originalTools);
+        Herald::getInstance()->set('tools', $originalTools);
         Event::off(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
     }
 });

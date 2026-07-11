@@ -1,22 +1,22 @@
 <?php
 
-namespace craftpulse\cortex\controllers;
+namespace craftpulse\herald\controllers;
 
 use Craft;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\exceptions\RateLimitExceededException;
-use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\mcp\transport\Http;
-use craftpulse\cortex\mcp\transport\SseEmitter;
-use craftpulse\cortex\tools\support\InvocationLogger;
-use craftpulse\cortex\values\RateLimitStatus;
+use craftpulse\herald\exceptions\RateLimitExceededException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
+use craftpulse\herald\mcp\transport\Http;
+use craftpulse\herald\mcp\transport\SseEmitter;
+use craftpulse\herald\tools\support\InvocationLogger;
+use craftpulse\herald\values\RateLimitStatus;
 use yii\web\Response;
 
 /**
  * =========================================================================
- * HTTP transport entry point — `POST/GET/DELETE /cortex/mcp`.
+ * HTTP transport entry point — `POST/GET/DELETE /herald/mcp`.
  *
  * Parallel to the stdio loop in `console/controllers/ServeController`,
  * but for the Streamable HTTP transport per MCP 2025-06-18. Header
@@ -26,8 +26,8 @@ use yii\web\Response;
  *
  * Sub-gate 7.2 lifts the 7.1 anonymous-allowed posture: every request
  * must carry `Authorization: Bearer <token>`, where `<token>` resolves
- * to a live row in `cortex_tokens`. Missing / malformed / unknown
- * credentials return 401 with `WWW-Authenticate: Bearer realm="cortex"`
+ * to a live row in `herald_tokens`. Missing / malformed / unknown
+ * credentials return 401 with `WWW-Authenticate: Bearer realm="herald"`
  * per RFC 6750. The authenticated user is bound to the session at
  * initialize and validated against the bearer token on every touch —
  * mid-session token-swap (initialize with token A, then `tools/call`
@@ -105,7 +105,7 @@ class McpController extends Controller
     private ?int $_authenticatedUserId = null;
 
     /**
-     * @var int|null Row id from `cortex_tokens` when the request was
+     * @var int|null Row id from `herald_tokens` when the request was
      *               authenticated via a long-lived bearer token. Null
      *               for OAuth-authenticated requests — OAuth
      *               correlation flows through the `(userId, clientName,
@@ -131,7 +131,7 @@ class McpController extends Controller
 
     /**
      * @var bool Whether this request's bound user carries a live WS2
-     *           elevation marker (`cortex:elevation:{userIdHash}`).
+     *           elevation marker (`herald:elevation:{userIdHash}`).
      *           Resolved in `beforeAction()` from the per-user elevation
      *           cache; threaded onto the dispatcher in `_handlePost()` so
      *           high-stakes tools (credential / admin mutations, content
@@ -168,7 +168,7 @@ class McpController extends Controller
      *      surface (PLANNING.md §4: Free ships stdio only).
      *   4. `Origin` allowlist — DNS-rebinding defense.
      *   5. `MCP-Protocol-Version` header.
-     *   6. `Authorization: Bearer` lookup against `cortex_tokens`.
+     *   6. `Authorization: Bearer` lookup against `herald_tokens`.
      *   7. Per-user rate limit consume (Gate 7.6).
      *
      * DELETE skips the bearer check because it carries no JSON-RPC
@@ -186,7 +186,7 @@ class McpController extends Controller
      */
     public function beforeAction($action): bool
     {
-        // Run the cortex transport gates BEFORE the Craft parent's
+        // Run the herald transport gates BEFORE the Craft parent's
         // `beforeAction()` because the parent's `_enforceAllowAnonymous`
         // throws on guest requests for a non-CP controller with
         // `$allowAnonymous = []`. Setting the bearer-bound identity
@@ -203,7 +203,7 @@ class McpController extends Controller
         //   8. Per-user rate limit consume (Gate 7.6).
         //   9. parent::beforeAction() — now sees an authenticated user.
 
-        $settings = Cortex::getInstance()->getSettings();
+        $settings = Herald::getInstance()->getSettings();
 
         // Gate 1 — kill switch.
         if (!$settings->httpEnabled) {
@@ -216,8 +216,8 @@ class McpController extends Controller
         // 503 — the kill switch means "configured off"; this means
         // "not licensed". Runs before Origin/bearer work so Free
         // installs spend nothing on requests they will never serve.
-        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
-            $this->_status(403, 'The HTTP transport requires the Cortex Pro edition.');
+        if (!Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
+            $this->_status(403, 'The HTTP transport requires the Herald Pro edition.');
             return false;
         }
 
@@ -265,12 +265,12 @@ class McpController extends Controller
         }
 
         // Gate 6 — bearer-token authentication. 401 with
-        // WWW-Authenticate: Bearer realm="cortex" on every reject
+        // WWW-Authenticate: Bearer realm="herald" on every reject
         // path per RFC 6750.
         //
         // Lookup precedence per locked decision 17:
         //   1. OAuth access tokens (short-lived, audience-bound).
-        //   2. Long-lived bearer tokens (cortex_tokens).
+        //   2. Long-lived bearer tokens (herald_tokens).
         //
         // Disambiguation: OAuth JWTs contain dots; opaque bearer tokens
         // are 64-char hex with no dots (`bin2hex(random_bytes(32))` —
@@ -300,7 +300,7 @@ class McpController extends Controller
         // re-auth flow, keyed by user id). Resolved here server-side —
         // never from a client claim, and never from a URL-borne token.
         $this->_elevated = $this->_authenticatedUserId !== null
-            && Cortex::getInstance()->oauth->isElevated($this->_authenticatedUserId);
+            && Herald::getInstance()->oauth->isElevated($this->_authenticatedUserId);
 
         // Bind the resolved user onto Craft's auth surface so the
         // parent `_enforceAllowAnonymous` gate sees a non-guest, and
@@ -323,7 +323,7 @@ class McpController extends Controller
         // audit row and 429 the caller with `Retry-After`.
         if ($this->_authenticatedUserId !== null) {
             try {
-                $status = Cortex::getInstance()->rateLimiter->consume($this->_authenticatedUserId);
+                $status = Herald::getInstance()->rateLimiter->consume($this->_authenticatedUserId);
                 $this->_rateLimitRemaining = $status->remaining;
             } catch (RateLimitExceededException $e) {
                 $this->_writeRateLimitedAuditRow($e->status);
@@ -434,9 +434,9 @@ class McpController extends Controller
             }
 
             Craft::warning(
-                'cortex HTTP transport: Origin allowlist is empty and httpEnabled is true. '
+                'herald HTTP transport: Origin allowlist is empty and httpEnabled is true. '
                 . 'Configure Settings::$allowedOrigins for any non-dev environment.',
-                'cortex',
+                'herald',
             );
             return true;
         }
@@ -515,7 +515,7 @@ class McpController extends Controller
     /**
      * Handle a DELETE — terminate the referenced session. The spec
      * lets servers respond 405 if they don't allow client-initiated
-     * termination; cortex does allow it, so we treat DELETE as a
+     * termination; herald does allow it, so we treat DELETE as a
      * first-class operation.
      *
      * @author Craftpulse
@@ -528,7 +528,7 @@ class McpController extends Controller
             return $this->_status(400, 'Missing Mcp-Session-Id header.');
         }
 
-        $sessions = Cortex::getInstance()->sessions;
+        $sessions = Herald::getInstance()->sessions;
         if ($sessions->get($sessionId) === null) {
             return $this->_status(404, 'Session not found.');
         }
@@ -558,7 +558,7 @@ class McpController extends Controller
         $method = is_string($request['method'] ?? null) ? $request['method'] : '';
         $isInitialize = $method === 'initialize';
 
-        $sessions = Cortex::getInstance()->sessions;
+        $sessions = Herald::getInstance()->sessions;
         $sessionIdHeader = $this->request->getHeaders()->get(Http::HEADER_SESSION_ID);
         $sessionId = is_string($sessionIdHeader) && $sessionIdHeader !== '' ? $sessionIdHeader : null;
 
@@ -839,7 +839,7 @@ class McpController extends Controller
     }
 
     /**
-     * Write a 401 with the canonical `WWW-Authenticate: Bearer realm="cortex"`
+     * Write a 401 with the canonical `WWW-Authenticate: Bearer realm="herald"`
      * challenge header and a JSON body. RFC 6750 §3 requires the
      * challenge header on every 401 from a bearer-protected resource;
      * RFC 9728 §5.1 extends it with `resource_metadata=` so
@@ -854,7 +854,7 @@ class McpController extends Controller
         $resourceMetadata = UrlHelper::siteUrl('.well-known/oauth-protected-resource');
         $this->response->headers->set(
             'WWW-Authenticate',
-            sprintf('Bearer realm="cortex", resource_metadata="%s"', $resourceMetadata),
+            sprintf('Bearer realm="herald", resource_metadata="%s"', $resourceMetadata),
         );
         return $this->_status(401, $message);
     }
@@ -872,10 +872,10 @@ class McpController extends Controller
      * resource A presented at resource B is rejected — RFC 8707
      * confused-deputy defense.
      *
-     * The bearer path carries the resolved `cortex_tokens.id` so the
+     * The bearer path carries the resolved `herald_tokens.id` so the
      * Gate 7.5 audit log can FK-correlate the invocation back to the
      * issuing bearer row. The OAuth path leaves `tokenId` null —
-     * OAuth tokens live in a separate table (`cortex_oauth_tokens`)
+     * OAuth tokens live in a separate table (`herald_oauth_tokens`)
      * and the audit table's single `tokenId` FK slot is bearer-only
      * per the locked schema decision in the migration's docblock.
      *
@@ -898,10 +898,10 @@ class McpController extends Controller
     private function _resolveBearer(string $bearer): ?array
     {
         $hasDots = str_contains($bearer, '.');
-        $expectedAudience = UrlHelper::siteUrl('cortex/mcp');
+        $expectedAudience = UrlHelper::siteUrl('herald/mcp');
 
         if ($hasDots) {
-            $oauthHit = Cortex::getInstance()->oauth->lookupAccessToken($bearer);
+            $oauthHit = Herald::getInstance()->oauth->lookupAccessToken($bearer);
             if ($oauthHit === null) {
                 return null;
             }
@@ -925,7 +925,7 @@ class McpController extends Controller
             ];
         }
 
-        $token = Cortex::getInstance()->tokens->lookup($bearer);
+        $token = Herald::getInstance()->tokens->lookup($bearer);
         if ($token === null) {
             return null;
         }
@@ -1005,7 +1005,7 @@ class McpController extends Controller
     }
 
     /**
-     * Write a `kind=rate_limited` row to `cortex_invocations` so the
+     * Write a `kind=rate_limited` row to `herald_invocations` so the
      * audit dashboard captures the throttle event with the same
      * forensic shape every successful invocation uses. The row's
      * `toolName` is a sentinel (`_rate_limited`) because the request
@@ -1018,7 +1018,7 @@ class McpController extends Controller
      * The write goes through `Invocations::record()` so the soft-
      * write contract applies — a DB failure inside the audit path
      * cannot break the throttle response. Failures log to the
-     * `cortex.audit` category and surface to operators tailing
+     * `herald.audit` category and surface to operators tailing
      * the file log.
      *
      * @author Craftpulse
@@ -1029,7 +1029,7 @@ class McpController extends Controller
         $sessionIdHeader = $this->request->getHeaders()->get(Http::HEADER_SESSION_ID);
         $sessionId = is_string($sessionIdHeader) && $sessionIdHeader !== '' ? $sessionIdHeader : null;
 
-        Cortex::getInstance()->invocations->record([
+        Herald::getInstance()->invocations->record([
             'tool' => '_rate_limited',
             'kind' => InvocationLogger::KIND_RATE_LIMITED,
             'duration_ms' => 0,

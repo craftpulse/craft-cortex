@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tools\dev;
+namespace craftpulse\herald\tools\dev;
 
 use Craft;
 use craft\base\ElementInterface;
@@ -14,16 +14,16 @@ use craft\elements\Tag;
 use craft\elements\User;
 use craft\events\MultiElementActionEvent;
 use craft\services\Elements;
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsOpenWorld;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\StreamableToolInterface;
-use craftpulse\cortex\tools\support\FiberProgressBridge;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsOpenWorld;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\StreamableToolInterface;
+use craftpulse\herald\tools\support\FiberProgressBridge;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use Generator;
 use Throwable;
 
@@ -72,7 +72,7 @@ use Throwable;
  * `ifInvalid`, `propagateTo`, `toDefault`, `setEnabledForSite`) are
  * rejected too — those rewrites are driven by
  * `EVENT_BEFORE_RESAVE_ELEMENT` in `ResaveController._resaveElements()`,
- * which Cortex doesn't re-implement here. Operators wanting field-
+ * which Herald doesn't re-implement here. Operators wanting field-
  * rewrites get a future gate; for now drop them or use `craft_command`
  * for the raw controller surface.
  * =========================================================================
@@ -351,7 +351,7 @@ class Resave extends AbstractTool implements StreamableToolInterface
                 if (!$event instanceof MultiElementActionEvent) {
                     return null;
                 }
-                // Defensive identity-filter: Cortex's stdio is single-
+                // Defensive identity-filter: Herald's stdio is single-
                 // process and HTTP isolates per request, but if a
                 // sibling resave runs concurrently we don't want to
                 // surface its events.
@@ -447,7 +447,7 @@ class Resave extends AbstractTool implements StreamableToolInterface
     /**
      * Build the element query for the streaming path. Mirrors the
      * shape `ResaveController._baseCriteria()` + each action method
-     * assembles, but consumes the keys cortex's `_buildParams()`
+     * assembles, but consumes the keys herald's `_buildParams()`
      * already validated. The returned query is what
      * `Elements::resaveElements()` iterates over inside the Fiber.
      *

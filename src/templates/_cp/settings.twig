@@ -1,10 +1,10 @@
-{% extends "cortex/_cp/_layout" %}
+{% extends "herald/_cp/_layout" %}
 {% import "_includes/forms.twig" as forms %}
 
 {# =========================================================================
-   Cortex Settings screen.
+   Herald Settings screen.
 
-   First screen in the Cortex CP section. Hosts project-config-synced
+   First screen in the Herald CP section. Hosts project-config-synced
    plugin defaults: `craft_exec` toggle, dry-run default, runtime override
    TTL, and the allowed-commands browser.
 
@@ -32,7 +32,7 @@
    the security point of the split is that a content toggle can never
    surface an admin-level route into the always-admitted bucket.
 
-   When either setting is locked by `config/cortex.php`
+   When either setting is locked by `config/herald.php`
    (`allowedCommandsOverridden` / `adminLevelCommandsOverridden`), that
    browser renders read-only with Craft's standard "defined in config"
    treatment.
@@ -42,47 +42,47 @@
    `Craft::$app->getPlugins()->savePluginSettings()` — sidesteps the
    split-settings footgun from `cp.md` §"Split Settings Pages".
 
-   Per locked decision 1 the save target is `cortex/settings/save`
+   Per locked decision 1 the save target is `herald/settings/save`
    (own controller action), NOT Craft's `plugins/save-plugin-settings`.
    ========================================================================= #}
 
 {% set selectedSubnavItem = 'settings' %}
 {% set fullPageForm = true %}
 
-{% do view.registerTranslations('cortex', [
+{% do view.registerTranslations('herald', [
     '{count}/{total} allowed',
     'Filter commands',
 ]) %}
 
 {% block content %}
-    {{ actionInput('cortex/settings/save') }}
-    {{ redirectInput('settings/plugins/cortex') }}
+    {{ actionInput('herald/settings/save') }}
+    {{ redirectInput('settings/plugins/herald') }}
 
-    <h2>{{ 'Defaults'|t('cortex') }}</h2>
+    <h2>{{ 'Defaults'|t('herald') }}</h2>
 
     <p class="light">
-        {{ 'These options sync to project config and apply across environments.'|t('cortex') }}
+        {{ 'These options sync to project config and apply across environments.'|t('herald') }}
     </p>
 
     {{ forms.lightswitchField({
-        label: 'Enable craft_exec'|t('cortex'),
-        instructions: 'Disable to remove the `craft_exec` tool from `tools/list` entirely. The tool is stdio-only and gated by six security checks regardless.'|t('cortex'),
+        label: 'Enable craft_exec'|t('herald'),
+        instructions: 'Disable to remove the `craft_exec` tool from `tools/list` entirely. The tool is stdio-only and gated by six security checks regardless.'|t('herald'),
         id: 'execEnabled',
         name: 'settings[execEnabled]',
         on: settings.execEnabled,
     }) }}
 
     {{ forms.lightswitchField({
-        label: 'craft_exec defaults to dry-run'|t('cortex'),
-        instructions: 'When enabled, `craft_exec` returns parsed analysis instead of evaluating until the caller passes `confirm: true`. Destructive expressions still need explicit `dangerous: true` regardless.'|t('cortex'),
+        label: 'craft_exec defaults to dry-run'|t('herald'),
+        instructions: 'When enabled, `craft_exec` returns parsed analysis instead of evaluating until the caller passes `confirm: true`. Destructive expressions still need explicit `dangerous: true` regardless.'|t('herald'),
         id: 'execDryRunDefault',
         name: 'settings[execDryRunDefault]',
         on: settings.execDryRunDefault,
     }) }}
 
     {{ forms.textField({
-        label: 'Temporary grant TTL (seconds)'|t('cortex'),
-        instructions: 'Default expiry applied to a new temporary grant when none is supplied at creation time. Default 7 days (604800).'|t('cortex'),
+        label: 'Temporary grant TTL (seconds)'|t('herald'),
+        instructions: 'Default expiry applied to a new temporary grant when none is supplied at creation time. Default 7 days (604800).'|t('herald'),
         id: 'runtimeOverrideTtl',
         name: 'settings[runtimeOverrideTtl]',
         value: settings.runtimeOverrideTtl,
@@ -92,44 +92,44 @@
 
     <hr>
 
-    <h2>{{ 'Content commands'|t('cortex') }}</h2>
+    <h2>{{ 'Content commands'|t('herald') }}</h2>
 
     <p class="light">
-        {{ 'Which content-level console commands the `craft_command` tool may dispatch. These touch content, caches, queues, or mail and are always admitted. Toggle a whole group, or expand it to allow individual actions. Patterns use `fnmatch` semantics: a group toggle saves `group/*`; an individual toggle saves the exact route id.'|t('cortex') }}
+        {{ 'Which content-level console commands the `craft_command` tool may dispatch. These touch content, caches, queues, or mail and are always admitted. Toggle a whole group, or expand it to allow individual actions. Patterns use `fnmatch` semantics: a group toggle saves `group/*`; an individual toggle saves the exact route id.'|t('herald') }}
     </p>
 
     {{ _self.commandBrowser({
         groups: commandGroups|filter(g => not g.adminLevel),
-        groupParam: 'cortexCommandGroups',
-        actionParam: 'cortexCommandActions',
+        groupParam: 'heraldCommandGroups',
+        actionParam: 'heraldCommandActions',
         customPatterns: contentCustomPatterns,
         customSetting: 'allowedCommands',
         disabled: allowedCommandsOverridden,
-        overriddenMessage: 'The content-commands list is defined in `config/cortex.php` and can’t be edited here.'|t('cortex'),
+        overriddenMessage: 'The content-commands list is defined in `config/herald.php` and can’t be edited here.'|t('herald'),
     }) }}
 
     <hr>
 
-    <h2>{{ 'Admin-level commands'|t('cortex') }}</h2>
+    <h2>{{ 'Admin-level commands'|t('herald') }}</h2>
 
     <p class="light">
-        {{ 'Console commands that mutate admin-only state — project config, migrations, scaffolding, section/field schema, fixtures. These dispatch ONLY when `allowAdminChanges` is enabled in `config/general.php`; with it off, a matching `craft_command` call is rejected regardless of what is toggled here.'|t('cortex') }}
+        {{ 'Console commands that mutate admin-only state — project config, migrations, scaffolding, section/field schema, fixtures. These dispatch ONLY when `allowAdminChanges` is enabled in `config/general.php`; with it off, a matching `craft_command` call is rejected regardless of what is toggled here.'|t('herald') }}
     </p>
 
     {% if not allowAdminChanges %}
         <p class="warning">
-            {{ '`allowAdminChanges` is currently off, so none of these commands will dispatch even when toggled on. They are shown so you can pre-configure the admin-level surface.'|t('cortex') }}
+            {{ '`allowAdminChanges` is currently off, so none of these commands will dispatch even when toggled on. They are shown so you can pre-configure the admin-level surface.'|t('herald') }}
         </p>
     {% endif %}
 
     {{ _self.commandBrowser({
         groups: commandGroups|filter(g => g.adminLevel),
-        groupParam: 'cortexAdminCommandGroups',
-        actionParam: 'cortexAdminCommandActions',
+        groupParam: 'heraldAdminCommandGroups',
+        actionParam: 'heraldAdminCommandActions',
         customPatterns: adminCustomPatterns,
         customSetting: 'adminLevelCommands',
         disabled: adminLevelCommandsOverridden,
-        overriddenMessage: 'The admin-level commands list is defined in `config/cortex.php` and can’t be edited here.'|t('cortex'),
+        overriddenMessage: 'The admin-level commands list is defined in `config/herald.php` and can’t be edited here.'|t('herald'),
     }) }}
 
 {% endblock %}
@@ -155,49 +155,49 @@
     {% endif %}
 
     <div
-        class="cortex-command-browser{{ browserDisabled ? ' cortex-command-browser--disabled' : '' }}"
-        data-cortex-command-browser
+        class="herald-command-browser{{ browserDisabled ? ' herald-command-browser--disabled' : '' }}"
+        data-herald-command-browser
         {{ browserDisabled ? 'aria-disabled="true"' : '' }}
     >
-        <div class="cortex-command-search">
+        <div class="herald-command-search">
             <div class="texticon search icon clearable">
                 <input
                     type="text"
                     class="text fullwidth"
                     autocomplete="off"
-                    data-cortex-command-filter
-                    placeholder="{{ 'Filter commands'|t('cortex') }}"
-                    aria-label="{{ 'Filter commands'|t('cortex') }}"
+                    data-herald-command-filter
+                    placeholder="{{ 'Filter commands'|t('herald') }}"
+                    aria-label="{{ 'Filter commands'|t('herald') }}"
                     {{ browserDisabled ? 'disabled' : '' }}
                 >
             </div>
         </div>
 
-        <div class="cortex-command-groups">
+        <div class="herald-command-groups">
             {% for handle, group in cfg.groups %}
                 <div
-                    class="cortex-command-group"
-                    data-cortex-command-group
+                    class="herald-command-group"
+                    data-herald-command-group
                     data-group-handle="{{ handle }}"
                 >
-                    <div class="cortex-command-group-header">
+                    <div class="herald-command-group-header">
                         <button
                             type="button"
-                            class="cortex-command-group-toggle"
-                            data-cortex-group-expand
+                            class="herald-command-group-toggle"
+                            data-herald-group-expand
                             aria-expanded="false"
                         >
-                            <span class="cortex-command-group-caret" aria-hidden="true">▸</span>
-                            <span class="cortex-command-group-name">{{ handle }}</span>
-                            <span class="cortex-command-group-source light">{{ group.source }}</span>
+                            <span class="herald-command-group-caret" aria-hidden="true">▸</span>
+                            <span class="herald-command-group-name">{{ handle }}</span>
+                            <span class="herald-command-group-source light">{{ group.source }}</span>
                         </button>
 
                         <span
-                            class="cortex-command-group-badge light"
-                            data-cortex-group-badge
+                            class="herald-command-group-badge light"
+                            data-herald-group-badge
                             {{ group.fullToggle ? 'hidden' : '' }}
                         >
-                            {{ '{count}/{total} allowed'|t('cortex', { count: group.allowedCount, total: group.totalCount }) }}
+                            {{ '{count}/{total} allowed'|t('herald', { count: group.allowedCount, total: group.totalCount }) }}
                         </span>
 
                         {{ forms.lightswitch({
@@ -209,11 +209,11 @@
                         }) }}
                     </div>
 
-                    <div class="cortex-command-actions" data-cortex-command-actions hidden>
+                    <div class="herald-command-actions" data-herald-command-actions hidden>
                         {% for action in group.actions %}
-                            <div class="cortex-command-action" data-cortex-command-action data-route-id="{{ action.id }}">
-                                <label class="cortex-command-action-label">
-                                    <code class="cortex-token-prefix">{{ action.id }}</code>
+                            <div class="herald-command-action" data-herald-command-action data-route-id="{{ action.id }}">
+                                <label class="herald-command-action-label">
+                                    <code class="herald-token-prefix">{{ action.id }}</code>
                                 </label>
                                 {{ forms.lightswitch({
                                     id: cfg.actionParam ~ '-' ~ (action.id|replace({'/': '-'})),
@@ -235,11 +235,11 @@
        commands that don't map to any enumerated group/action in this
        bucket. Preserved verbatim so toggling the browser never silently
        drops them. Collapsed by default; auto-expanded when it has rows. #}
-    <details class="cortex-custom-patterns" {{ cfg.customPatterns is not empty ? 'open' : '' }}>
-        <summary>{{ 'Custom patterns'|t('cortex') }} ({{ cfg.customPatterns|length }})</summary>
+    <details class="herald-custom-patterns" {{ cfg.customPatterns is not empty ? 'open' : '' }}>
+        <summary>{{ 'Custom patterns'|t('herald') }} ({{ cfg.customPatterns|length }})</summary>
 
         <p class="light">
-            {{ 'Glob patterns that don’t map to a listed command — custom wildcards, or commands for plugins that aren’t installed here. Edited as raw `fnmatch` patterns and merged with the toggles above on save.'|t('cortex') }}
+            {{ 'Glob patterns that don’t map to a listed command — custom wildcards, or commands for plugins that aren’t installed here. Edited as raw `fnmatch` patterns and merged with the toggles above on save.'|t('herald') }}
         </p>
 
         {{ forms.editableTable({
@@ -247,14 +247,14 @@
             name: 'settings[' ~ cfg.customSetting ~ ']',
             cols: {
                 pattern: {
-                    heading: 'Pattern'|t('cortex'),
+                    heading: 'Pattern'|t('herald'),
                     type: 'singleline',
                     code: true,
                 },
             },
             rows: cfg.customPatterns|map(p => { pattern: p }),
             defaultValues: { pattern: '' },
-            addRowLabel: 'Add a pattern'|t('cortex'),
+            addRowLabel: 'Add a pattern'|t('herald'),
             allowAdd: not browserDisabled,
             allowDelete: not browserDisabled,
             allowReorder: not browserDisabled,
@@ -265,12 +265,12 @@
 
 {% js %}
     (function() {
-        if (!window.Cortex || typeof window.Cortex.initCommandBrowser !== 'function') {
+        if (!window.Herald || typeof window.Herald.initCommandBrowser !== 'function') {
             return;
         }
-        var roots = document.querySelectorAll('[data-cortex-command-browser]');
+        var roots = document.querySelectorAll('[data-herald-command-browser]');
         Array.prototype.forEach.call(roots, function(root) {
-            window.Cortex.initCommandBrowser(root);
+            window.Herald.initCommandBrowser(root);
         });
     })();
 {% endjs %}

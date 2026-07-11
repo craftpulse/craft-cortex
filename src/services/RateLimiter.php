@@ -1,13 +1,13 @@
 <?php
 
-namespace craftpulse\cortex\services;
+namespace craftpulse\herald\services;
 
 use Carbon\Carbon;
 use Closure;
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\exceptions\RateLimitExceededException;
-use craftpulse\cortex\values\RateLimitStatus;
+use craftpulse\herald\exceptions\RateLimitExceededException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\values\RateLimitStatus;
 use DateTimeImmutable;
 use RuntimeException;
 use yii\base\Component;
@@ -18,7 +18,7 @@ use yii\caching\CacheInterface;
  * Per-user token-bucket rate limiter. PSR-16 cache backed.
  *
  * One bucket per Craft user id, keyed by
- * `cortex:ratelimit:user:{userId}` in Craft's cache. Each request to
+ * `herald:ratelimit:user:{userId}` in Craft's cache. Each request to
  * the HTTP transport's `actionIndex()` consumes one token; refills
  * accrue at `Settings::$rateLimitPerSecond` tokens per second, clamped
  * to `Settings::$rateLimitBurst`. A fresh user (or a user whose bucket
@@ -71,13 +71,13 @@ class RateLimiter extends Component
     // =========================================================================
 
     /**
-     * Prefix for cache keys. Namespaced under `cortex:ratelimit:user:`
+     * Prefix for cache keys. Namespaced under `herald:ratelimit:user:`
      * so we never collide with other component keys and so a future
      * pattern-based sweep stays cheap.
      *
      * @since 5.0.0
      */
-    public const CACHE_KEY_PREFIX = 'cortex:ratelimit:user:';
+    public const CACHE_KEY_PREFIX = 'herald:ratelimit:user:';
 
     // Private Properties
     // =========================================================================
@@ -408,7 +408,7 @@ class RateLimiter extends Component
     {
         $cache = Craft::$app->getCache();
         if ($cache === null) {
-            throw new RuntimeException('Craft cache component is not configured; cortex rate limiter cannot persist bucket state.');
+            throw new RuntimeException('Craft cache component is not configured; herald rate limiter cannot persist bucket state.');
         }
         return $cache;
     }
@@ -418,7 +418,7 @@ class RateLimiter extends Component
      * a string is an arbitrary caller-namespaced key (e.g. an IP-keyed
      * OAuth throttle). The shared prefix keeps both under one
      * namespace so the existing user-keyed format
-     * (`cortex:ratelimit:user:<id>`) is preserved unchanged.
+     * (`herald:ratelimit:user:<id>`) is preserved unchanged.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -434,7 +434,7 @@ class RateLimiter extends Component
      */
     private function _burst(): int
     {
-        return Cortex::getInstance()->getSettings()->rateLimitBurst;
+        return Herald::getInstance()->getSettings()->rateLimitBurst;
     }
 
     /**
@@ -443,6 +443,6 @@ class RateLimiter extends Component
      */
     private function _refillRate(): float
     {
-        return (float) Cortex::getInstance()->getSettings()->rateLimitPerSecond;
+        return (float) Herald::getInstance()->getSettings()->rateLimitPerSecond;
     }
 }

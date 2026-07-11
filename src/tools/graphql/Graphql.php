@@ -1,16 +1,16 @@
 <?php
 
-namespace craftpulse\cortex\tools\graphql;
+namespace craftpulse\herald\tools\graphql;
 
 use Craft;
 use craft\helpers\DateTimeHelper;
 use craft\models\GqlSchema;
 use craft\models\GqlToken;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use GraphQL\Utils\SchemaPrinter;
 use Throwable;
 

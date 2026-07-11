@@ -11,7 +11,7 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\models\Settings;
+use craftpulse\herald\models\Settings;
 
 it('accepts valid ISO-8601 durations for the OAuth TTL settings', function() {
     $settings = new Settings();

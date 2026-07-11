@@ -6,10 +6,10 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('system_info');
+    $this->tool = Herald::getInstance()->tools->getByName('system_info');
 });
 
 it('returns a craft / php / db / sites / license snapshot', function() {

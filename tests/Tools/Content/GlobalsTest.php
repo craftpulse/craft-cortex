@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('globals');
+    $this->tool = Herald::getInstance()->tools->getByName('globals');
 });
 
 it('returns every global set with field values when no handle is passed', function() {
@@ -39,7 +39,7 @@ it('returns a single global set when handle is passed', function() {
 });
 
 it('throws ToolException for unknown global set handle', function() {
-    $this->tool->execute(['handle' => '__cortex_no_such_global__']);
+    $this->tool->execute(['handle' => '__herald_no_such_global__']);
 })->throws(ToolException::class);
 
 it('respects the site filter (handle and id forms)', function() {

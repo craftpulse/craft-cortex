@@ -1,23 +1,23 @@
 <?php
 
-namespace craftpulse\cortex\generator;
+namespace craftpulse\herald\generator;
 
 use craft\generator\BaseGenerator;
 use craft\helpers\StringHelper;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\support\Schema;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\support\Schema;
 use Nette\PhpGenerator\PhpNamespace;
 
 /**
  * =========================================================================
- * Creates a new cortex MCP tool.
+ * Creates a new herald MCP tool.
  *
  * Hooks into Craft's `make` system per the `EVENT_REGISTER_GENERATORS`
- * pattern so users run `ddev craft make cortex-tool` (or
- * `craft make cortex-tool` outside DDEV) to scaffold a new tool against
- * the cortex tool surface — `AbstractTool` parent, Schema DSL for
+ * pattern so users run `ddev craft make herald-tool` (or
+ * `craft make herald-tool` outside DDEV) to scaffold a new tool against
+ * the herald tool surface — `AbstractTool` parent, Schema DSL for
  * input, attribute-based annotations.
  *
  * The generator prompts for:
@@ -26,8 +26,8 @@ use Nette\PhpGenerator\PhpNamespace;
  *   - MCP tool name (snake_case; defaults to `my_tool` from class name)
  *
  * After generation the user must register the tool either through their
- * plugin's `Cortex::init()` via `EVENT_REGISTER_TOOLS`, or directly in
- * cortex's own `services/Tools::_buildRegistry()` if extending core.
+ * plugin's `Herald::init()` via `EVENT_REGISTER_TOOLS`, or directly in
+ * herald's own `services/Tools::_buildRegistry()` if extending core.
  * The generator prints the registration snippet on success.
  * =========================================================================
  *
@@ -68,7 +68,7 @@ class Tool extends BaseGenerator
      */
     public static function name(): string
     {
-        return 'cortex-tool';
+        return 'herald-tool';
     }
 
     /**
@@ -79,7 +79,7 @@ class Tool extends BaseGenerator
      */
     public static function description(): string
     {
-        return 'Creates a new cortex MCP tool.';
+        return 'Creates a new herald MCP tool.';
     }
 
     /**
@@ -190,13 +190,13 @@ BODY);
 
         $serviceClass = '\\' . $this->_namespace . '\\' . $this->_className;
         $message = <<<MD
-**Cortex tool created!**
+**Herald tool created!**
 
-Register it in your plugin's `init()` so cortex picks it up:
+Register it in your plugin's `init()` so herald picks it up:
 
 ```
-use craftpulse\\cortex\\events\\RegisterToolsEvent;
-use craftpulse\\cortex\\services\\Tools;
+use craftpulse\\herald\\events\\RegisterToolsEvent;
+use craftpulse\\herald\\services\\Tools;
 use yii\\base\\Event;
 
 Event::on(
@@ -208,7 +208,7 @@ Event::on(
 );
 ```
 
-Then run `ddev craft cortex/serve` and your tool appears in `tools/list`.
+Then run `ddev craft herald/serve` and your tool appears in `tools/list`.
 MD;
 
         $this->command->success($message);

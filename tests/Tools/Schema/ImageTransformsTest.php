@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('image_transforms');
+    $this->tool = Herald::getInstance()->tools->getByName('image_transforms');
 });
 
 it('lists image transforms (possibly empty)', function() {
@@ -32,5 +32,5 @@ it('returns count when count: true is passed', function() {
 });
 
 it('throws ToolException for an unknown transform handle', function() {
-    $this->tool->execute(['handle' => '__cortex_no_such_transform__']);
+    $this->tool->execute(['handle' => '__herald_no_such_transform__']);
 })->throws(ToolException::class);

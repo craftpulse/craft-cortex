@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\oauth\entities;
+namespace craftpulse\herald\oauth\entities;
 
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Entities\Traits\ClientTrait;
@@ -8,7 +8,7 @@ use League\OAuth2\Server\Entities\Traits\EntityTrait;
 
 /**
  * =========================================================================
- * OAuth client entity — wraps a `cortex_oauth_clients` row in the
+ * OAuth client entity — wraps a `herald_oauth_clients` row in the
  * shape league's grants expect.
  *
  * `ClientTrait` provides `getName`, `getRedirectUri`, `isConfidential`,
@@ -59,7 +59,7 @@ class ClientEntity implements ClientEntityInterface
 
     /**
      * Set the registered redirect URI(s). League accepts a single
-     * string or a list — cortex always stores a list, even for
+     * string or a list — herald always stores a list, even for
      * single-URI clients.
      *
      * @param string|string[] $redirectUri

@@ -1,23 +1,23 @@
 <?php
 
-namespace craftpulse\cortex\plugin;
+namespace craftpulse\herald\plugin;
 
-use craftpulse\cortex\services\Allowlist;
-use craftpulse\cortex\services\Invocations;
-use craftpulse\cortex\services\Oauth;
-use craftpulse\cortex\services\Prompts;
-use craftpulse\cortex\services\RateLimiter;
-use craftpulse\cortex\services\Resources;
-use craftpulse\cortex\services\Scopes;
-use craftpulse\cortex\services\Sessions;
-use craftpulse\cortex\services\Skills;
-use craftpulse\cortex\services\Tokens;
-use craftpulse\cortex\services\Tools;
+use craftpulse\herald\services\Allowlist;
+use craftpulse\herald\services\Invocations;
+use craftpulse\herald\services\Oauth;
+use craftpulse\herald\services\Prompts;
+use craftpulse\herald\services\RateLimiter;
+use craftpulse\herald\services\Resources;
+use craftpulse\herald\services\Scopes;
+use craftpulse\herald\services\Sessions;
+use craftpulse\herald\services\Skills;
+use craftpulse\herald\services\Tokens;
+use craftpulse\herald\services\Tools;
 use yii\base\InvalidConfigException;
 
 /**
  * =========================================================================
- * Cortex service-accessor trait.
+ * Herald service-accessor trait.
  *
  * Mirrors the Craft Commerce `plugin/Services` pattern
  * (`vendor/craftcms/commerce/src/plugin/Services.php`). Each typed
@@ -26,7 +26,7 @@ use yii\base\InvalidConfigException;
  * class, no drift between the class-level docblock and the actual
  * `config()` map.
  *
- * Components are still declared in `Cortex::config()` (Yii's
+ * Components are still declared in `Herald::config()` (Yii's
  * component map is what makes `$this->get('xxx')` resolve). The
  * trait provides the typed surface; `config()` provides the
  * dependency wiring. Both files together are the source of truth —
@@ -52,7 +52,7 @@ use yii\base\InvalidConfigException;
  * @property Resources $resources the MCP resources registry
  * @property Scopes $scopes the OAuth capability-scope vocabulary + tool→scope authority
  * @property Sessions $sessions the HTTP-transport session store
- * @property Skills $skills the Cortex skills service — field layout + merged-corpus lookup
+ * @property Skills $skills the Herald skills service — field layout + merged-corpus lookup
  * @property Tokens $tokens the bearer-token issuance / lookup / revoke service
  * @property Tools $tools the MCP tool registry
  *
@@ -190,7 +190,7 @@ trait Services
     }
 
     /**
-     * Returns the Cortex skills service — field-layout management and
+     * Returns the Herald skills service — field-layout management and
      * merged-corpus lookup combining bundled + element-stored skills.
      *
      * @throws InvalidConfigException When the component is not registered.

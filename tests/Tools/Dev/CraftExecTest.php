@@ -18,11 +18,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('craft_exec');
+    $this->tool = Herald::getInstance()->tools->getByName('craft_exec');
 });
 
 it('throws when expression is missing', function() {
@@ -191,7 +191,7 @@ it('non-destructive expressions report isDestructive=false', function() {
 // -----------------------------------------------------------------------------
 
 it('declares isStdioOnly = true via attribute', function() {
-    expect(\craftpulse\cortex\tools\support\AttributeReader::isStdioOnly($this->tool))->toBeTrue();
+    expect(\craftpulse\herald\tools\support\AttributeReader::isStdioOnly($this->tool))->toBeTrue();
 });
 
 // -----------------------------------------------------------------------------
@@ -199,7 +199,7 @@ it('declares isStdioOnly = true via attribute', function() {
 // -----------------------------------------------------------------------------
 
 it('exposes destructiveHint:true via attribute reader', function() {
-    $annotations = \craftpulse\cortex\tools\support\AttributeReader::annotationsFor($this->tool);
+    $annotations = \craftpulse\herald\tools\support\AttributeReader::annotationsFor($this->tool);
     expect($annotations)->toHaveKey('destructiveHint', true);
     expect($annotations)->toHaveKey('idempotentHint', false);
 });
@@ -209,7 +209,7 @@ it('exposes destructiveHint:true via attribute reader', function() {
 // -----------------------------------------------------------------------------
 
 it('execDryRunDefault=false makes evaluation the default when confirm is absent', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $original = $settings->execDryRunDefault;
     $settings->execDryRunDefault = false;
 
@@ -227,7 +227,7 @@ it('execDryRunDefault=false makes evaluation the default when confirm is absent'
 });
 
 it('execDryRunDefault=false still respects explicit confirm=false (caller wins)', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $original = $settings->execDryRunDefault;
     $settings->execDryRunDefault = false;
 
@@ -246,7 +246,7 @@ it('execDryRunDefault=false still respects explicit confirm=false (caller wins)'
 });
 
 it('execDryRunDefault=false does not bypass the destructive guard', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $original = $settings->execDryRunDefault;
     $settings->execDryRunDefault = false;
 

@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tools;
+namespace craftpulse\herald\tools;
 
 use Craft;
 

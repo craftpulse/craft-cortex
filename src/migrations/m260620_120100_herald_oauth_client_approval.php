@@ -1,16 +1,16 @@
 <?php
 
-namespace craftpulse\cortex\migrations;
+namespace craftpulse\herald\migrations;
 
 use craft\db\Migration;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Adds the DCR approval gate to `cortex_oauth_clients`.
+ * Adds the DCR approval gate to `herald_oauth_clients`.
  *
  * RFC 7591 Dynamic Client Registration lets any caller self-register a
- * client. Cortex now starts every DCR-registered client UNAPPROVED:
+ * client. Herald now starts every DCR-registered client UNAPPROVED:
  * the authorize + token flows reject an unapproved client with a clear
  * "pending admin approval" error until an admin approves it on the
  * Clients CP screen (or `Settings::$dcrAutoApprove` is on for trusted /
@@ -31,7 +31,7 @@ use craftpulse\cortex\db\Table;
  * @author Craftpulse
  * @since  5.0.0
  */
-class m260620_120100_cortex_oauth_client_approval extends Migration
+class m260620_120100_herald_oauth_client_approval extends Migration
 {
     // Public Methods
     // =========================================================================

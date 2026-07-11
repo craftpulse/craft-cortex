@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\values;
+namespace craftpulse\herald\values;
 
 use DateTimeImmutable;
 

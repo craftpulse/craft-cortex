@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\elements;
+namespace craftpulse\herald\elements;
 
 use Craft;
 use craft\base\Element;
@@ -8,14 +8,14 @@ use craft\elements\actions\Delete;
 use craft\elements\actions\Restore;
 use craft\elements\User;
 use craft\models\FieldLayout;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\elements\db\SkillQuery;
-use craftpulse\cortex\records\Skill as SkillRecord;
+use craftpulse\herald\elements\db\SkillQuery;
+use craftpulse\herald\Herald;
+use craftpulse\herald\records\Skill as SkillRecord;
 use yii\base\InvalidConfigException;
 
 /**
  * =========================================================================
- * Cortex custom-skill element.
+ * Herald custom-skill element.
  *
  * Author-able write-side counterpart to the bundled
  * `michtio/craftcms-claude-skills` corpus. Each element represents one
@@ -32,19 +32,19 @@ use yii\base\InvalidConfigException;
  *   - `hasUris() = false` — no front-end URLs; surfaced over MCP only.
  *   - `isLocalized() = false` (default) — single canonical row per skill.
  *   - `trackChanges() = false` — drafts/revisions deferred to Gate 9.
- *   - Field layout comes from PC at `plugins.cortex.skillFieldLayout`
+ *   - Field layout comes from PC at `plugins.herald.skillFieldLayout`
  *     via `Skills::getFieldLayout()`. The default layout (seeded on
  *     first access) is one tab containing a single PlainText `body`
  *     field; the field layout is editable through the field-layout
  *     designer when Gate 9 ships the CP UI.
  *
- * Permission contract: `manageCortexSkills` is a single global
- * permission registered via Cortex's `EVENT_REGISTER_PERMISSIONS`
+ * Permission contract: `manageHeraldSkills` is a single global
+ * permission registered via Herald's `EVENT_REGISTER_PERMISSIONS`
  * listener. Admins always pass; non-admins pass when granted the
  * permission. There is no per-instance ACL.
  *
  * Cache invalidation: `afterSave`, `afterDelete`, and `afterRestore`
- * each call `Cortex::getInstance()->skills->resetMemo()` so the
+ * each call `Herald::getInstance()->skills->resetMemo()` so the
  * service-level `MemoizableArray` rebuild trigger fires on every
  * lifecycle event.
  * =========================================================================
@@ -59,12 +59,12 @@ class Skill extends Element
 
     /**
      * The global permission handle that gates create / update / delete
-     * operations on Cortex skills. Registered through
-     * `UserPermissions::EVENT_REGISTER_PERMISSIONS` in `Cortex::init()`.
+     * operations on Herald skills. Registered through
+     * `UserPermissions::EVENT_REGISTER_PERMISSIONS` in `Herald::init()`.
      *
      * @since 5.0.0
      */
-    public const PERMISSION_MANAGE = 'manageCortexSkills';
+    public const PERMISSION_MANAGE = 'manageHeraldSkills';
 
     /**
      * Slug-format constraint on the handle (the skill's natural key).
@@ -96,7 +96,7 @@ class Skill extends Element
 
     /**
      * Short human-readable description of the skill. Stored as a
-     * native column on `cortex_skills` (not in the field layout) so
+     * native column on `herald_skills` (not in the field layout) so
      * the list-view path doesn't pay for a content-table join.
      *
      * @author Craftpulse
@@ -115,7 +115,7 @@ class Skill extends Element
      */
     public static function displayName(): string
     {
-        return Craft::t('cortex', 'Skill');
+        return Craft::t('herald', 'Skill');
     }
 
     /**
@@ -126,7 +126,7 @@ class Skill extends Element
      */
     public static function lowerDisplayName(): string
     {
-        return Craft::t('cortex', 'skill');
+        return Craft::t('herald', 'skill');
     }
 
     /**
@@ -137,7 +137,7 @@ class Skill extends Element
      */
     public static function pluralDisplayName(): string
     {
-        return Craft::t('cortex', 'Skills');
+        return Craft::t('herald', 'Skills');
     }
 
     /**
@@ -148,7 +148,7 @@ class Skill extends Element
      */
     public static function pluralLowerDisplayName(): string
     {
-        return Craft::t('cortex', 'skills');
+        return Craft::t('herald', 'skills');
     }
 
     /**
@@ -274,13 +274,13 @@ class Skill extends Element
      */
     public function getFieldLayout(): ?FieldLayout
     {
-        return Cortex::getInstance()->skills->getFieldLayout();
+        return Herald::getInstance()->skills->getFieldLayout();
     }
 
     /**
      * @inheritdoc
      *
-     * Writes the cortex-specific record row (handle + description)
+     * Writes the herald-specific record row (handle + description)
      * after the element row has been persisted. Skips when propagating
      * — multi-site propagation would duplicate the unique-handle row.
      *
@@ -312,7 +312,7 @@ class Skill extends Element
             $record->save(false);
         }
 
-        Cortex::getInstance()->skills->resetMemo();
+        Herald::getInstance()->skills->resetMemo();
 
         parent::afterSave($isNew);
     }
@@ -325,7 +325,7 @@ class Skill extends Element
      */
     public function afterDelete(): void
     {
-        Cortex::getInstance()->skills->resetMemo();
+        Herald::getInstance()->skills->resetMemo();
         parent::afterDelete();
     }
 
@@ -337,7 +337,7 @@ class Skill extends Element
      */
     public function afterRestore(): void
     {
-        Cortex::getInstance()->skills->resetMemo();
+        Herald::getInstance()->skills->resetMemo();
         parent::afterRestore();
     }
 
@@ -362,7 +362,7 @@ class Skill extends Element
         return [
             [
                 'key' => '*',
-                'label' => Craft::t('cortex', 'All skills'),
+                'label' => Craft::t('herald', 'All skills'),
                 'criteria' => [],
             ],
         ];
@@ -396,7 +396,7 @@ class Skill extends Element
      * Adds the `handle` required + uniqueness rules and the
      * `description` length rule on top of the parent's validation set.
      * Handle uniqueness is also enforced at the DB layer by the
-     * UNIQUE index on `cortex_skills.handle` — the model rule runs
+     * UNIQUE index on `herald_skills.handle` — the model rule runs
      * first so consumers get a Yii-shaped error envelope before
      * hitting the integrity-violation surface.
      *
@@ -414,7 +414,7 @@ class Skill extends Element
             ['handle'],
             'match',
             'pattern' => self::HANDLE_PATTERN,
-            'message' => Craft::t('cortex', 'Handle must be a lowercase slug: letters, digits, and single hyphens (e.g. “my-skill”).'),
+            'message' => Craft::t('herald', 'Handle must be a lowercase slug: letters, digits, and single hyphens (e.g. “my-skill”).'),
         ];
         $rules[] = [['handle'], 'validateHandleImmutable'];
         $rules[] = [['handle'], 'validateHandleUnique'];
@@ -425,7 +425,7 @@ class Skill extends Element
     /**
      * Validates that the handle is not already in use by another
      * skill element — including a soft-deleted (trashed) one. The DB
-     * UNIQUE index on `cortex_skills.handle` holds the trashed row, so
+     * UNIQUE index on `herald_skills.handle` holds the trashed row, so
      * a default (`trashed=false`) probe would let a colliding-with-
      * trashed handle pass model validation and then explode with a raw
      * `IntegrityException` inside `afterSave()`, leaving a half-saved
@@ -457,7 +457,7 @@ class Skill extends Element
         if ($query->exists()) {
             $this->addError(
                 $attribute,
-                Craft::t('cortex', 'Handle “{value}” is already in use by another skill.', [
+                Craft::t('herald', 'Handle “{value}” is already in use by another skill.', [
                     'value' => $this->handle,
                 ]),
             );
@@ -481,7 +481,7 @@ class Skill extends Element
         if ($trashedQuery->exists()) {
             $this->addError(
                 $attribute,
-                Craft::t('cortex', 'Handle “{value}” is in use by a trashed skill. Restore it via the Craft CP, or hard-delete the trashed skill (mode=delete with hardDelete=true) to free the handle.', [
+                Craft::t('herald', 'Handle “{value}” is in use by a trashed skill. Restore it via the Craft CP, or hard-delete the trashed skill (mode=delete with hardDelete=true) to free the handle.', [
                     'value' => $this->handle,
                 ]),
             );
@@ -522,7 +522,7 @@ class Skill extends Element
         if ($this->handle !== $record->handle) {
             $this->addError(
                 $attribute,
-                Craft::t('cortex', 'Handle is immutable; “{old}” cannot be renamed to “{new}”. Create a new skill instead.', [
+                Craft::t('herald', 'Handle is immutable; “{old}” cannot be renamed to “{new}”. Create a new skill instead.', [
                     'old' => (string) $record->handle,
                     'new' => (string) $this->handle,
                 ]),
@@ -534,9 +534,9 @@ class Skill extends Element
     // =========================================================================
 
     /**
-     * Resolve whether the given user can manage Cortex skills. Admins
+     * Resolve whether the given user can manage Herald skills. Admins
      * always pass; non-admins pass when granted the
-     * `manageCortexSkills` permission. Centralised here so
+     * `manageHeraldSkills` permission. Centralised here so
      * `canView/canSave/canDelete/canDuplicate` all share a single
      * implementation.
      *

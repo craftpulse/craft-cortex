@@ -1,8 +1,8 @@
 <?php
 
-namespace craftpulse\cortex\tools;
+namespace craftpulse\herald\tools;
 
-use craftpulse\cortex\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\InvocationContext;
 use Generator;
 
 /**
@@ -98,7 +98,7 @@ interface StreamableToolInterface extends ToolInterface
      *   - Break the delegation into explicit yield points in the parent
      *     generator rather than using `yield from`.
      *
-     * This is a property of PHP's generator semantics, not a cortex
+     * This is a property of PHP's generator semantics, not a herald
      * limitation — the same constraint applies to any PHP generator
      * that delegates via `yield from`.
      *

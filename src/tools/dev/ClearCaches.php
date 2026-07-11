@@ -1,14 +1,14 @@
 <?php
 
-namespace craftpulse\cortex\tools\dev;
+namespace craftpulse\herald\tools\dev;
 
 use craft\helpers\FileHelper;
 use craft\utilities\ClearCaches as ClearCachesUtility;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use Throwable;
 use yii\base\InvalidArgumentException;
 

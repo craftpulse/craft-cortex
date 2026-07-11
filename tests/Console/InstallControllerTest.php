@@ -6,7 +6,7 @@
  *
  * Locks the per-client snippet shape against regression — bad snippets
  * are a ship blocker because they're the user's first encounter with
- * cortex. Each test asserts the strings that have to appear (and,
+ * herald. Each test asserts the strings that have to appear (and,
  * for the high-risk ones, the strings that MUST NOT appear).
  *
  * The controller is exercised through its `buildSnippet()` helper, which
@@ -18,19 +18,19 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\console\controllers\InstallController;
+use craftpulse\herald\console\controllers\InstallController;
 
 beforeEach(function() {
     $this->controller = new InstallController('install', Craft::$app);
-    $this->command = 'docker exec -i ddev-myproject-web php /var/www/html/craft cortex/serve';
+    $this->command = 'docker exec -i ddev-myproject-web php /var/www/html/craft herald/serve';
 });
 
 it('claude-code snippet uses the -- separator (otherwise -i parses as a Claude flag)', function() {
     $body = $this->controller->buildSnippet('claude-code', $this->command);
 
     expect($body)
-        ->toContain('claude mcp add --transport stdio cortex -- docker exec -i ')
-        ->and($body)->not->toContain('claude mcp add cortex docker'); // pre-fix shape
+        ->toContain('claude mcp add --transport stdio herald -- docker exec -i ')
+        ->and($body)->not->toContain('claude mcp add herald docker'); // pre-fix shape
 });
 
 it('continue.dev snippet uses YAML and the modern mcpServers key', function() {
@@ -39,7 +39,7 @@ it('continue.dev snippet uses YAML and the modern mcpServers key', function() {
     expect($body)
         ->toContain('config.yaml')
         ->toContain('mcpServers:')
-        ->toContain('- name: cortex')
+        ->toContain('- name: herald')
         ->toContain('command: docker')
         ->and($body)->not->toContain('experimental.modelContextProtocolServers') // deprecated
         ->and($body)->not->toContain('config.json'); // JSON form is legacy / different file
@@ -97,19 +97,19 @@ it('returns empty string for an unknown client', function() {
 // Apply action — merge semantics
 // -----------------------------------------------------------------------------
 
-it('merges a cortex entry into an empty mcpServers JSON config', function() {
+it('merges a herald entry into an empty mcpServers JSON config', function() {
     $result = $this->controller->buildMergedConfig('claude-desktop', null, $this->command);
 
     expect($result)->not->toBeNull();
     [$contents, $action] = $result;
-    expect($action)->toContain('create file with cortex entry');
+    expect($action)->toContain('create file with herald entry');
 
     $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
     expect($decoded)
         ->toHaveKey('mcpServers')
-        ->and($decoded['mcpServers'])->toHaveKey('cortex')
-        ->and($decoded['mcpServers']['cortex']['command'])->toBe('docker')
-        ->and($decoded['mcpServers']['cortex']['args'])->toBeArray()->not->toBeEmpty();
+        ->and($decoded['mcpServers'])->toHaveKey('herald')
+        ->and($decoded['mcpServers']['herald']['command'])->toBe('docker')
+        ->and($decoded['mcpServers']['herald']['args'])->toBeArray()->not->toBeEmpty();
 });
 
 it('preserves other servers when merging into a populated mcpServers JSON', function() {
@@ -130,14 +130,14 @@ it('preserves other servers when merging into a populated mcpServers JSON', func
     $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
     expect($decoded['mcpServers'])
         ->toHaveKey('filesystem')
-        ->toHaveKey('cortex')
+        ->toHaveKey('herald')
         ->and($decoded['mcpServers']['filesystem']['command'])->toBe('npx');
 });
 
-it('refuses to overwrite an existing cortex entry without --force', function() {
+it('refuses to overwrite an existing herald entry without --force', function() {
     $existing = json_encode([
         'mcpServers' => [
-            'cortex' => ['command' => 'old', 'args' => []],
+            'herald' => ['command' => 'old', 'args' => []],
         ],
     ]);
 
@@ -146,10 +146,10 @@ it('refuses to overwrite an existing cortex entry without --force', function() {
     expect($result)->toBeNull();
 });
 
-it('overwrites an existing cortex entry with --force', function() {
+it('overwrites an existing herald entry with --force', function() {
     $existing = json_encode([
         'mcpServers' => [
-            'cortex' => ['command' => 'old', 'args' => []],
+            'herald' => ['command' => 'old', 'args' => []],
         ],
     ]);
 
@@ -161,7 +161,7 @@ it('overwrites an existing cortex entry with --force', function() {
     expect($action)->toContain('overwrite');
 
     $decoded = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
-    expect($decoded['mcpServers']['cortex']['command'])->toBe('docker');
+    expect($decoded['mcpServers']['herald']['command'])->toBe('docker');
 });
 
 it('throws when the existing JSON is malformed', function() {
@@ -187,15 +187,15 @@ it('continue merger renders a standalone YAML with the required metadata', funct
     [$contents] = $result;
 
     expect($contents)
-        ->toContain('name: cortex')
+        ->toContain('name: herald')
         ->toContain('version: 0.0.1')
         ->toContain('schema: v1')
         ->toContain('mcpServers:')
-        ->toContain('- name: cortex');
+        ->toContain('- name: herald');
 });
 
 it('continue merger refuses an existing differing file without --force', function() {
-    $existing = "name: cortex\nversion: 0.0.1\nschema: v1\nmcpServers:\n  - name: cortex\n    command: old\n    args:\n      - foo\n";
+    $existing = "name: herald\nversion: 0.0.1\nschema: v1\nmcpServers:\n  - name: herald\n    command: old\n    args:\n      - foo\n";
 
     $result = $this->controller->buildMergedConfig('continue', $existing, $this->command);
 
@@ -203,7 +203,7 @@ it('continue merger refuses an existing differing file without --force', functio
 });
 
 it('continue merger overwrites with --force', function() {
-    $existing = "name: cortex\nversion: 0.0.1\nschema: v1\nmcpServers:\n  - name: cortex\n    command: old\n    args:\n      - foo\n";
+    $existing = "name: herald\nversion: 0.0.1\nschema: v1\nmcpServers:\n  - name: herald\n    command: old\n    args:\n      - foo\n";
 
     $this->controller->force = true;
     $result = $this->controller->buildMergedConfig('continue', $existing, $this->command);
@@ -232,13 +232,13 @@ it('resolves cursor config to ~/.cursor/mcp.json', function() {
         ->toEndWith(DIRECTORY_SEPARATOR . '.cursor' . DIRECTORY_SEPARATOR . 'mcp.json');
 });
 
-it('resolves continue config to standalone cortex.yaml under mcpServers/', function() {
+it('resolves continue config to standalone herald.yaml under mcpServers/', function() {
     $path = $this->controller->resolveConfigPath('continue');
 
     expect($path)
         ->toBeString()
         ->toContain('.continue')
-        ->toEndWith('mcpServers' . DIRECTORY_SEPARATOR . 'cortex.yaml');
+        ->toEndWith('mcpServers' . DIRECTORY_SEPARATOR . 'herald.yaml');
 });
 
 it('resolves windsurf config to ~/.codeium/windsurf/mcp_config.json', function() {

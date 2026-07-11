@@ -1,13 +1,13 @@
 <?php
 
-namespace craftpulse\cortex\records;
+namespace craftpulse\herald\records;
 
 use craft\db\ActiveRecord;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Active record for the `cortex_tokens` table.
+ * Active record for the `herald_tokens` table.
  *
  * Each row is one admin-issued bearer token bound to a Craft user. The
  * plaintext token is never stored; only the SHA-256 hex digest is kept
@@ -56,11 +56,11 @@ class Token extends ActiveRecord
      * @inheritdoc
      *
      * Mirrors the column constraints declared in
-     * `m260514_120000_cortex_tokens::safeUp()` at the model layer so
+     * `m260514_120000_herald_tokens::safeUp()` at the model layer so
      * `save()` fails cleanly via validation rather than as a raw DB
      * exception. The 64-char `tokenHash` constraint catches a caller
      * passing the plaintext where the hash was expected (or vice
-     * versa) — both happen to be 64 hex chars in cortex's scheme,
+     * versa) — both happen to be 64 hex chars in herald's scheme,
      * so the length check is necessary but not sufficient; callers
      * remain responsible for passing the *hashed* form.
      *

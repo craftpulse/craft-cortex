@@ -1,14 +1,14 @@
 <?php
 
-namespace craftpulse\cortex\tools\system;
+namespace craftpulse\herald\tools\system;
 
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
 
 /**
@@ -16,7 +16,7 @@ use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
  * `search_skills` tool — in-memory full-text search across the bundled
  * skills corpus.
  *
- * Cortex ships tens of thousands of lines of authored Craft expertise
+ * Herald ships tens of thousands of lines of authored Craft expertise
  * across the bundled skills (each a `SKILL.md` router plus N reference
  * documents) and Claude Code agents — the tool description below
  * computes the live counts. The MCP prompt + resource registry exposes
@@ -99,7 +99,7 @@ class SearchSkills extends AbstractTool
             '`mode: "search"` (default) returns ranked matches with a snippet and the ' .
             'resource URI for follow-up reads; `mode: "topics"` enumerates the corpus ' .
             'without scoring. Filter `kind` to `skill` / `reference` / `agent` to narrow. ' .
-            'Element-stored Cortex skills override bundled ones by handle and are included ' .
+            'Element-stored Herald skills override bundled ones by handle and are included ' .
             'in the merged corpus.';
     }
 
@@ -252,7 +252,7 @@ class SearchSkills extends AbstractTool
     private function _buildIndex(?string $kindFilter): array
     {
         /** @var list<array{kind:string,uri:string,skill:string,name:string|null,content:string,source:string}> $rows */
-        $rows = Cortex::getInstance()->skills->getMergedCorpus($kindFilter);
+        $rows = Herald::getInstance()->skills->getMergedCorpus($kindFilter);
         return $rows;
     }
 

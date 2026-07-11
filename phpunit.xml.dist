@@ -9,7 +9,7 @@
          failOnRisky="false"
          failOnWarning="false">
     <testsuites>
-        <testsuite name="cortex">
+        <testsuite name="herald">
             <directory>tests</directory>
             <exclude>tests/Bootstrap.php</exclude>
             <exclude>tests/Pest.php</exclude>

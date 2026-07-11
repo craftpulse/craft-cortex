@@ -1,16 +1,16 @@
 <?php
 
-namespace craftpulse\cortex\console\controllers;
+namespace craftpulse\herald\console\controllers;
 
 use craft\console\Controller;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\support\AttributeReader;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\support\AttributeReader;
 use yii\console\ExitCode;
 use yii\helpers\Console;
 
 /**
  * =========================================================================
- * Console — generate human-readable Markdown for cortex's tool, prompt,
+ * Console — generate human-readable Markdown for herald's tool, prompt,
  * and resource registries.
  *
  * Each action walks the runtime registry and writes a versioned snapshot
@@ -19,13 +19,13 @@ use yii\helpers\Console;
  * code so the repo carries its own reference.
  *
  * Usage:
- *   cortex/docs/tools       (writes docs/TOOLS.md)
- *   cortex/docs/prompts     (writes docs/PROMPTS.md)
- *   cortex/docs/resources   (writes docs/RESOURCES.md)
- *   cortex/docs/all         (runs all three)
+ *   herald/docs/tools       (writes docs/TOOLS.md)
+ *   herald/docs/prompts     (writes docs/PROMPTS.md)
+ *   herald/docs/resources   (writes docs/RESOURCES.md)
+ *   herald/docs/all         (runs all three)
  *
  * `--out=<dir>` overrides the output directory (default: `docs/`
- * relative to the cortex package root). Tests use this to write into
+ * relative to the herald package root). Tests use this to write into
  * a tmp directory and assert the output shape.
  * =========================================================================
  *
@@ -39,7 +39,7 @@ class DocsController extends Controller
 
     /**
      * @var string|null Override the output directory. Defaults to the
-     *                  `docs/` folder inside the cortex package root.
+     *                  `docs/` folder inside the herald package root.
      */
     public ?string $out = null;
 
@@ -66,7 +66,7 @@ class DocsController extends Controller
     public function actionAll(): int
     {
         // Run all three; report failure if any sub-action failed so CI
-        // calling `cortex/docs/all` can detect a partial write rather
+        // calling `herald/docs/all` can detect a partial write rather
         // than reading the always-OK exit as success. The later docs
         // still attempt to write even if an earlier one errored — a
         // single IO failure shouldn't suppress the others.
@@ -87,7 +87,7 @@ class DocsController extends Controller
      */
     public function actionTools(): int
     {
-        $tools = Cortex::getInstance()->tools->getAll();
+        $tools = Herald::getInstance()->tools->getAll();
         $md = $this->_renderToolsMarkdown($tools);
         return $this->_writeDoc('TOOLS.md', $md);
     }
@@ -100,7 +100,7 @@ class DocsController extends Controller
      */
     public function actionPrompts(): int
     {
-        $prompts = Cortex::getInstance()->prompts->getAll();
+        $prompts = Herald::getInstance()->prompts->getAll();
         $md = $this->_renderPromptsMarkdown($prompts);
         return $this->_writeDoc('PROMPTS.md', $md);
     }
@@ -113,7 +113,7 @@ class DocsController extends Controller
      */
     public function actionResources(): int
     {
-        $resources = Cortex::getInstance()->resources->getAll();
+        $resources = Herald::getInstance()->resources->getAll();
         $md = $this->_renderResourcesMarkdown($resources);
         return $this->_writeDoc('RESOURCES.md', $md);
     }
@@ -158,7 +158,7 @@ class DocsController extends Controller
     }
 
     /**
-     * @param \craftpulse\cortex\tools\ToolInterface[] $tools
+     * @param \craftpulse\herald\tools\ToolInterface[] $tools
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -169,10 +169,10 @@ class DocsController extends Controller
         $generatedAt = date('c');
 
         $md = <<<MD
-        # Cortex Tools
+        # Herald Tools
 
-        Auto-generated reference for the cortex MCP tool surface. Run
-        `ddev craft cortex/docs/tools` to refresh.
+        Auto-generated reference for the herald MCP tool surface. Run
+        `ddev craft herald/docs/tools` to refresh.
 
         - **Total tools:** {$count}
         - **Generated:** {$generatedAt}
@@ -218,7 +218,7 @@ class DocsController extends Controller
     }
 
     /**
-     * @param \craftpulse\cortex\prompts\PromptInterface[] $prompts
+     * @param \craftpulse\herald\prompts\PromptInterface[] $prompts
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -229,10 +229,10 @@ class DocsController extends Controller
         $generatedAt = date('c');
 
         $md = <<<MD
-        # Cortex Prompts
+        # Herald Prompts
 
-        Auto-generated reference for the cortex MCP prompt surface. Run
-        `ddev craft cortex/docs/prompts` to refresh.
+        Auto-generated reference for the herald MCP prompt surface. Run
+        `ddev craft herald/docs/prompts` to refresh.
 
         - **Total prompts:** {$count}
         - **Generated:** {$generatedAt}
@@ -259,7 +259,7 @@ class DocsController extends Controller
     }
 
     /**
-     * @param \craftpulse\cortex\resources\ResourceInterface[] $resources
+     * @param \craftpulse\herald\resources\ResourceInterface[] $resources
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -270,10 +270,10 @@ class DocsController extends Controller
         $generatedAt = date('c');
 
         $md = <<<MD
-        # Cortex Resources
+        # Herald Resources
 
-        Auto-generated reference for the cortex MCP resource surface. Run
-        `ddev craft cortex/docs/resources` to refresh.
+        Auto-generated reference for the herald MCP resource surface. Run
+        `ddev craft herald/docs/resources` to refresh.
 
         - **Total resources:** {$count}
         - **Generated:** {$generatedAt}

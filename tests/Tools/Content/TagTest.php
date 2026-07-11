@@ -25,16 +25,16 @@
 
 use craft\elements\Tag as TagElement;
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\content\Tag;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\content\Tag;
+use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_tagtest_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_tagtest_' . bin2hex(random_bytes(4)) . '_';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -59,12 +59,12 @@ afterEach(function() {
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _cortex_tag_tool(): Tag
+function _herald_tag_tool(): Tag
 {
     return new Tag();
 }
 
-function _cortex_tag_group(): ?\craft\models\TagGroup
+function _herald_tag_group(): ?\craft\models\TagGroup
 {
     $groups = Craft::$app->getTags()->getAllTagGroups();
     return $groups[0] ?? null;
@@ -75,11 +75,11 @@ function _cortex_tag_group(): ?\craft\models\TagGroup
 // -----------------------------------------------------------------------------
 
 it('is NOT registered on Free installs', function() {
-    expect(Cortex::getInstance()->tools->getByName('tag'))->toBeNull();
+    expect(Herald::getInstance()->tools->getByName('tag'))->toBeNull();
 
     $names = array_map(
         static fn(array $entry): string => $entry['name'],
-        Cortex::getInstance()->tools->asListPayload(),
+        Herald::getInstance()->tools->asListPayload(),
     );
     expect($names)->not->toContain('tag');
 });
@@ -87,7 +87,7 @@ it('is NOT registered on Free installs', function() {
 it('shouldRegister() returns true on Pro and false on Free', function() {
     expect(Tag::shouldRegister())->toBeFalse();
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect(Tag::shouldRegister())->toBeTrue();
     });
 });
@@ -97,22 +97,22 @@ it('shouldRegister() returns true on Pro and false on Free', function() {
 // -----------------------------------------------------------------------------
 
 it('filterFor(null) returns true — stdio is trusted', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_tag_tool()->filterFor(null))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_tag_tool()->filterFor(null))->toBeTrue();
     });
 });
 
 it('filterFor returns true for admin users', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect($this->admin)->toBeInstanceOf(User::class);
         expect($this->admin->admin)->toBeTrue();
-        expect(_cortex_tag_tool()->filterFor($this->admin))->toBeTrue();
+        expect(_herald_tag_tool()->filterFor($this->admin))->toBeTrue();
     });
 });
 
 it('filterFor returns false for non-admin users', function() {
     $user = new User();
-    $user->username = '__cortex_nonadmin_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_nonadmin_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -122,8 +122,8 @@ it('filterFor returns false for non-admin users', function() {
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
-            expect(_cortex_tag_tool()->filterFor($user))->toBeFalse();
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
+            expect(_herald_tag_tool()->filterFor($user))->toBeFalse();
         });
     } finally {
         Craft::$app->getElements()->deleteElement($user, hardDelete: true);
@@ -135,14 +135,14 @@ it('filterFor returns false for non-admin users', function() {
 // -----------------------------------------------------------------------------
 
 it('throws ToolException when mode is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_tag_tool()->execute([]);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_tag_tool()->execute([]);
     });
 })->throws(ToolException::class);
 
 it('throws ToolException on unknown mode', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_tag_tool()->execute(['mode' => 'frobnicate']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_tag_tool()->execute(['mode' => 'frobnicate']);
     });
 })->throws(ToolException::class);
 
@@ -151,14 +151,14 @@ it('throws ToolException on unknown mode', function() {
 // -----------------------------------------------------------------------------
 
 it('create mode round-trips against a test tag group as admin', function() {
-    $group = _cortex_tag_group();
+    $group = _herald_tag_group();
     if ($group === null) {
         $this->markTestSkipped('No tag groups in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
         $title = $this->fixturePrefix . 'happy';
-        $result = _cortex_tag_tool()->execute([
+        $result = _herald_tag_tool()->execute([
             'mode' => 'create',
             'groupHandle' => $group->handle,
             'title' => $title,
@@ -176,8 +176,8 @@ it('create mode round-trips against a test tag group as admin', function() {
 });
 
 it('create mode throws when no group-identifying argument is given', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_tag_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_tag_tool()->execute([
             'mode' => 'create',
             'title' => $this->fixturePrefix . 'nogroup',
         ]);
@@ -189,13 +189,13 @@ it('create mode throws when no group-identifying argument is given', function() 
 // -----------------------------------------------------------------------------
 
 it('update mode mutates an existing tag', function() {
-    $group = _cortex_tag_group();
+    $group = _herald_tag_group();
     if ($group === null) {
         $this->markTestSkipped('No tag groups in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group) {
-        $tool = _cortex_tag_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
+        $tool = _herald_tag_tool();
 
         $created = $tool->execute([
             'mode' => 'create',
@@ -222,13 +222,13 @@ it('update mode mutates an existing tag', function() {
 // -----------------------------------------------------------------------------
 
 it('delete mode soft-deletes by default', function() {
-    $group = _cortex_tag_group();
+    $group = _herald_tag_group();
     if ($group === null) {
         $this->markTestSkipped('No tag groups in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group) {
-        $tool = _cortex_tag_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
+        $tool = _herald_tag_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'groupHandle' => $group->handle,
@@ -251,13 +251,13 @@ it('delete mode soft-deletes by default', function() {
 });
 
 it('delete mode with hardDelete=true removes the row entirely', function() {
-    $group = _cortex_tag_group();
+    $group = _herald_tag_group();
     if ($group === null) {
         $this->markTestSkipped('No tag groups in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group) {
-        $tool = _cortex_tag_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
+        $tool = _herald_tag_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'groupHandle' => $group->handle,
@@ -277,13 +277,13 @@ it('delete mode with hardDelete=true removes the row entirely', function() {
 // -----------------------------------------------------------------------------
 
 it('the same idempotencyKey returns the cached envelope without re-saving', function() {
-    $group = _cortex_tag_group();
+    $group = _herald_tag_group();
     if ($group === null) {
         $this->markTestSkipped('No tag groups in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group) {
-        $tool = _cortex_tag_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
+        $tool = _herald_tag_tool();
         $idempotencyKey = 'idem_' . bin2hex(random_bytes(8));
 
         $args = [
@@ -314,13 +314,13 @@ it('the same idempotencyKey returns the cached envelope without re-saving', func
 // -----------------------------------------------------------------------------
 
 it('execute() refuses a non-admin dispatch even though filterFor would hide the tool', function() {
-    $group = _cortex_tag_group();
+    $group = _herald_tag_group();
     if ($group === null) {
         $this->markTestSkipped('No tag groups in the playground.');
     }
 
     $user = new User();
-    $user->username = '__cortex_nonadmin_exec_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_nonadmin_exec_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -330,11 +330,11 @@ it('execute() refuses a non-admin dispatch even though filterFor would hide the 
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($group, $user) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($group, $user) {
             Craft::$app->getUser()->setIdentity($user);
 
             try {
-                _cortex_tag_tool()->execute([
+                _herald_tag_tool()->execute([
                     'mode' => 'create',
                     'groupHandle' => $group->handle,
                     'title' => $this->fixturePrefix . 'denied',

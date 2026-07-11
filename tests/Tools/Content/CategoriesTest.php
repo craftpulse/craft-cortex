@@ -6,11 +6,11 @@
  */
 
 use craft\elements\Category;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('categories');
+    $this->tool = Herald::getInstance()->tools->getByName('categories');
 });
 
 it('returns categories list with pagination metadata', function() {

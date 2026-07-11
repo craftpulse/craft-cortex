@@ -2,7 +2,7 @@
 
 /**
  * =========================================================================
- * OauthController (console) tests — `cortex/oauth/init-keys`.
+ * OauthController (console) tests — `herald/oauth/init-keys`.
  *
  * The test environment already has a key pair from earlier dev runs,
  * so the test relocates the keys directory to a unique temporary
@@ -14,15 +14,15 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\console\controllers\OauthController;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\services\Oauth;
+use craftpulse\herald\console\controllers\OauthController;
+use craftpulse\herald\Herald;
+use craftpulse\herald\services\Oauth;
 
 // -----------------------------------------------------------------------------
 // Harness — captures stdout / stderr so assertions can introspect.
 // -----------------------------------------------------------------------------
 
-class _CortexOauthInitKeysHarness extends OauthController
+class _HeraldOauthInitKeysHarness extends OauthController
 {
     public string $captured = '';
 
@@ -49,11 +49,11 @@ class _CortexOauthInitKeysHarness extends OauthController
  * Returns `[harness, real-test-dir]`. Caller is responsible for
  * cleaning up the test dir.
  *
- * @return array{0: _CortexOauthInitKeysHarness, 1: string}
+ * @return array{0: _HeraldOauthInitKeysHarness, 1: string}
  */
-function _cortex_init_keys_harness(): array
+function _herald_init_keys_harness(): array
 {
-    $testRoot = sys_get_temp_dir() . '/cortex-test-' . bin2hex(random_bytes(6));
+    $testRoot = sys_get_temp_dir() . '/herald-test-' . bin2hex(random_bytes(6));
     $keysDir = $testRoot . '/' . Oauth::KEYS_SUBDIR;
 
     // Reflectively swap the storage path on Craft's `path` component.
@@ -65,7 +65,7 @@ function _cortex_init_keys_harness(): array
     $prop->setAccessible(true);
     $prop->setValue($pathSvc, $testRoot);
 
-    $controller = new _CortexOauthInitKeysHarness('oauth', Cortex::getInstance());
+    $controller = new _HeraldOauthInitKeysHarness('oauth', Herald::getInstance());
     return [$controller, $keysDir];
 }
 
@@ -73,7 +73,7 @@ function _cortex_init_keys_harness(): array
  * Recursively remove a temp directory and restore the original
  * storage path. Idempotent on a missing dir.
  */
-function _cortex_init_keys_cleanup(string $testKeysDir): void
+function _herald_init_keys_cleanup(string $testKeysDir): void
 {
     $root = dirname(dirname($testKeysDir));
     if (is_dir($root)) {
@@ -116,7 +116,7 @@ afterEach(function() {
 // -----------------------------------------------------------------------------
 
 it('init-keys generates a private + public key in the configured directory', function() {
-    [$controller, $keysDir] = _cortex_init_keys_harness();
+    [$controller, $keysDir] = _herald_init_keys_harness();
 
     try {
         $exit = $controller->actionInitKeys();
@@ -133,12 +133,12 @@ it('init-keys generates a private + public key in the configured directory', fun
         expect(file_get_contents($privatePath))->toContain('-----BEGIN');
         expect(file_get_contents($publicPath))->toContain('-----BEGIN PUBLIC KEY-----');
     } finally {
-        _cortex_init_keys_cleanup($keysDir);
+        _herald_init_keys_cleanup($keysDir);
     }
 });
 
 it('init-keys sets 0600 permissions on the private key', function() {
-    [$controller, $keysDir] = _cortex_init_keys_harness();
+    [$controller, $keysDir] = _herald_init_keys_harness();
 
     try {
         $controller->actionInitKeys();
@@ -147,30 +147,30 @@ it('init-keys sets 0600 permissions on the private key', function() {
         $perms = fileperms($privatePath) & 0o777;
         expect($perms)->toBe(0o600);
     } finally {
-        _cortex_init_keys_cleanup($keysDir);
+        _herald_init_keys_cleanup($keysDir);
     }
 });
 
 it('init-keys refuses to overwrite an existing key pair without --force', function() {
-    [$controller, $keysDir] = _cortex_init_keys_harness();
+    [$controller, $keysDir] = _herald_init_keys_harness();
 
     try {
         $first = $controller->actionInitKeys();
         expect($first)->toBe(0);
 
         // Second invocation without --force fails.
-        $controller2 = new _CortexOauthInitKeysHarness('oauth', Cortex::getInstance());
+        $controller2 = new _HeraldOauthInitKeysHarness('oauth', Herald::getInstance());
         $second = $controller2->actionInitKeys();
         expect($second)->not->toBe(0);
         expect($controller2->captured)->toContain('already exist');
         expect($controller2->captured)->toContain('--force');
     } finally {
-        _cortex_init_keys_cleanup($keysDir);
+        _herald_init_keys_cleanup($keysDir);
     }
 });
 
 it('init-keys with --force overwrites an existing key pair', function() {
-    [$controller, $keysDir] = _cortex_init_keys_harness();
+    [$controller, $keysDir] = _herald_init_keys_harness();
 
     try {
         $controller->actionInitKeys();
@@ -182,7 +182,7 @@ it('init-keys with --force overwrites an existing key pair', function() {
         // CSPRNG-driven but defensive.
         usleep(1000);
 
-        $controller2 = new _CortexOauthInitKeysHarness('oauth', Cortex::getInstance());
+        $controller2 = new _HeraldOauthInitKeysHarness('oauth', Herald::getInstance());
         $controller2->force = true;
         $exit = $controller2->actionInitKeys();
         expect($exit)->toBe(0);
@@ -190,6 +190,6 @@ it('init-keys with --force overwrites an existing key pair', function() {
         $rotated = file_get_contents($privatePath);
         expect($rotated)->not->toBe($original);
     } finally {
-        _cortex_init_keys_cleanup($keysDir);
+        _herald_init_keys_cleanup($keysDir);
     }
 });

@@ -13,12 +13,12 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
-use craftpulse\cortex\tools\workflow\ImportExport;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
+use craftpulse\herald\tools\workflow\ImportExport;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('import_export');
+    $this->tool = Herald::getInstance()->tools->getByName('import_export');
 });
 
 it('is registered on the tool registry', function() {
@@ -84,7 +84,7 @@ it('clamps limit to MAX_LIMIT', function() {
 });
 
 it('appears in the registry tools/list payload with annotations', function() {
-    $payload = Cortex::getInstance()->tools->asListPayload();
+    $payload = Herald::getInstance()->tools->asListPayload();
 
     $entry = collect($payload)->firstWhere('name', 'import_export');
     expect($entry)->not->toBeNull();

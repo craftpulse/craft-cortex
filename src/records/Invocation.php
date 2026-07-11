@@ -1,17 +1,17 @@
 <?php
 
-namespace craftpulse\cortex\records;
+namespace craftpulse\herald\records;
 
 use craft\db\ActiveRecord;
-use craftpulse\cortex\db\Table;
-use craftpulse\cortex\tools\support\InvocationLogger;
+use craftpulse\herald\db\Table;
+use craftpulse\herald\tools\support\InvocationLogger;
 
 /**
  * =========================================================================
- * Active record for the `cortex_invocations` audit-log table.
+ * Active record for the `herald_invocations` audit-log table.
  *
  * One row per authenticated HTTP-transport `tools/call`. Mirrors the
- * column layout declared in `m260514_120200_cortex_invocations` so
+ * column layout declared in `m260514_120200_herald_invocations` so
  * Yii's ActiveRecord can read/write rows without a hand-rolled query.
  *
  * The Record carries DateTime-shaped timestamps via Yii's standard

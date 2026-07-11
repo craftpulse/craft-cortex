@@ -1,13 +1,13 @@
 <?php
 
-namespace craftpulse\cortex\migrations;
+namespace craftpulse\herald\migrations;
 
 use craft\db\Migration;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Gate 7.6 migration — adds `rateLimitRemaining` to `cortex_invocations`.
+ * Gate 7.6 migration — adds `rateLimitRemaining` to `herald_invocations`.
  *
  * Per-row snapshot of the post-consume bucket headroom for the user
  * who made the call. Operators reading the audit table see throttle
@@ -34,7 +34,7 @@ use craftpulse\cortex\db\Table;
  * @author Craftpulse
  * @since  5.0.0
  */
-class m260514_120300_cortex_invocations_rate_limit extends Migration
+class m260514_120300_herald_invocations_rate_limit extends Migration
 {
     // Public Methods
     // =========================================================================

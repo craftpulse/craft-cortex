@@ -1,8 +1,8 @@
 <?php
 
-namespace craftpulse\cortex\tools;
+namespace craftpulse\herald\tools;
 
-use craftpulse\cortex\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\InvocationContext;
 
 /**
  * =========================================================================

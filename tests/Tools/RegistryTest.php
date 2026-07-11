@@ -9,8 +9,8 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolInterface;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolInterface;
 
 it('registers every bundled tool by name', function() {
     $expected = [
@@ -60,7 +60,7 @@ it('registers every bundled tool by name', function() {
         'import_export',
     ];
 
-    $tools = Cortex::getInstance()->tools;
+    $tools = Herald::getInstance()->tools;
 
     expect($tools->getCount())->toBe(count($expected));
 
@@ -72,13 +72,13 @@ it('registers every bundled tool by name', function() {
 });
 
 it('returns null for unknown tool names', function() {
-    expect(Cortex::getInstance()->tools->getByName('nope'))->toBeNull();
+    expect(Herald::getInstance()->tools->getByName('nope'))->toBeNull();
 });
 
 it('builds an MCP-shaped tools/list payload', function() {
-    $payload = Cortex::getInstance()->tools->asListPayload();
+    $payload = Herald::getInstance()->tools->asListPayload();
 
-    expect($payload)->toBeArray()->toHaveCount(Cortex::getInstance()->tools->getCount());
+    expect($payload)->toBeArray()->toHaveCount(Herald::getInstance()->tools->getCount());
 
     foreach ($payload as $item) {
         expect($item)->toBeMcpToolListItem();
@@ -86,7 +86,7 @@ it('builds an MCP-shaped tools/list payload', function() {
 });
 
 it('exposes every tool with a non-empty description and a JSON Schema input shape', function() {
-    foreach (Cortex::getInstance()->tools->getAll() as $tool) {
+    foreach (Herald::getInstance()->tools->getAll() as $tool) {
         expect($tool::getDescription())
             ->toBeString()
             ->not->toBeEmpty();

@@ -1,9 +1,9 @@
 <?php
 
-namespace craftpulse\cortex\events;
+namespace craftpulse\herald\events;
 
-use craftpulse\cortex\resources\ResourceInterface;
-use craftpulse\cortex\resources\ResourceTemplateInterface;
+use craftpulse\herald\resources\ResourceInterface;
+use craftpulse\herald\resources\ResourceTemplateInterface;
 use yii\base\Event;
 
 /**
@@ -20,7 +20,7 @@ use yii\base\Event;
  * resource bundle.
  *
  * Each `ResourceInterface` is keyed by its URI; duplicate URIs surface a
- * `Craft::warning()` line on the `cortex` channel and the second
+ * `Craft::warning()` line on the `herald` channel and the second
  * registration is dropped (first registration wins). Templates don't
  * shadow concrete URIs — concrete-URI lookups always hit `getByUri()`
  * first and only fall back to template matching on miss.
@@ -33,8 +33,8 @@ use yii\base\Event;
  * Example:
  *
  * ```php
- * use craftpulse\cortex\events\RegisterResourcesEvent;
- * use craftpulse\cortex\services\Resources;
+ * use craftpulse\herald\events\RegisterResourcesEvent;
+ * use craftpulse\herald\services\Resources;
  * use yii\base\Event;
  *
  * Event::on(

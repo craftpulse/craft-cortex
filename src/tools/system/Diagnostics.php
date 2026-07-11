@@ -1,19 +1,19 @@
 <?php
 
-namespace craftpulse\cortex\tools\system;
+namespace craftpulse\herald\tools\system;
 
 use Craft;
 use craft\elements\User;
 use craft\helpers\DateTimeHelper;
 use craft\helpers\FileHelper;
 use craft\queue\Queue;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\PermissionedToolTrait;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\PermissionedToolTrait;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use Throwable;
 
 /**
@@ -133,7 +133,7 @@ class Diagnostics extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        $types = Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')
+        $types = Herald::getInstance()->is(Herald::EDITION_PRO, '>=')
             ? array_merge(self::FREE_TYPES, self::PRO_TYPES)
             : self::FREE_TYPES;
 
@@ -179,7 +179,7 @@ class Diagnostics extends AbstractTool
         // final answer — no per-permission filtering applies.
         $schema = static::getInputSchema();
 
-        if ($user === null || !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+        if ($user === null || !Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             return $schema;
         }
 
@@ -212,7 +212,7 @@ class Diagnostics extends AbstractTool
             );
         }
 
-        if (in_array($type, self::PRO_TYPES, true) && !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+        if (in_array($type, self::PRO_TYPES, true) && !Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             throw new ToolException("system_diagnostics: type `{$type}` is unavailable on this edition.");
         }
 

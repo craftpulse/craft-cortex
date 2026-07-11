@@ -19,7 +19,7 @@
 <html lang="{{ craft.app.language }}">
 <head>
     <meta charset="utf-8">
-    <title>{{ 'Client awaiting approval'|t('cortex') }}</title>
+    <title>{{ 'Client awaiting approval'|t('herald') }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         :root {
@@ -51,15 +51,15 @@
 <body>
 <div class="container">
     <div class="panel">
-        <h1>{{ 'Awaiting approval'|t('cortex') }}</h1>
+        <h1>{{ 'Awaiting approval'|t('herald') }}</h1>
         <p class="lead">
-            {{ '{client} has registered but is not yet approved.'|t('cortex', { client: '<span class="client">' ~ clientName|e('html') ~ '</span>' })|raw }}
+            {{ '{client} has registered but is not yet approved.'|t('herald', { client: '<span class="client">' ~ clientName|e('html') ~ '</span>' })|raw }}
         </p>
         <p class="lead">
-            {{ 'An administrator must approve this client in the Cortex control panel (Clients) before it can connect.'|t('cortex') }}
+            {{ 'An administrator must approve this client in the Herald control panel (Clients) before it can connect.'|t('herald') }}
         </p>
         <div class="meta">
-            {{ 'Cortex OAuth — Powered by craftpulse/craft-cortex'|t('cortex') }}
+            {{ 'Herald OAuth — Powered by craftpulse/craft-herald'|t('herald') }}
         </div>
     </div>
 </div>

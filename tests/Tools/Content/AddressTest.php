@@ -31,16 +31,16 @@
 
 use craft\elements\Address as AddressElement;
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\content\Address;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\content\Address;
+use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_addresstest_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_addresstest_' . bin2hex(random_bytes(4)) . '_';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -84,7 +84,7 @@ afterEach(function() {
 /**
  * Direct instantiation sidesteps the boot-time registry gate.
  */
-function _cortex_address_tool(): Address
+function _herald_address_tool(): Address
 {
     return new Address();
 }
@@ -93,7 +93,7 @@ function _cortex_address_tool(): Address
  * Create a throwaway user for address round-trips. Returns null when
  * user creation fails (the test marks itself skipped).
  */
-function _cortex_address_user(string $prefix): ?User
+function _herald_address_user(string $prefix): ?User
 {
     $user = new User();
     $user->username = $prefix . 'owner';
@@ -114,11 +114,11 @@ function _cortex_address_user(string $prefix): ?User
 // -----------------------------------------------------------------------------
 
 it('is NOT registered on Free installs', function() {
-    expect(Cortex::getInstance()->tools->getByName('address'))->toBeNull();
+    expect(Herald::getInstance()->tools->getByName('address'))->toBeNull();
 
     $names = array_map(
         static fn(array $entry): string => $entry['name'],
-        Cortex::getInstance()->tools->asListPayload(),
+        Herald::getInstance()->tools->asListPayload(),
     );
     expect($names)->not->toContain('address');
 });
@@ -126,7 +126,7 @@ it('is NOT registered on Free installs', function() {
 it('shouldRegister() returns true on Pro and false on Free', function() {
     expect(Address::shouldRegister())->toBeFalse();
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect(Address::shouldRegister())->toBeTrue();
     });
 });
@@ -136,14 +136,14 @@ it('shouldRegister() returns true on Pro and false on Free', function() {
 // -----------------------------------------------------------------------------
 
 it('throws ToolException when mode is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_address_tool()->execute([]);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_address_tool()->execute([]);
     });
 })->throws(ToolException::class);
 
 it('throws ToolException on unknown mode', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_address_tool()->execute(['mode' => 'frobnicate']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_address_tool()->execute(['mode' => 'frobnicate']);
     });
 })->throws(ToolException::class);
 
@@ -152,15 +152,15 @@ it('throws ToolException on unknown mode', function() {
 // -----------------------------------------------------------------------------
 
 it('filterFor(null) returns true — stdio is trusted', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_address_tool()->filterFor(null))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_address_tool()->filterFor(null))->toBeTrue();
     });
 });
 
 it('filterFor returns true for admin users', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect($this->admin)->toBeInstanceOf(User::class);
-        expect(_cortex_address_tool()->filterFor($this->admin))->toBeTrue();
+        expect(_herald_address_tool()->filterFor($this->admin))->toBeTrue();
     });
 });
 
@@ -175,8 +175,8 @@ it('filterFor returns false for users without editUsers permission', function() 
         $this->markTestSkipped('Could not create fixture user: ' . json_encode($user->getErrors()));
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
-        expect(_cortex_address_tool()->filterFor($user))->toBeFalse();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
+        expect(_herald_address_tool()->filterFor($user))->toBeFalse();
     });
 });
 
@@ -185,16 +185,16 @@ it('filterFor returns false for users without editUsers permission', function() 
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor returns the full mode enum for admins', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_address_tool()->inputSchemaFor($this->admin);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_address_tool()->inputSchemaFor($this->admin);
         expect($schema['properties']['mode']['enum'])
             ->toBe(['list', 'get', 'create', 'update', 'delete']);
     });
 });
 
 it('inputSchemaFor returns the full mode enum for stdio (null user)', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_address_tool()->inputSchemaFor(null);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_address_tool()->inputSchemaFor(null);
         expect($schema['properties']['mode']['enum'])
             ->toBe(['list', 'get', 'create', 'update', 'delete']);
     });
@@ -205,14 +205,14 @@ it('inputSchemaFor returns the full mode enum for stdio (null user)', function()
 // -----------------------------------------------------------------------------
 
 it('create mode round-trips against a test user as admin', function() {
-    $owner = _cortex_address_user($this->fixturePrefix);
+    $owner = _herald_address_user($this->fixturePrefix);
     if ($owner === null) {
         $this->markTestSkipped('Could not create fixture user for address round-trip.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($owner) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($owner) {
         $line1 = $this->fixturePrefix . '100 Test Street';
-        $result = _cortex_address_tool()->execute([
+        $result = _herald_address_tool()->execute([
             'mode' => 'create',
             'title' => $this->fixturePrefix . 'label',
             'ownerId' => $owner->id,
@@ -240,8 +240,8 @@ it('create mode round-trips against a test user as admin', function() {
 // -----------------------------------------------------------------------------
 
 it('create mode throws when ownerId is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_address_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_address_tool()->execute([
             'mode' => 'create',
             'countryCode' => 'US',
             'addressLine1' => $this->fixturePrefix . 'noowner',
@@ -250,10 +250,10 @@ it('create mode throws when ownerId is missing', function() {
 })->throws(ToolException::class);
 
 it('create mode throws when ownerType is not user', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $caught = null;
         try {
-            _cortex_address_tool()->execute([
+            _herald_address_tool()->execute([
                 'mode' => 'create',
                 'ownerId' => $this->admin->id,
                 'ownerType' => 'commerce-customer',
@@ -274,13 +274,13 @@ it('create mode throws when ownerType is not user', function() {
 // -----------------------------------------------------------------------------
 
 it('country code validation surfaces in the validation envelope', function() {
-    $owner = _cortex_address_user($this->fixturePrefix);
+    $owner = _herald_address_user($this->fixturePrefix);
     if ($owner === null) {
         $this->markTestSkipped('Could not create fixture user for country-code validation.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($owner) {
-        $result = _cortex_address_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($owner) {
+        $result = _herald_address_tool()->execute([
             'mode' => 'create',
             'title' => $this->fixturePrefix . 'label',
             'ownerId' => $owner->id,
@@ -299,13 +299,13 @@ it('country code validation surfaces in the validation envelope', function() {
 // -----------------------------------------------------------------------------
 
 it('update mode mutates an existing address and persists changes', function() {
-    $owner = _cortex_address_user($this->fixturePrefix);
+    $owner = _herald_address_user($this->fixturePrefix);
     if ($owner === null) {
         $this->markTestSkipped('Could not create fixture user for update round-trip.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($owner) {
-        $tool = _cortex_address_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($owner) {
+        $tool = _herald_address_tool();
 
         $created = $tool->execute([
             'mode' => 'create',
@@ -338,14 +338,14 @@ it('update mode mutates an existing address and persists changes', function() {
 // -----------------------------------------------------------------------------
 
 it('update mode rejects ownerId changes via validation envelope', function() {
-    $ownerA = _cortex_address_user($this->fixturePrefix . 'A_');
-    $ownerB = _cortex_address_user($this->fixturePrefix . 'B_');
+    $ownerA = _herald_address_user($this->fixturePrefix . 'A_');
+    $ownerB = _herald_address_user($this->fixturePrefix . 'B_');
     if ($ownerA === null || $ownerB === null) {
         $this->markTestSkipped('Could not create fixture users for ownership-change test.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($ownerA, $ownerB) {
-        $tool = _cortex_address_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($ownerA, $ownerB) {
+        $tool = _herald_address_tool();
 
         $created = $tool->execute([
             'mode' => 'create',
@@ -372,13 +372,13 @@ it('update mode rejects ownerId changes via validation envelope', function() {
 // -----------------------------------------------------------------------------
 
 it('update mode refuses a trashed address with a hardDelete-hint message', function() {
-    $owner = _cortex_address_user($this->fixturePrefix);
+    $owner = _herald_address_user($this->fixturePrefix);
     if ($owner === null) {
         $this->markTestSkipped('Could not create fixture user for trashed-update test.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($owner) {
-        $tool = _cortex_address_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($owner) {
+        $tool = _herald_address_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'title' => $this->fixturePrefix . 'label',
@@ -412,13 +412,13 @@ it('update mode refuses a trashed address with a hardDelete-hint message', funct
 // -----------------------------------------------------------------------------
 
 it('get mode returns the serialised address', function() {
-    $owner = _cortex_address_user($this->fixturePrefix);
+    $owner = _herald_address_user($this->fixturePrefix);
     if ($owner === null) {
         $this->markTestSkipped('Could not create fixture user for get test.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($owner) {
-        $tool = _cortex_address_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($owner) {
+        $tool = _herald_address_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'title' => $this->fixturePrefix . 'label',
@@ -449,13 +449,13 @@ it('get mode returns the serialised address', function() {
 // -----------------------------------------------------------------------------
 
 it('list mode returns user-owned addresses', function() {
-    $owner = _cortex_address_user($this->fixturePrefix);
+    $owner = _herald_address_user($this->fixturePrefix);
     if ($owner === null) {
         $this->markTestSkipped('Could not create fixture user for list test.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($owner) {
-        $tool = _cortex_address_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($owner) {
+        $tool = _herald_address_tool();
 
         // Seed two addresses on the same owner.
         $tool->execute([
@@ -486,8 +486,8 @@ it('list mode returns user-owned addresses', function() {
 });
 
 it('list mode throws when ownerId is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_address_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_address_tool()->execute([
             'mode' => 'list',
         ]);
     });
@@ -498,13 +498,13 @@ it('list mode throws when ownerId is missing', function() {
 // -----------------------------------------------------------------------------
 
 it('delete mode soft-deletes by default; address reappears with trashed()', function() {
-    $owner = _cortex_address_user($this->fixturePrefix);
+    $owner = _herald_address_user($this->fixturePrefix);
     if ($owner === null) {
         $this->markTestSkipped('Could not create fixture user for soft-delete test.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($owner) {
-        $tool = _cortex_address_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($owner) {
+        $tool = _herald_address_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'title' => $this->fixturePrefix . 'label',
@@ -529,13 +529,13 @@ it('delete mode soft-deletes by default; address reappears with trashed()', func
 });
 
 it('delete mode with hardDelete=true removes the row entirely', function() {
-    $owner = _cortex_address_user($this->fixturePrefix);
+    $owner = _herald_address_user($this->fixturePrefix);
     if ($owner === null) {
         $this->markTestSkipped('Could not create fixture user for hard-delete test.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($owner) {
-        $tool = _cortex_address_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($owner) {
+        $tool = _herald_address_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'title' => $this->fixturePrefix . 'label',
@@ -557,13 +557,13 @@ it('delete mode with hardDelete=true removes the row entirely', function() {
 // -----------------------------------------------------------------------------
 
 it('the same idempotencyKey returns the cached envelope without re-saving', function() {
-    $owner = _cortex_address_user($this->fixturePrefix);
+    $owner = _herald_address_user($this->fixturePrefix);
     if ($owner === null) {
         $this->markTestSkipped('Could not create fixture user for idempotency test.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($owner) {
-        $tool = _cortex_address_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($owner) {
+        $tool = _herald_address_tool();
         $idempotencyKey = 'idem_' . bin2hex(random_bytes(8));
 
         $args = [
@@ -595,7 +595,7 @@ it('the same idempotencyKey returns the cached envelope without re-saving', func
 // -----------------------------------------------------------------------------
 
 it('create mode throws ToolException for a user without editUsers permission', function() {
-    $owner = _cortex_address_user($this->fixturePrefix);
+    $owner = _herald_address_user($this->fixturePrefix);
     if ($owner === null) {
         $this->markTestSkipped('Could not create fixture user for permission-denied test.');
     }
@@ -611,12 +611,12 @@ it('create mode throws ToolException for a user without editUsers permission', f
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($owner, $unprivileged) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($owner, $unprivileged) {
             Craft::$app->getUser()->setIdentity($unprivileged);
 
             $caught = null;
             try {
-                _cortex_address_tool()->execute([
+                _herald_address_tool()->execute([
                     'mode' => 'create',
                     'ownerId' => $owner->id,
                     'countryCode' => 'US',

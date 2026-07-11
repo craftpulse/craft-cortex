@@ -1,24 +1,24 @@
 <?php
 
-namespace craftpulse\cortex\migrations;
+namespace craftpulse\herald\migrations;
 
 use craft\db\Migration;
 use craft\db\Table as CraftTable;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Cortex install migration — creates the runtime-overrides + skills
+ * Herald install migration — creates the runtime-overrides + skills
  * tables.
  *
  * Tables:
- *   - `{{%cortex_runtime_overrides}}` — admin-editable allowlist
+ *   - `{{%herald_runtime_overrides}}` — admin-editable allowlist
  *     patterns that layer on top of the project-config defaults and
- *     `config/cortex.php` overrides. Each override has an explicit
+ *     `config/herald.php` overrides. Each override has an explicit
  *     `expiresAt` (default 7 days, configurable per
  *     `Settings::$runtimeOverrideTtl`) so transient grants don't
  *     accumulate indefinitely.
- *   - `{{%cortex_skills}}` (Gate 8.6) — author-able overrides for the
+ *   - `{{%herald_skills}}` (Gate 8.6) — author-able overrides for the
  *     bundled skills corpus. Joined to `elements(id)` via FK with
  *     ON DELETE CASCADE. `handle` is a globally-unique natural key
  *     (UNIQUE index); `description` lives as a native column so the
@@ -73,7 +73,7 @@ class Install extends Migration
             );
         }
 
-        // Gate 8.6 — cortex_skills table for author-able overrides of
+        // Gate 8.6 — herald_skills table for author-able overrides of
         // the bundled skills corpus. FK to elements(id) ON DELETE
         // CASCADE so a hard-deleted element wipes its row; handle is
         // UNIQUE so the natural-key invariant is enforced at the

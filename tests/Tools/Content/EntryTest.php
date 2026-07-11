@@ -11,7 +11,7 @@
  * Free path: the tool must not register at all — `getByName('entry')`
  * returns null and the tool is absent from `asListPayload()`.
  *
- * Pro path: every test wraps its execute in `cortex_with_edition('pro',
+ * Pro path: every test wraps its execute in `herald_with_edition('pro',
  * …)` and re-resolves the tool inside the wrapper because
  * `Tools::_buildRegistry()` ran at boot under the Free edition; calling
  * `Tools::getByName('entry')` on the boot-time registry returns null.
@@ -33,9 +33,9 @@
 
 use craft\elements\Entry as EntryElement;
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\content\Entry;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\content\Entry;
+use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
 // Setup
@@ -44,7 +44,7 @@ use craftpulse\cortex\tools\ToolException;
 beforeEach(function() {
     // Tag every fixture entry with this prefix so cleanup is reliable
     // and doesn't accidentally hard-delete a real playground entry.
-    $this->fixturePrefix = '__cortex_entrytest_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_entrytest_' . bin2hex(random_bytes(4)) . '_';
 
     // Bind the admin user as the dispatch identity. Per-mode permission
     // tests later switch to a non-admin or a User-with-permissions to
@@ -82,14 +82,14 @@ afterEach(function() {
  * active at execute-time — `shouldRegister()` is a registry concern,
  * not an `execute()` concern.
  */
-function _cortex_entry_tool(string $transport = \craftpulse\cortex\mcp\Server::TRANSPORT_STDIO, bool $elevated = false): Entry
+function _herald_entry_tool(string $transport = \craftpulse\herald\mcp\Server::TRANSPORT_STDIO, bool $elevated = false): Entry
 {
     $tool = new Entry();
     // Inject a context so the WS2 elevation gate has a transport signal.
     // Default stdio = trusted local = implicitly elevated, matching how
     // the dispatcher behaves for stdio dispatch. HTTP tests pass the
     // transport (un-elevated) or `elevated: true` explicitly.
-    $tool->setInvocationContext(new \craftpulse\cortex\tools\support\InvocationContext(
+    $tool->setInvocationContext(new \craftpulse\herald\tools\support\InvocationContext(
         transport: $transport,
         elevated: $elevated,
     ));
@@ -101,7 +101,7 @@ function _cortex_entry_tool(string $transport = \craftpulse\cortex\mcp\Server::T
  * Returns the section model or null when the playground doesn't
  * carry one with this handle.
  */
-function _cortex_section(string $handle): ?\craft\models\Section
+function _herald_section(string $handle): ?\craft\models\Section
 {
     return Craft::$app->getEntries()->getSectionByHandle($handle);
 }
@@ -111,11 +111,11 @@ function _cortex_section(string $handle): ?\craft\models\Section
 // -----------------------------------------------------------------------------
 
 it('is NOT registered on Free installs', function() {
-    expect(Cortex::getInstance()->tools->getByName('entry'))->toBeNull();
+    expect(Herald::getInstance()->tools->getByName('entry'))->toBeNull();
 
     $names = array_map(
         static fn(array $entry): string => $entry['name'],
-        Cortex::getInstance()->tools->asListPayload(),
+        Herald::getInstance()->tools->asListPayload(),
     );
     expect($names)->not->toContain('entry');
 });
@@ -123,7 +123,7 @@ it('is NOT registered on Free installs', function() {
 it('shouldRegister() returns true on Pro and false on Free', function() {
     expect(Entry::shouldRegister())->toBeFalse();
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect(Entry::shouldRegister())->toBeTrue();
     });
 });
@@ -133,14 +133,14 @@ it('shouldRegister() returns true on Pro and false on Free', function() {
 // -----------------------------------------------------------------------------
 
 it('throws ToolException when mode is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_entry_tool()->execute([]);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_entry_tool()->execute([]);
     });
 })->throws(ToolException::class);
 
 it('throws ToolException on unknown mode', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_entry_tool()->execute(['mode' => 'frobnicate']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_entry_tool()->execute(['mode' => 'frobnicate']);
     });
 })->throws(ToolException::class);
 
@@ -149,15 +149,15 @@ it('throws ToolException on unknown mode', function() {
 // -----------------------------------------------------------------------------
 
 it('filterFor(null) returns true — stdio is trusted', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_entry_tool()->filterFor(null))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_entry_tool()->filterFor(null))->toBeTrue();
     });
 });
 
 it('filterFor returns true for admin users', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect($this->admin)->toBeInstanceOf(User::class);
-        expect(_cortex_entry_tool()->filterFor($this->admin))->toBeTrue();
+        expect(_herald_entry_tool()->filterFor($this->admin))->toBeTrue();
     });
 });
 
@@ -166,7 +166,7 @@ it('filterFor returns false for users with no entry permissions on any section',
     // entry permissions. We synthesise a fresh `User` element each
     // run to keep state out of the playground.
     $user = new User();
-    $user->username = '__cortex_no_perms_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_no_perms_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -176,8 +176,8 @@ it('filterFor returns false for users with no entry permissions on any section',
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
-            expect(_cortex_entry_tool()->filterFor($user))->toBeFalse();
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
+            expect(_herald_entry_tool()->filterFor($user))->toBeFalse();
         });
     } finally {
         Craft::$app->getElements()->deleteElement($user, hardDelete: true);
@@ -189,8 +189,8 @@ it('filterFor returns false for users with no entry permissions on any section',
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor returns the full mode enum for admins', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_entry_tool()->inputSchemaFor($this->admin);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_entry_tool()->inputSchemaFor($this->admin);
         expect($schema['properties']['mode']['enum'])->toBe([
             'create', 'update', 'delete', 'restore', 'apply_draft',
         ]);
@@ -198,8 +198,8 @@ it('inputSchemaFor returns the full mode enum for admins', function() {
 });
 
 it('inputSchemaFor returns the full mode enum for stdio (null user)', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_entry_tool()->inputSchemaFor(null);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_entry_tool()->inputSchemaFor(null);
         expect($schema['properties']['mode']['enum'])->toBe([
             'create', 'update', 'delete', 'restore', 'apply_draft',
         ]);
@@ -211,14 +211,14 @@ it('inputSchemaFor returns the full mode enum for stdio (null user)', function()
 // -----------------------------------------------------------------------------
 
 it('create mode round-trips against a test section as admin', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
         $title = $this->fixturePrefix . 'happy';
-        $result = _cortex_entry_tool()->execute([
+        $result = _herald_entry_tool()->execute([
             'mode' => 'create',
             'sectionHandle' => $section->handle,
             'title' => $title,
@@ -237,14 +237,14 @@ it('create mode round-trips against a test section as admin', function() {
 });
 
 it('create mode defaults authorId to the dispatch user', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
         $title = $this->fixturePrefix . 'author';
-        $result = _cortex_entry_tool()->execute([
+        $result = _herald_entry_tool()->execute([
             'mode' => 'create',
             'sectionHandle' => $section->handle,
             'title' => $title,
@@ -261,8 +261,8 @@ it('create mode defaults authorId to the dispatch user', function() {
 // -----------------------------------------------------------------------------
 
 it('create mode throws when no section-identifying argument is given', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_entry_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_entry_tool()->execute([
             'mode' => 'create',
             'title' => $this->fixturePrefix . 'nosec',
         ]);
@@ -270,8 +270,8 @@ it('create mode throws when no section-identifying argument is given', function(
 })->throws(ToolException::class);
 
 it('create mode throws when sectionHandle does not resolve', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_entry_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_entry_tool()->execute([
             'mode' => 'create',
             'sectionHandle' => '__not_a_real_section_handle_x9z__',
             'title' => $this->fixturePrefix . 'bogus',
@@ -284,13 +284,13 @@ it('create mode throws when sectionHandle does not resolve', function() {
 // -----------------------------------------------------------------------------
 
 it('update mode mutates an existing entry and persists changes', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
-        $tool = _cortex_entry_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
+        $tool = _herald_entry_tool();
 
         $created = $tool->execute([
             'mode' => 'create',
@@ -315,8 +315,8 @@ it('update mode mutates an existing entry and persists changes', function() {
 });
 
 it('update mode throws when the entry does not exist', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_entry_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_entry_tool()->execute([
             'mode' => 'update',
             'id' => 99999999,
             'title' => $this->fixturePrefix . 'phantom',
@@ -325,13 +325,13 @@ it('update mode throws when the entry does not exist', function() {
 })->throws(ToolException::class);
 
 it('update mode refuses a trashed entry with a restore-hint message', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
-        $tool = _cortex_entry_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
+        $tool = _herald_entry_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'sectionHandle' => $section->handle,
@@ -375,13 +375,13 @@ it('update mode refuses a trashed entry with a restore-hint message', function()
 // -----------------------------------------------------------------------------
 
 it('delete mode soft-deletes by default; entry reappears with trashed()', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
-        $tool = _cortex_entry_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
+        $tool = _herald_entry_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'sectionHandle' => $section->handle,
@@ -406,13 +406,13 @@ it('delete mode soft-deletes by default; entry reappears with trashed()', functi
 });
 
 it('delete mode with hardDelete=true removes the row entirely', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
-        $tool = _cortex_entry_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
+        $tool = _herald_entry_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'sectionHandle' => $section->handle,
@@ -433,13 +433,13 @@ it('delete mode with hardDelete=true removes the row entirely', function() {
 // -----------------------------------------------------------------------------
 
 it('restore mode brings a soft-deleted entry back', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
-        $tool = _cortex_entry_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
+        $tool = _herald_entry_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'sectionHandle' => $section->handle,
@@ -460,13 +460,13 @@ it('restore mode brings a soft-deleted entry back', function() {
 });
 
 it('restore mode throws when the entry is not trashed', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
-        $tool = _cortex_entry_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
+        $tool = _herald_entry_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'sectionHandle' => $section->handle,
@@ -482,13 +482,13 @@ it('restore mode throws when the entry is not trashed', function() {
 // -----------------------------------------------------------------------------
 
 it('apply_draft mode applies the draft to its canonical', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
-        $tool = _cortex_entry_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
+        $tool = _herald_entry_tool();
 
         // 1. Create a canonical.
         $created = $tool->execute([
@@ -531,13 +531,13 @@ it('apply_draft mode applies the draft to its canonical', function() {
 // -----------------------------------------------------------------------------
 
 it('the same idempotencyKey returns the cached envelope without re-saving', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
-        $tool = _cortex_entry_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
+        $tool = _herald_entry_tool();
         $idempotencyKey = 'idem_' . bin2hex(random_bytes(8));
 
         $args = [
@@ -565,7 +565,7 @@ it('the same idempotencyKey returns the cached envelope without re-saving', func
 });
 
 it('idempotencyKey does not collide across different users', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
@@ -576,7 +576,7 @@ it('idempotencyKey does not collide across different users', function() {
     // test because we directly invoke the tool. The point is that
     // the cache key incorporates the user id.
     $userB = new User();
-    $userB->username = '__cortex_idem_' . bin2hex(random_bytes(4));
+    $userB->username = '__herald_idem_' . bin2hex(random_bytes(4));
     $userB->email = $userB->username . '@example.test';
     $userB->admin = true; // skip permission check for the test
     if (!Craft::$app->getElements()->saveElement($userB)) {
@@ -584,8 +584,8 @@ it('idempotencyKey does not collide across different users', function() {
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($userA, $userB, $section) {
-            $tool = _cortex_entry_tool();
+        herald_with_edition(Herald::EDITION_PRO, function() use ($userA, $userB, $section) {
+            $tool = _herald_entry_tool();
             $key = 'idem_' . bin2hex(random_bytes(8));
 
             Craft::$app->getUser()->setIdentity($userA);
@@ -617,13 +617,13 @@ it('idempotencyKey does not collide across different users', function() {
 // -----------------------------------------------------------------------------
 
 it('create mode throws -32002-shape ToolException for a user without saveEntries permission', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
     $user = new User();
-    $user->username = '__cortex_noperm_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_noperm_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -633,11 +633,11 @@ it('create mode throws -32002-shape ToolException for a user without saveEntries
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($section, $user) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($section, $user) {
             Craft::$app->getUser()->setIdentity($user);
 
             try {
-                _cortex_entry_tool()->execute([
+                _herald_entry_tool()->execute([
                     'mode' => 'create',
                     'sectionHandle' => $section->handle,
                     'title' => $this->fixturePrefix . 'denied',
@@ -659,15 +659,15 @@ it('create mode throws -32002-shape ToolException for a user without saveEntries
 // -----------------------------------------------------------------------------
 
 it('refuses a delete over un-elevated HTTP', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
         // Seed an entry over stdio (always allowed), then attempt the
         // delete over un-elevated HTTP.
-        $created = _cortex_entry_tool()->execute([
+        $created = _herald_entry_tool()->execute([
             'mode' => 'create',
             'sectionHandle' => $section->handle,
             'title' => $this->fixturePrefix . 'http-delete',
@@ -675,7 +675,7 @@ it('refuses a delete over un-elevated HTTP', function() {
 
         $caught = null;
         try {
-            _cortex_entry_tool(\craftpulse\cortex\mcp\Server::TRANSPORT_HTTP)->execute([
+            _herald_entry_tool(\craftpulse\herald\mcp\Server::TRANSPORT_HTTP)->execute([
                 'mode' => 'delete',
                 'id' => $created['entry']['id'],
             ]);
@@ -691,13 +691,13 @@ it('refuses a delete over un-elevated HTTP', function() {
 });
 
 it('refuses a publication-status change over un-elevated HTTP', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
-        $created = _cortex_entry_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
+        $created = _herald_entry_tool()->execute([
             'mode' => 'create',
             'sectionHandle' => $section->handle,
             'title' => $this->fixturePrefix . 'http-publish',
@@ -705,7 +705,7 @@ it('refuses a publication-status change over un-elevated HTTP', function() {
 
         $caught = null;
         try {
-            _cortex_entry_tool(\craftpulse\cortex\mcp\Server::TRANSPORT_HTTP)->execute([
+            _herald_entry_tool(\craftpulse\herald\mcp\Server::TRANSPORT_HTTP)->execute([
                 'mode' => 'update',
                 'id' => $created['entry']['id'],
                 'enabled' => false,
@@ -724,15 +724,15 @@ it('refuses a create that omits `enabled` over un-elevated HTTP (defaults live)'
     // un-elevated HTTP create that simply omits the key would publish a
     // live entry. The gate must key on the EFFECTIVE published outcome,
     // not the presence of the `enabled` argument.
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
         $caught = null;
         try {
-            _cortex_entry_tool(\craftpulse\cortex\mcp\Server::TRANSPORT_HTTP)->execute([
+            _herald_entry_tool(\craftpulse\herald\mcp\Server::TRANSPORT_HTTP)->execute([
                 'mode' => 'create',
                 'sectionHandle' => $section->handle,
                 'title' => $this->fixturePrefix . 'http-create-default-live',
@@ -752,13 +752,13 @@ it('refuses a create that omits `enabled` over un-elevated HTTP (defaults live)'
 it('allows a create with `enabled: false` over un-elevated HTTP (stays draft)', function() {
     // The flip side of MAJOR 3: an explicitly-disabled create does NOT
     // publish live content, so it must NOT trip the elevation gate.
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
-        $result = _cortex_entry_tool(\craftpulse\cortex\mcp\Server::TRANSPORT_HTTP)->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
+        $result = _herald_entry_tool(\craftpulse\herald\mcp\Server::TRANSPORT_HTTP)->execute([
             'mode' => 'create',
             'sectionHandle' => $section->handle,
             'title' => $this->fixturePrefix . 'http-create-disabled',
@@ -771,19 +771,19 @@ it('allows a create with `enabled: false` over un-elevated HTTP (stays draft)', 
 });
 
 it('allows a delete over ELEVATED HTTP (WS2)', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
-        $created = _cortex_entry_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
+        $created = _herald_entry_tool()->execute([
             'mode' => 'create',
             'sectionHandle' => $section->handle,
             'title' => $this->fixturePrefix . 'http-delete-ok',
         ]);
 
-        $result = _cortex_entry_tool(\craftpulse\cortex\mcp\Server::TRANSPORT_HTTP, elevated: true)->execute([
+        $result = _herald_entry_tool(\craftpulse\herald\mcp\Server::TRANSPORT_HTTP, elevated: true)->execute([
             'mode' => 'delete',
             'id' => $created['entry']['id'],
         ]);
@@ -794,19 +794,19 @@ it('allows a delete over ELEVATED HTTP (WS2)', function() {
 });
 
 it('allows a delete over stdio without elevation', function() {
-    $section = _cortex_section('heroes') ?? _cortex_section('teams');
+    $section = _herald_section('heroes') ?? _herald_section('teams');
     if ($section === null) {
         $this->markTestSkipped('No writable section available in playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section) {
-        $created = _cortex_entry_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section) {
+        $created = _herald_entry_tool()->execute([
             'mode' => 'create',
             'sectionHandle' => $section->handle,
             'title' => $this->fixturePrefix . 'stdio-delete',
         ]);
 
-        $result = _cortex_entry_tool()->execute([
+        $result = _herald_entry_tool()->execute([
             'mode' => 'delete',
             'id' => $created['entry']['id'],
         ]);

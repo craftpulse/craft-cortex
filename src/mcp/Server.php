@@ -1,20 +1,20 @@
 <?php
 
-namespace craftpulse\cortex\mcp;
+namespace craftpulse\herald\mcp;
 
 use Craft;
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\events\LogCallEvent;
-use craftpulse\cortex\tools\ContextAwareToolInterface;
-use craftpulse\cortex\tools\StreamableToolInterface;
-use craftpulse\cortex\tools\support\AttributeReader;
-use craftpulse\cortex\tools\support\CancellationToken;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\support\InvocationLogger;
-use craftpulse\cortex\tools\support\SecretRedactor;
-use craftpulse\cortex\tools\ToolException;
-use craftpulse\cortex\tools\ToolInterface;
+use craftpulse\herald\events\LogCallEvent;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ContextAwareToolInterface;
+use craftpulse\herald\tools\StreamableToolInterface;
+use craftpulse\herald\tools\support\AttributeReader;
+use craftpulse\herald\tools\support\CancellationToken;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\InvocationLogger;
+use craftpulse\herald\tools\support\SecretRedactor;
+use craftpulse\herald\tools\ToolException;
+use craftpulse\herald\tools\ToolInterface;
 use Generator;
 use Throwable;
 use yii\base\Event;
@@ -58,15 +58,15 @@ class Server
      * falls back to `PROTOCOL_VERSION` otherwise. The HTTP transport's
      * `MCP-Protocol-Version` header is validated against this same set.
      *
-     * 2025-11-25 and 2025-06-18 are wire-compatible for cortex's
+     * 2025-11-25 and 2025-06-18 are wire-compatible for herald's
      * surface — the 2025-11-25 deltas that touch a server are version
      * negotiation (handled here), the HTTP-403-on-bad-Origin rule
      * (already enforced in `McpController::_passesOrigin`), and
      * SEP-1303 "input-validation errors are tool-execution errors, not
-     * protocol errors" (already cortex's behaviour: tool-level failures
+     * protocol errors" (already herald's behaviour: tool-level failures
      * return `isError: true` envelopes, never JSON-RPC error codes).
      * The remaining 2025-11-25 additions (icons, OIDC discovery, CIMD,
-     * tasks, elicitation) are optional capabilities cortex does not
+     * tasks, elicitation) are optional capabilities herald does not
      * advertise, so honouring them is not required to speak the
      * revision.
      *
@@ -76,7 +76,7 @@ class Server
      */
     public const SUPPORTED_PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18'];
 
-    public const SERVER_NAME = 'cortex';
+    public const SERVER_NAME = 'herald';
 
     public const SERVER_VERSION = '5.0.0';
 
@@ -88,14 +88,14 @@ class Server
 
     /**
      * Cache key prefix for in-flight cancellation signals. Each entry
-     * is keyed by `cortex:cancel:{sessionId}:{requestId}` and stores
+     * is keyed by `herald:cancel:{sessionId}:{requestId}` and stores
      * `true` for one hour after a `notifications/cancelled` arrives.
      * The streaming dispatcher's `CancellationToken` reads through
      * this slot between yields so the running tool can short-circuit.
      *
      * Sessions without an `Mcp-Session-Id` (which would be unusual on
      * the streaming path — initialize never streams) write under the
-     * `cortex:cancel:-:{requestId}` key; the dash placeholder matches
+     * `herald:cancel:-:{requestId}` key; the dash placeholder matches
      * the `_orDash()` rendering used throughout the audit log.
      *
      * TTL of one hour is the proposal — long enough that a delayed
@@ -105,7 +105,7 @@ class Server
      *
      * @since 5.0.0
      */
-    public const CANCEL_CACHE_KEY_PREFIX = 'cortex:cancel:';
+    public const CANCEL_CACHE_KEY_PREFIX = 'herald:cancel:';
 
     /**
      * TTL in seconds for cancellation cache slots. Bounds how long a
@@ -163,7 +163,7 @@ class Server
     private ?int $_userId = null;
 
     /**
-     * @var int|null Row id from `cortex_tokens` when authentication
+     * @var int|null Row id from `herald_tokens` when authentication
      *               was via a long-lived bearer token. Set by the HTTP
      *               controller's `beforeAction()` once the bearer
      *               lookup resolves. Null for stdio (no bearer auth)
@@ -346,7 +346,7 @@ class Server
      * Bind the issuing bearer-token row id for this dispatcher's
      * lifetime. Parallel to `setUserId()`. Called by
      * `McpController::beforeAction()` after the bearer lookup resolves
-     * to a `cortex_tokens` row. OAuth-authenticated requests leave
+     * to a `herald_tokens` row. OAuth-authenticated requests leave
      * this null — OAuth correlation flows through the (userId,
      * clientName, dateCreated) tuple on the audit row instead.
      *
@@ -526,7 +526,7 @@ class Server
      * Cancellation: between every yield, the streaming dispatcher
      * checks the `CancellationToken` on the running invocation
      * context. The token's `isCancelled()` callback reads through the
-     * `cortex:cancel:{session}:{requestId}` cache slot the
+     * `herald:cancel:{session}:{requestId}` cache slot the
      * `notifications/cancelled` arrival populated; on flip, the
      * dispatcher yields one final `notifications/cancelled` envelope
      * and returns, leaving the generator drained but no terminal
@@ -709,10 +709,10 @@ class Server
      */
     private function _toolsList(): array
     {
-        $tools = Cortex::getInstance()->tools->asListPayloadFor($this->_resolveUser(), $this->_grantedScopes);
+        $tools = Herald::getInstance()->tools->asListPayloadFor($this->_resolveUser(), $this->_grantedScopes);
 
         if ($this->_transport !== self::TRANSPORT_STDIO) {
-            $registry = Cortex::getInstance()->tools;
+            $registry = Herald::getInstance()->tools;
             $tools = array_values(array_filter(
                 $tools,
                 static function(array $entry) use ($registry): bool {
@@ -736,7 +736,7 @@ class Server
     private function _promptsList(): array
     {
         return [
-            'prompts' => Cortex::getInstance()->prompts->asListPayload(),
+            'prompts' => Herald::getInstance()->prompts->asListPayload(),
         ];
     }
 
@@ -749,7 +749,7 @@ class Server
     private function _resourcesList(): array
     {
         return [
-            'resources' => Cortex::getInstance()->resources->asListPayload(),
+            'resources' => Herald::getInstance()->resources->asListPayload(),
         ];
     }
 
@@ -774,7 +774,7 @@ class Server
             return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: prompts/get requires `name` (string)');
         }
 
-        $prompt = Cortex::getInstance()->prompts->getByName($name);
+        $prompt = Herald::getInstance()->prompts->getByName($name);
         if ($prompt === null) {
             return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, "Unknown prompt: {$name}");
         }
@@ -813,7 +813,7 @@ class Server
             return $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: resources/read requires `uri` (string)');
         }
 
-        $resource = Cortex::getInstance()->resources->getByUri($uri);
+        $resource = Herald::getInstance()->resources->getByUri($uri);
         if ($resource !== null) {
             try {
                 $block = $resource->read();
@@ -828,7 +828,7 @@ class Server
         // future per-element resource use these. Concrete URIs are
         // tried first so a templated resource never shadows a bundled
         // entry.
-        $match = Cortex::getInstance()->resources->matchTemplate($uri);
+        $match = Herald::getInstance()->resources->matchTemplate($uri);
         if ($match !== null) {
             [$template, $captures] = $match;
             try {
@@ -945,7 +945,7 @@ class Server
             return $miss;
         }
 
-        $tool = Cortex::getInstance()->tools->getByNameFor($name, $this->_resolveUser(), $this->_grantedScopes);
+        $tool = Herald::getInstance()->tools->getByNameFor($name, $this->_resolveUser(), $this->_grantedScopes);
         if ($tool === null) {
             // Indistinguishable from "tool not registered" on the wire —
             // a tool the user lacks permission for fails closed as
@@ -1175,8 +1175,8 @@ class Server
             // streaming dispatcher and the cancellation notification
             // against the same Server instance observes the flip.
             Craft::info(
-                sprintf('cortex: notifications/cancelled arrived without an Mcp-Session-Id (requestId=%s)', (string) $requestId),
-                'cortex',
+                sprintf('herald: notifications/cancelled arrived without an Mcp-Session-Id (requestId=%s)', (string) $requestId),
+                'herald',
             );
         }
 
@@ -1532,7 +1532,7 @@ class Server
     /**
      * Log an unexpected exception and return a JSON-RPC -32603 envelope
      * with a generic message. The full message + trace go to Craft's
-     * logger under the `cortex` category; the wire response stays
+     * logger under the `herald` category; the wire response stays
      * generic so untrusted-client transports don't leak internal paths
      * or SQL fragments.
      *
@@ -1543,7 +1543,7 @@ class Server
      */
     private function _internalError(int|string|null $id, Throwable $e, string $message): array
     {
-        Craft::error($e->getMessage() . "\n" . $e->getTraceAsString(), 'cortex');
+        Craft::error($e->getMessage() . "\n" . $e->getTraceAsString(), 'herald');
         return $this->_errorResponse($id, self::ERR_INTERNAL, $message);
     }
 }

@@ -14,7 +14,7 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\tools\support\Schema;
+use craftpulse\herald\tools\support\Schema;
 
 // -----------------------------------------------------------------------------
 // Type entry points

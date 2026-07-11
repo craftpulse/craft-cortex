@@ -28,7 +28,7 @@
  *     Those are per-tool test territory.
  *   - **In scope (post-8.10 follow-up)**: a single canonical wire-
  *     envelope assertion driving one Pro tool through
- *     `Server::dispatch()` via the `cortex_with_pro_registry()` helper
+ *     `Server::dispatch()` via the `herald_with_pro_registry()` helper
  *     (`tests/Pest.php`). The `_toolErrorEnvelope()` shape
  *     (`{content: [{type: 'text', text}], isError: true}` per
  *     `src/mcp/Server.php:1327-1335`) is universal across Pro tools;
@@ -48,20 +48,20 @@
  */
 
 use craft\elements\User as UserElement;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\records\Invocation as InvocationRecord;
-use craftpulse\cortex\tools\content\Address;
-use craftpulse\cortex\tools\content\BulkEntries;
-use craftpulse\cortex\tools\content\Category;
-use craftpulse\cortex\tools\content\Entry;
-use craftpulse\cortex\tools\content\GlobalSet;
-use craftpulse\cortex\tools\content\ScaffoldEntries;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\support\InvocationLogger;
-use craftpulse\cortex\tools\system\Skill;
-use craftpulse\cortex\tools\system\Users;
-use craftpulse\cortex\tools\ToolException;
-use craftpulse\cortex\tools\ToolInterface;
+use craftpulse\herald\Herald;
+use craftpulse\herald\records\Invocation as InvocationRecord;
+use craftpulse\herald\tools\content\Address;
+use craftpulse\herald\tools\content\BulkEntries;
+use craftpulse\herald\tools\content\Category;
+use craftpulse\herald\tools\content\Entry;
+use craftpulse\herald\tools\content\GlobalSet;
+use craftpulse\herald\tools\content\ScaffoldEntries;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\InvocationLogger;
+use craftpulse\herald\tools\system\Skill;
+use craftpulse\herald\tools\system\Users;
+use craftpulse\herald\tools\ToolException;
+use craftpulse\herald\tools\ToolInterface;
 
 // -----------------------------------------------------------------------------
 // Setup
@@ -74,7 +74,7 @@ beforeEach(function() {
     Craft::$app->getUser()->setIdentity($admin);
     $this->admin = $admin;
 
-    $this->fixturePrefix = '__cortex_permbound_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_permbound_' . bin2hex(random_bytes(4)) . '_';
     $this->touchedAuditRowIds = [];
 });
 
@@ -106,7 +106,7 @@ afterEach(function() {
  *
  * @param string[] $permissions
  */
-function _cortex_permbound_user(string $prefix, string $label, array $permissions = []): ?UserElement
+function _herald_permbound_user(string $prefix, string $label, array $permissions = []): ?UserElement
 {
     $user = new UserElement();
     $user->username = $prefix . $label;
@@ -140,7 +140,7 @@ function _cortex_permbound_user(string $prefix, string $label, array $permission
  * @param array<string,mixed> $arguments
  * @return array{exception: ToolException|null, auditRow: InvocationRecord|null}
  */
-function _cortex_permbound_execute(
+function _herald_permbound_execute(
     object $testCase,
     ToolInterface $tool,
     array $arguments,
@@ -195,15 +195,15 @@ it('Entry denies a non-permitted user with ToolException + tool_error audit row'
         $this->markTestSkipped('No section in playground.');
     }
 
-    $caller = _cortex_permbound_user($this->fixturePrefix, 'entry', []);
+    $caller = _herald_permbound_user($this->fixturePrefix, 'entry', []);
     if ($caller === null) {
         $this->markTestSkipped('Could not create caller.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section, $caller) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section, $caller) {
         Craft::$app->getUser()->setIdentity($caller);
 
-        $result = _cortex_permbound_execute($this, new Entry(), [
+        $result = _herald_permbound_execute($this, new Entry(), [
             'mode' => 'create',
             'sectionHandle' => $section->handle,
             'title' => $this->fixturePrefix . 'denied',
@@ -231,15 +231,15 @@ it('Category denies a non-permitted user with ToolException + tool_error audit r
         $this->markTestSkipped('No category seeded in factions group.');
     }
 
-    $caller = _cortex_permbound_user($this->fixturePrefix, 'cat', []);
+    $caller = _herald_permbound_user($this->fixturePrefix, 'cat', []);
     if ($caller === null) {
         $this->markTestSkipped('Could not create caller.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group, $category, $caller) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group, $category, $caller) {
         Craft::$app->getUser()->setIdentity($caller);
 
-        $result = _cortex_permbound_execute($this, new Category(), [
+        $result = _herald_permbound_execute($this, new Category(), [
             'mode' => 'update',
             'id' => $category->id,
             'title' => $this->fixturePrefix . 'denied',
@@ -261,15 +261,15 @@ it('GlobalSet denies a non-permitted user with ToolException + tool_error audit 
         $this->markTestSkipped('No global sets in playground.');
     }
 
-    $caller = _cortex_permbound_user($this->fixturePrefix, 'gset', []);
+    $caller = _herald_permbound_user($this->fixturePrefix, 'gset', []);
     if ($caller === null) {
         $this->markTestSkipped('Could not create caller.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($set, $caller) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($set, $caller) {
         Craft::$app->getUser()->setIdentity($caller);
 
-        $result = _cortex_permbound_execute($this, new GlobalSet(), [
+        $result = _herald_permbound_execute($this, new GlobalSet(), [
             'handle' => $set->handle,
             'fields' => [],
         ]);
@@ -285,15 +285,15 @@ it('GlobalSet denies a non-permitted user with ToolException + tool_error audit 
 });
 
 it('Address denies a non-permitted user with ToolException + tool_error audit row', function() {
-    $caller = _cortex_permbound_user($this->fixturePrefix, 'addr', []);
+    $caller = _herald_permbound_user($this->fixturePrefix, 'addr', []);
     if ($caller === null) {
         $this->markTestSkipped('Could not create caller.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
         Craft::$app->getUser()->setIdentity($caller);
 
-        $result = _cortex_permbound_execute($this, new Address(), [
+        $result = _herald_permbound_execute($this, new Address(), [
             'mode' => 'create',
             'ownerId' => (int) $this->admin->id,
         ]);
@@ -309,15 +309,15 @@ it('Address denies a non-permitted user with ToolException + tool_error audit ro
 });
 
 it('Users denies a non-permitted user with ToolException + tool_error audit row', function() {
-    $caller = _cortex_permbound_user($this->fixturePrefix, 'usr', []);
+    $caller = _herald_permbound_user($this->fixturePrefix, 'usr', []);
     if ($caller === null) {
         $this->markTestSkipped('Could not create caller.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
         Craft::$app->getUser()->setIdentity($caller);
 
-        $result = _cortex_permbound_execute($this, new Users(), [
+        $result = _herald_permbound_execute($this, new Users(), [
             'mode' => 'update',
             'id' => (int) $this->admin->id,
             'username' => 'tampered',
@@ -334,15 +334,15 @@ it('Users denies a non-permitted user with ToolException + tool_error audit row'
 });
 
 it('Skill denies a non-permitted user with ToolException + tool_error audit row', function() {
-    $caller = _cortex_permbound_user($this->fixturePrefix, 'skl', []);
+    $caller = _herald_permbound_user($this->fixturePrefix, 'skl', []);
     if ($caller === null) {
         $this->markTestSkipped('Could not create caller.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($caller) {
         Craft::$app->getUser()->setIdentity($caller);
 
-        $result = _cortex_permbound_execute($this, new Skill(), [
+        $result = _herald_permbound_execute($this, new Skill(), [
             'mode' => 'create',
             'name' => $this->fixturePrefix . 'skill',
             'handle' => 'permboundSkill',
@@ -351,7 +351,7 @@ it('Skill denies a non-permitted user with ToolException + tool_error audit row'
 
         expect($result['exception'])->toBeInstanceOf(ToolException::class);
         expect($result['exception']->getMessage())
-            ->toStartWith('permission denied — mode `create` requires `manageCortexSkills`');
+            ->toStartWith('permission denied — mode `create` requires `manageHeraldSkills`');
 
         expect($result['auditRow'])->not->toBeNull();
         expect($result['auditRow']->kind)->toBe('tool_error');
@@ -370,15 +370,15 @@ it('ScaffoldEntries denies a non-permitted user with ToolException + tool_error 
         $this->markTestSkipped('No entry type on section.');
     }
 
-    $caller = _cortex_permbound_user($this->fixturePrefix, 'scf', []);
+    $caller = _herald_permbound_user($this->fixturePrefix, 'scf', []);
     if ($caller === null) {
         $this->markTestSkipped('Could not create caller.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section, $entryType, $caller) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section, $entryType, $caller) {
         Craft::$app->getUser()->setIdentity($caller);
 
-        $result = _cortex_permbound_execute($this, new ScaffoldEntries(), [
+        $result = _herald_permbound_execute($this, new ScaffoldEntries(), [
             'sectionUid' => $section->uid,
             'entryTypeUid' => $entryType->uid,
             'count' => 1,
@@ -405,15 +405,15 @@ it('BulkEntries (streaming) denies a non-permitted user with ToolException + too
         $this->markTestSkipped('minorHeroes section not seeded.');
     }
 
-    $caller = _cortex_permbound_user($this->fixturePrefix, 'blk', []);
+    $caller = _herald_permbound_user($this->fixturePrefix, 'blk', []);
     if ($caller === null) {
         $this->markTestSkipped('Could not create caller.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section, $caller) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section, $caller) {
         Craft::$app->getUser()->setIdentity($caller);
 
-        $result = _cortex_permbound_execute($this, new BulkEntries(), [
+        $result = _herald_permbound_execute($this, new BulkEntries(), [
             'mode' => 'set_status',
             'status' => 'disabled',
             'query' => ['section' => $section->handle],
@@ -440,7 +440,7 @@ it('stdio (null user) does not raise the permission-denial path for any Pro tool
     // boundary check is the absence of the denial path — the tool
     // may still throw for other reasons (no section, validation, etc.)
     // but NOT with the `permission denied — ` prefix.
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         Craft::$app->getUser()->setIdentity(null);
 
         $tools = [
@@ -481,7 +481,7 @@ it('stdio (null user) does not raise the permission-denial path for any Pro tool
 // continue to verify tool-specific message prefixes via direct
 // `execute()`.
 //
-// Uses `cortex_with_pro_registry()` (added to `tests/Pest.php`) which
+// Uses `herald_with_pro_registry()` (added to `tests/Pest.php`) which
 // flips the edition to Pro AND rebuilds the tool registry so
 // `Tools::getByNameFor()` resolves Pro tools. Production never flips
 // edition mid-process — this helper is test-only.
@@ -499,7 +499,7 @@ it('Server::dispatch() wraps Pro tool permission denial in the locked {content, 
         $this->markTestSkipped('minorHeroes + heroes sections not seeded.');
     }
 
-    $caller = _cortex_permbound_user($this->fixturePrefix, 'wire', [
+    $caller = _herald_permbound_user($this->fixturePrefix, 'wire', [
         "viewEntries:{$other->uid}",
         "saveEntries:{$other->uid}",
     ]);
@@ -507,12 +507,12 @@ it('Server::dispatch() wraps Pro tool permission denial in the locked {content, 
         $this->markTestSkipped('Could not create caller.');
     }
 
-    cortex_with_pro_registry(function() use ($target, $caller) {
+    herald_with_pro_registry(function() use ($target, $caller) {
         Craft::$app->getUser()->setIdentity($caller);
 
         $beforeAuditIds = InvocationRecord::find()->select('id')->column();
 
-        $server = new \craftpulse\cortex\mcp\Server(\craftpulse\cortex\mcp\Server::TRANSPORT_HTTP);
+        $server = new \craftpulse\herald\mcp\Server(\craftpulse\herald\mcp\Server::TRANSPORT_HTTP);
         $server->setUserId((int) $caller->id);
         $server->setSessionId('permbound-wire-' . bin2hex(random_bytes(4)));
 

@@ -1,20 +1,20 @@
 <?php
 
-namespace craftpulse\cortex\tools\content;
+namespace craftpulse\herald\tools\content;
 
 use Craft;
 use craft\elements\Tag as TagElement;
 use craft\elements\User;
 use craft\models\TagGroup;
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\IdempotencyTrait;
-use craftpulse\cortex\tools\ProToolTrait;
-use craftpulse\cortex\tools\support\ElementSerializer;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\IdempotencyTrait;
+use craftpulse\herald\tools\ProToolTrait;
+use craftpulse\herald\tools\support\ElementSerializer;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 
 /**
  * =========================================================================
@@ -34,9 +34,9 @@ use craftpulse\cortex\tools\ToolException;
  * `vendor/craftcms/cms/src/elements/Tag.php:257-284` — Tag's `canView`,
  * `canSave`, and `canDelete` all return `true` unconditionally; the
  * permission system simply does not register a `saveTags:*` or
- * `deleteTags:*` permission). This is a Craft limitation, not a Cortex
+ * `deleteTags:*` permission). This is a Craft limitation, not a Herald
  * one. To surface tag management to non-admins, a future Pro mode would
- * need to layer Cortex-specific permissions on top — out of scope for
+ * need to layer Herald-specific permissions on top — out of scope for
  * Gate 8.3.
  *
  * `filterFor()` returns `$user->admin === true` (or `true` for stdio).
@@ -45,7 +45,7 @@ use craftpulse\cortex\tools\ToolException;
  * — defense in depth.
  *
  * Validation envelope and idempotency: same shape as `category` and
- * `entry`. Idempotency cache prefix: `cortex:tag:idem:`.
+ * `entry`. Idempotency cache prefix: `herald:tag:idem:`.
  * =========================================================================
  *
  * @author Craftpulse
@@ -72,7 +72,7 @@ class Tag extends AbstractTool
      *
      * @since 5.0.0
      */
-    public const IDEMPOTENCY_CACHE_PREFIX = 'cortex:tag:idem:';
+    public const IDEMPOTENCY_CACHE_PREFIX = 'herald:tag:idem:';
 
     // Public Methods
     // =========================================================================

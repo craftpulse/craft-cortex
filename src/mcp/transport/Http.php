@@ -1,8 +1,8 @@
 <?php
 
-namespace craftpulse\cortex\mcp\transport;
+namespace craftpulse\herald\mcp\transport;
 
-use craftpulse\cortex\mcp\Server;
+use craftpulse\herald\mcp\Server;
 use JsonException;
 
 /**

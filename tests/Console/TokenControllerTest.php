@@ -19,9 +19,9 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\console\controllers\TokenController;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\records\Token as TokenRecord;
+use craftpulse\herald\console\controllers\TokenController;
+use craftpulse\herald\Herald;
+use craftpulse\herald\records\Token as TokenRecord;
 
 // -----------------------------------------------------------------------------
 // Harness
@@ -32,7 +32,7 @@ use craftpulse\cortex\records\Token as TokenRecord;
  * buffer instead of the file descriptors so tests can read what the
  * action printed.
  */
-class _CortexTokenControllerHarness extends TokenController
+class _HeraldTokenControllerHarness extends TokenController
 {
     public string $captured = '';
 
@@ -56,9 +56,9 @@ class _CortexTokenControllerHarness extends TokenController
  *
  * @param array<string,mixed> $options
  */
-function _cortex_token_harness(array $options = []): _CortexTokenControllerHarness
+function _herald_token_harness(array $options = []): _HeraldTokenControllerHarness
 {
-    $controller = new _CortexTokenControllerHarness('token', Craft::$app);
+    $controller = new _HeraldTokenControllerHarness('token', Craft::$app);
     foreach ($options as $key => $value) {
         $controller->{$key} = $value;
     }
@@ -82,7 +82,7 @@ afterEach(function() {
 // -----------------------------------------------------------------------------
 
 it('issue prints the plaintext exactly once and creates a row', function() {
-    $controller = _cortex_token_harness(['name' => '_test_/issue-output']);
+    $controller = _herald_token_harness(['name' => '_test_/issue-output']);
     $exit = $controller->actionIssue($this->userHandle);
 
     expect($exit)->toBe(0);
@@ -95,7 +95,7 @@ it('issue prints the plaintext exactly once and creates a row', function() {
 });
 
 it('issue with unknown user returns USAGE', function() {
-    $controller = _cortex_token_harness();
+    $controller = _herald_token_harness();
     $exit = $controller->actionIssue('no-such-user@example.com');
 
     expect($exit)->toBe(64); // ExitCode::USAGE
@@ -103,7 +103,7 @@ it('issue with unknown user returns USAGE', function() {
 });
 
 it('issue honours --ttl and writes a future expiry on the row', function() {
-    $controller = _cortex_token_harness([
+    $controller = _herald_token_harness([
         'name' => '_test_/issue-ttl',
         'ttl' => 60,
     ]);
@@ -116,7 +116,7 @@ it('issue honours --ttl and writes a future expiry on the row', function() {
 });
 
 it('issue defaults the name when --name is omitted', function() {
-    $controller = _cortex_token_harness();
+    $controller = _herald_token_harness();
     $exit = $controller->actionIssue($this->userHandle);
 
     expect($exit)->toBe(0);
@@ -138,9 +138,9 @@ it('issue defaults the name when --name is omitted', function() {
 // -----------------------------------------------------------------------------
 
 it('list shows the row by prefix and name, but never the plaintext', function() {
-    $issued = Cortex::getInstance()->tokens->issue($this->userId, '_test_/list-row');
+    $issued = Herald::getInstance()->tokens->issue($this->userId, '_test_/list-row');
 
-    $controller = _cortex_token_harness();
+    $controller = _herald_token_harness();
     $exit = $controller->actionList();
 
     expect($exit)->toBe(0);
@@ -155,7 +155,7 @@ it('list returns a friendly message when there are no live tokens', function() {
     // is reachable regardless of prior test residue.
     TokenRecord::deleteAll(['userId' => $this->userId]);
 
-    $controller = _cortex_token_harness(['user' => $this->userHandle]);
+    $controller = _herald_token_harness(['user' => $this->userHandle]);
     $exit = $controller->actionList();
 
     expect($exit)->toBe(0);
@@ -163,7 +163,7 @@ it('list returns a friendly message when there are no live tokens', function() {
 });
 
 it('list with unknown --user returns USAGE', function() {
-    $controller = _cortex_token_harness(['user' => 'no-such-user@example.com']);
+    $controller = _herald_token_harness(['user' => 'no-such-user@example.com']);
     $exit = $controller->actionList();
 
     expect($exit)->toBe(64);
@@ -175,9 +175,9 @@ it('list with unknown --user returns USAGE', function() {
 // -----------------------------------------------------------------------------
 
 it('revoke soft-deletes the row and returns OK', function() {
-    $issued = Cortex::getInstance()->tokens->issue($this->userId, '_test_/revoke-action');
+    $issued = Herald::getInstance()->tokens->issue($this->userId, '_test_/revoke-action');
 
-    $controller = _cortex_token_harness();
+    $controller = _herald_token_harness();
     $exit = $controller->actionRevoke($issued['model']->id);
 
     expect($exit)->toBe(0);
@@ -189,7 +189,7 @@ it('revoke soft-deletes the row and returns OK', function() {
 });
 
 it('revoke on unknown id returns NOUSER exit code', function() {
-    $controller = _cortex_token_harness();
+    $controller = _herald_token_harness();
     $exit = $controller->actionRevoke(987654321);
 
     expect($exit)->toBe(67); // ExitCode::NOUSER
@@ -197,13 +197,13 @@ it('revoke on unknown id returns NOUSER exit code', function() {
 });
 
 it('revoke on already-revoked id returns NOUSER (treated as no-live-match)', function() {
-    $issued = Cortex::getInstance()->tokens->issue($this->userId, '_test_/revoke-twice');
-    Cortex::getInstance()->tokens->revoke($issued['model']->id);
+    $issued = Herald::getInstance()->tokens->issue($this->userId, '_test_/revoke-twice');
+    Herald::getInstance()->tokens->revoke($issued['model']->id);
 
     // The controller's `getById` filter excludes soft-deleted rows, so
     // the second revoke surfaces as "no live token" — same response
     // the operator gets for a typo'd id.
-    $controller = _cortex_token_harness();
+    $controller = _herald_token_harness();
     $exit = $controller->actionRevoke($issued['model']->id);
 
     expect($exit)->toBe(67);

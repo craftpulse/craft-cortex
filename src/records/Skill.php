@@ -1,17 +1,17 @@
 <?php
 
-namespace craftpulse\cortex\records;
+namespace craftpulse\herald\records;
 
 use craft\db\ActiveRecord;
 use craft\records\Element;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 use yii\db\ActiveQueryInterface;
 
 /**
  * =========================================================================
- * Active record for the `cortex_skills` table.
+ * Active record for the `herald_skills` table.
  *
- * One row per element-stored custom skill — the Cortex-owned write-side
+ * One row per element-stored custom skill — the Herald-owned write-side
  * counterpart to the bundled `michtio/craftcms-claude-skills` corpus.
  * `handle` is a globally-unique natural key; `description` lives as a
  * native column so list-view paths skip the content-table join. The
@@ -52,7 +52,7 @@ class Skill extends ActiveRecord
      * Returns the skill's underlying element row. Mirrors the
      * `craft\records\Tag::getElement()` pattern — the FK to
      * `elements(id)` is one-to-one, so a `hasOne` relation surfaces it
-     * to consumers that need to traverse from the cortex-specific
+     * to consumers that need to traverse from the herald-specific
      * record back to Craft's element row.
      *
      * @author Craftpulse

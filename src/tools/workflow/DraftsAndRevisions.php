@@ -1,18 +1,18 @@
 <?php
 
-namespace craftpulse\cortex\tools\workflow;
+namespace craftpulse\herald\tools\workflow;
 
 use Craft;
 use craft\elements\Entry;
 use craft\elements\User;
 use craft\helpers\DateTimeHelper;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\PermissionedToolTrait;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\PermissionedToolTrait;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use Throwable;
 
 /**
@@ -130,7 +130,7 @@ class DraftsAndRevisions extends AbstractTool
      */
     public static function getInputSchema(): array
     {
-        $modes = Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')
+        $modes = Herald::getInstance()->is(Herald::EDITION_PRO, '>=')
             ? array_merge(self::FREE_MODES, self::PRO_MODES)
             : self::FREE_MODES;
 
@@ -176,7 +176,7 @@ class DraftsAndRevisions extends AbstractTool
         // final answer — no per-permission filtering applies.
         $schema = static::getInputSchema();
 
-        if ($user === null || !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+        if ($user === null || !Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             return $schema;
         }
 
@@ -209,7 +209,7 @@ class DraftsAndRevisions extends AbstractTool
             throw new ToolException('`mode` is required (list_drafts / list_revisions / compare / apply / discard).');
         }
 
-        if (in_array($mode, self::PRO_MODES, true) && !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+        if (in_array($mode, self::PRO_MODES, true) && !Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             throw new ToolException("drafts_and_revisions: mode `{$mode}` is unavailable on this edition.");
         }
 

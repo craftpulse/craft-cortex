@@ -2,7 +2,7 @@
 
 /**
  * =========================================================================
- * Architecture tests — enforce cortex coding conventions at the test
+ * Architecture tests — enforce herald coding conventions at the test
  * level. Catches regressions that ECS / PHPStan don't cover:
  *
  *   - No `eval()`, `exec()`, `shell_exec()`, `passthru()`, `popen()`,
@@ -28,7 +28,7 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\tools\ToolInterface;
+use craftpulse\herald\tools\ToolInterface;
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -39,7 +39,7 @@ use craftpulse\cortex\tools\ToolInterface;
  *
  * @return string[]
  */
-function cortex_src_files(): array
+function herald_src_files(): array
 {
     $iterator = new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator(
@@ -74,7 +74,7 @@ it('does not use eval, shell-exec family, or backticks anywhere in src/', functi
     $banned = ['shell_exec', 'proc_open', 'passthru', 'popen'];
 
     $violations = [];
-    foreach (cortex_src_files() as $file) {
+    foreach (herald_src_files() as $file) {
         $contents = file_get_contents($file);
         if ($contents === false) {
             continue;
@@ -161,7 +161,7 @@ it('does not use eval, shell-exec family, or backticks anywhere in src/', functi
 
 it('does not declare strict_types in src/', function() {
     $violations = [];
-    foreach (cortex_src_files() as $file) {
+    foreach (herald_src_files() as $file) {
         $contents = file_get_contents($file);
         if ($contents === false) {
             continue;
@@ -182,7 +182,7 @@ it('every PHP class file in src/ has a section header and @author Craftpulse', f
     $violations = [];
     $sectionMarker = '====';
 
-    foreach (cortex_src_files() as $file) {
+    foreach (herald_src_files() as $file) {
         $contents = file_get_contents($file);
         if ($contents === false) {
             continue;
@@ -232,7 +232,7 @@ it('every concrete class under src/tools/{schema,content,system,graphql,dev,work
                 continue;
             }
 
-            $className = 'craftpulse\\cortex\\tools\\' . $dir . '\\' . $file->getBasename('.php');
+            $className = 'craftpulse\\herald\\tools\\' . $dir . '\\' . $file->getBasename('.php');
 
             if (!class_exists($className)) {
                 $violations[] = "{$className} not autoloadable";
@@ -267,7 +267,7 @@ it('every PHP class file in src/ has at least one @since tag', function() {
 
     $violations = [];
 
-    foreach (cortex_src_files() as $file) {
+    foreach (herald_src_files() as $file) {
         if (str_contains($file, '/src/config/')) {
             continue;
         }
@@ -302,7 +302,7 @@ it('every private method and property under src/ uses the underscore-prefix conv
 
     $violations = [];
 
-    foreach (cortex_src_files() as $file) {
+    foreach (herald_src_files() as $file) {
         $contents = file_get_contents($file);
         if ($contents === false) {
             continue;
@@ -371,7 +371,7 @@ it('no tool declares `mixed` as the execute() return type', function() {
 
     $violations = [];
 
-    foreach (cortex_src_files() as $file) {
+    foreach (herald_src_files() as $file) {
         if (str_contains($file, '/src/config/')) {
             continue;
         }

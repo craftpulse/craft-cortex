@@ -1,10 +1,10 @@
 <?php
 
-namespace craftpulse\cortex\console\controllers;
+namespace craftpulse\herald\console\controllers;
 
 use craft\console\Controller;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\services\Oauth;
+use craftpulse\herald\Herald;
+use craftpulse\herald\services\Oauth;
 use yii\console\ExitCode;
 use yii\helpers\Console;
 
@@ -13,10 +13,10 @@ use yii\helpers\Console;
  * Console — OAuth key-pair bootstrap.
  *
  * Usage:
- *   cortex/oauth/init-keys [--force]
+ *   herald/oauth/init-keys [--force]
  *
  * Generates a fresh RSA 2048-bit key pair at
- * `storage/cortex/oauth-keys/{private,public}.key` for league/oauth2-
+ * `storage/herald/oauth-keys/{private,public}.key` for league/oauth2-
  * server's JWT signing path. Idempotent — refuses to overwrite an
  * existing pair unless `--force` is passed. Sets 0600 on the private
  * key, 0644 on the public.
@@ -68,7 +68,7 @@ class OauthController extends Controller
      */
     public function actionInitKeys(): int
     {
-        $oauth = Cortex::getInstance()->oauth;
+        $oauth = Herald::getInstance()->oauth;
         $dir = $oauth->getKeysDirectory();
         $privatePath = $dir . DIRECTORY_SEPARATOR . Oauth::PRIVATE_KEY_FILE;
         $publicPath = $dir . DIRECTORY_SEPARATOR . Oauth::PUBLIC_KEY_FILE;
@@ -145,7 +145,7 @@ class OauthController extends Controller
         $this->stdout("{$privatePath} (0600)\n");
         $this->stdout("  public key:  ", Console::FG_GREY);
         $this->stdout("{$publicPath} (0644)\n\n");
-        $this->stdout("These keys sign the JWT access tokens cortex's OAuth flow issues.\n", Console::FG_GREY);
+        $this->stdout("These keys sign the JWT access tokens herald's OAuth flow issues.\n", Console::FG_GREY);
         $this->stdout("Rotating them invalidates every in-flight access token.\n\n", Console::FG_GREY);
 
         return ExitCode::OK;

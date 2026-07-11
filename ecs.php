@@ -5,7 +5,7 @@ use Symplify\EasyCodingStandard\Config\ECSConfig;
 
 // ECS runs from inside the playground via:
 //   ddev exec --dir=/var/www/html/cms vendor/bin/ecs check \
-//     --config=vendor/craftpulse/craft-cortex/ecs.php
+//     --config=vendor/craftpulse/craft-herald/ecs.php
 //
 // craftcms/ecs:dev-main pins symplify/easy-coding-standard to ^10.3.3,
 // so this config uses the v10 closure API, not the v11+ chainable

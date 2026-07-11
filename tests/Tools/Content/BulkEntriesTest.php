@@ -15,7 +15,7 @@
  * unrelated rows aren't touched. `afterEach()` restores `enabled = true`
  * on every minorHero entry so subsequent tests see a clean baseline.
  * Tests that need fresh fixture entries create their own under the
- * `__cortex_bulktest_{hex}_` title prefix and hard-delete them on
+ * `__herald_bulktest_{hex}_` title prefix and hard-delete them on
  * teardown.
  * =========================================================================
  *
@@ -25,18 +25,18 @@
 
 use craft\elements\Entry as EntryElement;
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\tools\content\BulkEntries;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
+use craftpulse\herald\tools\content\BulkEntries;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_bulktest_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_bulktest_' . bin2hex(random_bytes(4)) . '_';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -97,9 +97,9 @@ afterEach(function() {
 
 /**
  * Direct instantiation — sidesteps the boot-time registry gate. Same
- * pattern as `EntryTest::_cortex_entry_tool()`.
+ * pattern as `EntryTest::_herald_entry_tool()`.
  */
-function _cortex_bulk_tool(): BulkEntries
+function _herald_bulk_tool(): BulkEntries
 {
     return new BulkEntries();
 }
@@ -109,7 +109,7 @@ function _cortex_bulk_tool(): BulkEntries
  *
  * @return array{0: list<array<string,mixed>>, 1: array<string,mixed>}
  */
-function _cortex_bulk_drain(Generator $gen): array
+function _herald_bulk_drain(Generator $gen): array
 {
     $frames = [];
     while ($gen->valid()) {
@@ -127,7 +127,7 @@ function _cortex_bulk_drain(Generator $gen): array
  *
  * @return list<int>
  */
-function _cortex_bulk_first_ids(int $n): array
+function _herald_bulk_first_ids(int $n): array
 {
     $entries = EntryElement::find()
         ->section('minorHeroes')
@@ -143,23 +143,23 @@ function _cortex_bulk_first_ids(int $n): array
 // -----------------------------------------------------------------------------
 
 it('is NOT registered on Free installs', function() {
-    expect(Cortex::getInstance()->tools->getByName('bulk_entries'))->toBeNull();
+    expect(Herald::getInstance()->tools->getByName('bulk_entries'))->toBeNull();
     $names = array_map(
         static fn(array $entry): string => $entry['name'],
-        Cortex::getInstance()->tools->asListPayload(),
+        Herald::getInstance()->tools->asListPayload(),
     );
     expect($names)->not->toContain('bulk_entries');
 });
 
 it('shouldRegister() returns true on Pro and false on Free', function() {
     expect(BulkEntries::shouldRegister())->toBeFalse();
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect(BulkEntries::shouldRegister())->toBeTrue();
     });
 });
 
 it('implements StreamableToolInterface', function() {
-    expect(_cortex_bulk_tool())->toBeInstanceOf(\craftpulse\cortex\tools\StreamableToolInterface::class);
+    expect(_herald_bulk_tool())->toBeInstanceOf(\craftpulse\herald\tools\StreamableToolInterface::class);
 });
 
 // -----------------------------------------------------------------------------
@@ -167,20 +167,20 @@ it('implements StreamableToolInterface', function() {
 // -----------------------------------------------------------------------------
 
 it('filterFor(null) returns true — stdio is trusted', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_bulk_tool()->filterFor(null))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_bulk_tool()->filterFor(null))->toBeTrue();
     });
 });
 
 it('filterFor returns true for admin users', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_bulk_tool()->filterFor($this->admin))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_bulk_tool()->filterFor($this->admin))->toBeTrue();
     });
 });
 
 it('filterFor returns false for users with no saveEntries permissions on any section', function() {
     $user = new User();
-    $user->username = '__cortex_bulk_noperms_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_bulk_noperms_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -189,8 +189,8 @@ it('filterFor returns false for users with no saveEntries permissions on any sec
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
-            expect(_cortex_bulk_tool()->filterFor($user))->toBeFalse();
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
+            expect(_herald_bulk_tool()->filterFor($user))->toBeFalse();
         });
     } finally {
         Craft::$app->getElements()->deleteElement($user, hardDelete: true);
@@ -202,14 +202,14 @@ it('filterFor returns false for users with no saveEntries permissions on any sec
 // -----------------------------------------------------------------------------
 
 it('throws ToolException when mode is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_bulk_tool()->execute(['query' => ['section' => 'minorHeroes']]);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_bulk_tool()->execute(['query' => ['section' => 'minorHeroes']]);
     });
 })->throws(ToolException::class);
 
 it('throws ToolException on unknown mode', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_bulk_tool()->execute(['mode' => 'frobnicate', 'query' => ['section' => 'minorHeroes']]);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_bulk_tool()->execute(['mode' => 'frobnicate', 'query' => ['section' => 'minorHeroes']]);
     });
 })->throws(ToolException::class);
 
@@ -218,8 +218,8 @@ it('throws ToolException on unknown mode', function() {
 // -----------------------------------------------------------------------------
 
 it('rejects an unknown section handle in the query', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_bulk_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_bulk_tool()->execute([
             'mode' => 'set_status',
             'status' => 'disabled',
             'query' => ['section' => '__not_a_section_x9z__'],
@@ -228,8 +228,8 @@ it('rejects an unknown section handle in the query', function() {
 })->throws(ToolException::class);
 
 it('rejects an unknown entry-type handle in the query', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_bulk_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_bulk_tool()->execute([
             'mode' => 'set_status',
             'status' => 'disabled',
             'query' => ['entryType' => '__not_an_entry_type_x9z__'],
@@ -254,9 +254,9 @@ it('throws when the row cap is exceeded without force', function() {
     // proceeds. The "throws over the cap" path is exercised in CI
     // against a real >10,000-row dataset; here we verify the gate
     // doesn't fire when total <= cap.
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $ids = _cortex_bulk_first_ids(3);
-        $result = _cortex_bulk_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(3);
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'set_status',
             'status' => 'disabled',
             'query' => ['ids' => $ids],
@@ -267,8 +267,8 @@ it('throws when the row cap is exceeded without force', function() {
 });
 
 it('parses dateCreated gte/lte into a working query', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_bulk_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'set_status',
             'status' => 'enabled',
             'query' => [
@@ -286,9 +286,9 @@ it('parses dateCreated gte/lte into a working query', function() {
 });
 
 it('siteId="*" widens the query to every site', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $ids = _cortex_bulk_first_ids(2);
-        $result = _cortex_bulk_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(2);
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'set_status',
             'status' => 'enabled',
             'siteId' => '*',
@@ -304,10 +304,10 @@ it('siteId="*" widens the query to every site', function() {
 // -----------------------------------------------------------------------------
 
 it('set_status disables N entries and returns N success rows', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $ids = _cortex_bulk_first_ids(5);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(5);
 
-        $result = _cortex_bulk_tool()->execute([
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'set_status',
             'status' => 'disabled',
             'query' => ['ids' => $ids],
@@ -337,8 +337,8 @@ it('set_status disables N entries and returns N success rows', function() {
 });
 
 it('set_status throws when status is not in the allowed enum', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_bulk_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'set_status',
             'status' => 'frobnicated',
             'query' => ['section' => 'minorHeroes'],
@@ -349,8 +349,8 @@ it('set_status throws when status is not in the allowed enum', function() {
 });
 
 it('set_status rejects empty result-set queries gracefully', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_bulk_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'set_status',
             'status' => 'disabled',
             'query' => ['ids' => [9999999, 9999998]],
@@ -366,11 +366,11 @@ it('set_status rejects empty result-set queries gracefully', function() {
 // -----------------------------------------------------------------------------
 
 it('idempotency cache returns the cached envelope on a second call with the same key', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $ids = _cortex_bulk_first_ids(3);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(3);
         $key = 'idem_' . bin2hex(random_bytes(4));
 
-        $first = _cortex_bulk_tool()->execute([
+        $first = _herald_bulk_tool()->execute([
             'mode' => 'set_status',
             'status' => 'disabled',
             'query' => ['ids' => $ids],
@@ -387,7 +387,7 @@ it('idempotency cache returns the cached envelope on a second call with the same
             Craft::$app->getElements()->saveElement($entry, runValidation: false);
         }
 
-        $second = _cortex_bulk_tool()->execute([
+        $second = _herald_bulk_tool()->execute([
             'mode' => 'set_status',
             'status' => 'disabled',
             'query' => ['ids' => $ids],
@@ -411,11 +411,11 @@ it('idempotency cache returns the cached envelope on a second call with the same
 // -----------------------------------------------------------------------------
 
 it('update_fields rewrites a plain-text field on N entries', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $ids = _cortex_bulk_first_ids(3);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(3);
         $newBio = 'Touched by bulk_entries ' . bin2hex(random_bytes(2));
 
-        $result = _cortex_bulk_tool()->execute([
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'update_fields',
             'fields' => ['minorBio' => $newBio],
             'query' => ['ids' => $ids],
@@ -437,10 +437,10 @@ it('update_fields rewrites a plain-text field on N entries', function() {
 });
 
 it('update_fields fails the call without a fields argument', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_bulk_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'update_fields',
-            'query' => ['ids' => _cortex_bulk_first_ids(2)],
+            'query' => ['ids' => _herald_bulk_first_ids(2)],
         ]);
         expect($result['success'])->toBeFalse();
         expect($result['errors'])->toHaveKey('fields');
@@ -452,12 +452,12 @@ it('update_fields fails the call without a fields argument', function() {
 // -----------------------------------------------------------------------------
 
 it('relate rejects a non-relation field with a top-level error', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_bulk_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'relate',
             'targetField' => 'minorBio', // plain text, not relational
             'targetIds' => [1],
-            'query' => ['ids' => _cortex_bulk_first_ids(2)],
+            'query' => ['ids' => _herald_bulk_first_ids(2)],
         ]);
         expect($result['success'])->toBeFalse();
         expect($result['errors'])->toHaveKey('targetField');
@@ -465,12 +465,12 @@ it('relate rejects a non-relation field with a top-level error', function() {
 });
 
 it('relate rejects an unknown field handle with a top-level error', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_bulk_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'relate',
             'targetField' => '__not_a_field_x9z__',
             'targetIds' => [1],
-            'query' => ['ids' => _cortex_bulk_first_ids(2)],
+            'query' => ['ids' => _herald_bulk_first_ids(2)],
         ]);
         expect($result['success'])->toBeFalse();
         expect($result['errors'])->toHaveKey('targetField');
@@ -478,13 +478,13 @@ it('relate rejects an unknown field handle with a top-level error', function() {
 });
 
 it('relate rejects an invalid mergeStrategy with a top-level error', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_bulk_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'relate',
             'targetField' => 'minorBio',
             'targetIds' => [1],
             'mergeStrategy' => 'frobnicate',
-            'query' => ['ids' => _cortex_bulk_first_ids(2)],
+            'query' => ['ids' => _herald_bulk_first_ids(2)],
         ]);
         expect($result['success'])->toBeFalse();
         expect($result['errors'])->toHaveKey('mergeStrategy');
@@ -496,8 +496,8 @@ it('relate rejects an invalid mergeStrategy with a top-level error', function() 
 // -----------------------------------------------------------------------------
 
 it('migrate dryRun (default) previews without mutating', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $ids = _cortex_bulk_first_ids(2);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(2);
 
         // Target = same minorHeroes section + same minorHero entry type
         // so the entry-type compatibility check passes without us
@@ -507,7 +507,7 @@ it('migrate dryRun (default) previews without mutating', function() {
         expect($section)->not->toBeNull();
         expect($entryType)->not->toBeNull();
 
-        $result = _cortex_bulk_tool()->execute([
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'migrate',
             'toSectionUid' => $section->uid,
             'toEntryTypeUid' => $entryType->uid,
@@ -528,12 +528,12 @@ it('migrate dryRun (default) previews without mutating', function() {
 });
 
 it('migrate dryRun=false actually commits the type change', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $ids = _cortex_bulk_first_ids(2);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(2);
         $section = Craft::$app->getEntries()->getSectionByHandle('minorHeroes');
         $entryType = Craft::$app->getEntries()->getEntryTypeByHandle('minorHero');
 
-        $result = _cortex_bulk_tool()->execute([
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'migrate',
             'dryRun' => false,
             'toSectionUid' => $section->uid,
@@ -547,12 +547,12 @@ it('migrate dryRun=false actually commits the type change', function() {
 });
 
 it('migrate rejects an unknown target section UID', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_bulk_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_bulk_tool()->execute([
             'mode' => 'migrate',
             'toSectionUid' => '__not_a_real_uid_x9z__',
             'toEntryTypeUid' => '__not_a_real_uid_y9z__',
-            'query' => ['ids' => _cortex_bulk_first_ids(1)],
+            'query' => ['ids' => _herald_bulk_first_ids(1)],
         ]);
         expect($result['success'])->toBeFalse();
         expect($result['errors'])->toHaveKey('toSectionUid');
@@ -560,13 +560,13 @@ it('migrate rejects an unknown target section UID', function() {
 });
 
 it('migrate dryRun and commit use separate idempotency cache slots', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $ids = _cortex_bulk_first_ids(2);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(2);
         $section = Craft::$app->getEntries()->getSectionByHandle('minorHeroes');
         $entryType = Craft::$app->getEntries()->getEntryTypeByHandle('minorHero');
         $key = 'mig_idem_' . bin2hex(random_bytes(4));
 
-        $dry = _cortex_bulk_tool()->execute([
+        $dry = _herald_bulk_tool()->execute([
             'mode' => 'migrate',
             'toSectionUid' => $section->uid,
             'toEntryTypeUid' => $entryType->uid,
@@ -576,7 +576,7 @@ it('migrate dryRun and commit use separate idempotency cache slots', function() 
         expect($dry['dryRun'])->toBeTrue();
         expect($dry['committed'])->toBe(0);
 
-        $commit = _cortex_bulk_tool()->execute([
+        $commit = _herald_bulk_tool()->execute([
             'mode' => 'migrate',
             'dryRun' => false,
             'toSectionUid' => $section->uid,
@@ -595,9 +595,9 @@ it('migrate dryRun and commit use separate idempotency cache slots', function() 
 // -----------------------------------------------------------------------------
 
 it('stream() yields one progress frame per progressInterval rows + a terminal return', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $ids = _cortex_bulk_first_ids(5);
-        $tool = _cortex_bulk_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(5);
+        $tool = _herald_bulk_tool();
         $gen = $tool->stream([
             'mode' => 'set_status',
             'status' => 'disabled',
@@ -605,7 +605,7 @@ it('stream() yields one progress frame per progressInterval rows + a terminal re
             'query' => ['ids' => $ids],
         ], new InvocationContext());
 
-        [$frames, $return] = _cortex_bulk_drain($gen);
+        [$frames, $return] = _herald_bulk_drain($gen);
 
         // 5 rows × interval 1 = 5 frames.
         expect($frames)->toHaveCount(5);
@@ -622,10 +622,10 @@ it('stream() yields one progress frame per progressInterval rows + a terminal re
 });
 
 it('execute() returns the same envelope stream()->getReturn() carries', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $ids = _cortex_bulk_first_ids(3);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(3);
 
-        $viaExecute = _cortex_bulk_tool()->execute([
+        $viaExecute = _herald_bulk_tool()->execute([
             'mode' => 'set_status',
             'status' => 'disabled',
             'query' => ['ids' => $ids],
@@ -638,12 +638,12 @@ it('execute() returns the same envelope stream()->getReturn() carries', function
             Craft::$app->getElements()->saveElement($entry, runValidation: false);
         }
 
-        $gen = _cortex_bulk_tool()->stream([
+        $gen = _herald_bulk_tool()->stream([
             'mode' => 'set_status',
             'status' => 'disabled',
             'query' => ['ids' => $ids],
         ], new InvocationContext());
-        [, $viaStream] = _cortex_bulk_drain($gen);
+        [, $viaStream] = _herald_bulk_drain($gen);
 
         expect($viaStream['mode'])->toBe($viaExecute['mode']);
         expect($viaStream['total'])->toBe($viaExecute['total']);
@@ -652,13 +652,13 @@ it('execute() returns the same envelope stream()->getReturn() carries', function
 });
 
 it('stream() short-circuits on a pre-armed cancellation token mid-stream', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $ids = _cortex_bulk_first_ids(10);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(10);
 
         // Build a token whose poll-callback flips to true the moment we
         // ask for the third row.
         $callCount = 0;
-        $token = new \craftpulse\cortex\tools\support\CancellationToken(static function() use (&$callCount): bool {
+        $token = new \craftpulse\herald\tools\support\CancellationToken(static function() use (&$callCount): bool {
             $callCount++;
             // Flip after the first row finished and we're about to
             // start row 2 — the loop's mid-yield check trips before
@@ -667,13 +667,13 @@ it('stream() short-circuits on a pre-armed cancellation token mid-stream', funct
         });
         $ctx = new InvocationContext(cancellationToken: $token);
 
-        $gen = _cortex_bulk_tool()->stream([
+        $gen = _herald_bulk_tool()->stream([
             'mode' => 'set_status',
             'status' => 'disabled',
             'progressInterval' => 1,
             'query' => ['ids' => $ids],
         ], $ctx);
-        [, $return] = _cortex_bulk_drain($gen);
+        [, $return] = _herald_bulk_drain($gen);
 
         expect($return['cancelled'])->toBeTrue();
         expect($return['processed'])->toBeLessThan(10);
@@ -682,8 +682,8 @@ it('stream() short-circuits on a pre-armed cancellation token mid-stream', funct
 });
 
 it('stream() reports cancelled=true when the dispatcher pre-arms the cache slot', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $ids = _cortex_bulk_first_ids(8);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(8);
 
         $sessionId = 'sess-bulk-cancel-' . bin2hex(random_bytes(2));
         $requestId = 7;
@@ -695,19 +695,19 @@ it('stream() reports cancelled=true when the dispatcher pre-arms the cache slot'
             // but register the bulk_entries tool inline for the Pro
             // edition. The simplest path is to set the cancel slot
             // and call `stream()` with a context that polls it.
-            $token = new \craftpulse\cortex\tools\support\CancellationToken(static function() use ($cancelKey): bool {
+            $token = new \craftpulse\herald\tools\support\CancellationToken(static function() use ($cancelKey): bool {
                 $cache = Craft::$app->getCache();
                 return $cache !== null && $cache->get($cancelKey) === true;
             });
             $ctx = new InvocationContext(cancellationToken: $token);
 
-            $gen = _cortex_bulk_tool()->stream([
+            $gen = _herald_bulk_tool()->stream([
                 'mode' => 'set_status',
                 'status' => 'disabled',
                 'progressInterval' => 1,
                 'query' => ['ids' => $ids],
             ], $ctx);
-            [, $return] = _cortex_bulk_drain($gen);
+            [, $return] = _herald_bulk_drain($gen);
 
             expect($return['cancelled'])->toBeTrue();
         } finally {
@@ -721,11 +721,11 @@ it('stream() reports cancelled=true when the dispatcher pre-arms the cache slot'
 // -----------------------------------------------------------------------------
 
 it('per-row permission denial routes to skipped[] with reason=permission_denied (default skip)', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         // Create a non-admin user with NO saveEntries permissions
         // anywhere. Per-row canSave() will deny every row.
         $user = new User();
-        $user->username = '__cortex_bulk_denied_' . bin2hex(random_bytes(4));
+        $user->username = '__herald_bulk_denied_' . bin2hex(random_bytes(4));
         $user->email = $user->username . '@example.test';
         $user->admin = false;
         if (!Craft::$app->getElements()->saveElement($user)) {
@@ -735,8 +735,8 @@ it('per-row permission denial routes to skipped[] with reason=permission_denied 
         try {
             Craft::$app->getUser()->setIdentity($user);
 
-            $ids = _cortex_bulk_first_ids(3);
-            $result = _cortex_bulk_tool()->execute([
+            $ids = _herald_bulk_first_ids(3);
+            $result = _herald_bulk_tool()->execute([
                 'mode' => 'set_status',
                 'status' => 'disabled',
                 'query' => ['ids' => $ids],
@@ -756,9 +756,9 @@ it('per-row permission denial routes to skipped[] with reason=permission_denied 
 });
 
 it('onPermissionDenied=fail aborts on the first denied row with a ToolException', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $user = new User();
-        $user->username = '__cortex_bulk_fail_' . bin2hex(random_bytes(4));
+        $user->username = '__herald_bulk_fail_' . bin2hex(random_bytes(4));
         $user->email = $user->username . '@example.test';
         $user->admin = false;
         if (!Craft::$app->getElements()->saveElement($user)) {
@@ -767,11 +767,11 @@ it('onPermissionDenied=fail aborts on the first denied row with a ToolException'
 
         try {
             Craft::$app->getUser()->setIdentity($user);
-            $ids = _cortex_bulk_first_ids(3);
+            $ids = _herald_bulk_first_ids(3);
 
             $threw = false;
             try {
-                _cortex_bulk_tool()->execute([
+                _herald_bulk_tool()->execute([
                     'mode' => 'set_status',
                     'status' => 'disabled',
                     'onPermissionDenied' => 'fail',
@@ -790,7 +790,7 @@ it('onPermissionDenied=fail aborts on the first denied row with a ToolException'
 });
 
 it('partial section permission routes rows to succeeded vs skipped per section', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         // Pre-flight: the spanning-permission scenario needs a second
         // writable section. The playground ships heroes/teams/about
         // alongside minorHeroes; we use heroes here. If the seed
@@ -821,7 +821,7 @@ it('partial section permission routes rows to succeeded vs skipped per section',
         // denied, so the per-row gate inside the each-loop routes
         // those rows to `skipped` with reason `permission_denied`.
         $user = new User();
-        $user->username = '__cortex_bulk_partial_' . bin2hex(random_bytes(4));
+        $user->username = '__herald_bulk_partial_' . bin2hex(random_bytes(4));
         $user->email = $user->username . '@example.test';
         $user->admin = false;
         if (!Craft::$app->getElements()->saveElement($user)) {
@@ -846,10 +846,10 @@ it('partial section permission routes rows to succeeded vs skipped per section',
         try {
             Craft::$app->getUser()->setIdentity($user);
 
-            $minorIds = _cortex_bulk_first_ids(3);
+            $minorIds = _herald_bulk_first_ids(3);
             $spanningIds = array_merge($minorIds, $heroesIds);
 
-            $result = _cortex_bulk_tool()->execute([
+            $result = _herald_bulk_tool()->execute([
                 'mode' => 'set_status',
                 'status' => 'disabled',
                 'query' => ['ids' => $spanningIds],
@@ -887,7 +887,7 @@ it('partial section permission routes rows to succeeded vs skipped per section',
 });
 
 it('partial section permission with onPermissionDenied=fail aborts on first denied row', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $heroesSection = Craft::$app->getEntries()->getSectionByHandle('heroes');
         $heroEntryType = Craft::$app->getEntries()->getEntryTypeByHandle('hero');
         if ($heroesSection === null || $heroEntryType === null) {
@@ -903,7 +903,7 @@ it('partial section permission with onPermissionDenied=fail aborts on first deni
         }
 
         $user = new User();
-        $user->username = '__cortex_bulk_partial_fail_' . bin2hex(random_bytes(4));
+        $user->username = '__herald_bulk_partial_fail_' . bin2hex(random_bytes(4));
         $user->email = $user->username . '@example.test';
         $user->admin = false;
         if (!Craft::$app->getElements()->saveElement($user)) {
@@ -928,16 +928,16 @@ it('partial section permission with onPermissionDenied=fail aborts on first deni
         try {
             Craft::$app->getUser()->setIdentity($user);
 
-            // Ordering: ids returned by `_cortex_bulk_first_ids()` are
+            // Ordering: ids returned by `_herald_bulk_first_ids()` are
             // minorHeroes (always allowed); appending the heroes id at
             // the end means the loop processes the allowed rows first
             // and aborts on the denied one. The error message must name
             // that specific id so we know the abort is on the right row.
-            $spanningIds = array_merge(_cortex_bulk_first_ids(2), [(int) $heroEntry->id]);
+            $spanningIds = array_merge(_herald_bulk_first_ids(2), [(int) $heroEntry->id]);
 
             $threw = false;
             try {
-                _cortex_bulk_tool()->execute([
+                _herald_bulk_tool()->execute([
                     'mode' => 'set_status',
                     'status' => 'disabled',
                     'onPermissionDenied' => 'fail',

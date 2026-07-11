@@ -2,8 +2,8 @@
    Activity-detail slideout body partial.
 
    Rendered by `SettingsController::actionActivityRow` and fetched via
-   `Craft.sendActionRequest('GET', 'cortex/settings/activity-row', {params: {id}})`
-   from `Cortex.openActivityDetailSlideout()`. The returned HTML is passed
+   `Craft.sendActionRequest('GET', 'herald/settings/activity-row', {params: {id}})`
+   from `Herald.openActivityDetailSlideout()`. The returned HTML is passed
    into `new Craft.Slideout(html, {...})`.
 
    Shows ONLY already-redacted columns (locked decision 11):
@@ -19,7 +19,7 @@
    slideout container supplies it.
 
    Context:
-     - `row`  : the raw `cortex_invocations` row (associative array).
+     - `row`  : the raw `herald_invocations` row (associative array).
      - `user` : `{id, label, cpEditUrl}` or null.
    ========================================================================= #}
 
@@ -31,60 +31,60 @@
    is NOT valid JSON. Twig's `|json_decode` (`Json::decode`) throws on a
    truncated excerpt instead of falling through (gate-9 browser smoke). #}
 
-<div class="so-body" data-cortex-activity-detail>
+<div class="so-body" data-herald-activity-detail>
     <header class="pane-header">
-        <h2 class="screen-title">{{ '{tool} activity'|t('cortex', { tool: row.toolName ?? 'tool call'|t('cortex') }) }}</h2>
+        <h2 class="screen-title">{{ '{tool} activity'|t('herald', { tool: row.toolName ?? 'tool call'|t('herald') }) }}</h2>
     </header>
 
     <div class="so-content padded">
         {# ---- Metadata ------------------------------------------------- #}
-        <div class="cortex-meta-grid">
+        <div class="herald-meta-grid">
             <dl>
-                <dt>{{ 'Tool'|t('cortex') }}</dt>
+                <dt>{{ 'Tool'|t('herald') }}</dt>
                 <dd><code>{{ row.toolName ?? '—' }}</code></dd>
 
                 {% if mode %}
-                    <dt>{{ 'Mode'|t('cortex') }}</dt>
+                    <dt>{{ 'Mode'|t('herald') }}</dt>
                     <dd><code>{{ mode }}</code></dd>
                 {% endif %}
 
-                <dt>{{ 'Kind'|t('cortex') }}</dt>
-                <dd><span class="cortex-status cortex-status--{{ kind|replace({'_': '-'}) }}">{{ kind }}</span></dd>
+                <dt>{{ 'Kind'|t('herald') }}</dt>
+                <dd><span class="herald-status herald-status--{{ kind|replace({'_': '-'}) }}">{{ kind }}</span></dd>
 
-                <dt>{{ 'User'|t('cortex') }}</dt>
+                <dt>{{ 'User'|t('herald') }}</dt>
                 <dd>
                     {% if user %}
                         <a href="{{ user.cpEditUrl }}">{{ user.label }}</a>
                     {% else %}
-                        <span class="light">{{ 'Anonymous'|t('cortex') }}</span>
+                        <span class="light">{{ 'Anonymous'|t('herald') }}</span>
                     {% endif %}
                 </dd>
 
-                <dt>{{ 'Duration'|t('cortex') }}</dt>
+                <dt>{{ 'Duration'|t('herald') }}</dt>
                 <dd>{{ row.durationMs ?? 0 }}ms</dd>
 
-                <dt>{{ 'Transport'|t('cortex') }}</dt>
+                <dt>{{ 'Transport'|t('herald') }}</dt>
                 <dd>{{ row.transport ?? '—' }}</dd>
 
-                <dt>{{ 'Client'|t('cortex') }}</dt>
+                <dt>{{ 'Client'|t('herald') }}</dt>
                 <dd>{{ row.clientName ?? '—' }}</dd>
 
                 {% if row.sessionId is defined and row.sessionId %}
-                    <dt>{{ 'Session'|t('cortex') }}</dt>
+                    <dt>{{ 'Session'|t('herald') }}</dt>
                     <dd><code>{{ row.sessionId }}</code></dd>
                 {% endif %}
 
                 {% if row.requestId is defined and row.requestId %}
-                    <dt>{{ 'Request ID'|t('cortex') }}</dt>
+                    <dt>{{ 'Request ID'|t('herald') }}</dt>
                     <dd><code>{{ row.requestId }}</code></dd>
                 {% endif %}
 
                 {% if row.rateLimitRemaining is defined and row.rateLimitRemaining is not null %}
-                    <dt>{{ 'Rate limit remaining'|t('cortex') }}</dt>
+                    <dt>{{ 'Rate limit remaining'|t('herald') }}</dt>
                     <dd>{{ row.rateLimitRemaining }}</dd>
                 {% endif %}
 
-                <dt>{{ 'When'|t('cortex') }}</dt>
+                <dt>{{ 'When'|t('herald') }}</dt>
                 <dd>{{ row.dateCreated ? row.dateCreated|datetime('short') : '—' }}</dd>
             </dl>
         </div>
@@ -95,7 +95,7 @@
 
         {% if kind in ['tool_error', 'internal_error'] and (errorClass or errorMessage) %}
             <div class="field">
-                <div class="heading"><label>{{ 'Error'|t('cortex') }}</label></div>
+                <div class="heading"><label>{{ 'Error'|t('herald') }}</label></div>
                 <div class="input">
                     {% if errorClass %}
                         <p><code>{{ errorClass }}</code></p>
@@ -109,7 +109,7 @@
 
         {% if kind == 'cancelled' and errorMessage %}
             <div class="field">
-                <div class="heading"><label>{{ 'Cancellation reason'|t('cortex') }}</label></div>
+                <div class="heading"><label>{{ 'Cancellation reason'|t('herald') }}</label></div>
                 <div class="input">
                     <blockquote class="note" role="status">{{ errorMessage }}</blockquote>
                 </div>
@@ -118,12 +118,12 @@
 
         {# ---- Redacted request args ------------------------------------ #}
         <div class="field">
-            <div class="heading"><label>{{ 'Request (redacted)'|t('cortex') }}</label></div>
+            <div class="heading"><label>{{ 'Request (redacted)'|t('herald') }}</label></div>
             <div class="input">
                 {% if argsPretty %}
-                    <pre class="cortex-payload"><code>{{ argsPretty }}</code></pre>
+                    <pre class="herald-payload"><code>{{ argsPretty }}</code></pre>
                 {% else %}
-                    <p class="light">{{ 'No arguments recorded.'|t('cortex') }}</p>
+                    <p class="light">{{ 'No arguments recorded.'|t('herald') }}</p>
                 {% endif %}
             </div>
         </div>
@@ -131,9 +131,9 @@
         {# ---- Redacted response excerpt -------------------------------- #}
         {% if responsePretty %}
             <div class="field">
-                <div class="heading"><label>{{ 'Response excerpt (redacted)'|t('cortex') }}</label></div>
+                <div class="heading"><label>{{ 'Response excerpt (redacted)'|t('herald') }}</label></div>
                 <div class="input">
-                    <pre class="cortex-payload"><code>{{ responsePretty }}</code></pre>
+                    <pre class="herald-payload"><code>{{ responsePretty }}</code></pre>
                 </div>
             </div>
         {% endif %}
@@ -142,7 +142,7 @@
     <footer class="so-footer">
         <div class="flex flex-nowrap">
             <div class="flex-grow"></div>
-            <button type="button" class="btn submit" data-cortex-done>{{ 'Done'|t('app') }}</button>
+            <button type="button" class="btn submit" data-herald-done>{{ 'Done'|t('app') }}</button>
         </div>
     </footer>
 </div>

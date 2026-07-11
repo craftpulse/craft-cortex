@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\controllers;
+namespace craftpulse\herald\controllers;
 
 use Craft;
 use craft\elements\User;
@@ -9,12 +9,12 @@ use craft\helpers\DateTimeHelper;
 use craft\helpers\Db;
 use craft\helpers\Json;
 use craft\web\Controller;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\db\InvocationQuery;
-use craftpulse\cortex\models\Token;
-use craftpulse\cortex\records\OauthClient as OauthClientRecord;
-use craftpulse\cortex\records\RuntimeOverride;
-use craftpulse\cortex\tools\support\InvocationLogger;
+use craftpulse\herald\db\InvocationQuery;
+use craftpulse\herald\Herald;
+use craftpulse\herald\models\Token;
+use craftpulse\herald\records\OauthClient as OauthClientRecord;
+use craftpulse\herald\records\RuntimeOverride;
+use craftpulse\herald\tools\support\InvocationLogger;
 use yii\base\Exception;
 use yii\base\InvalidArgumentException;
 use yii\web\ForbiddenHttpException;
@@ -23,7 +23,7 @@ use yii\web\Response;
 
 /**
  * =========================================================================
- * Web controller — Cortex CP screens + runtime allowlist override
+ * Web controller — Herald CP screens + runtime allowlist override
  * management.
  *
  * The Gate 9 plan moves the Settings boundary off Craft's built-in
@@ -37,7 +37,7 @@ use yii\web\Response;
  *
  * Permission posture per locked decision 7:
  *   - Settings / Tokens / Connection view actions    — `requireAdmin(false)`.
- *   - Activity view + table-data + row actions        — `requirePermission(Cortex::PERMISSION_VIEW_ACTIVITY)`.
+ *   - Activity view + table-data + row actions        — `requirePermission(Herald::PERMISSION_VIEW_ACTIVITY)`.
  *     Non-admins are scoped server-side to their own
  *     rows (fail-closed) — see `actionActivityTableData`.
  *   - All mutation actions (`actionSave` + the
@@ -61,7 +61,7 @@ class SettingsController extends Controller
     // =========================================================================
 
     /**
-     * Settings tab — landing page for `settings/plugins/cortex`. Renders
+     * Settings tab — landing page for `settings/plugins/herald`. Renders
      * the project-config-synced plugin defaults under the tabbed
      * lineage. Runtime allowlist overrides (DB-backed time-bound
      * grants) live on the Allowlist tab — see `actionAllowlist`.
@@ -70,7 +70,7 @@ class SettingsController extends Controller
      * `actionSave` strictly gates write access.
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
-     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
      * @author Craftpulse
@@ -80,7 +80,7 @@ class SettingsController extends Controller
     {
         $this->requireAdmin(false);
 
-        $plugin = Cortex::getInstance();
+        $plugin = Herald::getInstance();
         $settings = $plugin->getSettings();
 
         // Resolve the saved content-level (`allowedCommands`) and
@@ -95,7 +95,7 @@ class SettingsController extends Controller
             $settings->adminLevelCommands,
         );
 
-        return $this->renderTemplate('cortex/_cp/settings', [
+        return $this->renderTemplate('herald/_cp/settings', [
             'plugin' => $plugin,
             'settings' => $settings,
             'commandGroups' => $toggleState['groups'],
@@ -122,7 +122,7 @@ class SettingsController extends Controller
      * (`settings.tokenTtlDefault`).
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
-     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
      * @author Craftpulse
@@ -134,8 +134,8 @@ class SettingsController extends Controller
 
         $this->requireAdmin(false);
 
-        return $this->renderTemplate('cortex/_cp/tokens', [
-            'settings' => Cortex::getInstance()->getSettings(),
+        return $this->renderTemplate('herald/_cp/tokens', [
+            'settings' => Herald::getInstance()->getSettings(),
         ]);
     }
 
@@ -166,7 +166,7 @@ class SettingsController extends Controller
      * `requireAdmin(requireAdminChanges: true)`.
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
-     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException        from `requireAcceptsJson` on non-JSON callers.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
@@ -192,7 +192,7 @@ class SettingsController extends Controller
         // shape the table consumes.
         $rows = array_map(
             fn(Token $token): array => $this->_serializeTokenRow($token),
-            Cortex::getInstance()->tokens->getAll(),
+            Herald::getInstance()->tokens->getAll(),
         );
 
         if ($search !== '') {
@@ -235,7 +235,7 @@ class SettingsController extends Controller
 
     /**
      * Render the "+ New token" slideout body partial. Fetched by
-     * `Cortex.openTokenIssuanceSlideout()` and passed into
+     * `Herald.openTokenIssuanceSlideout()` and passed into
      * `new Craft.Slideout(html, {...})`.
      *
      * Returns `{html, headHtml, bodyHtml}` JSON — NOT a bare fragment.
@@ -247,7 +247,7 @@ class SettingsController extends Controller
      * select wires up.
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
-     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      * @throws \Throwable                              from template rendering.
      *
@@ -261,8 +261,8 @@ class SettingsController extends Controller
         $this->requireAdmin(false);
 
         $view = Craft::$app->getView();
-        $html = $view->renderTemplate('cortex/_cp/_token-issue-slideout', [
-            'settings' => Cortex::getInstance()->getSettings(),
+        $html = $view->renderTemplate('herald/_cp/_token-issue-slideout', [
+            'settings' => Herald::getInstance()->getSettings(),
         ]);
 
         return $this->asJson([
@@ -293,7 +293,7 @@ class SettingsController extends Controller
      * save failure → the exception is caught + logged with a generic
      * `Could not issue token.` returned to the caller.
      *
-     * @throws \yii\base\InvalidConfigException  from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException  from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
@@ -319,12 +319,12 @@ class SettingsController extends Controller
         }
         $userId = (int) $userIdParam;
         if ($userId <= 0) {
-            return $this->asFailure(Craft::t('cortex', 'A user is required.'));
+            return $this->asFailure(Craft::t('herald', 'A user is required.'));
         }
 
         $user = User::find()->id($userId)->status(null)->one();
         if (!$user instanceof User) {
-            return $this->asFailure(Craft::t('cortex', 'A user is required.'));
+            return $this->asFailure(Craft::t('herald', 'A user is required.'));
         }
 
         $name = $request->getBodyParam('name');
@@ -336,14 +336,14 @@ class SettingsController extends Controller
         $ttlSeconds = is_numeric($ttl) && (int) $ttl > 0 ? (int) $ttl : null;
 
         try {
-            $issued = Cortex::getInstance()->tokens->issue($userId, $name, $ttlSeconds);
+            $issued = Herald::getInstance()->tokens->issue($userId, $name, $ttlSeconds);
         } catch (Exception $e) {
-            Craft::error($e->getMessage(), 'cortex');
-            return $this->asFailure(Craft::t('cortex', 'Could not issue token.'));
+            Craft::error($e->getMessage(), 'herald');
+            return $this->asFailure(Craft::t('herald', 'Could not issue token.'));
         }
 
         return $this->asSuccess(
-            message: Craft::t('cortex', 'Token issued.'),
+            message: Craft::t('herald', 'Token issued.'),
             data: [
                 'token' => $issued['token'],
                 'model' => $this->_serializeTokenRow($issued['model']),
@@ -360,7 +360,7 @@ class SettingsController extends Controller
      * failure. After revocation a subsequent `Tokens::lookup()` of the
      * matching plaintext fails (the row's `dateDeleted` is non-null).
      *
-     * @throws \yii\base\InvalidConfigException  from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException  from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
@@ -378,18 +378,18 @@ class SettingsController extends Controller
         $id = (int) $this->request->getRequiredBodyParam('id');
 
         try {
-            $revoked = Cortex::getInstance()->tokens->revoke($id);
+            $revoked = Herald::getInstance()->tokens->revoke($id);
         } catch (Exception $e) {
-            Craft::error($e->getMessage(), 'cortex');
-            return $this->asFailure(Craft::t('cortex', 'Could not revoke token.'));
+            Craft::error($e->getMessage(), 'herald');
+            return $this->asFailure(Craft::t('herald', 'Could not revoke token.'));
         }
 
         if (!$revoked) {
             $this->response->setStatusCode(404);
-            return $this->asJson(['message' => Craft::t('cortex', 'Token not found.')]);
+            return $this->asJson(['message' => Craft::t('herald', 'Token not found.')]);
         }
 
-        return $this->asSuccess(Craft::t('cortex', 'Token revoked.'));
+        return $this->asSuccess(Craft::t('herald', 'Token revoked.'));
     }
 
     /**
@@ -403,7 +403,7 @@ class SettingsController extends Controller
      * (`settings.runtimeOverrideTtl`).
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
-     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
      * @author Craftpulse
@@ -413,7 +413,7 @@ class SettingsController extends Controller
     {
         $this->requireAdmin(false);
 
-        $allowlist = Cortex::getInstance()->allowlist;
+        $allowlist = Herald::getInstance()->allowlist;
 
         // Index active grants by pattern so the effective-allowlist panel
         // can annotate each grant row with its expiry. Base Settings
@@ -435,12 +435,12 @@ class SettingsController extends Controller
         // is the authority here — a tightened `adminLevelCommands` only
         // contributes its own patterns, but each is still admin-level.
         $adminLevelPatterns = array_fill_keys(
-            Cortex::getInstance()->getSettings()->adminLevelCommands,
+            Herald::getInstance()->getSettings()->adminLevelCommands,
             true,
         );
 
-        return $this->renderTemplate('cortex/_cp/allowlist', [
-            'settings' => Cortex::getInstance()->getSettings(),
+        return $this->renderTemplate('herald/_cp/allowlist', [
+            'settings' => Herald::getInstance()->getSettings(),
             'effective' => $allowlist->getEffective(),
             'grantExpiryByPattern' => $grantExpiryByPattern,
             'adminLevelPatterns' => $adminLevelPatterns,
@@ -475,7 +475,7 @@ class SettingsController extends Controller
      * `requireAdmin(requireAdminChanges: true)`.
      *
      * @throws \craft\errors\MissingComponentException     if the view component is unavailable.
-     * @throws \yii\base\InvalidConfigException            from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException            from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException            from `requireAcceptsJson` on non-JSON callers.
      * @throws \yii\web\ForbiddenHttpException             from `requireAdmin`.
      *
@@ -496,7 +496,7 @@ class SettingsController extends Controller
 
         // Raw rows — already filtered to non-deleted, includes expired
         // so operators can audit/cull expired entries until gc reaps them.
-        $rows = Cortex::getInstance()->allowlist->getAllOverrides(includeExpired: true);
+        $rows = Herald::getInstance()->allowlist->getAllOverrides(includeExpired: true);
 
         if ($search !== '') {
             $needle = mb_strtolower($search);
@@ -542,14 +542,14 @@ class SettingsController extends Controller
 
     /**
      * Render the "+ New override" slideout body partial. Fetched by
-     * `Cortex.openAllowlistOverrideSlideout()` and passed into
+     * `Herald.openAllowlistOverrideSlideout()` and passed into
      * `new Craft.Slideout(html, {...})`.
      *
      * Returns a bare HTML fragment — no `<html>`/`<body>` chrome, no
      * tab strip — the slideout container supplies that.
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
-     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
      * @author Craftpulse
@@ -559,8 +559,8 @@ class SettingsController extends Controller
     {
         $this->requireAdmin(false);
 
-        return $this->renderTemplate('cortex/_cp/_allowlist-override-slideout', [
-            'settings' => Cortex::getInstance()->getSettings(),
+        return $this->renderTemplate('herald/_cp/_allowlist-override-slideout', [
+            'settings' => Herald::getInstance()->getSettings(),
         ]);
     }
 
@@ -569,7 +569,7 @@ class SettingsController extends Controller
      * log plus a filter bar (kind / tool / user / date-range) and a
      * row-click Garnish.Slideout showing the already-redacted detail.
      *
-     * Permission-gated by `Cortex::PERMISSION_VIEW_ACTIVITY` per locked
+     * Permission-gated by `Herald::PERMISSION_VIEW_ACTIVITY` per locked
      * decision 7 — admins and granted non-admins both reach the tab.
      * The view passes the filter-option lists: the five `kind` enum
      * values from `InvocationLogger`, and the distinct tool names from
@@ -578,7 +578,7 @@ class SettingsController extends Controller
      * filter would be meaningless and is omitted client-side).
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
-     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requirePermission`.
      *
      * @author Craftpulse
@@ -588,12 +588,12 @@ class SettingsController extends Controller
     {
         $this->_requirePro();
 
-        $this->requirePermission(Cortex::PERMISSION_VIEW_ACTIVITY);
+        $this->requirePermission(Herald::PERMISSION_VIEW_ACTIVITY);
 
         $identity = Craft::$app->getUser()->getIdentity();
         $isAdmin = $identity instanceof User && $identity->admin;
 
-        return $this->renderTemplate('cortex/_cp/activity', [
+        return $this->renderTemplate('herald/_cp/activity', [
             'isAdmin' => $isAdmin,
             'kinds' => [
                 InvocationLogger::KIND_SUCCESS,
@@ -602,7 +602,7 @@ class SettingsController extends Controller
                 InvocationLogger::KIND_RATE_LIMITED,
                 InvocationLogger::KIND_CANCELLED,
             ],
-            'toolNames' => Cortex::getInstance()->invocations->find()->distinctToolNames(),
+            'toolNames' => Herald::getInstance()->invocations->find()->distinctToolNames(),
         ]);
     }
 
@@ -618,7 +618,7 @@ class SettingsController extends Controller
      * `filters[from]`, `filters[to]` (a `dateCreated` bracket).
      *
      * **Permission scoping — fail closed.** An admin sees every row; a
-     * non-admin (granted `cortex:viewActivity` but not admin) sees ONLY
+     * non-admin (granted `herald:viewActivity` but not admin) sees ONLY
      * rows whose `userId` equals their own. The scope is applied
      * unconditionally on the query before any caller-supplied filter, so
      * a non-admin cannot widen it by posting `filters[userId]=<other>` —
@@ -632,7 +632,7 @@ class SettingsController extends Controller
      * tuple exactly — drift = test failure.
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
-     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException        from `requireAcceptsJson` on non-JSON callers.
      * @throws \yii\web\ForbiddenHttpException         from `requirePermission`.
      *
@@ -644,7 +644,7 @@ class SettingsController extends Controller
         $this->_requirePro();
 
         $this->requireAcceptsJson();
-        $this->requirePermission(Cortex::PERMISSION_VIEW_ACTIVITY);
+        $this->requirePermission(Herald::PERMISSION_VIEW_ACTIVITY);
 
         $page = max(1, (int) $this->request->getParam('page', 1));
         $perPage = (int) $this->request->getParam('per_page', 50);
@@ -658,7 +658,7 @@ class SettingsController extends Controller
             $filters = [];
         }
 
-        $query = Cortex::getInstance()->invocations->find();
+        $query = Herald::getInstance()->invocations->find();
 
         // Fail-closed scope FIRST — a non-admin is pinned to their own
         // userId before any caller filter is applied. `filters[userId]`
@@ -753,7 +753,7 @@ class SettingsController extends Controller
      * row exists and leak enumeration signal). Missing ids also 404.
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
-     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException        from `requireAcceptsJson` on non-JSON callers.
      * @throws \yii\web\ForbiddenHttpException         from `requirePermission`.
      * @throws NotFoundHttpException                   when the row is missing or out of the caller's scope.
@@ -766,14 +766,14 @@ class SettingsController extends Controller
         $this->_requirePro();
 
         $this->requireAcceptsJson();
-        $this->requirePermission(Cortex::PERMISSION_VIEW_ACTIVITY);
+        $this->requirePermission(Herald::PERMISSION_VIEW_ACTIVITY);
 
         $id = (int) $this->request->getParam('id');
         if ($id <= 0) {
             throw new NotFoundHttpException('Invocation not found.');
         }
 
-        $query = Cortex::getInstance()->invocations->find()->andWhere(['id' => $id]);
+        $query = Herald::getInstance()->invocations->find()->andWhere(['id' => $id]);
         $this->_scopeActivityQueryToUser($query);
 
         $row = $query->one();
@@ -803,7 +803,7 @@ class SettingsController extends Controller
         // Twig's `|json_decode` (`Json::decode`) throws on it instead of
         // falling through (a truncated excerpt 500'd the slideout; caught
         // by the gate-9 browser smoke).
-        $html = $this->getView()->renderTemplate('cortex/_cp/_activity-detail-slideout', [
+        $html = $this->getView()->renderTemplate('herald/_cp/_activity-detail-slideout', [
             'row' => $row,
             'user' => $user,
             'mode' => $this->_extractMode($row['argsRedacted'] ?? null),
@@ -826,7 +826,7 @@ class SettingsController extends Controller
      * `requireAdmin(requireAdminChanges: true)`.
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
-     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
      * @author Craftpulse
@@ -838,8 +838,8 @@ class SettingsController extends Controller
 
         $this->requireAdmin(false);
 
-        return $this->renderTemplate('cortex/_cp/clients', [
-            'settings' => Cortex::getInstance()->getSettings(),
+        return $this->renderTemplate('herald/_cp/clients', [
+            'settings' => Herald::getInstance()->getSettings(),
         ]);
     }
 
@@ -855,7 +855,7 @@ class SettingsController extends Controller
      * tuple exactly — drift = test failure.
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
-     * @throws \yii\base\InvalidConfigException        from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException        from `requireAcceptsJson`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
@@ -876,7 +876,7 @@ class SettingsController extends Controller
 
         $rows = array_map(
             fn(OauthClientRecord $client): array => $this->_serializeClientRow($client),
-            Cortex::getInstance()->oauth->getAllClients(),
+            Herald::getInstance()->oauth->getAllClients(),
         );
 
         if ($search !== '') {
@@ -905,7 +905,7 @@ class SettingsController extends Controller
      * Clients tab's row action. Returns `200 {message}` on success,
      * `404 {message}` when the id is unknown.
      *
-     * @throws \yii\base\InvalidConfigException  from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException  from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
@@ -921,14 +921,14 @@ class SettingsController extends Controller
         $this->requireAdmin(requireAdminChanges: true);
 
         $id = (int) $this->request->getRequiredBodyParam('id');
-        $approved = Cortex::getInstance()->oauth->approveClient($id);
+        $approved = Herald::getInstance()->oauth->approveClient($id);
 
         if (!$approved) {
             $this->response->setStatusCode(404);
-            return $this->asJson(['message' => Craft::t('cortex', 'Client not found.')]);
+            return $this->asJson(['message' => Craft::t('herald', 'Client not found.')]);
         }
 
-        return $this->asSuccess(Craft::t('cortex', 'Client approved.'));
+        return $this->asSuccess(Craft::t('herald', 'Client approved.'));
     }
 
     /**
@@ -937,7 +937,7 @@ class SettingsController extends Controller
      * Clients tab's row trash action. Returns `200 {message}` on
      * success, `404 {message}` when the id is unknown.
      *
-     * @throws \yii\base\InvalidConfigException  from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException  from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
@@ -953,14 +953,14 @@ class SettingsController extends Controller
         $this->requireAdmin(requireAdminChanges: true);
 
         $id = (int) $this->request->getRequiredBodyParam('id');
-        $revoked = Cortex::getInstance()->oauth->revokeClient($id);
+        $revoked = Herald::getInstance()->oauth->revokeClient($id);
 
         if (!$revoked) {
             $this->response->setStatusCode(404);
-            return $this->asJson(['message' => Craft::t('cortex', 'Client not found.')]);
+            return $this->asJson(['message' => Craft::t('herald', 'Client not found.')]);
         }
 
-        return $this->asSuccess(Craft::t('cortex', 'Client revoked.'));
+        return $this->asSuccess(Craft::t('herald', 'Client revoked.'));
     }
 
     /**
@@ -979,12 +979,12 @@ class SettingsController extends Controller
 
         $this->requireAdmin(false);
 
-        return $this->renderTemplate('cortex/_cp/connection');
+        return $this->renderTemplate('herald/_cp/connection');
     }
 
     /**
      * Save action for the Settings tab. Replaces Craft's built-in
-     * `plugins/save-plugin-settings` route for Cortex per Gate 9
+     * `plugins/save-plugin-settings` route for Herald per Gate 9
      * locked decision 1.
      *
      * Body-param shape mirrors Craft's standard plugin-settings save —
@@ -999,7 +999,7 @@ class SettingsController extends Controller
      * `$settings` instance held on the plugin.
      *
      * @throws \yii\base\Exception                  on settings-save failure.
-     * @throws \yii\base\InvalidConfigException     from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException     from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException     from `requirePostRequest` on non-POST.
      * @throws \yii\web\ForbiddenHttpException      from `requireAdmin`.
      *
@@ -1011,7 +1011,7 @@ class SettingsController extends Controller
         $this->requirePostRequest();
         $this->requireAdmin(requireAdminChanges: true);
 
-        $plugin = Cortex::getInstance();
+        $plugin = Herald::getInstance();
         $settings = $plugin->getSettings();
 
         $posted = $this->request->getBodyParam('settings', []);
@@ -1023,20 +1023,20 @@ class SettingsController extends Controller
         // (admin-level) are each edited through the grouped toggle
         // browser's two sections, not raw editable tables. Each section
         // posts three sibling params:
-        //   - `cortex[Admin]CommandGroups[<handle>] = '1'` for a fully-toggled group.
-        //   - `cortex[Admin]CommandActions[<routeId>] = '1'` for an individually-checked action.
+        //   - `herald[Admin]CommandGroups[<handle>] = '1'` for a fully-toggled group.
+        //   - `herald[Admin]CommandActions[<routeId>] = '1'` for an individually-checked action.
         //   - `settings[<setting>][N][pattern]` from the "Custom patterns"
         //     editable table — power-user globs preserved verbatim.
         // Fold each section back into the flat `string[]` its setting
         // persists, with the bucket boundary enforced in the service so a
         // content toggle can never surface an admin route (and vice versa).
-        // Skip a setting entirely when it is locked by `config/cortex.php`
+        // Skip a setting entirely when it is locked by `config/herald.php`
         // — the file value wins regardless, and that section rendered
         // read-only, so there is nothing meaningful to fold.
         if (!$this->isSettingOverridden('allowedCommands')) {
             $posted['allowedCommands'] = $plugin->allowlist->patternsFromToggleState(
-                fullGroups: $this->_postedToggleMap('cortexCommandGroups'),
-                actionIds: $this->_postedToggleMap('cortexCommandActions'),
+                fullGroups: $this->_postedToggleMap('heraldCommandGroups'),
+                actionIds: $this->_postedToggleMap('heraldCommandActions'),
                 customPatterns: $this->_postedCustomPatterns('allowedCommands'),
                 adminLevel: false,
             );
@@ -1046,8 +1046,8 @@ class SettingsController extends Controller
 
         if (!$this->isSettingOverridden('adminLevelCommands')) {
             $posted['adminLevelCommands'] = $plugin->allowlist->patternsFromToggleState(
-                fullGroups: $this->_postedToggleMap('cortexAdminCommandGroups'),
-                actionIds: $this->_postedToggleMap('cortexAdminCommandActions'),
+                fullGroups: $this->_postedToggleMap('heraldAdminCommandGroups'),
+                actionIds: $this->_postedToggleMap('heraldAdminCommandActions'),
                 customPatterns: $this->_postedCustomPatterns('adminLevelCommands'),
                 adminLevel: true,
             );
@@ -1059,13 +1059,13 @@ class SettingsController extends Controller
 
         if (!Craft::$app->getPlugins()->savePluginSettings($plugin, $settings->toArray())) {
             Craft::$app->getSession()->setError(
-                Craft::t('cortex', "Couldn't save settings."),
+                Craft::t('herald', "Couldn't save settings."),
             );
             return $this->redirectToPostedUrl();
         }
 
         Craft::$app->getSession()->setNotice(
-            Craft::t('cortex', 'Settings saved.'),
+            Craft::t('herald', 'Settings saved.'),
         );
 
         return $this->redirectToPostedUrl();
@@ -1082,7 +1082,7 @@ class SettingsController extends Controller
      * (caught + logged) with a generic `Could not add override.` on
      * service-layer save failure.
      *
-     * @throws \yii\base\InvalidConfigException  from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException  from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
@@ -1104,24 +1104,24 @@ class SettingsController extends Controller
         $ttlSeconds = is_numeric($ttl) && (int) $ttl > 0 ? (int) $ttl : null;
 
         if ($pattern === '') {
-            return $this->asFailure(Craft::t('cortex', 'Pattern is required.'));
+            return $this->asFailure(Craft::t('herald', 'Pattern is required.'));
         }
 
         $userId = Craft::$app->getUser()->getId();
         try {
-            $override = Cortex::getInstance()->allowlist->add(
+            $override = Herald::getInstance()->allowlist->add(
                 pattern: $pattern,
                 userId: is_int($userId) ? $userId : null,
                 note: $note,
                 ttlSeconds: $ttlSeconds,
             );
         } catch (Exception $e) {
-            Craft::error($e->getMessage(), 'cortex');
-            return $this->asFailure(Craft::t('cortex', 'Could not add grant.'));
+            Craft::error($e->getMessage(), 'herald');
+            return $this->asFailure(Craft::t('herald', 'Could not add grant.'));
         }
 
         return $this->asSuccess(
-            message: Craft::t('cortex', 'Grant issued.'),
+            message: Craft::t('herald', 'Grant issued.'),
             data: ['model' => $this->_serializeOverrideRow($override->toArray())],
         );
     }
@@ -1135,7 +1135,7 @@ class SettingsController extends Controller
      * so a stale row click is rare, but defense in depth), and
      * `400 {message}` on service-layer failure.
      *
-     * @throws \yii\base\InvalidConfigException  from `Cortex::getInstance()`.
+     * @throws \yii\base\InvalidConfigException  from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
@@ -1151,18 +1151,18 @@ class SettingsController extends Controller
         $id = (int) $this->request->getRequiredBodyParam('id');
 
         try {
-            $removed = Cortex::getInstance()->allowlist->remove($id);
+            $removed = Herald::getInstance()->allowlist->remove($id);
         } catch (Exception $e) {
-            Craft::error($e->getMessage(), 'cortex');
-            return $this->asFailure(Craft::t('cortex', 'Could not remove override.'));
+            Craft::error($e->getMessage(), 'herald');
+            return $this->asFailure(Craft::t('herald', 'Could not remove override.'));
         }
 
         if (!$removed) {
             $this->response->setStatusCode(404);
-            return $this->asJson(['message' => Craft::t('cortex', 'Override not found.')]);
+            return $this->asJson(['message' => Craft::t('herald', 'Override not found.')]);
         }
 
-        return $this->asSuccess(Craft::t('cortex', 'Override removed.'));
+        return $this->asSuccess(Craft::t('herald', 'Override removed.'));
     }
 
     // Protected Methods
@@ -1170,7 +1170,7 @@ class SettingsController extends Controller
 
     /**
      * Whether a plugin-settings attribute is overridden from
-     * `config/cortex.php`. Craft merges that file's keys over the
+     * `config/herald.php`. Craft merges that file's keys over the
      * project-config-stored settings when loading the plugin (see
      * `craft\services\Plugins::createPlugin()` →
      * `getConfig()->getConfigFromFile($handle)`), but exposes no
@@ -1180,7 +1180,7 @@ class SettingsController extends Controller
      * with Craft's standard "defined in config" warning.
      *
      * Protected so the save-path test harness can stub the overridden
-     * branch without writing a real `config/cortex.php` mid-suite.
+     * branch without writing a real `config/herald.php` mid-suite.
      *
      * @throws \yii\base\InvalidConfigException from `Craft::$app->getConfig()`.
      *
@@ -1189,7 +1189,7 @@ class SettingsController extends Controller
      */
     protected function isSettingOverridden(string $attribute): bool
     {
-        $fileConfig = Craft::$app->getConfig()->getConfigFromFile('cortex');
+        $fileConfig = Craft::$app->getConfig()->getConfigFromFile('herald');
 
         return is_array($fileConfig) && array_key_exists($attribute, $fileConfig);
     }
@@ -1198,8 +1198,8 @@ class SettingsController extends Controller
     // =========================================================================
 
     /**
-     * Read a posted toggle map (`cortexCommandGroups` /
-     * `cortexCommandActions`) and keep only the keys whose lightswitch is
+     * Read a posted toggle map (`heraldCommandGroups` /
+     * `heraldCommandActions`) and keep only the keys whose lightswitch is
      * on. Craft's lightswitch macro posts a hidden input for every switch
      * — `'1'` when on, an empty string when off — so a raw read would
      * report every group/action as present. Filtering to truthy values
@@ -1314,7 +1314,7 @@ class SettingsController extends Controller
     }
 
     /**
-     * Serialise a `cortex_invocations` row into the locked Activity
+     * Serialise a `herald_invocations` row into the locked Activity
      * VueAdminTable data tuple. Shared by `actionActivityTableData` so the
      * table shape is asserted in exactly one place.
      *
@@ -1373,7 +1373,7 @@ class SettingsController extends Controller
      * Best-effort extraction of the `mode` key from a redacted-args JSON
      * column. Returns null when the column is absent, not JSON, or carries
      * no `mode`. The args are already redacted in the DB — this only reads
-     * the (non-sensitive) routing discriminator most Cortex tools carry.
+     * the (non-sensitive) routing discriminator most Herald tools carry.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -1409,8 +1409,8 @@ class SettingsController extends Controller
      */
     private function _requirePro(): void
     {
-        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
-            throw new ForbiddenHttpException('This feature requires the Cortex Pro edition.');
+        if (!Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
+            throw new ForbiddenHttpException('This feature requires the Herald Pro edition.');
         }
     }
 

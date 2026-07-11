@@ -1,13 +1,13 @@
 <?php
 
-namespace craftpulse\cortex\controllers;
+namespace craftpulse\herald\controllers;
 
 use Craft;
 use craft\elements\User;
 use craft\web\View;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\oauth\entities\UserEntity;
-use craftpulse\cortex\records\OauthClient as OauthClientRecord;
+use craftpulse\herald\Herald;
+use craftpulse\herald\oauth\entities\UserEntity;
+use craftpulse\herald\records\OauthClient as OauthClientRecord;
 use JsonException;
 use League\OAuth2\Server\Exception\OAuthServerException;
 use League\OAuth2\Server\RequestTypes\AuthorizationRequestInterface;
@@ -161,7 +161,7 @@ class OauthController extends AbstractOauthController
      *
      * @throws \yii\base\InvalidConfigException When the OAuth keys
      *         are not yet generated. Operators run
-     *         `cortex/oauth/init-keys` once per install.
+     *         `herald/oauth/init-keys` once per install.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -180,7 +180,7 @@ class OauthController extends AbstractOauthController
         }
         $currentUser = $identity;
 
-        $oauth = Cortex::getInstance()->oauth;
+        $oauth = Herald::getInstance()->oauth;
 
         // DCR approval gate (WS3): an unapproved client is invisible to
         // league's `ClientRepository`, so `validateAuthorizationRequest`
@@ -215,7 +215,7 @@ class OauthController extends AbstractOauthController
             return $this->_emitPsr7Response($oauthException->generateHttpResponse((new Psr17Factory())->createResponse()));
         }
 
-        // Stamp the audience indicator onto the cortex Oauth service
+        // Stamp the audience indicator onto the herald Oauth service
         // slot so the access-token entity picks it up at issuance.
         // RFC 8707 — the resource indicator that ends up in `aud`.
         $resource = $this->_resourceParam();
@@ -241,7 +241,7 @@ class OauthController extends AbstractOauthController
     {
         $this->requirePostRequest();
 
-        $oauth = Cortex::getInstance()->oauth;
+        $oauth = Herald::getInstance()->oauth;
         $psrRequest = $this->_buildPsrRequest();
 
         // Audience stamp again — refresh + token-exchange both need
@@ -257,7 +257,7 @@ class OauthController extends AbstractOauthController
         } catch (OAuthServerException $e) {
             $psrResponse = $e->generateHttpResponse($psrResponse);
         } catch (Throwable $e) {
-            Craft::error("cortex OAuth token endpoint internal error: {$e->getMessage()}\n{$e->getTraceAsString()}", 'cortex');
+            Craft::error("herald OAuth token endpoint internal error: {$e->getMessage()}\n{$e->getTraceAsString()}", 'herald');
             $psrResponse = $psrResponse->withStatus(500);
             $psrResponse->getBody()->write('{"error":"server_error"}');
         }
@@ -275,7 +275,7 @@ class OauthController extends AbstractOauthController
     {
         $this->requirePostRequest();
 
-        if (!Cortex::getInstance()->getSettings()->dcrEnabled) {
+        if (!Herald::getInstance()->getSettings()->dcrEnabled) {
             $this->response->setStatusCode(404);
             $this->response->format = Response::FORMAT_JSON;
             $this->response->data = ['error' => 'Dynamic Client Registration is disabled on this install.'];
@@ -294,11 +294,11 @@ class OauthController extends AbstractOauthController
         }
 
         try {
-            $response = Cortex::getInstance()->oauth->registerClient($payload);
+            $response = Herald::getInstance()->oauth->registerClient($payload);
         } catch (\InvalidArgumentException $e) {
             return $this->_dcrError(400, 'invalid_client_metadata', $e->getMessage());
         } catch (Throwable $e) {
-            Craft::error("cortex OAuth DCR error: {$e->getMessage()}\n{$e->getTraceAsString()}", 'cortex');
+            Craft::error("herald OAuth DCR error: {$e->getMessage()}\n{$e->getTraceAsString()}", 'herald');
             return $this->_dcrError(500, 'server_error', 'An internal error occurred during client registration.');
         }
 
@@ -324,7 +324,7 @@ class OauthController extends AbstractOauthController
 
         $token = $this->request->getBodyParam('token');
         if (is_string($token) && $token !== '') {
-            Cortex::getInstance()->oauth->revokeToken($token);
+            Herald::getInstance()->oauth->revokeToken($token);
         }
 
         $this->response->setStatusCode(200);
@@ -358,7 +358,7 @@ class OauthController extends AbstractOauthController
      *      account status checks (locked / cooldown / suspended). When the
      *      account has an active 2FA method, password-only elevation is
      *      refused and the operator is told to elevate via Craft's native
-     *      elevated-session flow in the CP first (Cortex does not
+     *      elevated-session flow in the CP first (Herald does not
      *      re-implement the full WebAuthn / TOTP challenge here).
      *   4. Only after that verification succeeds does it mint the per-user
      *      elevation marker for `Settings::$elevationTtl` seconds.
@@ -423,7 +423,7 @@ class OauthController extends AbstractOauthController
             return $this->_renderElevateScreen(
                 $identity,
                 Craft::t(
-                    'cortex',
+                    'herald',
                     'Your account uses two-step verification. Start an elevated session from the Craft control panel first, then retry.',
                 ),
             );
@@ -433,7 +433,7 @@ class OauthController extends AbstractOauthController
         if (!is_string($password) || $password === '') {
             return $this->_renderElevateScreen(
                 $identity,
-                Craft::t('cortex', 'Enter your password to confirm elevated access.'),
+                Craft::t('herald', 'Enter your password to confirm elevated access.'),
             );
         }
 
@@ -444,14 +444,14 @@ class OauthController extends AbstractOauthController
         if (!$identity->authenticate($password)) {
             return $this->_renderElevateScreen(
                 $identity,
-                Craft::t('cortex', 'Incorrect password.'),
+                Craft::t('herald', 'Incorrect password.'),
             );
         }
 
-        Cortex::getInstance()->oauth->grantElevation((int) $identity->id);
+        Herald::getInstance()->oauth->grantElevation((int) $identity->id);
 
-        return $this->_renderElevateTemplate('cortex/oauth/elevated', [
-            'ttl' => Cortex::getInstance()->getSettings()->elevationTtl,
+        return $this->_renderElevateTemplate('herald/oauth/elevated', [
+            'ttl' => Herald::getInstance()->getSettings()->elevationTtl,
         ]);
     }
 
@@ -466,7 +466,7 @@ class OauthController extends AbstractOauthController
      */
     private function _renderElevateScreen(User $identity, ?string $error = null): Response
     {
-        return $this->_renderElevateTemplate('cortex/oauth/elevate', [
+        return $this->_renderElevateTemplate('herald/oauth/elevate', [
             'username' => $identity->username ?? $identity->email,
             'error' => $error,
         ]);
@@ -575,7 +575,7 @@ class OauthController extends AbstractOauthController
      * action with the user's decision.
      *
      * Rendered with `View::TEMPLATE_MODE_CP` explicitly — `/oauth/
-     * authorize` is a SITE request, and the `cortex/...` plugin
+     * authorize` is a SITE request, and the `herald/...` plugin
      * template root only resolves in CP template mode (a site-mode
      * render throws `TemplateLoaderException`; caught by the gate-9
      * browser smoke).
@@ -595,7 +595,7 @@ class OauthController extends AbstractOauthController
         // Build a {scope => plain-English description} map so the
         // consent screen renders one capability line per requested
         // scope without baking the vocabulary into the template.
-        $scopesService = Cortex::getInstance()->scopes;
+        $scopesService = Herald::getInstance()->scopes;
         $scopeDescriptions = [];
         foreach ($scopes as $scope) {
             $scopeDescriptions[$scope] = $scopesService->describe($scope);
@@ -603,7 +603,7 @@ class OauthController extends AbstractOauthController
 
         $this->response->format = Response::FORMAT_HTML;
         $this->response->content = Craft::$app->getView()->renderTemplate(
-            'cortex/oauth/authorize',
+            'herald/oauth/authorize',
             [
                 'clientName' => $authRequest->getClient()->getName(),
                 'clientId' => $authRequest->getClient()->getIdentifier(),
@@ -643,7 +643,7 @@ class OauthController extends AbstractOauthController
 
         $psrResponse = (new Psr17Factory())->createResponse();
         try {
-            $psrResponse = Cortex::getInstance()
+            $psrResponse = Herald::getInstance()
                 ->oauth
                 ->getAuthorizationServer()
                 ->completeAuthorizationRequest($authRequest, $psrResponse);
@@ -700,7 +700,7 @@ class OauthController extends AbstractOauthController
         $this->response->setStatusCode(403);
         $this->response->format = Response::FORMAT_HTML;
         $this->response->content = Craft::$app->getView()->renderTemplate(
-            'cortex/oauth/pending-approval',
+            'herald/oauth/pending-approval',
             ['clientName' => (string) $record->clientName],
             View::TEMPLATE_MODE_CP,
         );

@@ -1,19 +1,19 @@
-{% extends "cortex/_cp/_layout" %}
+{% extends "herald/_cp/_layout" %}
 {% import "_includes/forms.twig" as forms %}
 
 {# =========================================================================
-   Cortex Activity tab — VueAdminTable of the HTTP-transport invocation
+   Herald Activity tab — VueAdminTable of the HTTP-transport invocation
    audit log + filter bar + row-click Garnish.Slideout detail.
 
    The log records one row per authenticated Streamable-HTTP `tools/call`.
-   Admins audit every row; non-admins granted `cortex:viewActivity` see
+   Admins audit every row; non-admins granted `herald:viewActivity` see
    ONLY their own rows — the scope is enforced server-side in
    `SettingsController::actionActivityTableData` and cannot be widened by
    the `filters[userId]` param (fail-closed, decision 7).
 
    Data path:
-     - Table data : GET cortex/settings/activity-table-data → JSON {pagination, data}
-     - Row detail : GET cortex/settings/activity-row?id=<id> → JSON {html}
+     - Table data : GET herald/settings/activity-table-data → JSON {pagination, data}
+     - Row detail : GET herald/settings/activity-row?id=<id> → JSON {html}
 
    The row shape is locked in `SettingsController::_serializeActivityRow`:
    `{id, tool: {id, tool, mode}, kind, user, durationMs, dateCreated}` —
@@ -32,7 +32,7 @@
 
 {% set selectedSubnavItem = 'activity' %}
 
-{% do view.registerTranslations('cortex', [
+{% do view.registerTranslations('herald', [
     'All kinds',
     'All tools',
     'Anonymous',
@@ -55,20 +55,20 @@
 
 {% block content %}
     <p class="light">
-        {{ 'Audit log of authenticated Streamable HTTP tool calls. Click a row to inspect the redacted request and response payloads.'|t('cortex') }}
+        {{ 'Audit log of authenticated Streamable HTTP tool calls. Click a row to inspect the redacted request and response payloads.'|t('herald') }}
     </p>
 
-    <div id="cortex-activity-filters" class="flex flex-nowrap" style="margin-bottom: 14px; gap: 10px; flex-wrap: wrap;">
+    <div id="herald-activity-filters" class="flex flex-nowrap" style="margin-bottom: 14px; gap: 10px; flex-wrap: wrap;">
         <div class="field">
             <div class="heading">
-                <label for="cortex-activity-filter-kind">{{ 'Kind'|t('cortex') }}</label>
+                <label for="herald-activity-filter-kind">{{ 'Kind'|t('herald') }}</label>
             </div>
             <div class="input">
                 {{ forms.select({
-                    id: 'cortex-activity-filter-kind',
+                    id: 'herald-activity-filter-kind',
                     name: 'kind',
-                    options: [{ label: 'All kinds'|t('cortex'), value: '' }]|merge(
-                        kinds|map(k => { label: k|t('cortex'), value: k })
+                    options: [{ label: 'All kinds'|t('herald'), value: '' }]|merge(
+                        kinds|map(k => { label: k|t('herald'), value: k })
                     ),
                 }) }}
             </div>
@@ -76,13 +76,13 @@
 
         <div class="field">
             <div class="heading">
-                <label for="cortex-activity-filter-tool">{{ 'Tool'|t('cortex') }}</label>
+                <label for="herald-activity-filter-tool">{{ 'Tool'|t('herald') }}</label>
             </div>
             <div class="input">
                 {{ forms.select({
-                    id: 'cortex-activity-filter-tool',
+                    id: 'herald-activity-filter-tool',
                     name: 'toolName',
-                    options: [{ label: 'All tools'|t('cortex'), value: '' }]|merge(
+                    options: [{ label: 'All tools'|t('herald'), value: '' }]|merge(
                         toolNames|map(t => { label: t, value: t })
                     ),
                 }) }}
@@ -92,15 +92,15 @@
         {% if isAdmin %}
             <div class="field">
                 <div class="heading">
-                    <label for="cortex-activity-filter-user">{{ 'User'|t('cortex') }}</label>
+                    <label for="herald-activity-filter-user">{{ 'User'|t('herald') }}</label>
                 </div>
                 <div class="input">
                     {{ forms.elementSelect({
-                        id: 'cortex-activity-filter-user',
+                        id: 'herald-activity-filter-user',
                         name: 'userId',
                         elementType: 'craft\\elements\\User',
                         limit: 1,
-                        selectionLabel: 'Choose a user'|t('cortex'),
+                        selectionLabel: 'Choose a user'|t('herald'),
                     }) }}
                 </div>
             </div>
@@ -108,11 +108,11 @@
 
         <div class="field">
             <div class="heading">
-                <label for="cortex-activity-filter-from">{{ 'From'|t('cortex') }}</label>
+                <label for="herald-activity-filter-from">{{ 'From'|t('herald') }}</label>
             </div>
             <div class="input">
                 {{ forms.date({
-                    id: 'cortex-activity-filter-from',
+                    id: 'herald-activity-filter-from',
                     name: 'from',
                 }) }}
             </div>
@@ -120,23 +120,23 @@
 
         <div class="field">
             <div class="heading">
-                <label for="cortex-activity-filter-to">{{ 'To'|t('cortex') }}</label>
+                <label for="herald-activity-filter-to">{{ 'To'|t('herald') }}</label>
             </div>
             <div class="input">
                 {{ forms.date({
-                    id: 'cortex-activity-filter-to',
+                    id: 'herald-activity-filter-to',
                     name: 'to',
                 }) }}
             </div>
         </div>
     </div>
 
-    <div id="cortex-activity-vue-admin-table"></div>
+    <div id="herald-activity-vue-admin-table"></div>
 {% endblock %}
 
 {% js %}
     (function() {
-        var tableContainer = '#cortex-activity-vue-admin-table';
+        var tableContainer = '#herald-activity-vue-admin-table';
 
         // Collect the current filter values into the `criteria` object the
         // VueAdminTable forwards as query params. Reads the live DOM each
@@ -149,16 +149,16 @@
             // The user element-select posts its id under `fields[...][]` —
             // read the hidden input the Garnish element-select maintains.
             var userId = '';
-            var userInput = document.querySelector('#cortex-activity-filter-user input[name="userId[]"]');
+            var userInput = document.querySelector('#herald-activity-filter-user input[name="userId[]"]');
             if (userInput) {
                 userId = userInput.value;
             }
             return {
-                kind: val('#cortex-activity-filter-kind'),
-                toolName: val('#cortex-activity-filter-tool'),
+                kind: val('#herald-activity-filter-kind'),
+                toolName: val('#herald-activity-filter-tool'),
                 userId: userId,
-                from: val('#cortex-activity-filter-from'),
-                to: val('#cortex-activity-filter-to'),
+                from: val('#herald-activity-filter-from'),
+                to: val('#herald-activity-filter-to'),
             };
         }
 
@@ -166,7 +166,7 @@
             // VueAdminTable callbacks receive ONLY the cell value — the
             // controller serialises a `{id, tool, mode}` composite so the
             // detail-trigger id and mode suffix travel inside the value.
-            var tool = value && value.tool ? Craft.escapeHtml(value.tool) : Craft.t('cortex', 'tool call');
+            var tool = value && value.tool ? Craft.escapeHtml(value.tool) : Craft.t('herald', 'tool call');
             if (value && value.mode) {
                 tool += ' <span class="light">/ ' + Craft.escapeHtml(value.mode) + '</span>';
             }
@@ -174,8 +174,8 @@
             // so it is reachable and operable by keyboard (Space/Enter)
             // without depending on VueAdminTable row internals.
             return (
-                '<button type="button" class="cortex-activity-row-trigger" ' +
-                'data-cortex-activity-id="' + parseInt(value && value.id, 10) + '">' +
+                '<button type="button" class="herald-activity-row-trigger" ' +
+                'data-herald-activity-id="' + parseInt(value && value.id, 10) + '">' +
                 tool +
                 '</button>'
             );
@@ -185,13 +185,13 @@
             if (!value) {
                 return '';
             }
-            var cls = 'cortex-status cortex-status--' + value.replace(/_/g, '-');
+            var cls = 'herald-status herald-status--' + value.replace(/_/g, '-');
             return '<span class="' + cls + '">' + Craft.escapeHtml(value) + '</span>';
         }
 
         function renderUserCell(value) {
             if (!value) {
-                return '<span class="light">' + Craft.t('cortex', 'Anonymous') + '</span>';
+                return '<span class="light">' + Craft.t('herald', 'Anonymous') + '</span>';
             }
             var label = Craft.escapeHtml(value.label || '');
             if (value.cpEditUrl) {
@@ -217,17 +217,17 @@
         }
 
         var columns = [
-            { name: 'tool', title: Craft.t('cortex', 'Tool'), sortField: 'tool', callback: renderToolCell },
-            { name: 'kind', title: Craft.t('cortex', 'Kind'), sortField: 'kind', callback: renderKindCell },
-            { name: 'user', title: Craft.t('cortex', 'User'), callback: renderUserCell },
-            { name: 'durationMs', title: Craft.t('cortex', 'Duration'), sortField: 'durationMs', callback: renderDurationCell },
-            { name: 'dateCreated', title: Craft.t('cortex', 'When'), sortField: 'dateCreated', callback: renderWhenCell },
+            { name: 'tool', title: Craft.t('herald', 'Tool'), sortField: 'tool', callback: renderToolCell },
+            { name: 'kind', title: Craft.t('herald', 'Kind'), sortField: 'kind', callback: renderKindCell },
+            { name: 'user', title: Craft.t('herald', 'User'), callback: renderUserCell },
+            { name: 'durationMs', title: Craft.t('herald', 'Duration'), sortField: 'durationMs', callback: renderDurationCell },
+            { name: 'dateCreated', title: Craft.t('herald', 'When'), sortField: 'dateCreated', callback: renderWhenCell },
         ];
 
         var adminTable = new Craft.VueAdminTable({
             container: tableContainer,
             columns: columns,
-            tableDataEndpoint: 'cortex/settings/activity-table-data',
+            tableDataEndpoint: 'herald/settings/activity-table-data',
             // VueAdminTable has NO `criteria` option — custom params must
             // go through the `onQueryParams` hook, which fires on every
             // fetch. Reading the live DOM here means a filter change only
@@ -243,13 +243,13 @@
                 return params;
             },
             search: true,
-            searchPlaceholder: Craft.t('cortex', 'Search activity'),
-            emptyMessage: Craft.t('cortex', 'No activity recorded yet.'),
+            searchPlaceholder: Craft.t('herald', 'Search activity'),
+            emptyMessage: Craft.t('herald', 'No activity recorded yet.'),
         });
 
         // Filter changes just reload — `onQueryParams` re-reads the live
         // DOM values on the fetch it triggers.
-        document.querySelectorAll('#cortex-activity-filters select, #cortex-activity-filters input').forEach(function(el) {
+        document.querySelectorAll('#herald-activity-filters select, #herald-activity-filters input').forEach(function(el) {
             el.addEventListener('change', function() {
                 adminTable.reload();
             });
@@ -259,17 +259,17 @@
         // survives table re-renders (VueAdminTable replaces the row DOM on
         // every fetch). Locale-proof: matches the data attribute, not text.
         document.addEventListener('click', function(event) {
-            var trigger = event.target.closest('.cortex-activity-row-trigger[data-cortex-activity-id]');
+            var trigger = event.target.closest('.herald-activity-row-trigger[data-herald-activity-id]');
             if (!trigger) {
                 return;
             }
             event.preventDefault();
-            var id = parseInt(trigger.getAttribute('data-cortex-activity-id'), 10);
+            var id = parseInt(trigger.getAttribute('data-herald-activity-id'), 10);
             if (id > 0) {
-                Cortex.openActivityDetailSlideout(id);
+                Herald.openActivityDetailSlideout(id);
             }
         });
 
-        window.cortexActivityTable = adminTable;
+        window.heraldActivityTable = adminTable;
     })();
 {% endjs %}

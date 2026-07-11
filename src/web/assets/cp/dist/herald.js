@@ -1,7 +1,7 @@
 /* =========================================================================
-   Cortex CP JavaScript.
+   Herald CP JavaScript.
 
-   Single global `Cortex` namespace on `window`. 9.2 ships the
+   Single global `Herald` namespace on `window`. 9.2 ships the
    Allowlist-tab slideout wiring; 9.3 / 9.5 extend with Activity-detail
    and Tokens-issuance slideouts respectively.
 
@@ -12,35 +12,35 @@
 (function(window) {
     'use strict';
 
-    if (typeof window.Cortex !== 'undefined') {
+    if (typeof window.Herald !== 'undefined') {
         return;
     }
 
     /**
-     * Cortex CP JavaScript namespace.
+     * Herald CP JavaScript namespace.
      *
      * Populated incrementally across Gate 9 sub-gates:
      *   - 9.2 — openAllowlistOverrideSlideout
      *   - 9.3 — openActivityDetailSlideout
      *   - 9.5 — openTokenIssuanceSlideout, copyToClipboard
      */
-    var Cortex = {
+    var Herald = {
         /**
          * Plugin handle — used to scope translations and disambiguate
-         * any global selectors Cortex JS attaches.
+         * any global selectors Herald JS attaches.
          */
-        handle: 'cortex',
+        handle: 'herald',
 
         /**
          * Open the "+ New override" slideout for the Allowlist tab.
          *
-         * Fetches the form HTML from the Cortex controller, hands it
+         * Fetches the form HTML from the Herald controller, hands it
          * to `Craft.Slideout` with `containerElement: 'form'` so the
          * slideout shell carries the `<form>` chrome we POST through,
          * then wires submit + cancel handlers.
          *
          * On submit:
-         *   - POST `cortex/settings/add-override` with the form payload.
+         *   - POST `herald/settings/add-override` with the form payload.
          *   - On 200 success: close the slideout, reload the table.
          *   - On 400 validation failure: surface the message inline,
          *     keep the slideout open so the operator can fix and retry.
@@ -50,7 +50,7 @@
          *                              successful issuance.
          */
         openAllowlistOverrideSlideout: function(adminTable) {
-            Craft.sendActionRequest('GET', 'cortex/settings/allowlist-override-slideout')
+            Craft.sendActionRequest('GET', 'herald/settings/allowlist-override-slideout')
                 .then(function(response) {
                     var html = response.data;
 
@@ -60,16 +60,16 @@
                             action: '',
                             method: 'post',
                             novalidate: '',
-                            class: 'cortex-slideout cortex-allowlist-slideout',
+                            class: 'herald-slideout herald-allowlist-slideout',
                         },
                     });
 
-                    Cortex._wireAllowlistSlideout(slideout, adminTable);
+                    Herald._wireAllowlistSlideout(slideout, adminTable);
                 })
                 .catch(function(error) {
-                    Craft.cp.displayError(Craft.t('cortex', 'Could not open the grant form.'));
+                    Craft.cp.displayError(Craft.t('herald', 'Could not open the grant form.'));
                     if (window.console && console.error) {
-                        console.error('Cortex slideout load failed:', error);
+                        console.error('Herald slideout load failed:', error);
                     }
                 });
         },
@@ -85,7 +85,7 @@
         _wireAllowlistSlideout: function(slideout, adminTable) {
             var $container = slideout.$container;
 
-            $container.on('click', '[data-cortex-cancel]', function(event) {
+            $container.on('click', '[data-herald-cancel]', function(event) {
                 event.preventDefault();
                 slideout.close();
             });
@@ -95,7 +95,7 @@
             $container.on('submit', function(event) {
                 event.preventDefault();
 
-                var $submit = $container.find('[data-cortex-submit]').addClass('loading').attr('disabled', 'disabled');
+                var $submit = $container.find('[data-herald-submit]').addClass('loading').attr('disabled', 'disabled');
 
                 // Strip any previous error decoration before retrying.
                 $container.find('.field.has-errors').each(function() {
@@ -105,7 +105,7 @@
                     $field.children('ul.errors').remove();
                 });
 
-                Craft.sendActionRequest('POST', 'cortex/settings/add-override', {
+                Craft.sendActionRequest('POST', 'herald/settings/add-override', {
                     data: $container.serialize(),
                 })
                     .then(function() {
@@ -113,10 +113,10 @@
                         if (adminTable && typeof adminTable.reload === 'function') {
                             adminTable.reload();
                         }
-                        Craft.cp.displayNotice(Craft.t('cortex', 'Grant issued.'));
+                        Craft.cp.displayNotice(Craft.t('herald', 'Grant issued.'));
                     })
                     .catch(function(error) {
-                        var message = Craft.t('cortex', 'Could not add grant.');
+                        var message = Craft.t('herald', 'Could not add grant.');
                         if (error && error.response && error.response.data && error.response.data.message) {
                             message = error.response.data.message;
                         }
@@ -132,11 +132,11 @@
          * Open the "+ New token" slideout for the Tokens tab.
          *
          * Fetches the slideout HTML (issue form + a hidden one-time
-         * reveal panel) from the Cortex controller, hands it to
+         * reveal panel) from the Herald controller, hands it to
          * `Craft.Slideout` with `containerElement: 'form'`, then wires
          * the submit / cancel / copy / done handlers.
          *
-         * On submit the issue form POSTs `cortex/settings/issue-token`; on 200
+         * On submit the issue form POSTs `herald/settings/issue-token`; on 200
          * the slideout swaps from the form to the reveal panel and
          * injects the plaintext (carried in the JSON response's `token`
          * key) into the `<code>` block. The plaintext lives ONLY in that
@@ -148,7 +148,7 @@
          *                              successful issuance.
          */
         openTokenIssuanceSlideout: function(adminTable) {
-            Craft.sendActionRequest('GET', 'cortex/settings/token-issue-slideout')
+            Craft.sendActionRequest('GET', 'herald/settings/token-issue-slideout')
                 .then(function(response) {
                     // The action returns `{html, headHtml, bodyHtml}` —
                     // the body delta carries the element-select init JS
@@ -163,7 +163,7 @@
                             action: '',
                             method: 'post',
                             novalidate: '',
-                            class: 'cortex-slideout cortex-token-slideout',
+                            class: 'herald-slideout herald-token-slideout',
                         },
                     });
 
@@ -174,12 +174,12 @@
                         Craft.appendBodyHtml(data.bodyHtml);
                     }
 
-                    Cortex._wireTokenSlideout(slideout, adminTable);
+                    Herald._wireTokenSlideout(slideout, adminTable);
                 })
                 .catch(function(error) {
-                    Craft.cp.displayError(Craft.t('cortex', 'Could not open the token form.'));
+                    Craft.cp.displayError(Craft.t('herald', 'Could not open the token form.'));
                     if (window.console && console.error) {
-                        console.error('Cortex token slideout load failed:', error);
+                        console.error('Herald token slideout load failed:', error);
                     }
                 });
         },
@@ -194,14 +194,14 @@
         _wireTokenSlideout: function(slideout, adminTable) {
             var $container = slideout.$container;
 
-            $container.on('click', '[data-cortex-cancel]', function(event) {
+            $container.on('click', '[data-herald-cancel]', function(event) {
                 event.preventDefault();
                 slideout.close();
             });
 
             // Done button on the reveal panel — closes and reloads the
             // table so the freshly-issued row appears.
-            $container.on('click', '[data-cortex-done]', function(event) {
+            $container.on('click', '[data-herald-done]', function(event) {
                 event.preventDefault();
                 slideout.close();
                 if (adminTable && typeof adminTable.reload === 'function') {
@@ -211,13 +211,13 @@
 
             // Copy-to-clipboard on the reveal panel. The plaintext is read
             // straight from the `<code>` node — it is never re-fetched.
-            $container.on('click', '[data-cortex-copy]', function(event) {
+            $container.on('click', '[data-herald-copy]', function(event) {
                 event.preventDefault();
-                var token = $container.find('[data-cortex-token]').text();
-                Cortex.copyToClipboard(token, function() {
-                    var $status = $container.find('[data-cortex-copy-status]');
-                    $status.text(Craft.t('cortex', 'Token copied to clipboard.'));
-                    Craft.cp.displayNotice(Craft.t('cortex', 'Token copied to clipboard.'));
+                var token = $container.find('[data-herald-token]').text();
+                Herald.copyToClipboard(token, function() {
+                    var $status = $container.find('[data-herald-copy-status]');
+                    $status.text(Craft.t('herald', 'Token copied to clipboard.'));
+                    Craft.cp.displayNotice(Craft.t('herald', 'Token copied to clipboard.'));
                 });
             });
 
@@ -225,7 +225,7 @@
             $container.on('submit', function(event) {
                 event.preventDefault();
 
-                var $submit = $container.find('[data-cortex-submit]').addClass('loading').attr('disabled', 'disabled');
+                var $submit = $container.find('[data-herald-submit]').addClass('loading').attr('disabled', 'disabled');
 
                 $container.find('.field.has-errors').each(function() {
                     var $field = Craft.$(this);
@@ -234,28 +234,28 @@
                     $field.children('ul.errors').remove();
                 });
 
-                Craft.sendActionRequest('POST', 'cortex/settings/issue-token', {
+                Craft.sendActionRequest('POST', 'herald/settings/issue-token', {
                     data: $container.serialize(),
                 })
                     .then(function(response) {
                         var token = response && response.data ? response.data.token : '';
 
                         // Swap from the issue form to the one-time reveal.
-                        $container.find('[data-cortex-issue-form]').attr('hidden', 'hidden');
-                        var $reveal = $container.find('[data-cortex-reveal]');
-                        $reveal.find('[data-cortex-token]').text(token || '');
+                        $container.find('[data-herald-issue-form]').attr('hidden', 'hidden');
+                        var $reveal = $container.find('[data-herald-reveal]');
+                        $reveal.find('[data-herald-token]').text(token || '');
                         $reveal.removeAttr('hidden');
 
                         // Move focus to the copy button so keyboard users
                         // land on the primary action of the new state.
-                        $reveal.find('[data-cortex-copy]').trigger('focus');
+                        $reveal.find('[data-herald-copy]').trigger('focus');
 
                         if (adminTable && typeof adminTable.reload === 'function') {
                             adminTable.reload();
                         }
                     })
                     .catch(function(error) {
-                        var message = Craft.t('cortex', 'Could not issue token.');
+                        var message = Craft.t('herald', 'Could not issue token.');
                         if (error && error.response && error.response.data && error.response.data.message) {
                             message = error.response.data.message;
                         }
@@ -283,10 +283,10 @@
          * Garnish.Slideout supplies the focus trap + ESC dismissal; the
          * "Done" button closes it.
          *
-         * @param {number} id - The `cortex_invocations` row id.
+         * @param {number} id - The `herald_invocations` row id.
          */
         openActivityDetailSlideout: function(id) {
-            Craft.sendActionRequest('GET', 'cortex/settings/activity-row', {
+            Craft.sendActionRequest('GET', 'herald/settings/activity-row', {
                 params: { id: id },
             })
                 .then(function(response) {
@@ -294,19 +294,19 @@
 
                     var slideout = new Craft.Slideout(html, {
                         containerAttributes: {
-                            class: 'cortex-slideout cortex-activity-slideout',
+                            class: 'herald-slideout herald-activity-slideout',
                         },
                     });
 
-                    slideout.$container.on('click', '[data-cortex-done]', function(event) {
+                    slideout.$container.on('click', '[data-herald-done]', function(event) {
                         event.preventDefault();
                         slideout.close();
                     });
                 })
                 .catch(function(error) {
-                    Craft.cp.displayError(Craft.t('cortex', 'Could not open the activity detail.'));
+                    Craft.cp.displayError(Craft.t('herald', 'Could not open the activity detail.'));
                     if (window.console && console.error) {
-                        console.error('Cortex activity detail load failed:', error);
+                        console.error('Herald activity detail load failed:', error);
                     }
                 });
         },
@@ -326,25 +326,25 @@
          * Craft's CP boot; we resolve each `Craft.LightSwitch` widget
          * instance and listen for its Garnish `change` event (the widget
          * fires it on itself, not as a bubbling DOM event) to toggle
-         * dependent UI. Read-only mode (`config/cortex.php` override)
+         * dependent UI. Read-only mode (`config/herald.php` override)
          * disables every control server-side, so this wiring is inert there.
          *
-         * @param {Element} root - The `[data-cortex-command-browser]` element.
+         * @param {Element} root - The `[data-herald-command-browser]` element.
          */
         initCommandBrowser: function(root) {
             if (!root || root.getAttribute('aria-disabled') === 'true') {
                 return;
             }
 
-            var groups = root.querySelectorAll('[data-cortex-command-group]');
+            var groups = root.querySelectorAll('[data-herald-command-group]');
             groups.forEach(function(group) {
-                Cortex._wireCommandGroup(group);
+                Herald._wireCommandGroup(group);
             });
 
-            var filter = root.querySelector('[data-cortex-command-filter]');
+            var filter = root.querySelector('[data-herald-command-filter]');
             if (filter) {
                 filter.addEventListener('input', function() {
-                    Cortex._filterCommandGroups(root, filter.value);
+                    Herald._filterCommandGroups(root, filter.value);
                 });
             }
         },
@@ -356,10 +356,10 @@
          * @private
          */
         _wireCommandGroup: function(group) {
-            var expandBtn = group.querySelector('[data-cortex-group-expand]');
-            var actions = group.querySelector('[data-cortex-command-actions]');
-            var caret = group.querySelector('.cortex-command-group-caret');
-            var groupSwitch = group.querySelector('.cortex-command-group-header > .lightswitch');
+            var expandBtn = group.querySelector('[data-herald-group-expand]');
+            var actions = group.querySelector('[data-herald-command-actions]');
+            var caret = group.querySelector('.herald-command-group-caret');
+            var groupSwitch = group.querySelector('.herald-command-group-header > .lightswitch');
 
             if (expandBtn && actions) {
                 expandBtn.addEventListener('click', function() {
@@ -378,24 +378,24 @@
             // element. Binding `Craft.$(el).on('change', ...)` would never
             // fire. Resolve the widget instance (Craft stashes it via
             // `$el.data('lightswitch', this)`) and register on it.
-            var groupWidget = Cortex._lightswitchWidget(groupSwitch);
+            var groupWidget = Herald._lightswitchWidget(groupSwitch);
             if (groupWidget) {
                 groupWidget.on('change', function() {
-                    Cortex._applyGroupSwitchState(group);
+                    Herald._applyGroupSwitchState(group);
                 });
             }
 
-            var actionSwitches = group.querySelectorAll('[data-cortex-command-action] .lightswitch');
+            var actionSwitches = group.querySelectorAll('[data-herald-command-action] .lightswitch');
             actionSwitches.forEach(function(sw) {
-                var actionWidget = Cortex._lightswitchWidget(sw);
+                var actionWidget = Herald._lightswitchWidget(sw);
                 if (actionWidget) {
                     actionWidget.on('change', function() {
-                        Cortex._updateGroupBadge(group);
+                        Herald._updateGroupBadge(group);
                     });
                 }
             });
 
-            Cortex._applyGroupSwitchState(group);
+            Herald._applyGroupSwitchState(group);
         },
 
         /**
@@ -406,13 +406,13 @@
          * @private
          */
         _applyGroupSwitchState: function(group) {
-            var groupSwitch = group.querySelector('.cortex-command-group-header > .lightswitch');
+            var groupSwitch = group.querySelector('.herald-command-group-header > .lightswitch');
             var on = !!groupSwitch && groupSwitch.classList.contains('on');
-            var badge = group.querySelector('[data-cortex-group-badge]');
+            var badge = group.querySelector('[data-herald-group-badge]');
 
-            var actionSwitches = group.querySelectorAll('[data-cortex-command-action] .lightswitch');
+            var actionSwitches = group.querySelectorAll('[data-herald-command-action] .lightswitch');
             actionSwitches.forEach(function(sw) {
-                var widget = Cortex._lightswitchWidget(sw);
+                var widget = Herald._lightswitchWidget(sw);
                 if (!widget) {
                     return;
                 }
@@ -427,7 +427,7 @@
                 badge.hidden = on;
             }
             if (!on) {
-                Cortex._updateGroupBadge(group);
+                Herald._updateGroupBadge(group);
             }
         },
 
@@ -438,12 +438,12 @@
          * @private
          */
         _updateGroupBadge: function(group) {
-            var badge = group.querySelector('[data-cortex-group-badge]');
+            var badge = group.querySelector('[data-herald-group-badge]');
             if (!badge) {
                 return;
             }
 
-            var actionSwitches = group.querySelectorAll('[data-cortex-command-action] .lightswitch');
+            var actionSwitches = group.querySelectorAll('[data-herald-command-action] .lightswitch');
             var total = actionSwitches.length;
             var allowed = 0;
             actionSwitches.forEach(function(sw) {
@@ -452,7 +452,7 @@
                 }
             });
 
-            badge.textContent = Craft.t('cortex', '{count}/{total} allowed', { count: allowed, total: total });
+            badge.textContent = Craft.t('herald', '{count}/{total} allowed', { count: allowed, total: total });
         },
 
         /**
@@ -482,14 +482,14 @@
          */
         _filterCommandGroups: function(root, needle) {
             needle = (needle || '').trim().toLowerCase();
-            var groups = root.querySelectorAll('[data-cortex-command-group]');
+            var groups = root.querySelectorAll('[data-herald-command-group]');
 
             groups.forEach(function(group) {
                 var handle = (group.getAttribute('data-group-handle') || '').toLowerCase();
                 var handleMatches = needle === '' || handle.indexOf(needle) !== -1;
                 var anyActionMatches = false;
 
-                var actions = group.querySelectorAll('[data-cortex-command-action]');
+                var actions = group.querySelectorAll('[data-herald-command-action]');
                 actions.forEach(function(action) {
                     var routeId = (action.getAttribute('data-route-id') || '').toLowerCase();
                     var match = needle === '' || handleMatches || routeId.indexOf(needle) !== -1;
@@ -517,12 +517,12 @@
 
             if (navigator.clipboard && navigator.clipboard.writeText) {
                 navigator.clipboard.writeText(text).then(done).catch(function() {
-                    Cortex._legacyCopy(text, done);
+                    Herald._legacyCopy(text, done);
                 });
                 return;
             }
 
-            Cortex._legacyCopy(text, done);
+            Herald._legacyCopy(text, done);
         },
 
         /**
@@ -543,12 +543,12 @@
                 done();
             } catch (e) {
                 if (window.console && console.error) {
-                    console.error('Cortex clipboard copy failed:', e);
+                    console.error('Herald clipboard copy failed:', e);
                 }
             }
             document.body.removeChild(textarea);
         },
     };
 
-    window.Cortex = Cortex;
+    window.Herald = Herald;
 })(window);

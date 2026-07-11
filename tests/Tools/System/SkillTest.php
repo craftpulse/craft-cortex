@@ -15,13 +15,13 @@
  *     elements.
  *   - Idempotency cache hit on `create`.
  *   - Handle-change refusal on `update` (natural-key invariant).
- *   - Permission denial for users without `manageCortexSkills`.
+ *   - Permission denial for users without `manageHeraldSkills`.
  *   - Trashed resolution emits the restore-hint message.
  *   - Override behaviour: creating a skill with a bundled handle
  *     succeeds; deleting the override re-surfaces the bundled row.
  *     (This is one of the four highest-value regression gates.)
  *
- * Fixture strategy: handle prefix `cortex-skilltest-<hex>-` (slug-shaped
+ * Fixture strategy: handle prefix `herald-skilltest-<hex>-` (slug-shaped
  * to satisfy `Skill::HANDLE_PATTERN`); afterEach hard-deletes by handle
  * LIKE.
  * =========================================================================
@@ -31,10 +31,10 @@
  */
 
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\elements\Skill as SkillElement;
-use craftpulse\cortex\tools\system\Skill;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\elements\Skill as SkillElement;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\system\Skill;
+use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
 // Setup
@@ -43,7 +43,7 @@ use craftpulse\cortex\tools\ToolException;
 beforeEach(function() {
     // Slug-shaped so handles satisfy Skill::HANDLE_PATTERN
     // (lowercase letters, digits, single hyphens).
-    $this->fixturePrefix = 'cortex-skilltest-' . bin2hex(random_bytes(4)) . '-';
+    $this->fixturePrefix = 'herald-skilltest-' . bin2hex(random_bytes(4)) . '-';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -57,7 +57,7 @@ afterEach(function() {
         ->status(null)
         ->trashed(null)
         ->site('*')
-        ->andWhere(['like', 'cortex_skills.handle', $this->fixturePrefix . '%', false])
+        ->andWhere(['like', 'herald_skills.handle', $this->fixturePrefix . '%', false])
         ->all();
     foreach ($rows as $row) {
         Craft::$app->getElements()->deleteElement($row, hardDelete: true);
@@ -73,14 +73,14 @@ afterEach(function() {
         Craft::$app->getElements()->deleteElement($user, hardDelete: true);
     }
 
-    Cortex::getInstance()->skills->resetMemo();
+    Herald::getInstance()->skills->resetMemo();
 });
 
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _cortex_skill_tool(): Skill
+function _herald_skill_tool(): Skill
 {
     return new Skill();
 }
@@ -90,18 +90,18 @@ function _cortex_skill_tool(): Skill
 // -----------------------------------------------------------------------------
 
 it('is NOT registered on Free installs', function() {
-    expect(Cortex::getInstance()->tools->getByName('skill'))->toBeNull();
+    expect(Herald::getInstance()->tools->getByName('skill'))->toBeNull();
 
     $names = array_map(
         static fn(array $entry): string => $entry['name'],
-        Cortex::getInstance()->tools->asListPayload(),
+        Herald::getInstance()->tools->asListPayload(),
     );
     expect($names)->not->toContain('skill');
 });
 
 it('shouldRegister() returns true on Pro and false on Free', function() {
     expect(Skill::shouldRegister())->toBeFalse();
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect(Skill::shouldRegister())->toBeTrue();
     });
 });
@@ -111,14 +111,14 @@ it('shouldRegister() returns true on Pro and false on Free', function() {
 // -----------------------------------------------------------------------------
 
 it('throws ToolException when mode is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_skill_tool()->execute([]);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_skill_tool()->execute([]);
     });
 })->throws(ToolException::class);
 
 it('throws ToolException on unknown mode', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_skill_tool()->execute(['mode' => 'frobnicate']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_skill_tool()->execute(['mode' => 'frobnicate']);
     });
 })->throws(ToolException::class);
 
@@ -127,18 +127,18 @@ it('throws ToolException on unknown mode', function() {
 // -----------------------------------------------------------------------------
 
 it('filterFor(null) returns true — stdio is trusted', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_skill_tool()->filterFor(null))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_skill_tool()->filterFor(null))->toBeTrue();
     });
 });
 
 it('filterFor returns true for admin users', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_skill_tool()->filterFor($this->admin))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_skill_tool()->filterFor($this->admin))->toBeTrue();
     });
 });
 
-it('filterFor returns false for users without manageCortexSkills', function() {
+it('filterFor returns false for users without manageHeraldSkills', function() {
     $user = new User();
     $user->username = $this->fixturePrefix . 'no_perms';
     $user->email = $user->username . '@example.test';
@@ -148,8 +148,8 @@ it('filterFor returns false for users without manageCortexSkills', function() {
         $this->markTestSkipped('Could not create fixture user');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
-        expect(_cortex_skill_tool()->filterFor($user))->toBeFalse();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
+        expect(_herald_skill_tool()->filterFor($user))->toBeFalse();
     });
 });
 
@@ -158,8 +158,8 @@ it('filterFor returns false for users without manageCortexSkills', function() {
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor returns the full mode enum', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_skill_tool()->inputSchemaFor($this->admin);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_skill_tool()->inputSchemaFor($this->admin);
         expect($schema['properties']['mode']['enum'])
             ->toBe(['list', 'get', 'create', 'update', 'delete']);
     });
@@ -170,9 +170,9 @@ it('inputSchemaFor returns the full mode enum', function() {
 // -----------------------------------------------------------------------------
 
 it('create mode persists a new skill and round-trips through find()', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $handle = $this->fixturePrefix . 'create';
-        $result = _cortex_skill_tool()->execute([
+        $result = _herald_skill_tool()->execute([
             'mode' => 'create',
             'handle' => $handle,
             'title' => 'Create test',
@@ -193,21 +193,21 @@ it('create mode persists a new skill and round-trips through find()', function()
 });
 
 it('create mode rejects missing handle', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_skill_tool()->execute(['mode' => 'create', 'title' => 'no handle']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_skill_tool()->execute(['mode' => 'create', 'title' => 'no handle']);
     });
 })->throws(ToolException::class, '`handle` is required');
 
 it('create mode rejects missing title', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_skill_tool()->execute(['mode' => 'create', 'handle' => $this->fixturePrefix . 'notitle']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_skill_tool()->execute(['mode' => 'create', 'handle' => $this->fixturePrefix . 'notitle']);
     });
 })->throws(ToolException::class, '`title` is required');
 
 it('create mode returns a validation envelope when handle collides with another element', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $handle = $this->fixturePrefix . 'dup';
-        $tool = _cortex_skill_tool();
+        $tool = _herald_skill_tool();
         $tool->execute(['mode' => 'create', 'handle' => $handle, 'title' => 'first']);
 
         $result = $tool->execute(['mode' => 'create', 'handle' => $handle, 'title' => 'second']);
@@ -221,9 +221,9 @@ it('create mode returns a validation envelope (not an IntegrityException) when t
     // skill used to slip past validation and explode with a raw
     // IntegrityException inside afterSave(). The tool must instead
     // return the clean _validationEnvelope shape.
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $handle = $this->fixturePrefix . 'trashedclash';
-        $tool = _cortex_skill_tool();
+        $tool = _herald_skill_tool();
         $created = $tool->execute(['mode' => 'create', 'handle' => $handle, 'title' => 'original']);
         $tool->execute(['mode' => 'delete', 'id' => $created['skill']['id']]);
 
@@ -248,9 +248,9 @@ it('create mode returns a validation envelope (not an IntegrityException) when t
 // -----------------------------------------------------------------------------
 
 it('get mode finds the element by id, uid, and handle', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $handle = $this->fixturePrefix . 'getall';
-        $tool = _cortex_skill_tool();
+        $tool = _herald_skill_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'handle' => $handle,
@@ -272,14 +272,14 @@ it('get mode finds the element by id, uid, and handle', function() {
 });
 
 it('get mode falls through to a bundled handle when no element exists', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $bundledNames = \Michtio\CraftCmsClaudeSkills\Skills::skillNames();
         if ($bundledNames === []) {
             $this->markTestSkipped('No bundled skills installed.');
         }
         $bundledHandle = $bundledNames[0];
 
-        $result = _cortex_skill_tool()->execute([
+        $result = _herald_skill_tool()->execute([
             'mode' => 'get',
             'handle' => $bundledHandle,
         ]);
@@ -292,16 +292,16 @@ it('get mode falls through to a bundled handle when no element exists', function
 });
 
 it('get mode throws when no identifier is supplied', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_skill_tool()->execute(['mode' => 'get']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_skill_tool()->execute(['mode' => 'get']);
     });
 })->throws(ToolException::class);
 
 it('get mode throws on a non-existent handle', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_skill_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_skill_tool()->execute([
             'mode' => 'get',
-            'handle' => 'cortex-skilltest-nonexistent-zzz',
+            'handle' => 'herald-skilltest-nonexistent-zzz',
         ]);
     });
 })->throws(ToolException::class);
@@ -311,8 +311,8 @@ it('get mode throws on a non-existent handle', function() {
 // -----------------------------------------------------------------------------
 
 it('list mode returns merged corpus rows with source on every row', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $result = _cortex_skill_tool()->execute(['mode' => 'list', 'limit' => 200]);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $result = _herald_skill_tool()->execute(['mode' => 'list', 'limit' => 200]);
         expect($result['success'])->toBeTrue();
         expect($result['mode'])->toBe('list');
         expect($result['skills'])->toBeArray();
@@ -324,16 +324,16 @@ it('list mode returns merged corpus rows with source on every row', function() {
 });
 
 it('list mode source=bundled returns only bundled rows', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         // Seed an element-stored skill so we can prove the filter
         // removes element rows from the returned set.
-        _cortex_skill_tool()->execute([
+        _herald_skill_tool()->execute([
             'mode' => 'create',
             'handle' => $this->fixturePrefix . 'bundledfilter',
             'title' => 'Bundled filter probe',
         ]);
 
-        $result = _cortex_skill_tool()->execute([
+        $result = _herald_skill_tool()->execute([
             'mode' => 'list',
             'source' => 'bundled',
             'limit' => 200,
@@ -345,15 +345,15 @@ it('list mode source=bundled returns only bundled rows', function() {
 });
 
 it('list mode source=element returns only element rows', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $handle = $this->fixturePrefix . 'elementfilter';
-        _cortex_skill_tool()->execute([
+        _herald_skill_tool()->execute([
             'mode' => 'create',
             'handle' => $handle,
             'title' => 'Element-only probe',
         ]);
 
-        $result = _cortex_skill_tool()->execute([
+        $result = _herald_skill_tool()->execute([
             'mode' => 'list',
             'source' => 'element',
             'limit' => 200,
@@ -368,15 +368,15 @@ it('list mode source=element returns only element rows', function() {
 });
 
 it('list mode applies the search substring filter', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $needle = $this->fixturePrefix . 'searchtoken';
-        _cortex_skill_tool()->execute([
+        _herald_skill_tool()->execute([
             'mode' => 'create',
             'handle' => $needle,
             'title' => 'search probe',
         ]);
 
-        $result = _cortex_skill_tool()->execute([
+        $result = _herald_skill_tool()->execute([
             'mode' => 'list',
             'search' => $needle,
             'limit' => 200,
@@ -394,8 +394,8 @@ it('list mode applies the search substring filter', function() {
 // -----------------------------------------------------------------------------
 
 it('update mode mutates title and description', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $tool = _cortex_skill_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $tool = _herald_skill_tool();
         $handle = $this->fixturePrefix . 'updateok';
         $created = $tool->execute([
             'mode' => 'create',
@@ -419,8 +419,8 @@ it('update mode mutates title and description', function() {
 });
 
 it('update mode REJECTS a handle change attempt with a structured envelope', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $tool = _cortex_skill_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $tool = _herald_skill_tool();
         $handle = $this->fixturePrefix . 'handlechange';
         $created = $tool->execute([
             'mode' => 'create',
@@ -441,8 +441,8 @@ it('update mode REJECTS a handle change attempt with a structured envelope', fun
 });
 
 it('update mode refuses a trashed skill with a restore-hint message', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $tool = _cortex_skill_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $tool = _herald_skill_tool();
         $handle = $this->fixturePrefix . 'trashed';
         $created = $tool->execute([
             'mode' => 'create',
@@ -473,8 +473,8 @@ it('update mode refuses a trashed skill with a restore-hint message', function()
 // -----------------------------------------------------------------------------
 
 it('delete mode soft-deletes by default; skill reappears under trashed()', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $tool = _cortex_skill_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $tool = _herald_skill_tool();
         $handle = $this->fixturePrefix . 'softdel';
         $created = $tool->execute(['mode' => 'create', 'handle' => $handle, 'title' => 'soft']);
         $id = $created['skill']['id'];
@@ -490,8 +490,8 @@ it('delete mode soft-deletes by default; skill reappears under trashed()', funct
 });
 
 it('delete mode with hardDelete=true wipes the row', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $tool = _cortex_skill_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $tool = _herald_skill_tool();
         $handle = $this->fixturePrefix . 'harddel';
         $created = $tool->execute(['mode' => 'create', 'handle' => $handle, 'title' => 'hard']);
         $id = $created['skill']['id'];
@@ -508,8 +508,8 @@ it('delete mode with hardDelete=true wipes the row', function() {
 // -----------------------------------------------------------------------------
 
 it('the same idempotencyKey returns the cached envelope without re-saving', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $tool = _cortex_skill_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $tool = _herald_skill_tool();
         $handle = $this->fixturePrefix . 'idem';
         $idempotencyKey = 'idem_' . bin2hex(random_bytes(8));
 
@@ -535,8 +535,8 @@ it('the same idempotencyKey returns the cached envelope without re-saving', func
 // Permission gating
 // -----------------------------------------------------------------------------
 
-it('create mode throws ToolException for users without manageCortexSkills', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+it('create mode throws ToolException for users without manageHeraldSkills', function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $unprivileged = new User();
         $unprivileged->username = $this->fixturePrefix . 'denied';
         $unprivileged->email = $unprivileged->username . '@example.test';
@@ -551,7 +551,7 @@ it('create mode throws ToolException for users without manageCortexSkills', func
 
             $caught = null;
             try {
-                _cortex_skill_tool()->execute([
+                _herald_skill_tool()->execute([
                     'mode' => 'create',
                     'handle' => $this->fixturePrefix . 'denied',
                     'title' => 'denied',
@@ -575,7 +575,7 @@ it('create mode throws ToolException for users without manageCortexSkills', func
 // -----------------------------------------------------------------------------
 
 it('overriding a bundled handle hides the bundled row from list mode', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $bundledNames = \Michtio\CraftCmsClaudeSkills\Skills::skillNames();
         if ($bundledNames === []) {
             $this->markTestSkipped('No bundled skills installed.');
@@ -583,32 +583,32 @@ it('overriding a bundled handle hides the bundled row from list mode', function(
         $bundledHandle = $bundledNames[0];
 
         // Baseline — the bundled handle surfaces with source=bundled.
-        $baseline = _cortex_skill_tool()->execute(['mode' => 'list', 'limit' => 200]);
+        $baseline = _herald_skill_tool()->execute(['mode' => 'list', 'limit' => 200]);
         $bundledRow = collect($baseline['skills'])->firstWhere('handle', $bundledHandle);
         expect($bundledRow)->not->toBeNull();
         expect($bundledRow['source'])->toBe('bundled');
 
         // Override via an element-stored skill with the SAME handle.
-        $created = _cortex_skill_tool()->execute([
+        $created = _herald_skill_tool()->execute([
             'mode' => 'create',
             'handle' => $bundledHandle,
             'title' => 'Override probe',
         ]);
         expect($created['success'])->toBeTrue();
 
-        $afterOverride = _cortex_skill_tool()->execute(['mode' => 'list', 'limit' => 200]);
+        $afterOverride = _herald_skill_tool()->execute(['mode' => 'list', 'limit' => 200]);
         $overrideRow = collect($afterOverride['skills'])->firstWhere('handle', $bundledHandle);
         expect($overrideRow['source'])->toBe('element');
 
         // Now hard-delete the override and confirm the bundled row
         // re-surfaces.
-        _cortex_skill_tool()->execute([
+        _herald_skill_tool()->execute([
             'mode' => 'delete',
             'id' => $created['skill']['id'],
             'hardDelete' => true,
         ]);
 
-        $afterRestore = _cortex_skill_tool()->execute(['mode' => 'list', 'limit' => 200]);
+        $afterRestore = _herald_skill_tool()->execute(['mode' => 'list', 'limit' => 200]);
         $restoredRow = collect($afterRestore['skills'])->firstWhere('handle', $bundledHandle);
         expect($restoredRow['source'])->toBe('bundled');
     });
@@ -619,7 +619,7 @@ it('overriding a bundled handle hides the bundled row from list mode', function(
 // -----------------------------------------------------------------------------
 
 it('appears in the Pro registry tools/list payload with annotations', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         // Rebuild the registry under Pro by constructing a new Tools
         // service — boot order means the existing component instance
         // booted under Free. The static `shouldRegister()` flip is

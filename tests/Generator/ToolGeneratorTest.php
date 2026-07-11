@@ -2,14 +2,14 @@
 
 /**
  * =========================================================================
- * Smoke tests for the cortex-tool generator.
+ * Smoke tests for the herald-tool generator.
  *
  * Interactive code generation is hard to test end-to-end without a TTY,
- * so this suite asserts only the registration contract: cortex registers
+ * so this suite asserts only the registration contract: herald registers
  * the generator on Craft's `make` command, the generator declares the
  * expected CLI name and description, and the class satisfies the
  * `BaseGenerator` parent contract. Manual smoke through
- * `ddev craft make cortex-tool` covers the actual code-output path.
+ * `ddev craft make herald-tool` covers the actual code-output path.
  * =========================================================================
  *
  * @author Craftpulse
@@ -18,15 +18,15 @@
 
 use craft\generator\BaseGenerator;
 use craft\generator\Command;
-use craftpulse\cortex\generator\Tool as ToolGenerator;
+use craftpulse\herald\generator\Tool as ToolGenerator;
 use yii\base\Event;
 
 it('extends BaseGenerator', function() {
     expect(is_subclass_of(ToolGenerator::class, BaseGenerator::class))->toBeTrue();
 });
 
-it('exposes the cortex-tool CLI name', function() {
-    expect(ToolGenerator::name())->toBe('cortex-tool');
+it('exposes the herald-tool CLI name', function() {
+    expect(ToolGenerator::name())->toBe('herald-tool');
 });
 
 it('exposes a non-empty description', function() {
@@ -34,7 +34,7 @@ it('exposes a non-empty description', function() {
 });
 
 it('is registered on the make command via EVENT_REGISTER_GENERATORS', function() {
-    // Cortex::init() fires the registration on boot. The Yii Event class
+    // Herald::init() fires the registration on boot. The Yii Event class
     // tracks listeners on the class itself so we can verify by
     // simulating the event and checking that ToolGenerator appears in
     // the resulting types list.

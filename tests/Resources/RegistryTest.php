@@ -9,10 +9,10 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\resources\AgentResource;
-use craftpulse\cortex\resources\ResourceInterface;
-use craftpulse\cortex\resources\SkillResource;
+use craftpulse\herald\Herald;
+use craftpulse\herald\resources\AgentResource;
+use craftpulse\herald\resources\ResourceInterface;
+use craftpulse\herald\resources\SkillResource;
 use Michtio\CraftCmsClaudeSkills\Skills;
 
 it('registers one resource per skill plus one per reference plus one per agent', function() {
@@ -21,14 +21,14 @@ it('registers one resource per skill plus one per reference plus one per agent',
         $expected += 1 + count(Skills::references($skill));
     }
 
-    $resources = Cortex::getInstance()->resources;
+    $resources = Herald::getInstance()->resources;
 
     expect($resources->getCount())->toBe($expected);
     expect($expected)->toBeGreaterThan(8);
 });
 
 it('registers a router resource for every bundled skill', function() {
-    $resources = Cortex::getInstance()->resources;
+    $resources = Herald::getInstance()->resources;
 
     foreach (Skills::skillNames() as $skill) {
         $uri = sprintf('%s://%s', SkillResource::URI_SCHEME, $skill);
@@ -39,7 +39,7 @@ it('registers a router resource for every bundled skill', function() {
 });
 
 it('registers a reference resource for every reference of every skill', function() {
-    $resources = Cortex::getInstance()->resources;
+    $resources = Herald::getInstance()->resources;
 
     foreach (Skills::skillNames() as $skill) {
         foreach (Skills::references($skill) as $reference) {
@@ -54,27 +54,27 @@ it('registers a reference resource for every reference of every skill', function
 it('emits unique URIs across the entire registry', function() {
     $uris = array_map(
         static fn(ResourceInterface $r): string => $r->getUri(),
-        Cortex::getInstance()->resources->getAll(),
+        Herald::getInstance()->resources->getAll(),
     );
 
     expect($uris)->toHaveCount(count(array_unique($uris)));
 });
 
 it('uses the craft-skills:// scheme for every resource', function() {
-    foreach (Cortex::getInstance()->resources->getAll() as $resource) {
+    foreach (Herald::getInstance()->resources->getAll() as $resource) {
         expect($resource->getUri())->toStartWith('craft-skills://');
     }
 });
 
 it('returns null for unknown URIs', function() {
-    expect(Cortex::getInstance()->resources->getByUri('craft-skills://no-such-skill'))->toBeNull();
-    expect(Cortex::getInstance()->resources->getByUri('http://example.com'))->toBeNull();
+    expect(Herald::getInstance()->resources->getByUri('craft-skills://no-such-skill'))->toBeNull();
+    expect(Herald::getInstance()->resources->getByUri('http://example.com'))->toBeNull();
 });
 
 it('builds a spec-shaped resources/list payload', function() {
-    $payload = Cortex::getInstance()->resources->asListPayload();
+    $payload = Herald::getInstance()->resources->asListPayload();
 
-    expect($payload)->toBeArray()->toHaveCount(Cortex::getInstance()->resources->getCount());
+    expect($payload)->toBeArray()->toHaveCount(Herald::getInstance()->resources->getCount());
 
     foreach ($payload as $item) {
         expect($item)
@@ -86,7 +86,7 @@ it('builds a spec-shaped resources/list payload', function() {
 });
 
 it('registers an agent resource for every bundled agent', function() {
-    $resources = Cortex::getInstance()->resources;
+    $resources = Herald::getInstance()->resources;
 
     foreach (Skills::agentNames() as $agent) {
         $uri = sprintf('%s://%s/%s', AgentResource::URI_SCHEME, AgentResource::URI_PREFIX, $agent);
@@ -105,7 +105,7 @@ it('agent resource read returns the agent file content', function() {
 
     $first = $agents[0];
     $uri = sprintf('%s://%s/%s', AgentResource::URI_SCHEME, AgentResource::URI_PREFIX, $first);
-    $resource = Cortex::getInstance()->resources->getByUri($uri);
+    $resource = Herald::getInstance()->resources->getByUri($uri);
     $block = $resource->read();
 
     expect($block)

@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('category_groups');
+    $this->tool = Herald::getInstance()->tools->getByName('category_groups');
 });
 
 it('lists category groups (possibly empty)', function() {
@@ -45,5 +45,5 @@ it('returns a single group when handle is passed', function() {
 });
 
 it('throws ToolException for an unknown category-group handle', function() {
-    $this->tool->execute(['handle' => '__cortex_no_such_group__']);
+    $this->tool->execute(['handle' => '__herald_no_such_group__']);
 })->throws(ToolException::class);

@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\mcp;
+namespace craftpulse\herald\mcp;
 
 use Carbon\Carbon;
 use DateTimeInterface;
