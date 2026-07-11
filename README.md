@@ -1,6 +1,6 @@
-# Cortex plugin for Craft CMS 5.x
+# Herald MCP plugin for Craft CMS 5.x
 
-Cortex is a [Model Context Protocol](https://modelcontextprotocol.io/) server that gives your AI assistant a direct line into your Craft 5 project. Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf — they all connect over a single stdio transport and immediately have read access to your content model, your content, and a bundled ~30,000-line corpus of authored Craft expertise. Stop pasting Craft docs into your chat window.
+Herald is a [Model Context Protocol](https://modelcontextprotocol.io/) server that gives your AI assistant a direct line into your Craft 5 project. Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf — they all connect over a single stdio transport and immediately have read access to your content model, your content, and a bundled ~30,000-line corpus of authored Craft expertise. Stop pasting Craft docs into your chat window.
 
 The free tier ships **33 tools**, **10 prompts**, and **98 resources**. The Pro tier adds an authenticated HTTP transport with content-write capabilities for non-developer operators — agencies hand it to their clients without handing over shell access.
 
@@ -12,7 +12,7 @@ The free tier ships **33 tools**, **10 prompts**, and **98 resources**. The Pro 
 
 ## Installation
 
-To install Cortex, follow these steps:
+To install Herald, follow these steps:
 
 1. Open your terminal and go to your Craft project:
 
@@ -20,54 +20,54 @@ To install Cortex, follow these steps:
 
 2. Then tell Composer to load the plugin:
 
-        composer require craftpulse/craft-cortex
+        composer require craftpulse/craft-herald
 
-3. Install the plugin via `./craft plugin/install cortex` from the CLI, or in the Control Panel go to **Settings → Plugins** and click the **Install** button for Cortex.
+3. Install the plugin via `./craft plugin/install herald` from the CLI, or in the Control Panel go to **Settings → Plugins** and click the **Install** button for Herald.
 
-You can also install Cortex via the **Plugin Store** in the Craft Control Panel — search for *Cortex* and click **Install**.
+You can also install Herald via the **Plugin Store** in the Craft Control Panel — search for *Herald* and click **Install**.
 
-If you develop with [DDEV](https://ddev.com/), run the same commands through the container: `ddev composer require craftpulse/craft-cortex` then `ddev craft plugin/install cortex`. Cortex is DDEV-aware and emits the correct `docker exec` invocation form when generating client config.
+If you develop with [DDEV](https://ddev.com/), run the same commands through the container: `ddev composer require craftpulse/craft-herald` then `ddev craft plugin/install herald`. Herald is DDEV-aware and emits the correct `docker exec` invocation form when generating client config.
 
-Cortex works on Craft 5.x.
+Herald works on Craft 5.x.
 
 ## Connect your MCP client
 
-Cortex ships four console actions for hooking up your MCP client, in increasing order of magic:
+Herald ships four console actions for hooking up your MCP client, in increasing order of magic:
 
 ```bash
 # 1. Print copy-paste snippets for all seven supported clients
-ddev craft cortex/install
+ddev craft herald/install
 
-# 2. Write Cortex config to one specific client's config file
-ddev craft cortex/install/apply --client=claude-desktop --dry-run
-ddev craft cortex/install/apply --client=claude-desktop
+# 2. Write Herald config to one specific client's config file
+ddev craft herald/install/apply --client=claude-desktop --dry-run
+ddev craft herald/install/apply --client=claude-desktop
 
 # 3. Scan your host for installed clients and print a status table
-php craft cortex/install/detect
+php craft herald/install/detect
 
-# 4. Scan, then prompt to apply Cortex config for each detected client
-php craft cortex/install/auto
+# 4. Scan, then prompt to apply Herald config for each detected client
+php craft herald/install/auto
 ```
 
 The `apply` action writes atomically (temp file + rename), backs the original up to `<file>.bak.<unix-timestamp>`, and is idempotent — re-runs are no-ops unless you pass `--force`. The `detect` and `auto` actions scan `/Applications`, `PATH`, and `%LOCALAPPDATA%\Programs` for installed clients, plus the per-client config directories for "configured" signals.
 
-**`detect` and `auto` refuse to run from inside a container** (DDEV, Docker, Lando, Sail, Podman, LXC, Kubernetes) because the container can't see your host's `/Applications`, `~/.cursor`, etc. — detection from inside would return false negatives. Run them from your host's PHP, or stick with the snippet form (`ddev craft cortex/install`) which works fine inside DDEV.
+**`detect` and `auto` refuse to run from inside a container** (DDEV, Docker, Lando, Sail, Podman, LXC, Kubernetes) because the container can't see your host's `/Applications`, `~/.cursor`, etc. — detection from inside would return false negatives. Run them from your host's PHP, or stick with the snippet form (`ddev craft herald/install`) which works fine inside DDEV.
 
-Cortex supports seven clients today — Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf. Full per-client instructions, troubleshooting, and per-platform config paths are in **[`docs/INSTALL.md`](docs/INSTALL.md)**.
+Herald supports seven clients today — Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf. Full per-client instructions, troubleshooting, and per-platform config paths are in **[`docs/INSTALL.md`](docs/INSTALL.md)**.
 
-## What makes Cortex different
+## What makes Herald different
 
-**The bundled skills are the moat.** Cortex ships [`craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) — ten skills, ~30,000 lines of authored Craft expertise — as MCP prompts that your assistant picks up automatically when the conversation touches Craft architecture, content modelling, Twig templating, PHP standards, DDEV, Garnish, or hosting on Servd / Craft Cloud. This isn't a vectorised docs lookup. It's reverse-engineered internals — the 15-step element save lifecycle, the four-layer authorization model, the dual-layer session architecture — that don't exist in the public docs.
+**The bundled skills are the moat.** Herald ships [`craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) — ten skills, ~30,000 lines of authored Craft expertise — as MCP prompts that your assistant picks up automatically when the conversation touches Craft architecture, content modelling, Twig templating, PHP standards, DDEV, Garnish, or hosting on Servd / Craft Cloud. This isn't a vectorised docs lookup. It's reverse-engineered internals — the 15-step element save lifecycle, the four-layer authorization model, the dual-layer session architecture — that don't exist in the public docs.
 
 **Lean tool surface, parameter-rich.** 33 thick tools cover broader ground than a 50-tool catalogue would by collapsing `list_*`/`get_*` pairs into single tools with optional `handle`/`id` parameters, exposing a `count: true` mode on every list-capable tool, and offering the full element-query surface (`relatedTo`, `with: [...]` eager loading, structure params, site filter) on the content tools. Smaller `tools/list` = faster LLM tool selection + fewer tokens consumed by the system prompt every turn.
 
 **Defense in depth, not naive blocklisting.** `craft_exec` runs PHP `eval` behind six layered security gates — dry-run-by-default, structured output, secret redaction, destructive-op guard, hard HTTP-transport rejection (stdio only), and the MCP `destructiveHint` annotation so spec-aware clients warn before invoking. Nothing else in the source uses `eval` / `shell_exec` / `proc_open` / `passthru` / `popen` / backticks, enforced by a tokenising architecture test. No raw SQL tool. No PII in Free. The threat model isn't sandbox escape — it's an LLM choosing destructive operations because it misread context, and the gates are designed around that.
 
-**MCP 2025-11-25 spec compliance.** Cortex advertises the current 2025-11-25 revision and negotiates 2025-06-18 for older clients. Five tools declare `outputSchema`; the dispatcher dual-emits `structuredContent` alongside the legacy text block. PHP 8 attributes (`#[IsReadOnly]`, `#[IsDestructive]`, `#[IsIdempotent]`, `#[IsOpenWorld]`, `#[IsStdioOnly]`, `#[Title]`) carry the MCP `ToolAnnotations`. JSON-RPC 2.0 dispatcher uses correct error codes (-32600 / -32601 / -32602 / -32603) and returns tool-execution errors as `isError: true` envelopes (not protocol errors) so the LLM can self-correct.
+**MCP 2025-11-25 spec compliance.** Herald advertises the current 2025-11-25 revision and negotiates 2025-06-18 for older clients. Five tools declare `outputSchema`; the dispatcher dual-emits `structuredContent` alongside the legacy text block. PHP 8 attributes (`#[IsReadOnly]`, `#[IsDestructive]`, `#[IsIdempotent]`, `#[IsOpenWorld]`, `#[IsStdioOnly]`, `#[Title]`) carry the MCP `ToolAnnotations`. JSON-RPC 2.0 dispatcher uses correct error codes (-32600 / -32601 / -32602 / -32603) and returns tool-execution errors as `isError: true` envelopes (not protocol errors) so the LLM can self-correct.
 
 ## What the AI gets
 
-After Cortex is connected, your assistant can:
+After Herald is connected, your assistant can:
 
 - **Get oriented in one call.** `get_initial_context` returns Craft version + edition + environment, your primary site, a thin index of sites / sections / element types, the bundled `craftcms_*` skill prompts, the `craft_exec` security posture, and the effective command allowlist — all in one tool call. Fresh agents stop wasting four turns on orientation tools.
 - **Inspect your content model.** Read-only tools cover sections, entry types, fields, field types, category groups, tag groups, sites, image transforms, volumes, filesystems, plugins, routes, system info, permissions, GraphQL schemas, the database schema, and more. List / get / count modes collapse behind a single `handle` argument so the LLM picks the right tool faster and uses fewer tokens.
@@ -82,13 +82,13 @@ For the full reference (per-tool argument schemas, annotations, and prompt / res
 - [`docs/PROMPTS.md`](docs/PROMPTS.md) — auto-generated prompt reference.
 - [`docs/RESOURCES.md`](docs/RESOURCES.md) — auto-generated resource reference.
 
-All three regenerate from the live registries via `ddev craft cortex/docs/all`.
+All three regenerate from the live registries via `ddev craft herald/docs/all`.
 
 ## Configuration
 
-The plugin ships with sensible defaults. For environment-specific overrides, copy `vendor/craftpulse/craft-cortex/src/config/cortex.php` to your project's `config/cortex.php` and edit there. Per-environment blocks (`'production'`, `'staging'`) work the same way as Craft's other config files.
+The plugin ships with sensible defaults. For environment-specific overrides, copy `vendor/craftpulse/craft-herald/src/config/herald.php` to your project's `config/herald.php` and edit there. Per-environment blocks (`'production'`, `'staging'`) work the same way as Craft's other config files.
 
-Cortex's CP section (a top-level **Cortex** entry in the sidebar; Settings also reachable via **Settings → Plugins → Cortex**) provides a live editor for:
+Herald's CP section (a top-level **Herald** entry in the sidebar; Settings also reachable via **Settings → Plugins → Herald**) provides a live editor for:
 
 - the `craft_command` allowlist — a grouped toggle browser over every console command on the install (writes to project config so it syncs across environments)
 - the `craft_exec` toggles (`execEnabled`, `execDryRunDefault`)
@@ -98,7 +98,7 @@ Full configuration reference: **[`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
 
 ## Security
 
-Cortex's security model treats the transport as the boundary. The stdio transport is trusted (local user, single process). The HTTP transport authenticates every request against a Craft user before dispatching.
+Herald's security model treats the transport as the boundary. The stdio transport is trusted (local user, single process). The HTTP transport authenticates every request against a Craft user before dispatching.
 
 Highlights:
 
@@ -107,19 +107,19 @@ Highlights:
 - **Refresh-token rotation + theft detection.** Refresh tokens rotate on every exchange and carry family-lineage tracking — replaying a consumed refresh token revokes the entire token family and logs a security event (RFC 6819 / OAuth 2.1 BCP).
 - **In-band elevation for high-stakes operations.** Credential / admin mutations and content publish / delete over HTTP require a fresh re-authentication via `/oauth/elevate`. Code execution (`craft_exec`) stays stdio-only **always** — elevation never unlocks it.
 - `craft_exec` runs PHP `eval` behind six layered security gates (same approach as Craft's own `ExecController`, not a wrapper around it): dry-run-default, structured output, secret redaction, destructive-op guard, hard HTTP rejection, and `destructiveHint: true` annotation.
-- `craft_command` enforces an allowlist at the tool layer, layered as project-config defaults + admin-issued runtime overrides + optional `config/cortex.php` overrides.
+- `craft_command` enforces an allowlist at the tool layer, layered as project-config defaults + admin-issued runtime overrides + optional `config/herald.php` overrides.
 - No `eval` / `shell_exec` / `proc_open` / `passthru` / `popen` / backticks anywhere in the source — verified by the architecture test suite.
-- Every tool invocation emits one structured audit-log line (`cortex` channel) with secret-redacted arguments.
+- Every tool invocation emits one structured audit-log line (`herald` channel) with secret-redacted arguments.
 
 Full security reference: **[`docs/SECURITY.md`](docs/SECURITY.md)**.
 
 ## Extending
 
-Third-party plugins can register their own tools, prompts, and resources via class-level events. Cortex enforces architectural contracts (interface implementation, transport gating, dispatch shape) — third-party authors are responsible for behavioural correctness, the same trust model Craft itself uses for plugin extensibility.
+Third-party plugins can register their own tools, prompts, and resources via class-level events. Herald enforces architectural contracts (interface implementation, transport gating, dispatch shape) — third-party authors are responsible for behavioural correctness, the same trust model Craft itself uses for plugin extensibility.
 
 ```php
-use craftpulse\cortex\events\RegisterToolsEvent;
-use craftpulse\cortex\services\Tools;
+use craftpulse\herald\events\RegisterToolsEvent;
+use craftpulse\herald\services\Tools;
 use yii\base\Event;
 
 Event::on(
@@ -131,23 +131,23 @@ Event::on(
 );
 ```
 
-To scaffold a new tool against Cortex's `AbstractTool` parent with the right attributes and Schema DSL stub:
+To scaffold a new tool against Herald's `AbstractTool` parent with the right attributes and Schema DSL stub:
 
 ```bash
-ddev craft make cortex-tool
+ddev craft make herald-tool
 ```
 
 Full extension guide (events, interfaces, attributes, Schema DSL, naming conventions, generator usage): **[`docs/EXTENDING.md`](docs/EXTENDING.md)**.
 
 ## Develop
 
-This plugin is developed against the test environment at `~/dev/craft-plugin-playground/cms_v5/`, where it's symlinked into `vendor/craftpulse/craft-cortex` via a Composer path repository.
+This plugin is developed against the test environment at `~/dev/craft-plugin-playground/cms_v5/`, where it's symlinked into `vendor/craftpulse/craft-herald` via a Composer path repository.
 
 ### Run the tests
 
 ```bash
 ddev exec --dir=/var/www/html/cms vendor/bin/pest \
-  --configuration=vendor/craftpulse/craft-cortex/phpunit.xml.dist
+  --configuration=vendor/craftpulse/craft-herald/phpunit.xml.dist
 ```
 
 Pest covers the registry, every tool, every prompt, every resource, the JSON-RPC dispatcher, the extension events, and seven architectural conventions (no `eval` / shell-exec family / `declare(strict_types=1)`, every tool implements `ToolInterface`, every class has a section header + `@author Craftpulse` + `@since`, every private method/property uses the underscore prefix, no tool's `execute()` declares `mixed`).
@@ -156,7 +156,7 @@ Pest covers the registry, every tool, every prompt, every resource, the JSON-RPC
 
 ```bash
 ddev exec --dir=/var/www/html/cms vendor/bin/phpstan analyse \
-  --memory-limit=1G -c vendor/craftpulse/craft-cortex/phpstan.neon
+  --memory-limit=1G -c vendor/craftpulse/craft-herald/phpstan.neon
 ```
 
 PHPStan level 8 — clean.
@@ -176,9 +176,9 @@ In the Inspector UI, point at:
 
 - **Transport Type:** STDIO
 - **Command:** `docker`
-- **Arguments:** `exec -i ddev-<project>-web php /var/www/html/craft cortex/serve`
+- **Arguments:** `exec -i ddev-<project>-web php /var/www/html/craft herald/serve`
 
-The `initialize` handshake should succeed (`cortex 5.0.0`, protocol `2025-11-25` — or `2025-06-18` if your client requests it), and every tool / prompt / resource shows up in the lists.
+The `initialize` handshake should succeed (`herald 5.0.0`, protocol `2025-11-25` — or `2025-06-18` if your client requests it), and every tool / prompt / resource shows up in the lists.
 
 ## Roadmap
 
@@ -188,18 +188,18 @@ The `initialize` handshake should succeed (`cortex 5.0.0`, protocol `2025-11-25`
 
 ## Support
 
-- Issues: [github.com/craftpulse/craft-cortex/issues](https://github.com/craftpulse/craft-cortex/issues)
+- Issues: [github.com/craftpulse/craft-herald/issues](https://github.com/craftpulse/craft-herald/issues)
 - Email: [support@craftpulse.com](mailto:support@craftpulse.com)
 
 ## License
 
-Cortex is a proprietary, commercially-licensed Craft plugin distributed under the [Craft License](https://craftcms.github.io/license/) through the Craft Plugin Store. The Free edition is free of charge; the Pro edition is paid and license-gated through the Plugin Store. (The bundled [`michtio/craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) corpus package is separately MIT-licensed.)
+Herald is a proprietary, commercially-licensed Craft plugin distributed under the [Craft License](https://craftcms.github.io/license/) through the Craft Plugin Store. The Free edition is free of charge; the Pro edition is paid and license-gated through the Plugin Store. (The bundled [`michtio/craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) corpus package is separately MIT-licensed.)
 
 ## Credits
 
 - [Model Context Protocol](https://modelcontextprotocol.io/) — Anthropic et al.
 - [Craft CMS](https://craftcms.com/) — Pixel & Tonic
-- [`craftcms/generator`](https://github.com/craftcms/generator) — the make-system extensibility Cortex hooks into for `cortex-tool`
-- [`michtio/craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) — the bundled skills package Cortex serves as prompts and resources
+- [`craftcms/generator`](https://github.com/craftcms/generator) — the make-system extensibility Herald hooks into for `herald-tool`
+- [`michtio/craftcms-claude-skills`](https://github.com/michtio/craftcms-claude-skills) — the bundled skills package Herald serves as prompts and resources
 
 Brought to you by [CraftPulse](https://craft-pulse.com/)

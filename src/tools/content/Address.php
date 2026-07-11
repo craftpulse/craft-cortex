@@ -1,21 +1,21 @@
 <?php
 
-namespace craftpulse\cortex\tools\content;
+namespace craftpulse\herald\tools\content;
 
 use CommerceGuys\Addressing\Exception\UnknownCountryException;
 use Craft;
 use craft\elements\Address as AddressElement;
 use craft\elements\User;
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\IdempotencyTrait;
-use craftpulse\cortex\tools\PermissionedToolTrait;
-use craftpulse\cortex\tools\ProToolTrait;
-use craftpulse\cortex\tools\support\ElementSerializer;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\IdempotencyTrait;
+use craftpulse\herald\tools\PermissionedToolTrait;
+use craftpulse\herald\tools\ProToolTrait;
+use craftpulse\herald\tools\support\ElementSerializer;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use Throwable;
 
 /**
@@ -61,7 +61,7 @@ use Throwable;
  * Commerce-deferred hint (out of scope per PLANNING.md §4.8).
  *
  * Idempotency contract: `idempotencyKey` is server-side dedup for
- * `create` and `update`. Cache prefix `cortex:address:idem:`. TTL 24h.
+ * `create` and `update`. Cache prefix `herald:address:idem:`. TTL 24h.
  * Skipped on stdio.
  *
  * Cancellation: single-mutation tool, not streaming. The Gate 7.4
@@ -103,7 +103,7 @@ class Address extends AbstractTool
      *
      * @since 5.0.0
      */
-    public const IDEMPOTENCY_CACHE_PREFIX = 'cortex:address:idem:';
+    public const IDEMPOTENCY_CACHE_PREFIX = 'herald:address:idem:';
 
     /**
      * The only owner type Phase 1 supports. Commerce owner types are

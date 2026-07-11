@@ -31,15 +31,15 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\elements\Skill as SkillElement;
-use craftpulse\cortex\resources\SkillResource;
+use craftpulse\herald\elements\Skill as SkillElement;
+use craftpulse\herald\Herald;
+use craftpulse\herald\resources\SkillResource;
 use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
 
 beforeEach(function() {
     // Slug-shaped so handles satisfy Skill::HANDLE_PATTERN
     // (lowercase letters, digits, single hyphens).
-    $this->fixturePrefix = 'cortex-skilltest-' . bin2hex(random_bytes(4)) . '-';
+    $this->fixturePrefix = 'herald-skilltest-' . bin2hex(random_bytes(4)) . '-';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -47,7 +47,7 @@ beforeEach(function() {
     Craft::$app->getUser()->setIdentity($admin);
     $this->admin = $admin;
 
-    $this->tool = Cortex::getInstance()->tools->getByName('search_skills');
+    $this->tool = Herald::getInstance()->tools->getByName('search_skills');
 });
 
 afterEach(function() {
@@ -61,7 +61,7 @@ afterEach(function() {
         ->status(null)
         ->trashed(null)
         ->site('*')
-        ->andWhere(['like', 'cortex_skills.handle', 'cortex-skilltest-%', false])
+        ->andWhere(['like', 'herald_skills.handle', 'herald-skilltest-%', false])
         ->all();
     foreach ($rows as $row) {
         Craft::$app->getElements()->deleteElement($row, hardDelete: true);
@@ -79,14 +79,14 @@ afterEach(function() {
         }
     }
 
-    Cortex::getInstance()->skills->resetMemo();
+    Herald::getInstance()->skills->resetMemo();
 });
 
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _cortex_coex_save(string $handle, string $title, ?string $description = null, ?string $body = null): SkillElement
+function _herald_coex_save(string $handle, string $title, ?string $description = null, ?string $body = null): SkillElement
 {
     $skill = new SkillElement();
     $skill->handle = $handle;
@@ -126,7 +126,7 @@ it('element-stored skill with a bundled handle overrides; delete re-surfaces bun
     expect($beforeRow['source'])->toBe('bundled');
 
     // Create the override.
-    $override = _cortex_coex_save($bundledHandle, 'Override probe');
+    $override = _herald_coex_save($bundledHandle, 'Override probe');
     expect($override->id)->toBeInt();
 
     // Run topics again — bundled is hidden, element wins.
@@ -159,7 +159,7 @@ it('trashed (soft-deleted) override does NOT hide the bundled row', function() {
     }
     $bundledHandle = $bundledNames[0];
 
-    $override = _cortex_coex_save($bundledHandle, 'Trashed-override probe');
+    $override = _herald_coex_save($bundledHandle, 'Trashed-override probe');
 
     // Soft-delete the override.
     Craft::$app->getElements()->deleteElement($override, hardDelete: false);
@@ -177,7 +177,7 @@ it('trashed (soft-deleted) override does NOT hide the bundled row', function() {
 
 it('element-only handle (no bundled counterpart) surfaces with source: element', function() {
     $handle = $this->fixturePrefix . 'unique';
-    _cortex_coex_save($handle, 'Element-only');
+    _herald_coex_save($handle, 'Element-only');
 
     $result = $this->tool->execute(['mode' => 'topics', 'kind' => 'skill']);
     $row = collect($result['topics'])->firstWhere('skill', $handle);
@@ -191,9 +191,9 @@ it('element-only handle (no bundled counterpart) surfaces with source: element',
 
 it('Skills::getMergedCorpus kind=skill returns bundled + element rows', function() {
     $handle = $this->fixturePrefix . 'kindskill';
-    _cortex_coex_save($handle, 'kind=skill probe');
+    _herald_coex_save($handle, 'kind=skill probe');
 
-    $rows = Cortex::getInstance()->skills->getMergedCorpus('skill');
+    $rows = Herald::getInstance()->skills->getMergedCorpus('skill');
     $handles = array_column($rows, 'skill');
     expect($handles)->toContain($handle);
     $bundledNames = BundledSkills::skillNames();
@@ -204,9 +204,9 @@ it('Skills::getMergedCorpus kind=skill returns bundled + element rows', function
 
 it('Skills::getMergedCorpus kind=reference returns bundled-only references', function() {
     $handle = $this->fixturePrefix . 'kindref';
-    _cortex_coex_save($handle, 'kind=reference probe');
+    _herald_coex_save($handle, 'kind=reference probe');
 
-    $rows = Cortex::getInstance()->skills->getMergedCorpus('reference');
+    $rows = Herald::getInstance()->skills->getMergedCorpus('reference');
     foreach ($rows as $row) {
         expect($row['kind'])->toBe('reference');
         expect($row['source'])->toBe('bundled');
@@ -214,7 +214,7 @@ it('Skills::getMergedCorpus kind=reference returns bundled-only references', fun
 });
 
 it('Skills::getMergedCorpus kind=agent returns bundled-only agents', function() {
-    $rows = Cortex::getInstance()->skills->getMergedCorpus('agent');
+    $rows = Herald::getInstance()->skills->getMergedCorpus('agent');
     foreach ($rows as $row) {
         expect($row['kind'])->toBe('agent');
         expect($row['source'])->toBe('bundled');
@@ -227,23 +227,23 @@ it('Skills::getMergedCorpus kind=agent returns bundled-only agents', function() 
 
 it('element-stored skill with a non-whitelisted handle is NOT registered as a prompt', function() {
     $nonWhitelistedHandle = $this->fixturePrefix . 'notinmap';
-    _cortex_coex_save($nonWhitelistedHandle, 'Not in prompt map');
+    _herald_coex_save($nonWhitelistedHandle, 'Not in prompt map');
 
     // The prompt registry was built at boot — confirm the new handle
     // is absent from `Prompts::asListPayload()`.
-    $payload = Cortex::getInstance()->prompts->asListPayload();
+    $payload = Herald::getInstance()->prompts->asListPayload();
     $names = array_column($payload, 'name');
     expect($names)->not->toContain($nonWhitelistedHandle);
-    expect($names)->not->toContain('cortex_skill_' . $nonWhitelistedHandle);
+    expect($names)->not->toContain('herald_skill_' . $nonWhitelistedHandle);
 });
 
 it('element-stored skill with a non-whitelisted handle IS surfaced as a resource', function() {
     $handle = $this->fixturePrefix . 'resourceonly';
-    _cortex_coex_save($handle, 'Resource only');
+    _herald_coex_save($handle, 'Resource only');
 
     // Re-instantiating the Resources service rebuilds the registry
     // against the current DB state, which now includes our fixture.
-    $resources = new \craftpulse\cortex\services\Resources();
+    $resources = new \craftpulse\herald\services\Resources();
     $resources->init();
 
     $resource = $resources->getByUri('craft-skills://' . $handle);
@@ -273,7 +273,7 @@ it('SkillResource::read() returns synthesised bytes for an overridden bundled ha
     expect($bundledBlock['text'])->toBe(BundledSkills::content($bundledHandle));
 
     // Create the override.
-    $override = _cortex_coex_save($bundledHandle, 'SkillResource override probe', 'override desc');
+    $override = _herald_coex_save($bundledHandle, 'SkillResource override probe', 'override desc');
 
     // Read again — now the synthesised override bytes return.
     $overrideBlock = $resource->read();

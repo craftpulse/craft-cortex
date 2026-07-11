@@ -7,11 +7,11 @@
 
 use Craft;
 use craft\elements\Asset;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('assets');
+    $this->tool = Herald::getInstance()->tools->getByName('assets');
 });
 
 it('returns assets list with pagination metadata', function() {
@@ -86,5 +86,5 @@ it('throws ToolException when mode: folders is requested without volume', functi
 })->throws(ToolException::class);
 
 it('throws ToolException when mode: folders gets an unknown volume', function() {
-    $this->tool->execute(['mode' => 'folders', 'volume' => '__cortex_no_such_volume__']);
+    $this->tool->execute(['mode' => 'folders', 'volume' => '__herald_no_such_volume__']);
 })->throws(ToolException::class);

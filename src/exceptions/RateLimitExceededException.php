@@ -1,8 +1,8 @@
 <?php
 
-namespace craftpulse\cortex\exceptions;
+namespace craftpulse\herald\exceptions;
 
-use craftpulse\cortex\values\RateLimitStatus;
+use craftpulse\herald\values\RateLimitStatus;
 use RuntimeException;
 
 /**

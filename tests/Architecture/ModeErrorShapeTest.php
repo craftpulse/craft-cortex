@@ -42,7 +42,7 @@
  *
  * Edition-denial coverage is integration-flavoured: invoke `execute()`
  * with a Pro-mode argument set on a Free edition (via
- * `cortex_with_edition(EDITION_FREE, ...)`) and match the thrown
+ * `herald_with_edition(EDITION_FREE, ...)`) and match the thrown
  * `ToolException::getMessage()` against the edition-denial template.
  * =========================================================================
  *
@@ -50,21 +50,21 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\content\Address;
-use craftpulse\cortex\tools\content\BulkEntries;
-use craftpulse\cortex\tools\content\Category;
-use craftpulse\cortex\tools\content\Entry;
-use craftpulse\cortex\tools\content\GlobalSet;
-use craftpulse\cortex\tools\content\ScaffoldEntries;
-use craftpulse\cortex\tools\content\Tag;
-use craftpulse\cortex\tools\system\Diagnostics;
-use craftpulse\cortex\tools\system\Skill;
-use craftpulse\cortex\tools\system\Users;
-use craftpulse\cortex\tools\ToolException;
-use craftpulse\cortex\tools\workflow\Audit;
-use craftpulse\cortex\tools\workflow\DraftsAndRevisions;
-use craftpulse\cortex\tools\workflow\ImportExport;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\content\Address;
+use craftpulse\herald\tools\content\BulkEntries;
+use craftpulse\herald\tools\content\Category;
+use craftpulse\herald\tools\content\Entry;
+use craftpulse\herald\tools\content\GlobalSet;
+use craftpulse\herald\tools\content\ScaffoldEntries;
+use craftpulse\herald\tools\content\Tag;
+use craftpulse\herald\tools\system\Diagnostics;
+use craftpulse\herald\tools\system\Skill;
+use craftpulse\herald\tools\system\Users;
+use craftpulse\herald\tools\ToolException;
+use craftpulse\herald\tools\workflow\Audit;
+use craftpulse\herald\tools\workflow\DraftsAndRevisions;
+use craftpulse\herald\tools\workflow\ImportExport;
 
 // -----------------------------------------------------------------------------
 // Helpers — reflection invocation of the protected message builder
@@ -78,7 +78,7 @@ use craftpulse\cortex\tools\workflow\ImportExport;
  *
  * @param array<string,mixed> $arguments
  */
-function _cortex_invoke_permission_denied_message(
+function _herald_invoke_permission_denied_message(
     object $tool,
     string $missingPermission,
     array $arguments,
@@ -95,8 +95,8 @@ function _cortex_invoke_permission_denied_message(
 // -----------------------------------------------------------------------------
 
 it('entry permission-denied message matches `permission denied — mode `<mode>` on section `<uid>` requires `<perm>`.`', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $message = _cortex_invoke_permission_denied_message(
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $message = _herald_invoke_permission_denied_message(
             new Entry(),
             'saveEntries:xxxx-yyyy-zzzz',
             ['mode' => 'create', 'sectionUid' => 'xxxx-yyyy-zzzz'],
@@ -110,8 +110,8 @@ it('entry permission-denied message matches `permission denied — mode `<mode>`
 });
 
 it('category permission-denied message matches `permission denied — mode `<mode>` on group `<uid>` requires `<perm>`.`', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $message = _cortex_invoke_permission_denied_message(
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $message = _herald_invoke_permission_denied_message(
             new Category(),
             'saveCategories:xxxx-yyyy-zzzz',
             ['mode' => 'update', 'groupUid' => 'xxxx-yyyy-zzzz'],
@@ -123,8 +123,8 @@ it('category permission-denied message matches `permission denied — mode `<mod
 });
 
 it('global_set permission-denied message matches `permission denied — global_set update on set `<uid>` requires `<perm>`.`', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $message = _cortex_invoke_permission_denied_message(
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $message = _herald_invoke_permission_denied_message(
             new GlobalSet(),
             'editGlobalSet:xxxx-yyyy-zzzz',
             ['globalSetUid' => 'xxxx-yyyy-zzzz'],
@@ -136,8 +136,8 @@ it('global_set permission-denied message matches `permission denied — global_s
 });
 
 it('address permission-denied message matches `permission denied — mode `<mode>` requires `<perm>`.`', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $message = _cortex_invoke_permission_denied_message(
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $message = _herald_invoke_permission_denied_message(
             new Address(),
             'editUsers',
             ['mode' => 'update'],
@@ -147,8 +147,8 @@ it('address permission-denied message matches `permission denied — mode `<mode
 });
 
 it('users permission-denied message matches `permission denied — mode `<mode>` requires `<perm>`.`', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $message = _cortex_invoke_permission_denied_message(
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $message = _herald_invoke_permission_denied_message(
             new Users(),
             'editUsers',
             ['mode' => 'update'],
@@ -158,19 +158,19 @@ it('users permission-denied message matches `permission denied — mode `<mode>`
 });
 
 it('skill permission-denied message matches `permission denied — mode `<mode>` requires `<perm>`.`', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $message = _cortex_invoke_permission_denied_message(
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $message = _herald_invoke_permission_denied_message(
             new Skill(),
-            'cortex:editSkills',
+            'herald:editSkills',
             ['mode' => 'create'],
         );
-        expect($message)->toBe('permission denied — mode `create` requires `cortex:editSkills`.');
+        expect($message)->toBe('permission denied — mode `create` requires `herald:editSkills`.');
     });
 });
 
 it('bulk_entries permission-denied message matches `permission denied — mode `<mode>` requires `<perm>`.`', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $message = _cortex_invoke_permission_denied_message(
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $message = _herald_invoke_permission_denied_message(
             new BulkEntries(),
             'saveEntries:xxxx-yyyy-zzzz',
             ['mode' => 'set_status'],
@@ -182,8 +182,8 @@ it('bulk_entries permission-denied message matches `permission denied — mode `
 });
 
 it('scaffold_entries permission-denied message matches `permission denied — scaffold_entries requires `<perm>`.`', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $message = _cortex_invoke_permission_denied_message(
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $message = _herald_invoke_permission_denied_message(
             new ScaffoldEntries(),
             'utility:project-config',
             [],
@@ -193,7 +193,7 @@ it('scaffold_entries permission-denied message matches `permission denied — sc
 });
 
 it('drafts_and_revisions permission-denied message matches `permission denied — mode `<mode>` on section `<uid>` requires `<perm>`.`', function() {
-    $message = _cortex_invoke_permission_denied_message(
+    $message = _herald_invoke_permission_denied_message(
         new DraftsAndRevisions(),
         'saveEntries:xxxx-yyyy-zzzz',
         ['mode' => 'apply', 'sectionUid' => 'xxxx-yyyy-zzzz'],
@@ -204,7 +204,7 @@ it('drafts_and_revisions permission-denied message matches `permission denied �
 });
 
 it('content_audit (section) permission-denied message matches `permission denied — mode `<mode>` on section `<uid>` requires `<perm>`.`', function() {
-    $message = _cortex_invoke_permission_denied_message(
+    $message = _herald_invoke_permission_denied_message(
         new Audit(),
         'saveEntries:xxxx-yyyy-zzzz',
         ['mode' => 'fix_relations', 'sectionUid' => 'xxxx-yyyy-zzzz'],
@@ -215,7 +215,7 @@ it('content_audit (section) permission-denied message matches `permission denied
 });
 
 it('content_audit (volume) permission-denied message uses the `volume` resource type', function() {
-    $message = _cortex_invoke_permission_denied_message(
+    $message = _herald_invoke_permission_denied_message(
         new Audit(),
         'saveAssets:xxxx-yyyy-zzzz',
         ['mode' => 'prune_unused_assets', 'volumeUid' => 'xxxx-yyyy-zzzz'],
@@ -226,7 +226,7 @@ it('content_audit (volume) permission-denied message uses the `volume` resource 
 });
 
 it('content_audit (group) permission-denied message uses the `group` resource type', function() {
-    $message = _cortex_invoke_permission_denied_message(
+    $message = _herald_invoke_permission_denied_message(
         new Audit(),
         'saveCategories:xxxx-yyyy-zzzz',
         ['mode' => 'fix_relations', 'groupUid' => 'xxxx-yyyy-zzzz'],
@@ -237,7 +237,7 @@ it('content_audit (group) permission-denied message uses the `group` resource ty
 });
 
 it('import_export permission-denied message matches `permission denied — mode `import` on section `<uid>` requires `<perm>`.`', function() {
-    $message = _cortex_invoke_permission_denied_message(
+    $message = _herald_invoke_permission_denied_message(
         new ImportExport(),
         'saveEntries:xxxx-yyyy-zzzz',
         ['mode' => 'import', 'sectionUid' => 'xxxx-yyyy-zzzz'],
@@ -248,7 +248,7 @@ it('import_export permission-denied message matches `permission denied — mode 
 });
 
 it('system_diagnostics permission-denied message matches `permission denied — type `<type>` requires `<perm>`.`', function() {
-    $message = _cortex_invoke_permission_denied_message(
+    $message = _herald_invoke_permission_denied_message(
         new Diagnostics(),
         'utility:queue-manager',
         ['type' => 'manage_queue'],
@@ -267,7 +267,7 @@ it('tag admin gate emits the whole-tool admin-status message', function() {
     // directly in `_assertAdmin()`. Drive the path by executing the
     // tool as a non-admin user and assert the locked deviation message.
     $caller = new \craft\elements\User();
-    $caller->username = '__cortex_modeerrshape_tag_' . bin2hex(random_bytes(4));
+    $caller->username = '__herald_modeerrshape_tag_' . bin2hex(random_bytes(4));
     $caller->email = $caller->username . '@example.test';
     $caller->admin = false;
     $caller->pending = true;
@@ -277,7 +277,7 @@ it('tag admin gate emits the whole-tool admin-status message', function() {
 
     try {
         $caught = null;
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($caller, &$caught) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($caller, &$caught) {
             Craft::$app->getUser()->setIdentity($caller);
             try {
                 (new Tag())->execute(['mode' => 'create', 'groupHandle' => 'doesnotmatter', 'title' => 'x']);
@@ -300,7 +300,7 @@ it('tag admin gate emits the whole-tool admin-status message', function() {
 
 it('drafts_and_revisions emits the edition-denial template on Free for a Pro mode', function() {
     $caught = null;
-    cortex_with_edition(Cortex::EDITION_FREE, function() use (&$caught) {
+    herald_with_edition(Herald::EDITION_FREE, function() use (&$caught) {
         try {
             (new DraftsAndRevisions())->execute(['mode' => 'apply']);
         } catch (ToolException $e) {
@@ -313,7 +313,7 @@ it('drafts_and_revisions emits the edition-denial template on Free for a Pro mod
 
 it('content_audit emits the edition-denial template on Free for a Pro mode', function() {
     $caught = null;
-    cortex_with_edition(Cortex::EDITION_FREE, function() use (&$caught) {
+    herald_with_edition(Herald::EDITION_FREE, function() use (&$caught) {
         try {
             (new Audit())->execute(['mode' => 'fix_relations']);
         } catch (ToolException $e) {
@@ -326,7 +326,7 @@ it('content_audit emits the edition-denial template on Free for a Pro mode', fun
 
 it('import_export emits the edition-denial template on Free for the import mode', function() {
     $caught = null;
-    cortex_with_edition(Cortex::EDITION_FREE, function() use (&$caught) {
+    herald_with_edition(Herald::EDITION_FREE, function() use (&$caught) {
         try {
             (new ImportExport())->execute(['mode' => 'import']);
         } catch (ToolException $e) {
@@ -339,7 +339,7 @@ it('import_export emits the edition-denial template on Free for the import mode'
 
 it('system_diagnostics emits the edition-denial template on Free for a Pro type', function() {
     $caught = null;
-    cortex_with_edition(Cortex::EDITION_FREE, function() use (&$caught) {
+    herald_with_edition(Herald::EDITION_FREE, function() use (&$caught) {
         try {
             (new Diagnostics())->execute(['type' => 'manage_queue']);
         } catch (ToolException $e) {

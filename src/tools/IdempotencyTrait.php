@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tools;
+namespace craftpulse\herald\tools;
 
 use Craft;
 use craft\elements\User;
@@ -15,7 +15,7 @@ use craft\elements\User;
  *
  * Cache key shape: `{IDEMPOTENCY_CACHE_PREFIX}{userId}:{idempotencyKey}`.
  * Each consuming tool declares its own `IDEMPOTENCY_CACHE_PREFIX`
- * constant (`cortex:entry:idem:`, `cortex:category:idem:`, etc.) so the
+ * constant (`herald:entry:idem:`, `herald:category:idem:`, etc.) so the
  * cache namespace stays grep-able and the per-user scope is uniform.
  *
  * TTL is 24h (mirrors Stripe / GitHub idempotency conventions) without

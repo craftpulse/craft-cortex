@@ -1,12 +1,12 @@
 <?php
 
-namespace craftpulse\cortex\attributes;
+namespace craftpulse\herald\attributes;
 
 use Attribute;
 
 /**
  * =========================================================================
- * Marks a tool as stdio-transport-only — cortex-specific (not an MCP
+ * Marks a tool as stdio-transport-only — herald-specific (not an MCP
  * spec annotation).
  *
  * The dispatcher hard-rejects HTTP requests for stdio-only tools at

@@ -1,56 +1,56 @@
 <?php
 
-namespace craftpulse\cortex\services;
+namespace craftpulse\herald\services;
 
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\events\RegisterToolsEvent;
-use craftpulse\cortex\tools\content\Address;
-use craftpulse\cortex\tools\content\Assets;
-use craftpulse\cortex\tools\content\BulkEntries;
-use craftpulse\cortex\tools\content\Categories;
-use craftpulse\cortex\tools\content\Category;
-use craftpulse\cortex\tools\content\Entries;
-use craftpulse\cortex\tools\content\Entry;
-use craftpulse\cortex\tools\content\Globals;
-use craftpulse\cortex\tools\content\GlobalSet;
-use craftpulse\cortex\tools\content\ScaffoldEntries;
-use craftpulse\cortex\tools\content\Tag;
-use craftpulse\cortex\tools\content\Tags;
-use craftpulse\cortex\tools\dev\ClearCaches;
-use craftpulse\cortex\tools\dev\CraftCommand;
-use craftpulse\cortex\tools\dev\CraftExec;
-use craftpulse\cortex\tools\dev\Resave;
-use craftpulse\cortex\tools\dev\StreamingFixtureTool;
-use craftpulse\cortex\tools\graphql\Graphql;
-use craftpulse\cortex\tools\schema\CategoryGroups;
-use craftpulse\cortex\tools\schema\ElementTypes;
-use craftpulse\cortex\tools\schema\EntryTypes;
-use craftpulse\cortex\tools\schema\Fields;
-use craftpulse\cortex\tools\schema\FieldTypes;
-use craftpulse\cortex\tools\schema\ImageTransforms;
-use craftpulse\cortex\tools\schema\Sections;
-use craftpulse\cortex\tools\schema\Sites;
-use craftpulse\cortex\tools\schema\TagGroups;
-use craftpulse\cortex\tools\schema\VolumesAndFilesystems;
-use craftpulse\cortex\tools\support\AttributeReader;
-use craftpulse\cortex\tools\support\RegistryLog;
-use craftpulse\cortex\tools\system\Config;
-use craftpulse\cortex\tools\system\DatabaseSchema;
-use craftpulse\cortex\tools\system\Diagnostics;
-use craftpulse\cortex\tools\system\Extensibility;
-use craftpulse\cortex\tools\system\InitialContext;
-use craftpulse\cortex\tools\system\PermissionsAndGroups;
-use craftpulse\cortex\tools\system\Plugins;
-use craftpulse\cortex\tools\system\Routes;
-use craftpulse\cortex\tools\system\SearchSkills;
-use craftpulse\cortex\tools\system\Skill;
-use craftpulse\cortex\tools\system\SystemInfo;
-use craftpulse\cortex\tools\system\Users;
-use craftpulse\cortex\tools\ToolInterface;
-use craftpulse\cortex\tools\workflow\Audit;
-use craftpulse\cortex\tools\workflow\DraftsAndRevisions;
-use craftpulse\cortex\tools\workflow\ImportExport;
+use craftpulse\herald\events\RegisterToolsEvent;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\content\Address;
+use craftpulse\herald\tools\content\Assets;
+use craftpulse\herald\tools\content\BulkEntries;
+use craftpulse\herald\tools\content\Categories;
+use craftpulse\herald\tools\content\Category;
+use craftpulse\herald\tools\content\Entries;
+use craftpulse\herald\tools\content\Entry;
+use craftpulse\herald\tools\content\Globals;
+use craftpulse\herald\tools\content\GlobalSet;
+use craftpulse\herald\tools\content\ScaffoldEntries;
+use craftpulse\herald\tools\content\Tag;
+use craftpulse\herald\tools\content\Tags;
+use craftpulse\herald\tools\dev\ClearCaches;
+use craftpulse\herald\tools\dev\CraftCommand;
+use craftpulse\herald\tools\dev\CraftExec;
+use craftpulse\herald\tools\dev\Resave;
+use craftpulse\herald\tools\dev\StreamingFixtureTool;
+use craftpulse\herald\tools\graphql\Graphql;
+use craftpulse\herald\tools\schema\CategoryGroups;
+use craftpulse\herald\tools\schema\ElementTypes;
+use craftpulse\herald\tools\schema\EntryTypes;
+use craftpulse\herald\tools\schema\Fields;
+use craftpulse\herald\tools\schema\FieldTypes;
+use craftpulse\herald\tools\schema\ImageTransforms;
+use craftpulse\herald\tools\schema\Sections;
+use craftpulse\herald\tools\schema\Sites;
+use craftpulse\herald\tools\schema\TagGroups;
+use craftpulse\herald\tools\schema\VolumesAndFilesystems;
+use craftpulse\herald\tools\support\AttributeReader;
+use craftpulse\herald\tools\support\RegistryLog;
+use craftpulse\herald\tools\system\Config;
+use craftpulse\herald\tools\system\DatabaseSchema;
+use craftpulse\herald\tools\system\Diagnostics;
+use craftpulse\herald\tools\system\Extensibility;
+use craftpulse\herald\tools\system\InitialContext;
+use craftpulse\herald\tools\system\PermissionsAndGroups;
+use craftpulse\herald\tools\system\Plugins;
+use craftpulse\herald\tools\system\Routes;
+use craftpulse\herald\tools\system\SearchSkills;
+use craftpulse\herald\tools\system\Skill;
+use craftpulse\herald\tools\system\SystemInfo;
+use craftpulse\herald\tools\system\Users;
+use craftpulse\herald\tools\ToolInterface;
+use craftpulse\herald\tools\workflow\Audit;
+use craftpulse\herald\tools\workflow\DraftsAndRevisions;
+use craftpulse\herald\tools\workflow\ImportExport;
 use yii\base\Component;
 
 /**
@@ -219,7 +219,7 @@ class Tools extends Component
      */
     public function asListPayloadFor(?User $user, ?array $grantedScopes = null): array
     {
-        $scopes = Cortex::getInstance()->scopes;
+        $scopes = Herald::getInstance()->scopes;
         $payload = [];
         foreach ($this->_tools as $tool) {
             if (!$tool->filterFor($user)) {
@@ -261,7 +261,7 @@ class Tools extends Component
         if (!$tool->filterFor($user)) {
             return null;
         }
-        if (!Cortex::getInstance()->scopes->grantsTool($tool::getName(), $grantedScopes)) {
+        if (!Herald::getInstance()->scopes->grantsTool($tool::getName(), $grantedScopes)) {
             return null;
         }
         return $tool;
@@ -348,7 +348,7 @@ class Tools extends Component
             new GlobalSet(),
             new Address(),
             new Users(), // system-namespaced but shares the Pro-write registration block
-            new Skill(), // Gate 8.6 — Cortex's first owned element type
+            new Skill(), // Gate 8.6 — Herald's first owned element type
             new BulkEntries(), // Gate 8.7 — first streaming Pro tool
             new ScaffoldEntries(), // Gate 8.7 — template-driven create-many sibling
 

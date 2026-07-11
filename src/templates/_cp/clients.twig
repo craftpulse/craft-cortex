@@ -1,7 +1,7 @@
-{% extends "cortex/_cp/_layout" %}
+{% extends "herald/_cp/_layout" %}
 
 {# =========================================================================
-   Cortex Clients tab — VueAdminTable of registered OAuth clients + inline
+   Herald Clients tab — VueAdminTable of registered OAuth clients + inline
    approve / revoke.
 
    The DCR approval gate (WS3) lands every self-registered client
@@ -11,9 +11,9 @@
    Tokens (9.5).
 
    Data path:
-     - Table data : GET  cortex/settings/clients-table-data → JSON {pagination, data}
-     - Approve    : POST cortex/settings/approve-client      → JSON {message}
-     - Revoke     : POST cortex/settings/revoke-client (VueAdminTable
+     - Table data : GET  herald/settings/clients-table-data → JSON {pagination, data}
+     - Approve    : POST herald/settings/approve-client      → JSON {message}
+     - Revoke     : POST herald/settings/revoke-client (VueAdminTable
                                                 deleteAction) → JSON {message}
 
    The row shape is locked in `SettingsController::_serializeClientRow`:
@@ -22,7 +22,7 @@
 
 {% set selectedSubnavItem = 'clients' %}
 
-{% do view.registerTranslations('cortex', [
+{% do view.registerTranslations('herald', [
     'Approve',
     'Approved',
     'Are you sure you want to revoke the client “{name}”? This revokes every token it issued.',
@@ -44,15 +44,15 @@
 
 {% block content %}
     <p class="light">
-        {{ 'OAuth clients that have registered with this server. Self-registered (DCR) clients start unapproved — approve one before it can connect.'|t('cortex') }}
+        {{ 'OAuth clients that have registered with this server. Self-registered (DCR) clients start unapproved — approve one before it can connect.'|t('herald') }}
     </p>
 
-    <div id="cortex-clients-vue-admin-table"></div>
+    <div id="herald-clients-vue-admin-table"></div>
 {% endblock %}
 
 {% js %}
     (function() {
-        var tableContainer = '#cortex-clients-vue-admin-table';
+        var tableContainer = '#herald-clients-vue-admin-table';
 
         function renderNameCell(value) {
             if (!value) {
@@ -72,14 +72,14 @@
             if (!value) {
                 return '<span class="light">—</span>';
             }
-            return Craft.escapeHtml(Craft.t('cortex', value));
+            return Craft.escapeHtml(Craft.t('herald', value));
         }
 
         function renderStatusCell(value) {
             if (value === true) {
-                return '<span class="status green"></span> ' + Craft.t('cortex', 'Approved');
+                return '<span class="status green"></span> ' + Craft.t('herald', 'Approved');
             }
-            return '<span class="status orange"></span> ' + Craft.t('cortex', 'Pending approval');
+            return '<span class="status orange"></span> ' + Craft.t('herald', 'Pending approval');
         }
 
         function renderRedirectCell(value) {
@@ -107,31 +107,31 @@
                 return '';
             }
             return (
-                '<button type="button" class="btn small cortex-approve-client" data-id="' +
+                '<button type="button" class="btn small herald-approve-client" data-id="' +
                 Craft.escapeHtml(String(value.id)) +
-                '">' + Craft.t('cortex', 'Approve') + '</button>'
+                '">' + Craft.t('herald', 'Approve') + '</button>'
             );
         }
 
         var columns = [
             {
                 name: 'clientName',
-                title: Craft.t('cortex', 'Client'),
+                title: Craft.t('herald', 'Client'),
                 callback: renderNameCell,
             },
             {
                 name: 'clientId',
-                title: Craft.t('cortex', 'Client ID'),
+                title: Craft.t('herald', 'Client ID'),
                 callback: renderClientIdCell,
             },
             {
                 name: 'type',
-                title: Craft.t('cortex', 'Type'),
+                title: Craft.t('herald', 'Type'),
                 callback: renderTypeCell,
             },
             {
                 name: 'approved',
-                title: Craft.t('cortex', 'Status'),
+                title: Craft.t('herald', 'Status'),
                 callback: renderStatusCell,
             },
             {
@@ -141,12 +141,12 @@
             },
             {
                 name: 'redirectUris',
-                title: Craft.t('cortex', 'Redirect URIs'),
+                title: Craft.t('herald', 'Redirect URIs'),
                 callback: renderRedirectCell,
             },
             {
                 name: 'dateCreated',
-                title: Craft.t('cortex', 'Created'),
+                title: Craft.t('herald', 'Created'),
                 callback: renderDateCreatedCell,
             },
         ];
@@ -154,13 +154,13 @@
         var adminTable = new Craft.VueAdminTable({
             container: tableContainer,
             columns: columns,
-            tableDataEndpoint: 'cortex/settings/clients-table-data',
-            deleteAction: 'cortex/settings/revoke-client',
-            deleteConfirmationMessage: Craft.t('cortex', 'Are you sure you want to revoke the client “{name}”? This revokes every token it issued.'),
-            deleteSuccessMessage: Craft.t('cortex', 'Client revoked.'),
-            emptyMessage: Craft.t('cortex', 'No clients registered yet.'),
+            tableDataEndpoint: 'herald/settings/clients-table-data',
+            deleteAction: 'herald/settings/revoke-client',
+            deleteConfirmationMessage: Craft.t('herald', 'Are you sure you want to revoke the client “{name}”? This revokes every token it issued.'),
+            deleteSuccessMessage: Craft.t('herald', 'Client revoked.'),
+            emptyMessage: Craft.t('herald', 'No clients registered yet.'),
             search: true,
-            searchPlaceholder: Craft.t('cortex', 'Search clients'),
+            searchPlaceholder: Craft.t('herald', 'Search clients'),
         });
 
         // The inline approve button posts the client id. The server is
@@ -175,7 +175,7 @@
         // binding to it is leak-safe.
         var tableEl = document.querySelector(tableContainer);
         (tableEl || document).addEventListener('click', function(event) {
-            var btn = event.target.closest('.cortex-approve-client');
+            var btn = event.target.closest('.herald-approve-client');
             if (!btn) {
                 return;
             }
@@ -185,22 +185,22 @@
                 return;
             }
             btn.setAttribute('disabled', 'disabled');
-            Craft.sendActionRequest('POST', 'cortex/settings/approve-client', {
+            Craft.sendActionRequest('POST', 'herald/settings/approve-client', {
                 data: { id: id },
             }).then(function(response) {
                 Craft.cp.displayNotice(
-                    (response.data && response.data.message) || Craft.t('cortex', 'Client approved.')
+                    (response.data && response.data.message) || Craft.t('herald', 'Client approved.')
                 );
                 adminTable.reload();
             }).catch(function(error) {
                 btn.removeAttribute('disabled');
                 var message = error && error.response && error.response.data && error.response.data.message
                     ? error.response.data.message
-                    : Craft.t('cortex', 'A server error occurred.');
+                    : Craft.t('herald', 'A server error occurred.');
                 Craft.cp.displayError(message);
             });
         });
 
-        window.cortexClientsTable = adminTable;
+        window.heraldClientsTable = adminTable;
     })();
 {% endjs %}

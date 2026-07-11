@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('fields');
+    $this->tool = Herald::getInstance()->tools->getByName('fields');
 });
 
 it('lists fields with type, handle, instructions', function() {
@@ -72,5 +72,5 @@ it('throws ToolException when mode: usage is requested without a handle', functi
 })->throws(ToolException::class, 'mode "usage" requires a `handle`.');
 
 it('throws ToolException for an unknown field handle', function() {
-    $this->tool->execute(['handle' => '__cortex_no_such_field__']);
+    $this->tool->execute(['handle' => '__herald_no_such_field__']);
 })->throws(ToolException::class);

@@ -1,7 +1,7 @@
-# Cortex Resources
+# Herald Resources
 
-Auto-generated reference for the cortex MCP resource surface. Run
-`ddev craft cortex/docs/resources` to refresh.
+Auto-generated reference for the herald MCP resource surface. Run
+`ddev craft herald/docs/resources` to refresh.
 
 - **Total resources:** 98
 - **Generated:** 2026-06-10T08:12:17-07:00

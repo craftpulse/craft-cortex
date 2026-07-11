@@ -1,11 +1,11 @@
 <?php
 
-namespace craftpulse\cortex\oauth\repositories;
+namespace craftpulse\herald\oauth\repositories;
 
 use Carbon\Carbon;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\oauth\entities\AccessTokenEntity;
-use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
+use craftpulse\herald\Herald;
+use craftpulse\herald\oauth\entities\AccessTokenEntity;
+use craftpulse\herald\records\OauthToken as OauthTokenRecord;
 use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Exception\UniqueTokenIdentifierConstraintViolationException;
@@ -21,11 +21,11 @@ use League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface;
  *
  * `getNewToken()` mints a fresh `AccessTokenEntity` and stamps the
  * audience indicator onto it via `setAudience()` — the audience comes
- * from the cortex `Oauth` service's per-request slot, which the
+ * from the herald `Oauth` service's per-request slot, which the
  * controller populated from the `resource=` query parameter.
  * `isAccessTokenRevoked()` returns true iff `dateRevoked IS NOT NULL`.
  *
- * Note: cortex's audience binding is forwarded via the entity (not
+ * Note: herald's audience binding is forwarded via the entity (not
  * through league's request object) because `getNewToken()`'s signature
  * doesn't carry the request. The `Oauth` service stamps the audience
  * onto each newly-issued token via the entity's `setAudience()`
@@ -64,10 +64,10 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
         }
 
         // Stamp the pending RFC 8707 resource indicator onto the
-        // entity. The cortex `Oauth` service set it from the
+        // entity. The herald `Oauth` service set it from the
         // controller's `resource=` parsing before invoking the grant;
         // this is where it gets baked into the JWT.
-        $entity->setAudience(Cortex::getInstance()->oauth->getPendingAudience());
+        $entity->setAudience(Herald::getInstance()->oauth->getPendingAudience());
 
         return $entity;
     }
@@ -95,7 +95,7 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
         // the rotated access token inherits it. On the auth-code flow
         // the pending slot is null and we mint a fresh family — the
         // root of a new lineage.
-        $oauth = Cortex::getInstance()->oauth;
+        $oauth = Herald::getInstance()->oauth;
         $familyId = $oauth->getPendingFamilyId();
         if ($familyId === null) {
             $familyId = $oauth->newFamilyId();

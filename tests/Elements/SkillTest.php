@@ -2,7 +2,7 @@
 
 /**
  * =========================================================================
- * Element-class tests for the Cortex `Skill` element — Gate 8.6.
+ * Element-class tests for the Herald `Skill` element — Gate 8.6.
  *
  * Covers:
  *   - Save round-trip + field round-trip via the native handle +
@@ -12,12 +12,12 @@
  *   - `canView` / `canSave` / `canDelete` / `canDuplicate` permission
  *     resolution for admin, permitted, and unpermitted users.
  *   - Soft-delete + restore lifecycle, including
- *     `Cortex::getInstance()->skills->resetMemo()` firing on each
+ *     `Herald::getInstance()->skills->resetMemo()` firing on each
  *     lifecycle event.
  *   - `SkillQuery::handle()` filter returns the saved row.
  *
  * Fixture strategy: prefix every handle with
- * `cortex-skilltest-<hex>-` (slug-shaped to satisfy
+ * `herald-skilltest-<hex>-` (slug-shaped to satisfy
  * `Skill::HANDLE_PATTERN`) so `afterEach` can `LIKE`-hard-delete the
  * entire test run. No global state — element overrides land in the DB
  * and are gone by next test.
@@ -28,8 +28,8 @@
  */
 
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\elements\Skill;
+use craftpulse\herald\elements\Skill;
+use craftpulse\herald\Herald;
 
 // -----------------------------------------------------------------------------
 // Setup
@@ -38,7 +38,7 @@ use craftpulse\cortex\elements\Skill;
 beforeEach(function() {
     // Slug-shaped so handles satisfy Skill::HANDLE_PATTERN
     // (lowercase letters, digits, single hyphens).
-    $this->fixturePrefix = 'cortex-skilltest-' . bin2hex(random_bytes(4)) . '-';
+    $this->fixturePrefix = 'herald-skilltest-' . bin2hex(random_bytes(4)) . '-';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -52,7 +52,7 @@ afterEach(function() {
         ->status(null)
         ->trashed(null)
         ->site('*')
-        ->andWhere(['like', 'cortex_skills.handle', $this->fixturePrefix . '%', false])
+        ->andWhere(['like', 'herald_skills.handle', $this->fixturePrefix . '%', false])
         ->all();
     foreach ($rows as $row) {
         Craft::$app->getElements()->deleteElement($row, hardDelete: true);
@@ -69,14 +69,14 @@ afterEach(function() {
         Craft::$app->getElements()->deleteElement($user, hardDelete: true);
     }
 
-    Cortex::getInstance()->skills->resetMemo();
+    Herald::getInstance()->skills->resetMemo();
 });
 
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _cortex_skill_save(string $handle, string $title, ?string $description = null): Skill
+function _herald_skill_save(string $handle, string $title, ?string $description = null): Skill
 {
     $skill = new Skill();
     $skill->handle = $handle;
@@ -111,7 +111,7 @@ it('exposes the expected static surface', function() {
 
 it('round-trips a saved skill through Skill::find()', function() {
     $handle = $this->fixturePrefix . 'roundtrip';
-    $skill = _cortex_skill_save($handle, 'Round-trip skill', 'A short description.');
+    $skill = _herald_skill_save($handle, 'Round-trip skill', 'A short description.');
 
     $reloaded = Skill::find()->status(null)->site('*')->id($skill->id)->one();
     expect($reloaded)->toBeInstanceOf(Skill::class);
@@ -124,13 +124,13 @@ it('round-trips a saved skill through Skill::find()', function() {
     expect($byHandle->id)->toBe($skill->id);
 });
 
-it('persists a row in the cortex_skills table after save', function() {
+it('persists a row in the herald_skills table after save', function() {
     $handle = $this->fixturePrefix . 'dbrow';
-    $skill = _cortex_skill_save($handle, 'DB row check');
+    $skill = _herald_skill_save($handle, 'DB row check');
 
     $row = (new \craft\db\Query())
         ->select(['id', 'handle'])
-        ->from(\craftpulse\cortex\db\Table::SKILLS)
+        ->from(\craftpulse\herald\db\Table::SKILLS)
         ->where(['id' => $skill->id])
         ->one();
 
@@ -144,7 +144,7 @@ it('persists a row in the cortex_skills table after save', function() {
 
 it('rejects a handle change on an existing skill at the element layer', function() {
     $handle = $this->fixturePrefix . 'immutable';
-    $skill = _cortex_skill_save($handle, 'Immutable');
+    $skill = _herald_skill_save($handle, 'Immutable');
 
     // Reload and rename the handle, then save via the canonical
     // elements/save path (what the Gate 9.6 CP authoring screen uses).
@@ -162,7 +162,7 @@ it('rejects a handle change on an existing skill at the element layer', function
 
 it('allows re-saving an existing skill with an unchanged handle', function() {
     $handle = $this->fixturePrefix . 'unchanged';
-    $skill = _cortex_skill_save($handle, 'Unchanged');
+    $skill = _herald_skill_save($handle, 'Unchanged');
 
     $reloaded = Skill::find()->status(null)->site('*')->id($skill->id)->one();
     $reloaded->title = 'Unchanged — edited';
@@ -172,7 +172,7 @@ it('allows re-saving an existing skill with an unchanged handle', function() {
 
 it('rejects duplicate handles via validateHandleUnique', function() {
     $handle = $this->fixturePrefix . 'dup';
-    _cortex_skill_save($handle, 'First');
+    _herald_skill_save($handle, 'First');
 
     $second = new Skill();
     $second->handle = $handle;
@@ -222,16 +222,16 @@ it('accepts a valid lowercase-slug handle', function(string $handle) {
 
 it('rejects recreating a soft-deleted handle with a clean validation error — no IntegrityException, no orphaned element row', function() {
     // BLOCKER (Gate 9 hardening): the DB UNIQUE index on
-    // cortex_skills.handle holds the trashed row, so a default
+    // herald_skills.handle holds the trashed row, so a default
     // (trashed=false) uniqueness probe used to pass, saveElement()
     // persisted the element + elements_sites rows, then afterSave()'s
     // raw SkillRecord save threw an IntegrityException — leaving a
     // half-saved element. validateHandleUnique() must probe the trashed
     // slot and fail closed.
     $handle = $this->fixturePrefix . 'trashedhandle';
-    $original = _cortex_skill_save($handle, 'Original');
+    $original = _herald_skill_save($handle, 'Original');
 
-    // Soft-delete it. The cortex_skills row (and the UNIQUE index entry)
+    // Soft-delete it. The herald_skills row (and the UNIQUE index entry)
     // survive a soft delete.
     Craft::$app->getElements()->deleteElement($original, hardDelete: false);
     expect(Skill::find()->status(null)->handle($handle)->one())->toBeNull();
@@ -273,7 +273,7 @@ it('rejects recreating a soft-deleted handle with a clean validation error — n
 // -----------------------------------------------------------------------------
 
 it('admin always passes canSave / canView / canDelete / canDuplicate', function() {
-    $skill = _cortex_skill_save($this->fixturePrefix . 'admincan', 'admin');
+    $skill = _herald_skill_save($this->fixturePrefix . 'admincan', 'admin');
     expect($skill->canView($this->admin))->toBeTrue();
     expect($skill->canSave($this->admin))->toBeTrue();
     expect($skill->canDelete($this->admin))->toBeTrue();
@@ -281,7 +281,7 @@ it('admin always passes canSave / canView / canDelete / canDuplicate', function(
 });
 
 it('non-admin without permission is denied across the can-suite', function() {
-    $skill = _cortex_skill_save($this->fixturePrefix . 'denied', 'denied');
+    $skill = _herald_skill_save($this->fixturePrefix . 'denied', 'denied');
 
     $user = new User();
     $user->username = $this->fixturePrefix . 'denieduser';
@@ -302,17 +302,17 @@ it('non-admin without permission is denied across the can-suite', function() {
 // Permission registration
 // -----------------------------------------------------------------------------
 
-it('registers `manageCortexSkills` under a `Cortex` heading', function() {
+it('registers `manageHeraldSkills` under a `Herald` heading', function() {
     $permissions = Craft::$app->getUserPermissions()->getAllPermissions();
-    $cortexBlock = null;
+    $heraldBlock = null;
     foreach ($permissions as $block) {
-        if (($block['heading'] ?? null) === 'Cortex') {
-            $cortexBlock = $block;
+        if (($block['heading'] ?? null) === 'Herald') {
+            $heraldBlock = $block;
             break;
         }
     }
-    expect($cortexBlock)->not->toBeNull();
-    expect($cortexBlock['permissions'] ?? [])->toHaveKey(Skill::PERMISSION_MANAGE);
+    expect($heraldBlock)->not->toBeNull();
+    expect($heraldBlock['permissions'] ?? [])->toHaveKey(Skill::PERMISSION_MANAGE);
 });
 
 // -----------------------------------------------------------------------------
@@ -322,12 +322,12 @@ it('registers `manageCortexSkills` under a `Cortex` heading', function() {
 
 it('afterSave / afterDelete / afterRestore reset the memoized corpus', function() {
     // Warm the cache so the memoized array exists.
-    $service = Cortex::getInstance()->skills;
+    $service = Herald::getInstance()->skills;
     $service->resetMemo();
     $service->getMergedCorpus(); // first read populates the memo
 
     $handle = $this->fixturePrefix . 'memoreset';
-    $skill = _cortex_skill_save($handle, 'memo-reset');
+    $skill = _herald_skill_save($handle, 'memo-reset');
 
     // afterSave should have reset the memo — the new skill must show
     // up on the very next read. The row's `skill` field carries the
@@ -355,7 +355,7 @@ it('afterSave / afterDelete / afterRestore reset the memoized corpus', function(
 
 it('soft-deletes and restores cleanly', function() {
     $handle = $this->fixturePrefix . 'softdelete';
-    $skill = _cortex_skill_save($handle, 'softdelete');
+    $skill = _herald_skill_save($handle, 'softdelete');
 
     Craft::$app->getElements()->deleteElement($skill, hardDelete: false);
     expect(Skill::find()->status(null)->handle($handle)->one())->toBeNull();
@@ -369,18 +369,18 @@ it('soft-deletes and restores cleanly', function() {
 });
 
 // -----------------------------------------------------------------------------
-// Hard-delete wipes the cortex_skills row (FK CASCADE)
+// Hard-delete wipes the herald_skills row (FK CASCADE)
 // -----------------------------------------------------------------------------
 
-it('hard-delete cascades the cortex_skills row via FK', function() {
+it('hard-delete cascades the herald_skills row via FK', function() {
     $handle = $this->fixturePrefix . 'hardwipe';
-    $skill = _cortex_skill_save($handle, 'hardwipe');
+    $skill = _herald_skill_save($handle, 'hardwipe');
     $skillId = $skill->id;
 
     Craft::$app->getElements()->deleteElement($skill, hardDelete: true);
 
     $exists = (new \craft\db\Query())
-        ->from(\craftpulse\cortex\db\Table::SKILLS)
+        ->from(\craftpulse\herald\db\Table::SKILLS)
         ->where(['id' => $skillId])
         ->exists();
     expect($exists)->toBeFalse();

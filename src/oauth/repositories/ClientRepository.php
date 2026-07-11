@@ -1,9 +1,9 @@
 <?php
 
-namespace craftpulse\cortex\oauth\repositories;
+namespace craftpulse\herald\oauth\repositories;
 
-use craftpulse\cortex\oauth\entities\ClientEntity;
-use craftpulse\cortex\records\OauthClient as OauthClientRecord;
+use craftpulse\herald\oauth\entities\ClientEntity;
+use craftpulse\herald\records\OauthClient as OauthClientRecord;
 use JsonException;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Repositories\ClientRepositoryInterface;
@@ -12,7 +12,7 @@ use League\OAuth2\Server\Repositories\ClientRepositoryInterface;
  * =========================================================================
  * League adapter — `ClientRepositoryInterface`.
  *
- * Fetches `cortex_oauth_clients` rows by `clientId` and validates the
+ * Fetches `herald_oauth_clients` rows by `clientId` and validates the
  * client secret for confidential clients. Public clients (PKCE-only,
  * `isPublic = 1`) bypass the secret check — league re-verifies the
  * PKCE proof at the token endpoint.
@@ -108,7 +108,7 @@ class ClientRepository implements ClientRepositoryInterface
     // =========================================================================
 
     /**
-     * Hydrate a league `ClientEntity` from a `cortex_oauth_clients`
+     * Hydrate a league `ClientEntity` from a `herald_oauth_clients`
      * record. `redirectUris` decodes from JSON; a malformed JSON
      * payload (would only happen via direct DB write) falls back to
      * an empty list so league rejects the request with

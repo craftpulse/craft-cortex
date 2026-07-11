@@ -1,20 +1,20 @@
 <?php
 
-namespace craftpulse\cortex\tools\workflow;
+namespace craftpulse\herald\tools\workflow;
 
 use Craft;
 use craft\elements\Entry;
 use craft\elements\User;
 use craft\helpers\DateTimeHelper;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\PermissionedToolTrait;
-use craftpulse\cortex\tools\StreamableToolInterface;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\PermissionedToolTrait;
+use craftpulse\herald\tools\StreamableToolInterface;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use DateTimeImmutable;
 use Generator;
 use Throwable;
@@ -185,7 +185,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface
      */
     public static function getInputSchema(): array
     {
-        $modes = Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')
+        $modes = Herald::getInstance()->is(Herald::EDITION_PRO, '>=')
             ? array_merge(self::FREE_MODES, self::PRO_MODES)
             : self::FREE_MODES;
 
@@ -229,7 +229,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface
     {
         $schema = static::getInputSchema();
 
-        if ($user === null || !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+        if ($user === null || !Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             return $schema;
         }
 
@@ -269,7 +269,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface
             throw new ToolException('`mode` is required (export / import).');
         }
 
-        if (in_array($mode, self::PRO_MODES, true) && !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+        if (in_array($mode, self::PRO_MODES, true) && !Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             throw new ToolException("import_export: mode `{$mode}` is unavailable on this edition.");
         }
 
@@ -319,7 +319,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface
             throw new ToolException("import_export: mode `{$mode}` is not streamable.");
         }
 
-        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+        if (!Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             throw new ToolException("import_export: mode `{$mode}` is unavailable on this edition.");
         }
 

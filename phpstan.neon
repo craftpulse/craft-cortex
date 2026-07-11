@@ -1,9 +1,9 @@
-# PHPStan config for cortex.
+# PHPStan config for herald.
 #
 # Run from the playground:
 #
 #   ddev exec --dir=/var/www/html/cms vendor/bin/phpstan analyse \
-#     --memory-limit=1G -c vendor/craftpulse/craft-cortex/phpstan.neon
+#     --memory-limit=1G -c vendor/craftpulse/craft-herald/phpstan.neon
 #
 # Level 8 — fully strict. The lean exclusions below cover patterns
 # where Craft / Yii's stubs are conservatively typed but the real
@@ -27,10 +27,10 @@ parameters:
         - identifier: missingType.iterableValue
           path: src/tools/*
 
-        # Cortex::config() returns Yii's generic component-config array;
+        # Herald::config() returns Yii's generic component-config array;
         # the schema isn't worth pinning down for one method.
         - identifier: missingType.iterableValue
-          path: src/Cortex.php
+          path: src/Herald.php
 
         # Craft's element-query classes use generic templates we don't
         # need to forward in private builder helpers.
@@ -38,10 +38,10 @@ parameters:
           path: src/tools/content/*
 
         # `Element::find()` returns its concrete element-query class —
-        # Cortex's `Skill::find()` mirrors Craft's `Tag::find()` shape
+        # Herald's `Skill::find()` mirrors Craft's `Tag::find()` shape
         # (`@return TagQuery` without template parameters). Forwarding
         # the generics on a public `find()` override leaks Element's
-        # internal `TKey/TElement` covariance constraints into Cortex
+        # internal `TKey/TElement` covariance constraints into Herald
         # callers and conflicts with Element's non-covariant template
         # types. The query class itself does declare templates on its
         # own docblock.

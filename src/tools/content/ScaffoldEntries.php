@@ -1,21 +1,21 @@
 <?php
 
-namespace craftpulse\cortex\tools\content;
+namespace craftpulse\herald\tools\content;
 
 use Craft;
 use craft\elements\Entry as EntryElement;
 use craft\elements\User;
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\IdempotencyTrait;
-use craftpulse\cortex\tools\PermissionedToolTrait;
-use craftpulse\cortex\tools\ProToolTrait;
-use craftpulse\cortex\tools\StreamableToolInterface;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\IdempotencyTrait;
+use craftpulse\herald\tools\PermissionedToolTrait;
+use craftpulse\herald\tools\ProToolTrait;
+use craftpulse\herald\tools\StreamableToolInterface;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use Generator;
 use Throwable;
 
@@ -46,7 +46,7 @@ use Throwable;
  *     scaffold into `posts` but not into `news` even when the
  *     argument lies; the per-row check is the security boundary.
  *
- * Idempotency contract: cache prefix `cortex:scaffold_entries:idem:`.
+ * Idempotency contract: cache prefix `herald:scaffold_entries:idem:`.
  * Whole-operation cache keyed by `{userId, idempotencyKey}`. Caveat: if
  * the operator changes `count` or `template.title` between calls
  * sharing the same key, the OLD cached envelope is returned. LLMs
@@ -75,7 +75,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
      *
      * @since 5.0.0
      */
-    public const IDEMPOTENCY_CACHE_PREFIX = 'cortex:scaffold_entries:idem:';
+    public const IDEMPOTENCY_CACHE_PREFIX = 'herald:scaffold_entries:idem:';
 
     /**
      * Hard ceiling on the number of entries created per call. Above

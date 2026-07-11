@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tests\Tools\Fixtures;
+namespace craftpulse\herald\tests\Tools\Fixtures;
 
 use craft\console\Controller;
 use yii\console\ExitCode;
@@ -14,7 +14,7 @@ use yii\console\ExitCode;
  * reaches either the wire response or the persisted audit excerpt.
  *
  * Registered into `Craft::$app->controllerMap` for the duration of the
- * test under the `cortex-test-secret` controller id, then removed.
+ * test under the `herald-test-secret` controller id, then removed.
  * =========================================================================
  *
  * @author Craftpulse

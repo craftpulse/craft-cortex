@@ -27,9 +27,9 @@
 
 use craft\elements\GlobalSet as GlobalSetElement;
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\content\GlobalSet;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\content\GlobalSet;
+use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
 // Setup
@@ -47,12 +47,12 @@ beforeEach(function() {
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _cortex_global_set_tool(): GlobalSet
+function _herald_global_set_tool(): GlobalSet
 {
     return new GlobalSet();
 }
 
-function _cortex_first_global_set(): ?GlobalSetElement
+function _herald_first_global_set(): ?GlobalSetElement
 {
     $sets = Craft::$app->getGlobals()->getAllSets();
     return $sets[0] ?? null;
@@ -63,11 +63,11 @@ function _cortex_first_global_set(): ?GlobalSetElement
 // -----------------------------------------------------------------------------
 
 it('is NOT registered on Free installs', function() {
-    expect(Cortex::getInstance()->tools->getByName('global_set'))->toBeNull();
+    expect(Herald::getInstance()->tools->getByName('global_set'))->toBeNull();
 
     $names = array_map(
         static fn(array $entry): string => $entry['name'],
-        Cortex::getInstance()->tools->asListPayload(),
+        Herald::getInstance()->tools->asListPayload(),
     );
     expect($names)->not->toContain('global_set');
 });
@@ -75,7 +75,7 @@ it('is NOT registered on Free installs', function() {
 it('shouldRegister() returns true on Pro and false on Free', function() {
     expect(GlobalSet::shouldRegister())->toBeFalse();
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect(GlobalSet::shouldRegister())->toBeTrue();
     });
 });
@@ -85,19 +85,19 @@ it('shouldRegister() returns true on Pro and false on Free', function() {
 // -----------------------------------------------------------------------------
 
 it('throws ToolException on unknown mode', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_global_set_tool()->execute(['mode' => 'frobnicate']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_global_set_tool()->execute(['mode' => 'frobnicate']);
     });
 })->throws(ToolException::class);
 
 it('accepts an omitted mode and defaults to update', function() {
-    $set = _cortex_first_global_set();
+    $set = _herald_first_global_set();
     if ($set === null) {
         $this->markTestSkipped('No global sets in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($set) {
-        $result = _cortex_global_set_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($set) {
+        $result = _herald_global_set_tool()->execute([
             'handle' => $set->handle,
             'fields' => (object) [],
         ]);
@@ -110,24 +110,24 @@ it('accepts an omitted mode and defaults to update', function() {
 // -----------------------------------------------------------------------------
 
 it('filterFor(null) returns true — stdio is trusted', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_global_set_tool()->filterFor(null))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_global_set_tool()->filterFor(null))->toBeTrue();
     });
 });
 
 it('filterFor returns true for admin users', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_global_set_tool()->filterFor($this->admin))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_global_set_tool()->filterFor($this->admin))->toBeTrue();
     });
 });
 
 it('filterFor returns false for users with no editGlobalSet permission on any set', function() {
-    if (_cortex_first_global_set() === null) {
+    if (_herald_first_global_set() === null) {
         $this->markTestSkipped('No global sets in the playground — filterFor() needs at least one set to evaluate.');
     }
 
     $user = new User();
-    $user->username = '__cortex_noglob_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_noglob_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -137,8 +137,8 @@ it('filterFor returns false for users with no editGlobalSet permission on any se
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
-            expect(_cortex_global_set_tool()->filterFor($user))->toBeFalse();
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
+            expect(_herald_global_set_tool()->filterFor($user))->toBeFalse();
         });
     } finally {
         Craft::$app->getElements()->deleteElement($user, hardDelete: true);
@@ -150,13 +150,13 @@ it('filterFor returns false for users with no editGlobalSet permission on any se
 // -----------------------------------------------------------------------------
 
 it('update mode resolves a set by handle and returns the success envelope', function() {
-    $set = _cortex_first_global_set();
+    $set = _herald_first_global_set();
     if ($set === null) {
         $this->markTestSkipped('No global sets in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($set) {
-        $result = _cortex_global_set_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($set) {
+        $result = _herald_global_set_tool()->execute([
             'mode' => 'update',
             'handle' => $set->handle,
             'fields' => (object) [],
@@ -169,13 +169,13 @@ it('update mode resolves a set by handle and returns the success envelope', func
 });
 
 it('update mode resolves a set by id', function() {
-    $set = _cortex_first_global_set();
+    $set = _herald_first_global_set();
     if ($set === null) {
         $this->markTestSkipped('No global sets in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($set) {
-        $result = _cortex_global_set_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($set) {
+        $result = _herald_global_set_tool()->execute([
             'mode' => 'update',
             'id' => $set->id,
             'fields' => (object) [],
@@ -185,13 +185,13 @@ it('update mode resolves a set by id', function() {
 });
 
 it('update mode resolves a set by uid', function() {
-    $set = _cortex_first_global_set();
+    $set = _herald_first_global_set();
     if ($set === null) {
         $this->markTestSkipped('No global sets in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($set) {
-        $result = _cortex_global_set_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() use ($set) {
+        $result = _herald_global_set_tool()->execute([
             'mode' => 'update',
             'uid' => $set->uid,
             'fields' => (object) [],
@@ -201,8 +201,8 @@ it('update mode resolves a set by uid', function() {
 });
 
 it('update mode throws when no identifier is supplied', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_global_set_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_global_set_tool()->execute([
             'mode' => 'update',
             'fields' => (object) [],
         ]);
@@ -210,10 +210,10 @@ it('update mode throws when no identifier is supplied', function() {
 })->throws(ToolException::class);
 
 it('update mode throws when handle does not resolve', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_global_set_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_global_set_tool()->execute([
             'mode' => 'update',
-            'handle' => '__cortex_no_such_global_set__',
+            'handle' => '__herald_no_such_global_set__',
             'fields' => (object) [],
         ]);
     });
@@ -224,13 +224,13 @@ it('update mode throws when handle does not resolve', function() {
 // -----------------------------------------------------------------------------
 
 it('the same idempotencyKey returns the cached envelope without re-saving', function() {
-    $set = _cortex_first_global_set();
+    $set = _herald_first_global_set();
     if ($set === null) {
         $this->markTestSkipped('No global sets in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($set) {
-        $tool = _cortex_global_set_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($set) {
+        $tool = _herald_global_set_tool();
         $idempotencyKey = 'idem_' . bin2hex(random_bytes(8));
 
         $args = [
@@ -253,13 +253,13 @@ it('the same idempotencyKey returns the cached envelope without re-saving', func
 // -----------------------------------------------------------------------------
 
 it('update mode throws ToolException for a user without editGlobalSet permission', function() {
-    $set = _cortex_first_global_set();
+    $set = _herald_first_global_set();
     if ($set === null) {
         $this->markTestSkipped('No global sets in the playground.');
     }
 
     $user = new User();
-    $user->username = '__cortex_noperm_glob_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_noperm_glob_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -269,11 +269,11 @@ it('update mode throws ToolException for a user without editGlobalSet permission
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($set, $user) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($set, $user) {
             Craft::$app->getUser()->setIdentity($user);
 
             try {
-                _cortex_global_set_tool()->execute([
+                _herald_global_set_tool()->execute([
                     'mode' => 'update',
                     'handle' => $set->handle,
                     'fields' => (object) [],

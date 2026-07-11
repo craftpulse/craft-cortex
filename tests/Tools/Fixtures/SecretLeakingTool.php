@@ -1,8 +1,8 @@
 <?php
 
-namespace craftpulse\cortex\tests\Tools\Fixtures;
+namespace craftpulse\herald\tests\Tools\Fixtures;
 
-use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\herald\tools\AbstractTool;
 
 /**
  * =========================================================================

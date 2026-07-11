@@ -16,10 +16,10 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\events\LogCallEvent;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\support\InvocationLogger;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\events\LogCallEvent;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\InvocationLogger;
+use craftpulse\herald\tools\ToolException;
 use yii\base\Event;
 
 it('emits a success line with redacted args and zero error fields', function() {
@@ -261,7 +261,7 @@ it('fires EVENT_LOG_CALL even for stdio invocations — listener filters by tran
     // Decision 11: stdio gets the KV log line, no DB row. The event
     // fires regardless so subscribers can route stdio differently
     // (e.g. mirror to a separate sink); the audit-log listener in
-    // Cortex::init() is the one that filters by transport.
+    // Herald::init() is the one that filters by transport.
     $events = [];
     $handler = function(LogCallEvent $event) use (&$events): void {
         $events[] = $event->entry['transport'] ?? null;

@@ -17,9 +17,9 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -31,7 +31,7 @@ use craftpulse\cortex\tools\ToolException;
  *
  * @return array{0: array<int,array<string,mixed>>, 1: array<string,mixed>}
  */
-function _cortex_resave_drain(Generator $gen): array
+function _herald_resave_drain(Generator $gen): array
 {
     $frames = [];
     while ($gen->valid()) {
@@ -47,7 +47,7 @@ function _cortex_resave_drain(Generator $gen): array
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('resave');
+    $this->tool = Herald::getInstance()->tools->getByName('resave');
 });
 
 it('streams progress frames against the minorHeroes seed and returns a structured terminal envelope', function() {
@@ -58,7 +58,7 @@ it('streams progress frames against the minorHeroes seed and returns a structure
         'limit' => 5,
     ], $ctx);
 
-    [$frames, $terminal] = _cortex_resave_drain($gen);
+    [$frames, $terminal] = _herald_resave_drain($gen);
 
     expect($frames)->not->toBeEmpty();
     // The 60Hz throttle can collapse some frames into one, but the
@@ -101,7 +101,7 @@ it('emits a single zero-row frame when no elements match', function() {
         'status' => 'no_such_status_value_xyz',
     ], $ctx);
 
-    [$frames, $terminal] = _cortex_resave_drain($gen);
+    [$frames, $terminal] = _herald_resave_drain($gen);
 
     expect($frames)->toHaveCount(1);
     expect($frames[0])->toMatchArray(['progress' => 0, 'total' => 0]);
@@ -204,7 +204,7 @@ it('non-streaming execute() drains stream() and returns the same terminal envelo
     ];
 
     $ctx = new InvocationContext();
-    [, $streamTerminal] = _cortex_resave_drain($this->tool->stream($arguments, $ctx));
+    [, $streamTerminal] = _herald_resave_drain($this->tool->stream($arguments, $ctx));
     $executeResult = $this->tool->execute($arguments);
 
     // Both surfaces emit the unified shape — no legacy `exitCode` /

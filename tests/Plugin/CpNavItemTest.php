@@ -2,7 +2,7 @@
 
 /**
  * =========================================================================
- * `Cortex::getCpNavItem()` behavioural tests.
+ * `Herald::getCpNavItem()` behavioural tests.
  *
  * The subnav is presentation-only — every controller action behind a nav
  * item re-checks its own `requireAdmin` / `requirePermission` /
@@ -15,7 +15,7 @@
  *   - Admin / Pro                        → all five items.
  *   - Non-admin with `viewActivity` / Pro → Activity only.
  *
- * Edition flips go through `cortex_with_edition()` so the project-config
+ * Edition flips go through `herald_with_edition()` so the project-config
  * write is muted and restored. Identity is set with `setIdentity()` and
  * cleared in `afterEach`.
  * =========================================================================
@@ -25,7 +25,7 @@
  */
 
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 
 beforeEach(function() {
     $this->admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio');
@@ -41,14 +41,14 @@ afterEach(function() {
 it('returns null for an anonymous request', function() {
     Craft::$app->getUser()->setIdentity(null);
 
-    expect(Cortex::getInstance()->getCpNavItem())->toBeNull();
+    expect(Herald::getInstance()->getCpNavItem())->toBeNull();
 });
 
 it('shows only Settings + Temporary grants to an admin on Free', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
-    cortex_with_edition(Cortex::EDITION_FREE, function() {
-        $navItem = Cortex::getInstance()->getCpNavItem();
+    herald_with_edition(Herald::EDITION_FREE, function() {
+        $navItem = Herald::getInstance()->getCpNavItem();
 
         expect($navItem)->toBeArray();
         expect(array_keys($navItem['subnav']))->toBe(['settings', 'grants']);
@@ -58,8 +58,8 @@ it('shows only Settings + Temporary grants to an admin on Free', function() {
 it('shows all items to an admin on Pro', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $navItem = Cortex::getInstance()->getCpNavItem();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $navItem = Herald::getInstance()->getCpNavItem();
 
         expect($navItem)->toBeArray();
         expect(array_keys($navItem['subnav']))
@@ -68,22 +68,22 @@ it('shows all items to an admin on Pro', function() {
 });
 
 it('shows only Activity to a non-admin with viewActivity on Pro', function() {
-    // A non-admin user granted only `cortex:viewActivity`. The playground
+    // A non-admin user granted only `herald:viewActivity`. The playground
     // may not seed one; skip rather than fail the suite if absent.
     $nonAdmin = User::find()
         ->admin(false)
         ->status(null)
         ->collect()
-        ->first(fn(User $u): bool => $u->can(Cortex::PERMISSION_VIEW_ACTIVITY));
+        ->first(fn(User $u): bool => $u->can(Herald::PERMISSION_VIEW_ACTIVITY));
 
     if (!$nonAdmin instanceof User) {
-        $this->markTestSkipped('No non-admin user with cortex:viewActivity in the playground.');
+        $this->markTestSkipped('No non-admin user with herald:viewActivity in the playground.');
     }
 
     Craft::$app->getUser()->setIdentity($nonAdmin);
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $navItem = Cortex::getInstance()->getCpNavItem();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $navItem = Herald::getInstance()->getCpNavItem();
 
         expect($navItem)->toBeArray();
         expect(array_keys($navItem['subnav']))->toBe(['activity']);

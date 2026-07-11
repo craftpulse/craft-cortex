@@ -1,9 +1,9 @@
 <?php
 
-namespace craftpulse\cortex\tools;
+namespace craftpulse\herald\tools;
 
-use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\tools\support\InvocationContext;
+use craftpulse\herald\mcp\Server;
+use craftpulse\herald\tools\support\InvocationContext;
 
 /**
  * =========================================================================

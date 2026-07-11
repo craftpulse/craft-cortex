@@ -2,15 +2,15 @@
 
 /**
  * =========================================================================
- * Pest / PHPUnit bootstrap for Cortex tests.
+ * Pest / PHPUnit bootstrap for Herald tests.
  *
  * Runs once before any test. Boots Craft's console application against
  * the surrounding install (the playground at /var/www/html/cms when run
  * via `ddev exec` from the playground), then leaves `Craft::$app`
- * primed so tests can call `Cortex::getInstance()->tools->...` directly.
+ * primed so tests can call `Herald::getInstance()->tools->...` directly.
  *
  * We deliberately use the playground's existing Craft instance rather
- * than spinning up an isolated fixtures install: cortex tools introspect
+ * than spinning up an isolated fixtures install: herald tools introspect
  * Craft's API surface, not user data, so tests assert on shape (keys,
  * types) rather than specific records. That makes tests portable across
  * playground states without requiring a sealed fixtures dataset.
@@ -24,20 +24,20 @@
 // its own vendor, so pest plugins that other harnesses install into the
 // shared cms vendor (e.g. craft-pest-core) can never hijack this suite:
 //   ddev exec --dir=<plugin dir> "[ -d vendor ] || composer install; vendor/bin/pest"
-// The surrounding Craft install is located via `CORTEX_TEST_CRAFT_BASE` when
+// The surrounding Craft install is located via `HERALD_TEST_CRAFT_BASE` when
 // set, then the working directory (legacy cms-root invocation), then the
 // playground's in-container default.
-$craftBase = getenv('CORTEX_TEST_CRAFT_BASE') ?: getcwd();
+$craftBase = getenv('HERALD_TEST_CRAFT_BASE') ?: getcwd();
 
 if ($craftBase === false || !file_exists($craftBase . '/craft')) {
     $craftBase = '/var/www/html/cms';
 }
 
 if (!file_exists($craftBase . '/craft')) {
-    fwrite(STDERR, "Cortex test bootstrap could not locate a Craft install (tried CORTEX_TEST_CRAFT_BASE, cwd, /var/www/html/cms).\n");
+    fwrite(STDERR, "Herald test bootstrap could not locate a Craft install (tried HERALD_TEST_CRAFT_BASE, cwd, /var/www/html/cms).\n");
     fwrite(STDERR, "Run tests via:\n");
     fwrite(STDERR, "  ddev exec --dir=<plugin dir> \"vendor/bin/pest\"\n");
-    fwrite(STDERR, "or point CORTEX_TEST_CRAFT_BASE at a Craft root.\n");
+    fwrite(STDERR, "or point HERALD_TEST_CRAFT_BASE at a Craft root.\n");
     exit(1);
 }
 
@@ -56,25 +56,25 @@ if (!defined('CRAFT_ENVIRONMENT')) {
 }
 
 // Boot the console application. After this, Craft::$app is the
-// ConsoleApplication, plugins are registered, and Cortex::getInstance()
-// resolves cortex.
+// ConsoleApplication, plugins are registered, and Herald::getInstance()
+// resolves herald.
 require CRAFT_VENDOR_PATH . '/craftcms/cms/bootstrap/console.php';
 
 // Register the test-namespace PSR-4 mapping on the playground's
 // autoloader so test fixtures under `tests/Tools/Fixtures/` (and any
 // other namespaced test helpers we add later) resolve without an
 // explicit `require`. The playground's `vendor/composer/autoload_psr4.php`
-// only knows about `craftpulse\cortex\` → `src/`; the dev autoload from
+// only knows about `craftpulse\herald\` → `src/`; the dev autoload from
 // the plugin's own composer.json never lands in the playground's
 // vendor dir, so we plumb it in here.
 $composerLoader = require CRAFT_VENDOR_PATH . '/autoload.php';
 if (is_object($composerLoader) && method_exists($composerLoader, 'addPsr4')) {
-    $composerLoader->addPsr4('craftpulse\\cortex\\tests\\', __DIR__ . '/');
+    $composerLoader->addPsr4('craftpulse\\herald\\tests\\', __DIR__ . '/');
 }
 
 // Pest's auto-discovery looks for `tests/Pest.php` relative to its working
 // directory; under the legacy cms-root invocation that misses our config in
-// cortex/tests/, so we load it explicitly here so `uses()` and the custom
+// herald/tests/, so we load it explicitly here so `uses()` and the custom
 // `expect()` extensions register before tests run. `require_once`, not
 // `require`: under the plugin-local invocation pest's own BootFiles has
 // already include_once'd this file, and a plain require would fatally

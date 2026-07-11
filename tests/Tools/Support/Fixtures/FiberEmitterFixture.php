@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tests\Tools\Support\Fixtures;
+namespace craftpulse\herald\tests\Tools\Support\Fixtures;
 
 use craft\db\QueryAbortedException;
 use RuntimeException;
@@ -34,7 +34,7 @@ final class FiberEmitterFixture extends Component
     /**
      * @event FiberEmitterFixtureEvent Fired once per row inside `run()`.
      */
-    public const EVENT_ROW = 'cortex.test.fiberEmitterRow';
+    public const EVENT_ROW = 'herald.test.fiberEmitterRow';
 
     // Public Properties
     // =========================================================================

@@ -5,11 +5,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('graphql');
+    $this->tool = Herald::getInstance()->tools->getByName('graphql');
 });
 
 it('throws when mode is missing', function() {

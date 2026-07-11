@@ -1,10 +1,10 @@
 <?php
 
-namespace craftpulse\cortex\tests\Tools\Fixtures;
+namespace craftpulse\herald\tests\Tools\Fixtures;
 
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\StreamableToolInterface;
-use craftpulse\cortex\tools\support\InvocationContext;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\StreamableToolInterface;
+use craftpulse\herald\tools\support\InvocationContext;
 use Generator;
 
 /**
@@ -16,7 +16,7 @@ use Generator;
  * `Server::dispatchStreaming()` and the controller's SSE response path
  * against a known-shape generator. Registered per-test via the
  * `EVENT_REGISTER_TOOLS` listener pattern the rest of the suite uses
- * — no boot-time wiring in `Cortex::init()` for tests so the fixture
+ * — no boot-time wiring in `Herald::init()` for tests so the fixture
  * stays out of the production registry.
  *
  * Behaviour:

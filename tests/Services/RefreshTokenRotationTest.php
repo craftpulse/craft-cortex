@@ -22,13 +22,13 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\oauth\repositories\RefreshTokenRepository;
-use craftpulse\cortex\records\OauthClient as OauthClientRecord;
-use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
-use craftpulse\cortex\tools\support\InvocationLogger;
+use craftpulse\herald\Herald;
+use craftpulse\herald\oauth\repositories\RefreshTokenRepository;
+use craftpulse\herald\records\OauthClient as OauthClientRecord;
+use craftpulse\herald\records\OauthToken as OauthTokenRecord;
+use craftpulse\herald\tools\support\InvocationLogger;
 
-const CORTEX_ROTATION_TEST_CLIENT = '_rotation_test_client';
+const HERALD_ROTATION_TEST_CLIENT = '_rotation_test_client';
 
 /**
  * Persist a token row for the rotation tests. Returns the plaintext id
@@ -36,13 +36,13 @@ const CORTEX_ROTATION_TEST_CLIENT = '_rotation_test_client';
  *
  * @param array<string,mixed> $overrides
  */
-function cortex_make_token_row(string $type, string $familyId, array $overrides = []): OauthTokenRecord
+function herald_make_token_row(string $type, string $familyId, array $overrides = []): OauthTokenRecord
 {
     $record = new OauthTokenRecord();
     $record->tokenType = $type;
     $record->tokenHash = hash('sha256', $overrides['plaintext'] ?? bin2hex(random_bytes(16)));
     $record->userId = null;
-    $record->clientId = $overrides['clientId'] ?? CORTEX_ROTATION_TEST_CLIENT;
+    $record->clientId = $overrides['clientId'] ?? HERALD_ROTATION_TEST_CLIENT;
     $record->familyId = $familyId;
     $record->scope = 'content:read';
     $record->audience = 'https://rotation-test.invalid/mcp';
@@ -56,9 +56,9 @@ function cortex_make_token_row(string $type, string $familyId, array $overrides 
 beforeEach(function() {
     // The tokens table has an ON DELETE CASCADE FK on clientId, so a
     // client row must exist before any token row inserts.
-    if (OauthClientRecord::findOne(['clientId' => CORTEX_ROTATION_TEST_CLIENT]) === null) {
+    if (OauthClientRecord::findOne(['clientId' => HERALD_ROTATION_TEST_CLIENT]) === null) {
         $client = new OauthClientRecord();
-        $client->clientId = CORTEX_ROTATION_TEST_CLIENT;
+        $client->clientId = HERALD_ROTATION_TEST_CLIENT;
         $client->clientName = '_test_/rotation-client';
         $client->redirectUris = '["https://rotation-test.invalid/cb"]';
         $client->isPublic = true;
@@ -69,14 +69,14 @@ beforeEach(function() {
 afterEach(function() {
     OauthTokenRecord::deleteAll(['like', 'audience', 'https://rotation-test.invalid/%', false]);
     // Dropping the client cascades any stragglers.
-    OauthClientRecord::deleteAll(['clientId' => CORTEX_ROTATION_TEST_CLIENT]);
-    Cortex::getInstance()->oauth->setPendingFamilyId(null);
+    OauthClientRecord::deleteAll(['clientId' => HERALD_ROTATION_TEST_CLIENT]);
+    Herald::getInstance()->oauth->setPendingFamilyId(null);
 });
 
 it('revokeRefreshToken marks the row consumed and revoked', function() {
     $plaintext = bin2hex(random_bytes(20));
-    $familyId = Cortex::getInstance()->oauth->newFamilyId();
-    cortex_make_token_row('refresh', $familyId, ['plaintext' => $plaintext]);
+    $familyId = Herald::getInstance()->oauth->newFamilyId();
+    herald_make_token_row('refresh', $familyId, ['plaintext' => $plaintext]);
 
     (new RefreshTokenRepository())->revokeRefreshToken($plaintext);
 
@@ -87,18 +87,18 @@ it('revokeRefreshToken marks the row consumed and revoked', function() {
 
 it('revokeRefreshToken stamps the family onto the Oauth service for the rotated pair', function() {
     $plaintext = bin2hex(random_bytes(20));
-    $familyId = Cortex::getInstance()->oauth->newFamilyId();
-    cortex_make_token_row('refresh', $familyId, ['plaintext' => $plaintext]);
+    $familyId = Herald::getInstance()->oauth->newFamilyId();
+    herald_make_token_row('refresh', $familyId, ['plaintext' => $plaintext]);
 
     (new RefreshTokenRepository())->revokeRefreshToken($plaintext);
 
-    expect(Cortex::getInstance()->oauth->getPendingFamilyId())->toBe($familyId);
+    expect(Herald::getInstance()->oauth->getPendingFamilyId())->toBe($familyId);
 });
 
 it('isRefreshTokenRevoked returns false for a live refresh token', function() {
     $plaintext = bin2hex(random_bytes(20));
-    $familyId = Cortex::getInstance()->oauth->newFamilyId();
-    cortex_make_token_row('refresh', $familyId, ['plaintext' => $plaintext]);
+    $familyId = Herald::getInstance()->oauth->newFamilyId();
+    herald_make_token_row('refresh', $familyId, ['plaintext' => $plaintext]);
 
     expect((new RefreshTokenRepository())->isRefreshTokenRevoked($plaintext))->toBeFalse();
 });
@@ -108,16 +108,16 @@ it('isRefreshTokenRevoked returns true for a missing row (fail closed)', functio
 });
 
 it('replaying a consumed refresh token revokes the whole family', function() {
-    $familyId = Cortex::getInstance()->oauth->newFamilyId();
+    $familyId = Herald::getInstance()->oauth->newFamilyId();
 
     // The lineage: one live access token, one live refresh token, and
     // the consumed (rotated-away) refresh token being replayed.
-    $liveAccess = cortex_make_token_row('access', $familyId);
-    $liveRefresh = cortex_make_token_row('refresh', $familyId);
+    $liveAccess = herald_make_token_row('access', $familyId);
+    $liveRefresh = herald_make_token_row('refresh', $familyId);
 
     $consumedPlaintext = bin2hex(random_bytes(20));
     $now = (new DateTime())->format('Y-m-d H:i:s');
-    cortex_make_token_row('refresh', $familyId, [
+    herald_make_token_row('refresh', $familyId, [
         'plaintext' => $consumedPlaintext,
         'dateRevoked' => $now,
         'consumedAt' => $now,
@@ -135,12 +135,12 @@ it('replaying a consumed refresh token revokes the whole family', function() {
 });
 
 it('a family-revoke writes a kind=security audit row', function() {
-    $familyId = Cortex::getInstance()->oauth->newFamilyId();
-    $count = Cortex::getInstance()->oauth->revokeFamily($familyId, 'test replay');
+    $familyId = Herald::getInstance()->oauth->newFamilyId();
+    $count = Herald::getInstance()->oauth->revokeFamily($familyId, 'test replay');
 
     expect($count)->toBeInt();
 
-    $auditRow = Cortex::getInstance()->invocations->find()
+    $auditRow = Herald::getInstance()->invocations->find()
         ->andWhere(['kind' => InvocationLogger::KIND_SECURITY])
         ->andWhere(['toolName' => '_oauth_token_theft'])
         ->one();
@@ -149,14 +149,14 @@ it('a family-revoke writes a kind=security audit row', function() {
 });
 
 it('a revoked-but-not-consumed token does not re-trigger a family revoke', function() {
-    $familyId = Cortex::getInstance()->oauth->newFamilyId();
+    $familyId = Herald::getInstance()->oauth->newFamilyId();
 
     // A live sibling that would be wiped IF the family revoke fired.
-    $sibling = cortex_make_token_row('access', $familyId);
+    $sibling = herald_make_token_row('access', $familyId);
 
     // An operator-revoked (RFC 7009) refresh token: revoked, NOT consumed.
     $plaintext = bin2hex(random_bytes(20));
-    cortex_make_token_row('refresh', $familyId, [
+    herald_make_token_row('refresh', $familyId, [
         'plaintext' => $plaintext,
         'dateRevoked' => (new DateTime())->format('Y-m-d H:i:s'),
     ]);

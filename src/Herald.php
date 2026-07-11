@@ -1,37 +1,37 @@
 <?php
 
-namespace craftpulse\cortex;
+namespace craftpulse\herald;
 
 use Craft;
 use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\elements\User;
 use craft\helpers\UrlHelper;
-use craftpulse\cortex\models\Settings;
-use craftpulse\cortex\plugin\PluginTrait;
-use craftpulse\cortex\plugin\Services as CortexServices;
-use craftpulse\cortex\services\Allowlist;
-use craftpulse\cortex\services\Invocations;
-use craftpulse\cortex\services\Oauth;
-use craftpulse\cortex\services\Prompts;
-use craftpulse\cortex\services\RateLimiter;
-use craftpulse\cortex\services\Resources;
-use craftpulse\cortex\services\Scopes;
-use craftpulse\cortex\services\Sessions;
-use craftpulse\cortex\services\Skills;
-use craftpulse\cortex\services\Tokens;
-use craftpulse\cortex\services\Tools;
+use craftpulse\herald\models\Settings;
+use craftpulse\herald\plugin\PluginTrait;
+use craftpulse\herald\plugin\Services as HeraldServices;
+use craftpulse\herald\services\Allowlist;
+use craftpulse\herald\services\Invocations;
+use craftpulse\herald\services\Oauth;
+use craftpulse\herald\services\Prompts;
+use craftpulse\herald\services\RateLimiter;
+use craftpulse\herald\services\Resources;
+use craftpulse\herald\services\Scopes;
+use craftpulse\herald\services\Sessions;
+use craftpulse\herald\services\Skills;
+use craftpulse\herald\services\Tokens;
+use craftpulse\herald\services\Tools;
 
 /**
  * =========================================================================
- * Cortex plugin entry point.
+ * Herald plugin entry point.
  *
  * Wires the MCP server's services, console controllers (auto-discovered
  * from `src/console/controllers/`), and the Gate 7 HTTP transport
- * (`cortex/mcp` plus the OAuth + `.well-known` URL rules registered in
+ * (`herald/mcp` plus the OAuth + `.well-known` URL rules registered in
  * `init()`).
  *
- * Service accessors live on the `CortexServices` trait
+ * Service accessors live on the `HeraldServices` trait
  * (`src/plugin/Services.php`) — one typed `getXxx(): Xxx` per registered
  * component. The trait is the canonical type contract; `config()`
  * declares the Yii component map that makes `$this->get('xxx')` resolve.
@@ -46,19 +46,19 @@ use craftpulse\cortex\services\Tools;
  *
  * Edition handles (`EDITION_FREE`, `EDITION_PRO`) are declared via
  * `editions()` per the Plugin Store contract. The active edition lives
- * in project config at `plugins.cortex.edition`; Craft owns the
- * storage. Cortex does not run a license network call.
+ * in project config at `plugins.herald.edition`; Craft owns the
+ * storage. Herald does not run a license network call.
  * =========================================================================
  *
  * @author Craftpulse
  * @since  5.0.0
  *
- * @method static Cortex getInstance()
+ * @method static Herald getInstance()
  * @method Settings getSettings()
  */
-class Cortex extends BasePlugin
+class Herald extends BasePlugin
 {
-    use CortexServices;
+    use HeraldServices;
     use PluginTrait;
 
     // Constants
@@ -67,7 +67,7 @@ class Cortex extends BasePlugin
     /**
      * Edition handle for the Free tier — read-only / dev surface, no
      * write tools, no PII, no admin-level command patterns. The default
-     * value Craft assigns to `plugins.cortex.edition` on a fresh install.
+     * value Craft assigns to `plugins.herald.edition` on a fresh install.
      *
      * @since 5.0.0
      */
@@ -77,7 +77,7 @@ class Cortex extends BasePlugin
      * Edition handle for the Pro tier — adds the content-write tools,
      * the `users` PII surface, mode unlocks on the four Free workflow
      * tools, and streaming enablement on bulk-mutation paths. The
-     * Plugin Store sets this handle on purchase; Cortex does not run
+     * Plugin Store sets this handle on purchase; Herald does not run
      * a license network call.
      *
      * @since 5.0.0
@@ -85,16 +85,16 @@ class Cortex extends BasePlugin
     public const EDITION_PRO = 'pro';
 
     /**
-     * Permission handle gating the Activity tab in the Cortex CP page.
+     * Permission handle gating the Activity tab in the Herald CP page.
      * Admins implicitly pass; non-admins with this permission see only
      * their own invocations (the `SettingsController::actionActivity*`
      * actions scope the query by `userId` when the caller is not an
-     * admin). Registered under the Cortex heading on the user-permissions
-     * screen via `PluginTrait::_registerCortexPermissions()`.
+     * admin). Registered under the Herald heading on the user-permissions
+     * screen via `PluginTrait::_registerHeraldPermissions()`.
      *
      * @since 5.0.0
      */
-    public const PERMISSION_VIEW_ACTIVITY = 'cortex:viewActivity';
+    public const PERMISSION_VIEW_ACTIVITY = 'herald:viewActivity';
 
     // Public Properties
     // =========================================================================
@@ -115,7 +115,7 @@ class Cortex extends BasePlugin
      * Required as soon as `getSettingsResponse()` is overridden — the
      * base `Plugin::init()` only auto-flips this when the default
      * implementation is in use. Without the explicit declaration the
-     * CP nav link to Cortex settings disappears when
+     * CP nav link to Herald settings disappears when
      * `allowAdminChanges = false`. Reference:
      * `~/.claude-eng/skills/craftcms/references/cp.md` line 516.
      */
@@ -124,12 +124,12 @@ class Cortex extends BasePlugin
     /**
      * @inheritdoc
      *
-     * Cortex owns a top-level CP section (`/cortex`) so its operator
+     * Herald owns a top-level CP section (`/herald`) so its operator
      * surfaces — Settings, Temporary grants, and the Pro Tokens /
      * Activity / Connection screens — live in the global sidebar with a
      * permission- and edition-gated subnav (`getCpNavItem()`), rather
      * than buried behind Settings → Plugins. The plugin Settings page
-     * stays reachable from Settings → Plugins → Cortex too
+     * stays reachable from Settings → Plugins → Herald too
      * (`getSettingsResponse()` is unchanged).
      */
     public bool $hasCpSection = true;
@@ -171,8 +171,8 @@ class Cortex extends BasePlugin
      * '>=')` but a Free install does not satisfy `is(EDITION_PRO, '>=')`.
      *
      * The active edition handle lives in project config at
-     * `plugins.cortex.edition` and is stored by Craft itself — the
-     * Plugin Store sets it on purchase. Cortex does not maintain a
+     * `plugins.herald.edition` and is stored by Craft itself — the
+     * Plugin Store sets it on purchase. Herald does not maintain a
      * separate license table and does not call out to a license
      * server.
      *
@@ -193,7 +193,7 @@ class Cortex extends BasePlugin
      * @inheritdoc
      *
      * Parent-boots, then delegates to `PluginTrait::onPluginInit()`
-     * which wires every Cortex event listener and project-config
+     * which wires every Herald event listener and project-config
      * handler. Splitting registration into the trait keeps the
      * entry-point class focused on the Plugin Store contract
      * (`config`, `editions`, settings) and the trait composition.
@@ -212,13 +212,13 @@ class Cortex extends BasePlugin
      * @inheritdoc
      *
      * Redirects every settings entry-point — the CP nav link under
-     * Settings → Plugins → Cortex, the click on the plugin row in
+     * Settings → Plugins → Herald, the click on the plugin row in
      * Settings → Plugins, and anything else hitting Craft's built-in
-     * settings response — to the Cortex-owned tabbed page at
-     * `settings/plugins/cortex`. The redirect target route is
+     * settings response — to the Herald-owned tabbed page at
+     * `settings/plugins/herald`. The redirect target route is
      * registered in `PluginTrait::_registerUrlRules()` under
      * `EVENT_REGISTER_CP_URL_RULES` and resolves to
-     * `cortex/settings/index`.
+     * `herald/settings/index`.
      *
      * Per Gate 9 locked decision 1 + `cp.md` §"Tabbed Settings
      * Pages" line 432 — `settingsHtml()` cannot host tabs because
@@ -235,13 +235,13 @@ class Cortex extends BasePlugin
     {
         /** @var \craft\web\Response $response */
         $response = Craft::$app->getResponse();
-        return $response->redirect(UrlHelper::cpUrl('settings/plugins/cortex'));
+        return $response->redirect(UrlHelper::cpUrl('settings/plugins/herald'));
     }
 
     /**
      * @inheritdoc
      *
-     * Builds the Cortex CP section's subnav, permission- and
+     * Builds the Herald CP section's subnav, permission- and
      * edition-gated so each operator only sees the screens they can
      * actually open. The gating here is presentation only — every
      * controller action behind these items re-checks its own
@@ -256,7 +256,7 @@ class Cortex extends BasePlugin
      *                          `allowlist`).
      *   - Tokens            — admin + Pro.
      *   - Clients           — admin + Pro (OAuth client approval gate).
-     *   - Activity          — `cortex:viewActivity` + Pro (admins pass
+     *   - Activity          — `herald:viewActivity` + Pro (admins pass
      *                          implicitly via `can()`).
      *   - Connection        — admin + Pro.
      *
@@ -287,37 +287,37 @@ class Cortex extends BasePlugin
 
         if ($user->admin) {
             $subnav['settings'] = [
-                'label' => Craft::t('cortex', 'Settings'),
-                'url' => 'cortex/settings',
+                'label' => Craft::t('herald', 'Settings'),
+                'url' => 'herald/settings',
             ];
             $subnav['grants'] = [
-                'label' => Craft::t('cortex', 'Temporary grants'),
-                'url' => 'cortex/allowlist',
+                'label' => Craft::t('herald', 'Temporary grants'),
+                'url' => 'herald/allowlist',
             ];
         }
 
         if ($isPro && $user->admin) {
             $subnav['tokens'] = [
-                'label' => Craft::t('cortex', 'Tokens'),
-                'url' => 'cortex/tokens',
+                'label' => Craft::t('herald', 'Tokens'),
+                'url' => 'herald/tokens',
             ];
             $subnav['clients'] = [
-                'label' => Craft::t('cortex', 'Clients'),
-                'url' => 'cortex/clients',
+                'label' => Craft::t('herald', 'Clients'),
+                'url' => 'herald/clients',
             ];
         }
 
         if ($isPro && $user->can(self::PERMISSION_VIEW_ACTIVITY)) {
             $subnav['activity'] = [
-                'label' => Craft::t('cortex', 'Activity'),
-                'url' => 'cortex/activity',
+                'label' => Craft::t('herald', 'Activity'),
+                'url' => 'herald/activity',
             ];
         }
 
         if ($isPro && $user->admin) {
             $subnav['connection'] = [
-                'label' => Craft::t('cortex', 'Connection'),
-                'url' => 'cortex/connection',
+                'label' => Craft::t('herald', 'Connection'),
+                'url' => 'herald/connection',
             ];
         }
 

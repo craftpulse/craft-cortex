@@ -10,13 +10,13 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\resources\SkillResource;
+use craftpulse\herald\Herald;
+use craftpulse\herald\resources\SkillResource;
 use Michtio\CraftCmsClaudeSkills\Skills;
 
 it('reads a skill router resource as the SKILL.md content', function() {
     $uri = sprintf('%s://craftcms', SkillResource::URI_SCHEME);
-    $resource = Cortex::getInstance()->resources->getByUri($uri);
+    $resource = Herald::getInstance()->resources->getByUri($uri);
     expect($resource)->not->toBeNull();
 
     $block = $resource->read();
@@ -31,7 +31,7 @@ it('reads a skill router resource as the SKILL.md content', function() {
 
 it('reads a reference resource as the corresponding references/<name>.md content', function() {
     $uri = sprintf('%s://craftcms/elements', SkillResource::URI_SCHEME);
-    $resource = Cortex::getInstance()->resources->getByUri($uri);
+    $resource = Herald::getInstance()->resources->getByUri($uri);
     expect($resource)->not->toBeNull();
 
     $block = $resource->read();
@@ -42,7 +42,7 @@ it('reads a reference resource as the corresponding references/<name>.md content
 });
 
 it('reads every registered resource without raising and emits non-empty markdown', function() {
-    foreach (Cortex::getInstance()->resources->getAll() as $resource) {
+    foreach (Herald::getInstance()->resources->getAll() as $resource) {
         $block = $resource->read();
 
         expect($block)->toHaveKeys(['uri', 'mimeType', 'text']);

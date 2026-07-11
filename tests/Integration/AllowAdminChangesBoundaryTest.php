@@ -41,7 +41,7 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -56,7 +56,7 @@ use craftpulse\cortex\Cortex;
  * @param array<string,mixed>|mixed $schema
  * @return string[]
  */
-function _cortex_collect_enum_values(mixed $schema): array
+function _herald_collect_enum_values(mixed $schema): array
 {
     if (!is_array($schema)) {
         return [];
@@ -74,7 +74,7 @@ function _cortex_collect_enum_values(mixed $schema): array
 
     foreach ($schema as $child) {
         if (is_array($child)) {
-            $values = array_merge($values, _cortex_collect_enum_values($child));
+            $values = array_merge($values, _herald_collect_enum_values($child));
         }
     }
 
@@ -93,7 +93,7 @@ function _cortex_collect_enum_values(mixed $schema): array
  * Today no tool's enum carries such a value; this is the future-proof
  * predicate the boundary test asserts against.
  */
-function _cortex_is_admin_bleed_value(string $value): bool
+function _herald_is_admin_bleed_value(string $value): bool
 {
     if ($value === 'up') {
         return true;
@@ -111,9 +111,9 @@ function _cortex_is_admin_bleed_value(string $value): bool
 // -----------------------------------------------------------------------------
 
 it('Allowlist::getEffective() contains zero admin-level patterns under allowAdminChanges=false', function() {
-    cortex_with_admin_changes(false, function() {
-        $effective = Cortex::getInstance()->allowlist->getEffective();
-        $adminPatterns = Cortex::getInstance()->getSettings()->adminLevelCommands;
+    herald_with_admin_changes(false, function() {
+        $effective = Herald::getInstance()->allowlist->getEffective();
+        $adminPatterns = Herald::getInstance()->getSettings()->adminLevelCommands;
 
         $bleed = array_intersect($effective, $adminPatterns);
         expect($bleed)->toBe([]);
@@ -121,9 +121,9 @@ it('Allowlist::getEffective() contains zero admin-level patterns under allowAdmi
 });
 
 it('Allowlist::getEffective() contains every admin-level pattern under allowAdminChanges=true', function() {
-    cortex_with_admin_changes(true, function() {
-        $effective = Cortex::getInstance()->allowlist->getEffective();
-        $adminPatterns = Cortex::getInstance()->getSettings()->adminLevelCommands;
+    herald_with_admin_changes(true, function() {
+        $effective = Herald::getInstance()->allowlist->getEffective();
+        $adminPatterns = Herald::getInstance()->getSettings()->adminLevelCommands;
 
         $missing = array_diff($adminPatterns, $effective);
         expect($missing)->toBe([]);
@@ -135,16 +135,16 @@ it('Allowlist::getEffective() contains every admin-level pattern under allowAdmi
 // -----------------------------------------------------------------------------
 
 it('no registered tool exposes an admin-bleed enum value under allowAdminChanges=false', function() {
-    cortex_with_admin_changes(false, function() {
-        $payload = Cortex::getInstance()->tools->asListPayload();
+    herald_with_admin_changes(false, function() {
+        $payload = Herald::getInstance()->tools->asListPayload();
 
         $violations = [];
         foreach ($payload as $entry) {
             $name = $entry['name'] ?? '<unknown>';
             $schema = $entry['inputSchema'] ?? [];
-            $values = _cortex_collect_enum_values($schema);
+            $values = _herald_collect_enum_values($schema);
             foreach ($values as $value) {
-                if (_cortex_is_admin_bleed_value($value)) {
+                if (_herald_is_admin_bleed_value($value)) {
                     $violations[] = sprintf(
                         '%s exposes admin-bleed enum value `%s` under allowAdminChanges=false',
                         $name,
@@ -171,15 +171,15 @@ it('the enum walk is non-trivial — system_diagnostics.type carries the expecte
     // and the reason we don't assert on it directly. The locked
     // decision 8 guarantee (`manage_queue` is content-level, not
     // admin-bleed) is independently asserted below.
-    $tool = Cortex::getInstance()->tools->getByName('system_diagnostics');
+    $tool = Herald::getInstance()->tools->getByName('system_diagnostics');
     expect($tool)->not->toBeNull();
     $schema = $tool::getInputSchema();
-    $values = _cortex_collect_enum_values($schema);
+    $values = _herald_collect_enum_values($schema);
     expect($values)->toContain('logs');
     expect($values)->toContain('project_config_diff');
 
     // Verify the predicate — `manage_queue` is operator-level
     // mutability, not schema mutability, so it doesn't trip the
     // admin-bleed gate even when surfaced on Pro installs.
-    expect(_cortex_is_admin_bleed_value('manage_queue'))->toBeFalse();
+    expect(_herald_is_admin_bleed_value('manage_queue'))->toBeFalse();
 });

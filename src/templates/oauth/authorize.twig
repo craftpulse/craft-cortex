@@ -20,7 +20,7 @@
 <html lang="{{ craft.app.language }}">
 <head>
     <meta charset="utf-8">
-    <title>{{ 'Authorize OAuth client'|t('cortex') }}</title>
+    <title>{{ 'Authorize OAuth client'|t('herald') }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         :root {
@@ -66,13 +66,13 @@
 <body>
 <div class="container">
     <div class="panel">
-        <h1>{{ 'Authorize {client}'|t('cortex', { client: clientName }) }}</h1>
+        <h1>{{ 'Authorize {client}'|t('herald', { client: clientName }) }}</h1>
         <p class="lead">
-            {{ '{client} is requesting access to your Craft account.'|t('cortex', { client: '<span class="client">' ~ clientName|e('html') ~ '</span>' })|raw }}
+            {{ '{client} is requesting access to your Craft account.'|t('herald', { client: '<span class="client">' ~ clientName|e('html') ~ '</span>' })|raw }}
         </p>
 
         <div class="user-row">
-            {{ 'Signed in as'|t('cortex') }} <strong>{{ username }}</strong>
+            {{ 'Signed in as'|t('herald') }} <strong>{{ username }}</strong>
         </div>
 
         {% if scopes is not empty %}
@@ -81,7 +81,7 @@
                     <li>
                         <span class="scope-name">{{ scope }}</span>
                         <span class="scope-desc">
-                            {{- scopeDescriptions[scope] ?? 'Additional scope.'|t('cortex') -}}
+                            {{- scopeDescriptions[scope] ?? 'Additional scope.'|t('herald') -}}
                         </span>
                     </li>
                 {% endfor %}
@@ -95,13 +95,13 @@
             <input type="hidden" name="{{ craft.app.config.general.csrfTokenName }}" value="{{ craft.app.request.csrfToken }}">
 
             <div class="actions">
-                <button type="submit" name="approve" value="0">{{ 'Deny'|t('cortex') }}</button>
-                <button type="submit" name="approve" value="1" class="primary">{{ 'Authorize'|t('cortex') }}</button>
+                <button type="submit" name="approve" value="0">{{ 'Deny'|t('herald') }}</button>
+                <button type="submit" name="approve" value="1" class="primary">{{ 'Authorize'|t('herald') }}</button>
             </div>
         </form>
 
         <div class="meta">
-            {{ 'Cortex OAuth — Powered by craftpulse/craft-cortex'|t('cortex') }}
+            {{ 'Herald OAuth — Powered by craftpulse/craft-herald'|t('herald') }}
         </div>
     </div>
 </div>

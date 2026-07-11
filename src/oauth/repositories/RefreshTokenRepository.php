@@ -1,12 +1,12 @@
 <?php
 
-namespace craftpulse\cortex\oauth\repositories;
+namespace craftpulse\herald\oauth\repositories;
 
 use Carbon\Carbon;
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\oauth\entities\RefreshTokenEntity;
-use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
+use craftpulse\herald\Herald;
+use craftpulse\herald\oauth\entities\RefreshTokenEntity;
+use craftpulse\herald\records\OauthToken as OauthTokenRecord;
 use League\OAuth2\Server\Entities\RefreshTokenEntityInterface;
 use League\OAuth2\Server\Exception\UniqueTokenIdentifierConstraintViolationException;
 use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
@@ -15,7 +15,7 @@ use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
  * =========================================================================
  * League adapter — `RefreshTokenRepositoryInterface`.
  *
- * Persists opaque refresh tokens to `cortex_oauth_tokens` with
+ * Persists opaque refresh tokens to `herald_oauth_tokens` with
  * `tokenType = 'refresh'`. The plaintext refresh identifier is never
  * stored; we keep the SHA-256 only so revocation lookups match the
  * same shape as access-token revocation.
@@ -27,7 +27,7 @@ use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
  *
  * **Rotation TOCTOU window.** League drives rotation as two separate
  * calls — `isRefreshTokenRevoked()` (the check) then, on a fresh
- * exchange, `revokeRefreshToken()` (the consume). Cortex cannot wrap
+ * exchange, `revokeRefreshToken()` (the consume). Herald cannot wrap
  * both league calls in one transaction from inside these adapter
  * methods, so two genuinely-concurrent exchanges of the *same* refresh
  * token could in principle both pass the `consumedAt IS NULL` check
@@ -81,7 +81,7 @@ class RefreshTokenRepository implements RefreshTokenRepositoryInterface
         // slot, set by `AccessTokenRepository::persistNewAccessToken`).
         // Clear the slot afterwards so the next unrelated grant in the
         // same process doesn't inherit a stale family.
-        $oauth = Cortex::getInstance()->oauth;
+        $oauth = Herald::getInstance()->oauth;
         $familyId = $oauth->getPendingFamilyId();
 
         $record = new OauthTokenRecord();
@@ -148,7 +148,7 @@ class RefreshTokenRepository implements RefreshTokenRepositoryInterface
         });
 
         if ($familyId !== null) {
-            Cortex::getInstance()->oauth->setPendingFamilyId($familyId);
+            Herald::getInstance()->oauth->setPendingFamilyId($familyId);
         }
     }
 
@@ -188,7 +188,7 @@ class RefreshTokenRepository implements RefreshTokenRepositoryInterface
         if ($record->consumedAt !== null) {
             // Replay of a consumed refresh token. Burn the whole family.
             if ($record->familyId !== null) {
-                Cortex::getInstance()->oauth->revokeFamily(
+                Herald::getInstance()->oauth->revokeFamily(
                     $record->familyId,
                     'A consumed refresh token was presented again (replay).',
                 );

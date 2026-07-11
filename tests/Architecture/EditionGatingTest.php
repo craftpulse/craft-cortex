@@ -24,23 +24,23 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\content\Address;
-use craftpulse\cortex\tools\content\BulkEntries;
-use craftpulse\cortex\tools\content\Category;
-use craftpulse\cortex\tools\content\Entry;
-use craftpulse\cortex\tools\content\GlobalSet;
-use craftpulse\cortex\tools\content\ScaffoldEntries;
-use craftpulse\cortex\tools\content\Tag;
-use craftpulse\cortex\tools\dev\Resave;
-use craftpulse\cortex\tools\dev\StreamingFixtureTool;
-use craftpulse\cortex\tools\ProToolTrait;
-use craftpulse\cortex\tools\StreamableToolInterface;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\system\Skill;
-use craftpulse\cortex\tools\system\Users;
-use craftpulse\cortex\tools\workflow\Audit;
-use craftpulse\cortex\tools\workflow\ImportExport;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\content\Address;
+use craftpulse\herald\tools\content\BulkEntries;
+use craftpulse\herald\tools\content\Category;
+use craftpulse\herald\tools\content\Entry;
+use craftpulse\herald\tools\content\GlobalSet;
+use craftpulse\herald\tools\content\ScaffoldEntries;
+use craftpulse\herald\tools\content\Tag;
+use craftpulse\herald\tools\dev\Resave;
+use craftpulse\herald\tools\dev\StreamingFixtureTool;
+use craftpulse\herald\tools\ProToolTrait;
+use craftpulse\herald\tools\StreamableToolInterface;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\system\Skill;
+use craftpulse\herald\tools\system\Users;
+use craftpulse\herald\tools\workflow\Audit;
+use craftpulse\herald\tools\workflow\ImportExport;
 
 // -----------------------------------------------------------------------------
 // Helpers
@@ -53,7 +53,7 @@ use craftpulse\cortex\tools\workflow\ImportExport;
  *
  * @return array<class-string>
  */
-function _cortex_pro_tool_classes(): array
+function _herald_pro_tool_classes(): array
 {
     return [
         Entry::class,
@@ -74,7 +74,7 @@ function _cortex_pro_tool_classes(): array
 
 it('every Pro tool uses ProToolTrait', function() {
     $violations = [];
-    foreach (_cortex_pro_tool_classes() as $class) {
+    foreach (_herald_pro_tool_classes() as $class) {
         $traits = class_uses($class);
         if ($traits === false) {
             $violations[] = "{$class}: class_uses() failed";
@@ -93,7 +93,7 @@ it('every Pro tool uses ProToolTrait', function() {
 
 it('every Pro tool shouldRegister() returns false on Free', function() {
     $violations = [];
-    foreach (_cortex_pro_tool_classes() as $class) {
+    foreach (_herald_pro_tool_classes() as $class) {
         if ($class::shouldRegister() !== false) {
             $violations[] = "{$class}::shouldRegister() returned true on Free";
         }
@@ -102,9 +102,9 @@ it('every Pro tool shouldRegister() returns false on Free', function() {
 });
 
 it('every Pro tool shouldRegister() returns true on Pro', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $violations = [];
-        foreach (_cortex_pro_tool_classes() as $class) {
+        foreach (_herald_pro_tool_classes() as $class) {
             if ($class::shouldRegister() !== true) {
                 $violations[] = "{$class}::shouldRegister() returned false on Pro";
             }
@@ -119,9 +119,9 @@ it('every Pro tool shouldRegister() returns true on Pro', function() {
 
 it('every Pro tool is absent from Tools::getByName() on Free', function() {
     $violations = [];
-    foreach (_cortex_pro_tool_classes() as $class) {
+    foreach (_herald_pro_tool_classes() as $class) {
         $name = $class::getName();
-        if (Cortex::getInstance()->tools->getByName($name) !== null) {
+        if (Herald::getInstance()->tools->getByName($name) !== null) {
             $violations[] = "{$name}: resolved on Free install (should be null)";
         }
     }
@@ -131,10 +131,10 @@ it('every Pro tool is absent from Tools::getByName() on Free', function() {
 it('every Pro tool is absent from asListPayload() on Free', function() {
     $listed = array_map(
         static fn(array $entry): string => $entry['name'],
-        Cortex::getInstance()->tools->asListPayload(),
+        Herald::getInstance()->tools->asListPayload(),
     );
     $violations = [];
-    foreach (_cortex_pro_tool_classes() as $class) {
+    foreach (_herald_pro_tool_classes() as $class) {
         $name = $class::getName();
         if (in_array($name, $listed, true)) {
             $violations[] = "{$name}: present in asListPayload() on Free";
@@ -159,7 +159,7 @@ it('every Pro tool is absent from asListPayload() on Free', function() {
  *
  * @return array<class-string>
  */
-function _cortex_streaming_tool_classes(): array
+function _herald_streaming_tool_classes(): array
 {
     return [
         BulkEntries::class,
@@ -173,7 +173,7 @@ function _cortex_streaming_tool_classes(): array
 
 it('every streaming tool implements StreamableToolInterface', function() {
     $violations = [];
-    foreach (_cortex_streaming_tool_classes() as $class) {
+    foreach (_herald_streaming_tool_classes() as $class) {
         $reflect = new ReflectionClass($class);
         if (!$reflect->implementsInterface(StreamableToolInterface::class)) {
             $violations[] = "{$class}: missing StreamableToolInterface";
@@ -184,7 +184,7 @@ it('every streaming tool implements StreamableToolInterface', function() {
 
 it('every streaming tool declares stream(): Generator with (array, InvocationContext) parameters', function() {
     $violations = [];
-    foreach (_cortex_streaming_tool_classes() as $class) {
+    foreach (_herald_streaming_tool_classes() as $class) {
         $reflect = new ReflectionClass($class);
         if (!$reflect->hasMethod('stream')) {
             $violations[] = "{$class}: missing stream() method";
@@ -228,7 +228,7 @@ it('every streaming tool declares execute(): array', function() {
     // documents the BulkEntries reference pattern), but the signature
     // must consistently declare an array return.
     $violations = [];
-    foreach (_cortex_streaming_tool_classes() as $class) {
+    foreach (_herald_streaming_tool_classes() as $class) {
         $reflect = new ReflectionClass($class);
         if (!$reflect->hasMethod('execute')) {
             $violations[] = "{$class}: missing execute() method";
@@ -253,11 +253,11 @@ it('Free-registered streaming tools remain registered on a Free install', functi
         Resave::class,
         Audit::class,
         ImportExport::class,
-        // StreamingFixtureTool is gated by CORTEX_STREAMING_FIXTURE
+        // StreamingFixtureTool is gated by HERALD_STREAMING_FIXTURE
         // env var — skip the registry check (locked decision 13).
     ];
 
-    $tools = Cortex::getInstance()->tools;
+    $tools = Herald::getInstance()->tools;
     $violations = [];
     foreach ($freeRegistered as $class) {
         $name = $class::getName();
@@ -274,7 +274,7 @@ it('Pro-gated streaming tools are absent from the Free registry', function() {
         ScaffoldEntries::class,
     ];
 
-    $tools = Cortex::getInstance()->tools;
+    $tools = Herald::getInstance()->tools;
     $violations = [];
     foreach ($proGated as $class) {
         $name = $class::getName();

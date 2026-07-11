@@ -1,14 +1,14 @@
 <?php
 
-namespace craftpulse\cortex\tools\support;
+namespace craftpulse\herald\tools\support;
 
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsOpenWorld;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\attributes\IsStdioOnly;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\tools\ToolInterface;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsOpenWorld;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\attributes\IsStdioOnly;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\tools\ToolInterface;
 use ReflectionClass;
 
 /**
@@ -21,7 +21,7 @@ use ReflectionClass;
  *
  *   - `annotationsFor()` — the MCP `ToolAnnotations` payload as the
  *     server emits it in `tools/list`.
- *   - `isStdioOnly()` — the cortex-specific transport-gating flag the
+ *   - `isStdioOnly()` — the herald-specific transport-gating flag the
  *     dispatcher checks before invoking a tool over HTTP.
  *
  * Both methods accept either a `ToolInterface` instance or a

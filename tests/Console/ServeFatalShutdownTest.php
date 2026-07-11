@@ -17,8 +17,8 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\console\controllers\ServeController;
-use craftpulse\cortex\mcp\Server;
+use craftpulse\herald\console\controllers\ServeController;
+use craftpulse\herald\mcp\Server;
 
 /**
  * Build a controller with private state primed for the shutdown body,
@@ -28,9 +28,9 @@ use craftpulse\cortex\mcp\Server;
  * @param array{type:int,message:string,file:string,line:int}|null $lastError
  * @return array<string,mixed>|null
  */
-function _cortex_drive_shutdown(bool $inFlight, int|string|null $id, ?array $lastError, bool $alreadyEmitted = false): ?array
+function _herald_drive_shutdown(bool $inFlight, int|string|null $id, ?array $lastError, bool $alreadyEmitted = false): ?array
 {
-    $controller = new ServeController('cortex/serve', Craft::$app);
+    $controller = new ServeController('herald/serve', Craft::$app);
 
     $ref = new ReflectionClass($controller);
     foreach (['_inFlight' => $inFlight, '_inFlightRequestId' => $id, '_shutdownEmitted' => $alreadyEmitted] as $prop => $value) {
@@ -55,13 +55,13 @@ function _cortex_drive_shutdown(bool $inFlight, int|string|null $id, ?array $las
     return json_decode(trim($raw), true);
 }
 
-function _cortex_fatal(): array
+function _herald_fatal(): array
 {
     return ['type' => E_ERROR, 'message' => 'Allowed memory size exhausted', 'file' => 'x', 'line' => 1];
 }
 
 it('emits a -32603 carrying the in-flight id on a fatal mid-dispatch', function() {
-    $envelope = _cortex_drive_shutdown(inFlight: true, id: 99, lastError: _cortex_fatal());
+    $envelope = _herald_drive_shutdown(inFlight: true, id: 99, lastError: _herald_fatal());
 
     expect($envelope)->toBeArray()
         ->and($envelope['jsonrpc'])->toBe('2.0')
@@ -70,7 +70,7 @@ it('emits a -32603 carrying the in-flight id on a fatal mid-dispatch', function(
 });
 
 it('carries a null id when the in-flight request had none', function() {
-    $envelope = _cortex_drive_shutdown(inFlight: true, id: null, lastError: _cortex_fatal());
+    $envelope = _herald_drive_shutdown(inFlight: true, id: null, lastError: _herald_fatal());
 
     expect($envelope)->toBeArray()
         ->and($envelope['id'])->toBeNull()
@@ -78,18 +78,18 @@ it('carries a null id when the in-flight request had none', function() {
 });
 
 it('is a no-op on clean shutdown (no last error)', function() {
-    expect(_cortex_drive_shutdown(inFlight: true, id: 1, lastError: null))->toBeNull();
+    expect(_herald_drive_shutdown(inFlight: true, id: 1, lastError: null))->toBeNull();
 });
 
 it('is a no-op when the last error is non-fatal', function() {
     $warning = ['type' => E_WARNING, 'message' => 'undefined', 'file' => 'x', 'line' => 1];
-    expect(_cortex_drive_shutdown(inFlight: true, id: 1, lastError: $warning))->toBeNull();
+    expect(_herald_drive_shutdown(inFlight: true, id: 1, lastError: $warning))->toBeNull();
 });
 
 it('is a no-op when no request was in flight', function() {
-    expect(_cortex_drive_shutdown(inFlight: false, id: 1, lastError: _cortex_fatal()))->toBeNull();
+    expect(_herald_drive_shutdown(inFlight: false, id: 1, lastError: _herald_fatal()))->toBeNull();
 });
 
 it('does not double-emit when the guard is already set', function() {
-    expect(_cortex_drive_shutdown(inFlight: true, id: 1, lastError: _cortex_fatal(), alreadyEmitted: true))->toBeNull();
+    expect(_herald_drive_shutdown(inFlight: true, id: 1, lastError: _herald_fatal(), alreadyEmitted: true))->toBeNull();
 });

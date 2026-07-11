@@ -1,11 +1,11 @@
 <?php
 
-namespace craftpulse\cortex\services;
+namespace craftpulse\herald\services;
 
 use Carbon\Carbon;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\models\Token;
-use craftpulse\cortex\records\Token as TokenRecord;
+use craftpulse\herald\Herald;
+use craftpulse\herald\models\Token;
+use craftpulse\herald\records\Token as TokenRecord;
 use yii\base\Component;
 use yii\base\Exception;
 
@@ -85,7 +85,7 @@ class Tokens extends Component
      */
     public function issue(int $userId, string $name, ?int $ttlSeconds = null): array
     {
-        $ttl = $ttlSeconds ?? Cortex::getInstance()->getSettings()->tokenTtlDefault;
+        $ttl = $ttlSeconds ?? Herald::getInstance()->getSettings()->tokenTtlDefault;
 
         $plaintext = $this->_generatePlaintext();
         $hash = hash('sha256', $plaintext);
@@ -229,7 +229,7 @@ class Tokens extends Component
 
     /**
      * All non-deleted tokens belonging to one Craft user, newest
-     * first. Drives the per-user filter on `cortex/token/list`.
+     * first. Drives the per-user filter on `herald/token/list`.
      *
      * @return Token[]
      *
@@ -248,7 +248,7 @@ class Tokens extends Component
 
     /**
      * Every non-deleted token across all users, newest first. Drives
-     * the unfiltered `cortex/token/list`.
+     * the unfiltered `herald/token/list`.
      *
      * @return Token[]
      *

@@ -6,13 +6,13 @@
  *
  * The Gate 9 CP rework replaced the raw `allowedCommands` editable table
  * with a grouped toggle browser. `actionSave` folds three posted sources
- * — `cortexCommandGroups` (full-group globs), `cortexCommandActions`
+ * — `heraldCommandGroups` (full-group globs), `heraldCommandActions`
  * (exact ids), and `settings[allowedCommands]` (custom-pattern table) —
  * back into the flat `string[]` the settings model persists, via
  * `Allowlist::patternsFromToggleState()`.
  *
  * **SEQUENTIAL ONLY.** Each test drives `actionSave`, which calls
- * `savePluginSettings()` and writes `plugins.cortex.settings.allowedCommands`
+ * `savePluginSettings()` and writes `plugins.herald.settings.allowedCommands`
  * to project config. Running these in parallel would race the PC surface
  * other tests read. The current Pest sequential default is safe; each test
  * restores the original patterns in a `finally`.
@@ -22,8 +22,8 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\controllers\SettingsController;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\controllers\SettingsController;
+use craftpulse\herald\Herald;
 
 // -----------------------------------------------------------------------------
 // Harness
@@ -34,9 +34,9 @@ use craftpulse\cortex\Cortex;
  * (`requirePostRequest`, `requireAdmin`, `redirectToPostedUrl`) so
  * `actionSave` runs its body against a console-bootstrapped Craft.
  */
-class _CortexSaveHarness extends SettingsController
+class _HeraldSaveHarness extends SettingsController
 {
-    /** @var string[] Settings to report as locked by `config/cortex.php`. */
+    /** @var string[] Settings to report as locked by `config/herald.php`. */
     public array $overriddenSettings = [];
 
     public function requirePostRequest(): void
@@ -49,7 +49,7 @@ class _CortexSaveHarness extends SettingsController
 
     /**
      * Stub the config-file override check so the read-only branch can be
-     * exercised without writing a real `config/cortex.php` mid-suite.
+     * exercised without writing a real `config/herald.php` mid-suite.
      */
     protected function isSettingOverridden(string $attribute): bool
     {
@@ -66,7 +66,7 @@ class _CortexSaveHarness extends SettingsController
      */
     public function withBody(array $body): self
     {
-        $this->request = new _CortexSaveRequest($body);
+        $this->request = new _HeraldSaveRequest($body);
         $this->response = new \yii\web\Response();
         return $this;
     }
@@ -76,7 +76,7 @@ class _CortexSaveHarness extends SettingsController
  * Minimal request stub exposing the body-param accessors `actionSave`
  * and its fold helpers call.
  */
-class _CortexSaveRequest
+class _HeraldSaveRequest
 {
     /**
      * @param array<string,mixed> $body
@@ -95,7 +95,7 @@ class _CortexSaveRequest
  * Records the flash messages `actionSave` sets so a console-bootstrapped
  * Craft (whose real session component throws) survives the call.
  */
-class _CortexSaveSession
+class _HeraldSaveSession
 {
     public function setError(string $message): void
     {
@@ -110,15 +110,15 @@ class _CortexSaveSession
  * `Yii::$app` proxy delegating everything but `getSession()` to the live
  * console application, so `actionSave` can set its success flash.
  */
-class _CortexSaveAppProxy
+class _HeraldSaveAppProxy
 {
     public function __construct(
         public \craft\console\Application $delegate,
-        public _CortexSaveSession $sessionStub,
+        public _HeraldSaveSession $sessionStub,
     ) {
     }
 
-    public function getSession(): _CortexSaveSession
+    public function getSession(): _HeraldSaveSession
     {
         return $this->sessionStub;
     }
@@ -140,12 +140,12 @@ class _CortexSaveAppProxy
 }
 
 beforeEach(function() {
-    $this->plugin = Cortex::getInstance();
+    $this->plugin = Herald::getInstance();
     $this->originalPatterns = $this->plugin->getSettings()->allowedCommands;
     $this->originalAdminPatterns = $this->plugin->getSettings()->adminLevelCommands;
 
     $this->originalApp = \Yii::$app;
-    \Yii::$app = new _CortexSaveAppProxy($this->originalApp, new _CortexSaveSession());
+    \Yii::$app = new _HeraldSaveAppProxy($this->originalApp, new _HeraldSaveSession());
 });
 
 afterEach(function() {
@@ -176,35 +176,35 @@ afterEach(function() {
  * @param array<string,mixed> $body
  * @return string[]
  */
-function _cortexRunSave(array $body): array
+function _heraldRunSave(array $body): array
 {
-    $controller = new _CortexSaveHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldSaveHarness('settings', Herald::getInstance());
     $controller->withBody($body);
     $controller->actionSave();
 
-    return Cortex::getInstance()->getSettings()->allowedCommands;
+    return Herald::getInstance()->getSettings()->allowedCommands;
 }
 
 /**
- * As `_cortexRunSave` but returns the persisted `adminLevelCommands` —
+ * As `_heraldRunSave` but returns the persisted `adminLevelCommands` —
  * the admin-level bucket the toggle browser's second section folds into.
  *
  * @param array<string,mixed> $body
  * @return string[]
  */
-function _cortexRunSaveAdmin(array $body): array
+function _heraldRunSaveAdmin(array $body): array
 {
-    $controller = new _CortexSaveHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldSaveHarness('settings', Herald::getInstance());
     $controller->withBody($body);
     $controller->actionSave();
 
-    return Cortex::getInstance()->getSettings()->adminLevelCommands;
+    return Herald::getInstance()->getSettings()->adminLevelCommands;
 }
 
 it('folds a full-group toggle into a single group glob', function() {
-    $patterns = _cortexRunSave([
-        'cortexCommandGroups' => ['resave' => '1'],
-        'cortexCommandActions' => [],
+    $patterns = _heraldRunSave([
+        'heraldCommandGroups' => ['resave' => '1'],
+        'heraldCommandActions' => [],
         'settings' => ['allowedCommands' => []],
     ]);
 
@@ -214,9 +214,9 @@ it('folds a full-group toggle into a single group glob', function() {
 });
 
 it('folds individual action toggles into exact route ids', function() {
-    $patterns = _cortexRunSave([
-        'cortexCommandGroups' => [],
-        'cortexCommandActions' => ['resave/entries' => '1'],
+    $patterns = _heraldRunSave([
+        'heraldCommandGroups' => [],
+        'heraldCommandActions' => ['resave/entries' => '1'],
         'settings' => ['allowedCommands' => []],
     ]);
 
@@ -227,9 +227,9 @@ it('folds individual action toggles into exact route ids', function() {
 it('ignores off (empty-string) toggle values from the lightswitch macro', function() {
     // Craft's lightswitch posts '' for an off switch. Those must not
     // produce a `group/*` glob or an exact id.
-    $patterns = _cortexRunSave([
-        'cortexCommandGroups' => ['resave' => '', 'cache' => '1'],
-        'cortexCommandActions' => ['resave/entries' => ''],
+    $patterns = _heraldRunSave([
+        'heraldCommandGroups' => ['resave' => '', 'cache' => '1'],
+        'heraldCommandActions' => ['resave/entries' => ''],
         'settings' => ['allowedCommands' => []],
     ]);
 
@@ -239,9 +239,9 @@ it('ignores off (empty-string) toggle values from the lightswitch macro', functi
 });
 
 it('preserves custom patterns from the editable table verbatim', function() {
-    $patterns = _cortexRunSave([
-        'cortexCommandGroups' => [],
-        'cortexCommandActions' => [],
+    $patterns = _heraldRunSave([
+        'heraldCommandGroups' => [],
+        'heraldCommandActions' => [],
         'settings' => ['allowedCommands' => [
             ['pattern' => 'resave/ent*'],
             ['pattern' => 'no-such-plugin/do-thing'],
@@ -256,9 +256,9 @@ it('preserves custom patterns from the editable table verbatim', function() {
 });
 
 it('merges all three sources on a single save', function() {
-    $patterns = _cortexRunSave([
-        'cortexCommandGroups' => ['cache' => '1'],
-        'cortexCommandActions' => ['resave/entries' => '1'],
+    $patterns = _heraldRunSave([
+        'heraldCommandGroups' => ['cache' => '1'],
+        'heraldCommandActions' => ['resave/entries' => '1'],
         'settings' => ['allowedCommands' => [['pattern' => 'custom/glob*']]],
     ]);
 
@@ -268,17 +268,17 @@ it('merges all three sources on a single save', function() {
 });
 
 it('folds an admin-level toggle into adminLevelCommands, never allowedCommands', function() {
-    $controller = new _CortexSaveHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldSaveHarness('settings', Herald::getInstance());
     $controller->withBody([
-        'cortexAdminCommandGroups' => ['migrate' => '1'],
-        'cortexAdminCommandActions' => [],
-        'cortexCommandGroups' => [],
-        'cortexCommandActions' => [],
+        'heraldAdminCommandGroups' => ['migrate' => '1'],
+        'heraldAdminCommandActions' => [],
+        'heraldCommandGroups' => [],
+        'heraldCommandActions' => [],
         'settings' => ['allowedCommands' => [], 'adminLevelCommands' => []],
     ]);
     $controller->actionSave();
 
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     // The security boundary: an admin route must NOT land in the
     // always-admitted content bucket.
     expect($settings->allowedCommands)->not->toContain('migrate/*');
@@ -286,17 +286,17 @@ it('folds an admin-level toggle into adminLevelCommands, never allowedCommands',
 });
 
 it('folds a content toggle into allowedCommands, never adminLevelCommands', function() {
-    $controller = new _CortexSaveHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldSaveHarness('settings', Herald::getInstance());
     $controller->withBody([
-        'cortexCommandGroups' => ['cache' => '1'],
-        'cortexCommandActions' => [],
-        'cortexAdminCommandGroups' => [],
-        'cortexAdminCommandActions' => [],
+        'heraldCommandGroups' => ['cache' => '1'],
+        'heraldCommandActions' => [],
+        'heraldAdminCommandGroups' => [],
+        'heraldAdminCommandActions' => [],
         'settings' => ['allowedCommands' => [], 'adminLevelCommands' => []],
     ]);
     $controller->actionSave();
 
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     expect($settings->allowedCommands)->toContain('cache/*');
     expect($settings->adminLevelCommands)->not->toContain('cache/*');
 });
@@ -305,11 +305,11 @@ it('refuses to promote an admin route posted into the content section', function
     // Even if the migrate group is posted under the CONTENT toggle params
     // (a forged payload), the service drops it — it never reaches the
     // always-admitted bucket.
-    $patterns = _cortexRunSave([
-        'cortexCommandGroups' => ['migrate' => '1'],
-        'cortexCommandActions' => ['migrate/up' => '1'],
-        'cortexAdminCommandGroups' => [],
-        'cortexAdminCommandActions' => [],
+    $patterns = _heraldRunSave([
+        'heraldCommandGroups' => ['migrate' => '1'],
+        'heraldCommandActions' => ['migrate/up' => '1'],
+        'heraldAdminCommandGroups' => [],
+        'heraldAdminCommandActions' => [],
         'settings' => ['allowedCommands' => [], 'adminLevelCommands' => []],
     ]);
 
@@ -318,11 +318,11 @@ it('refuses to promote an admin route posted into the content section', function
 });
 
 it('preserves admin custom patterns from the admin editable table', function() {
-    $patterns = _cortexRunSaveAdmin([
-        'cortexCommandGroups' => [],
-        'cortexCommandActions' => [],
-        'cortexAdminCommandGroups' => [],
-        'cortexAdminCommandActions' => [],
+    $patterns = _heraldRunSaveAdmin([
+        'heraldCommandGroups' => [],
+        'heraldCommandActions' => [],
+        'heraldAdminCommandGroups' => [],
+        'heraldAdminCommandActions' => [],
         'settings' => [
             'allowedCommands' => [],
             'adminLevelCommands' => [['pattern' => 'migrate/custom*']],
@@ -332,52 +332,52 @@ it('preserves admin custom patterns from the admin editable table', function() {
     expect($patterns)->toContain('migrate/custom*');
 });
 
-it('leaves allowedCommands untouched when locked by config/cortex.php', function() {
-    $original = Cortex::getInstance()->getSettings()->allowedCommands;
+it('leaves allowedCommands untouched when locked by config/herald.php', function() {
+    $original = Herald::getInstance()->getSettings()->allowedCommands;
 
-    $controller = new _CortexSaveHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldSaveHarness('settings', Herald::getInstance());
     $controller->overriddenSettings = ['allowedCommands'];
     $controller->withBody([
         // A content toggle that WOULD change the value if not locked.
-        'cortexCommandGroups' => ['cache' => '1'],
-        'cortexCommandActions' => [],
-        'cortexAdminCommandGroups' => [],
-        'cortexAdminCommandActions' => [],
+        'heraldCommandGroups' => ['cache' => '1'],
+        'heraldCommandActions' => [],
+        'heraldAdminCommandGroups' => [],
+        'heraldAdminCommandActions' => [],
         'settings' => ['allowedCommands' => [['pattern' => 'should/not-persist*']]],
     ]);
     $controller->actionSave();
 
-    $after = Cortex::getInstance()->getSettings()->allowedCommands;
+    $after = Herald::getInstance()->getSettings()->allowedCommands;
     expect($after)->toBe($original);
     expect($after)->not->toContain('should/not-persist*');
 });
 
-it('leaves adminLevelCommands untouched when locked by config/cortex.php', function() {
-    $original = Cortex::getInstance()->getSettings()->adminLevelCommands;
+it('leaves adminLevelCommands untouched when locked by config/herald.php', function() {
+    $original = Herald::getInstance()->getSettings()->adminLevelCommands;
 
-    $controller = new _CortexSaveHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldSaveHarness('settings', Herald::getInstance());
     $controller->overriddenSettings = ['adminLevelCommands'];
     $controller->withBody([
-        'cortexCommandGroups' => [],
-        'cortexCommandActions' => [],
-        'cortexAdminCommandGroups' => ['migrate' => '1'],
-        'cortexAdminCommandActions' => [],
+        'heraldCommandGroups' => [],
+        'heraldCommandActions' => [],
+        'heraldAdminCommandGroups' => ['migrate' => '1'],
+        'heraldAdminCommandActions' => [],
         'settings' => ['adminLevelCommands' => [['pattern' => 'should/not-persist*']]],
     ]);
     $controller->actionSave();
 
-    $after = Cortex::getInstance()->getSettings()->adminLevelCommands;
+    $after = Herald::getInstance()->getSettings()->adminLevelCommands;
     expect($after)->toBe($original);
     expect($after)->not->toContain('should/not-persist*');
 });
 
 it('content and admin custom patterns stay in their own buckets', function() {
-    $controller = new _CortexSaveHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldSaveHarness('settings', Herald::getInstance());
     $controller->withBody([
-        'cortexCommandGroups' => [],
-        'cortexCommandActions' => [],
-        'cortexAdminCommandGroups' => [],
-        'cortexAdminCommandActions' => [],
+        'heraldCommandGroups' => [],
+        'heraldCommandActions' => [],
+        'heraldAdminCommandGroups' => [],
+        'heraldAdminCommandActions' => [],
         'settings' => [
             'allowedCommands' => [['pattern' => 'content/glob*']],
             'adminLevelCommands' => [['pattern' => 'admin/glob*']],
@@ -385,7 +385,7 @@ it('content and admin custom patterns stay in their own buckets', function() {
     ]);
     $controller->actionSave();
 
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     expect($settings->allowedCommands)->toContain('content/glob*');
     expect($settings->allowedCommands)->not->toContain('admin/glob*');
     expect($settings->adminLevelCommands)->toContain('admin/glob*');

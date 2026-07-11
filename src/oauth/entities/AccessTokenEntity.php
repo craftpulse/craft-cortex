@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\oauth\entities;
+namespace craftpulse\herald\oauth\entities;
 
 use DateTimeImmutable;
 use Lcobucci\JWT\Configuration;
@@ -30,11 +30,11 @@ use RuntimeException;
  *   2. Still embed the client id in a separate custom claim (`cid`)
  *      so `BearerTokenValidator` still has it; we also override the
  *      validation path in `Oauth::lookupAccessToken()` to read the
- *      cortex-specific claims rather than league's defaults.
+ *      herald-specific claims rather than league's defaults.
  *
  * Rationale: league's `BearerTokenValidator` reads `aud[0]` as the
  * client id at validate time. By moving the client id to `cid` and
- * placing the resource URI in `aud`, the cortex `Oauth` service can
+ * placing the resource URI in `aud`, the herald `Oauth` service can
  * enforce audience binding without monkey-patching league's
  * validator. The MCP-spec `aud` semantics win; the client correlation
  * uses our custom claim.
@@ -125,7 +125,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
     /**
      * Generate the JWT, embedding the resource indicator in the `aud`
      * claim per RFC 8707 §2. The client id moves to a custom `cid`
-     * claim so cortex's own validator can correlate the token back to
+     * claim so herald's own validator can correlate the token back to
      * its issuing client.
      *
      * @author Craftpulse
@@ -183,7 +183,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
 
     /**
      * Resolve the JWT subject. User-bound tokens carry the user id;
-     * client-credentials-style tokens (not used in cortex today, but
+     * client-credentials-style tokens (not used in herald today, but
      * reserved) fall back to the client id.
      *
      * @author Craftpulse

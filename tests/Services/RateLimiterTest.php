@@ -27,17 +27,17 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\exceptions\RateLimitExceededException;
-use craftpulse\cortex\services\RateLimiter;
-use craftpulse\cortex\values\RateLimitStatus;
+use craftpulse\herald\exceptions\RateLimitExceededException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\services\RateLimiter;
+use craftpulse\herald\values\RateLimitStatus;
 
 beforeEach(function() {
-    $this->service = Cortex::getInstance()->rateLimiter;
+    $this->service = Herald::getInstance()->rateLimiter;
     $this->userId = 999001;
 
     // Reset to defaults regardless of what a prior test poked.
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $this->originalBurst = $settings->rateLimitBurst;
     $this->originalRate = $settings->rateLimitPerSecond;
     $settings->rateLimitBurst = 60;
@@ -54,7 +54,7 @@ beforeEach(function() {
 });
 
 afterEach(function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $settings->rateLimitBurst = $this->originalBurst;
     $settings->rateLimitPerSecond = $this->originalRate;
     $this->service->clear($this->userId);
@@ -229,7 +229,7 @@ it('consumeKey() shares the bucket math with consume() on a fresh string key', f
 });
 
 it('consumeKey() throws once the string-keyed bucket is exhausted', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $settings->rateLimitBurst = 2;
     $settings->rateLimitPerSecond = 1;
     $this->service->clearKey('oauth:ip:exhaust');
@@ -254,7 +254,7 @@ it('an oauth:ip-keyed bucket is independent from the same-numbered user bucket',
     // The OAuth throttle namespaces its key as `oauth:ip:<ip>`, so it
     // never collides with a bare-int user bucket. Drain the IP bucket
     // and confirm the user-id 42 bucket still has its full token.
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $settings->rateLimitBurst = 1;
 
     $this->service->clear(42);
@@ -274,5 +274,5 @@ it('an oauth:ip-keyed bucket is independent from the same-numbered user bucket',
 // -----------------------------------------------------------------------------
 
 it('is registered on the plugin as the `rateLimiter` component', function() {
-    expect(Cortex::getInstance()->rateLimiter)->toBeInstanceOf(RateLimiter::class);
+    expect(Herald::getInstance()->rateLimiter)->toBeInstanceOf(RateLimiter::class);
 });

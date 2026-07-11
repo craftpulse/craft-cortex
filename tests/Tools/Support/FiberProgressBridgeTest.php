@@ -16,9 +16,9 @@
  */
 
 use craft\db\QueryAbortedException;
-use craftpulse\cortex\tests\Tools\Support\Fixtures\FiberEmitterFixture;
-use craftpulse\cortex\tests\Tools\Support\Fixtures\FiberEmitterFixtureEvent;
-use craftpulse\cortex\tools\support\FiberProgressBridge;
+use craftpulse\herald\tests\Tools\Support\Fixtures\FiberEmitterFixture;
+use craftpulse\herald\tests\Tools\Support\Fixtures\FiberEmitterFixtureEvent;
+use craftpulse\herald\tools\support\FiberProgressBridge;
 use yii\base\Event;
 
 // -----------------------------------------------------------------------------
@@ -32,7 +32,7 @@ use yii\base\Event;
  *
  * @return array{0: FiberProgressBridge, 1: FiberEmitterFixture}
  */
-function _cortex_bridge_fixture(int $iterations, bool $cancellable = true): array
+function _herald_bridge_fixture(int $iterations, bool $cancellable = true): array
 {
     $emitter = new FiberEmitterFixture();
     $bridge = new FiberProgressBridge(
@@ -52,7 +52,7 @@ function _cortex_bridge_fixture(int $iterations, bool $cancellable = true): arra
  *
  * @return array<int,array<string,mixed>>
  */
-function _cortex_bridge_drain(Generator $gen): array
+function _herald_bridge_drain(Generator $gen): array
 {
     $frames = [];
     while ($gen->valid()) {
@@ -67,10 +67,10 @@ function _cortex_bridge_drain(Generator $gen): array
 // -----------------------------------------------------------------------------
 
 it('yields one frame per event and returns the blocking call value', function() {
-    [$bridge, $emitter] = _cortex_bridge_fixture(3);
+    [$bridge, $emitter] = _herald_bridge_fixture(3);
 
     $gen = $bridge->run(static fn() => false);
-    $frames = _cortex_bridge_drain($gen);
+    $frames = _herald_bridge_drain($gen);
 
     expect($frames)->toHaveCount(3);
     expect($frames[0])->toMatchArray(['progress' => 1, 'total' => 3, 'message' => 'row 1']);
@@ -82,10 +82,10 @@ it('yields one frame per event and returns the blocking call value', function() 
 });
 
 it('detaches the listener after the blocking call completes', function() {
-    [$bridge] = _cortex_bridge_fixture(2);
+    [$bridge] = _herald_bridge_fixture(2);
 
     $gen = $bridge->run(static fn() => false);
-    _cortex_bridge_drain($gen);
+    _herald_bridge_drain($gen);
 
     // Fire another event from a fresh emitter — no leaked handler from
     // the bridge run should react. We assert no exception is raised
@@ -94,7 +94,7 @@ it('detaches the listener after the blocking call completes', function() {
 });
 
 it('shortcuts on cancellation via $fiber->throw and re-engages the host catch-block', function() {
-    [$bridge, $emitter] = _cortex_bridge_fixture(10);
+    [$bridge, $emitter] = _herald_bridge_fixture(10);
 
     // Cancel after the second frame: the parent generator polls
     // `$shouldCancel` BEFORE each resume, so flipping the flag on yield
@@ -192,7 +192,7 @@ it('skips emit when eventToFrame returns null', function() {
     );
 
     $gen = $bridge->run(static fn() => false);
-    $frames = _cortex_bridge_drain($gen);
+    $frames = _herald_bridge_drain($gen);
 
     expect($frames)->toHaveCount(2);
     expect($frames[0])->toBe(['progress' => 1]);

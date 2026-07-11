@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tools\content;
+namespace craftpulse\herald\tools\content;
 
 use Craft;
 use craft\elements\Entry as EntryElement;
@@ -8,18 +8,18 @@ use craft\elements\User;
 use craft\helpers\DateTimeHelper;
 use craft\models\EntryType;
 use craft\models\Section;
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\ContextAwareToolInterface;
-use craftpulse\cortex\tools\ElevationGatedToolTrait;
-use craftpulse\cortex\tools\IdempotencyTrait;
-use craftpulse\cortex\tools\PermissionedToolTrait;
-use craftpulse\cortex\tools\ProToolTrait;
-use craftpulse\cortex\tools\support\ElementSerializer;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\ContextAwareToolInterface;
+use craftpulse\herald\tools\ElevationGatedToolTrait;
+use craftpulse\herald\tools\IdempotencyTrait;
+use craftpulse\herald\tools\PermissionedToolTrait;
+use craftpulse\herald\tools\ProToolTrait;
+use craftpulse\herald\tools\support\ElementSerializer;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use Throwable;
 
 /**
@@ -65,7 +65,7 @@ use Throwable;
  *
  * Idempotency contract: `idempotencyKey` is server-side deduplication
  * for `create` and `update` only. When present:
- *   - Cache key: `cortex:entry:idem:{userId}:{idempotencyKey}` — scoped
+ *   - Cache key: `herald:entry:idem:{userId}:{idempotencyKey}` — scoped
  *     per-user so two users with the same key don't collide.
  *   - TTL: 24h (86400s).
  *   - On replay: returns the cached envelope without re-saving and
@@ -98,14 +98,14 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
 
     /**
      * Idempotency cache key prefix. Gate 8.3+ Pro tools follow the
-     * same `cortex:{toolName}:idem:{userId}:{key}` shape so the cache
+     * same `herald:{toolName}:idem:{userId}:{key}` shape so the cache
      * namespace stays grep-able and the per-user scope is uniform.
      *
      * Consumed by `IdempotencyTrait` via `static::IDEMPOTENCY_CACHE_PREFIX`.
      *
      * @since 5.0.0
      */
-    public const IDEMPOTENCY_CACHE_PREFIX = 'cortex:entry:idem:';
+    public const IDEMPOTENCY_CACHE_PREFIX = 'herald:entry:idem:';
 
     // Public Methods
     // =========================================================================

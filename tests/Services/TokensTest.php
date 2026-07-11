@@ -7,7 +7,7 @@
  *
  * Tests run against the playground's live admin user. Each test cleans
  * up the rows it created so the table stays in the shape it started in
- * — the playground keeps cortex installed across runs.
+ * — the playground keeps herald installed across runs.
  *
  * Token naming pattern: every test prefixes the human-readable name
  * with `_test_/` so the afterEach() teardown deletes only its own rows
@@ -19,12 +19,12 @@
  */
 
 use Carbon\Carbon;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\records\Token as TokenRecord;
+use craftpulse\herald\Herald;
+use craftpulse\herald\records\Token as TokenRecord;
 use yii\base\Exception;
 
 beforeEach(function() {
-    $this->service = Cortex::getInstance()->tokens;
+    $this->service = Herald::getInstance()->tokens;
     // The playground always has at least one admin user; we use it as
     // the userId binding for issued tokens. Resolving via the lookup
     // catches CI envs where the seeded user has shifted.
@@ -77,7 +77,7 @@ it('issue() with a TTL writes a future expiresAt; without TTL writes null', func
 });
 
 it('issue() defaults to Settings::$tokenTtlDefault when no TTL passed', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $original = $settings->tokenTtlDefault;
     $settings->tokenTtlDefault = 7200;
 
@@ -112,7 +112,7 @@ it('lookup() with a valid plaintext returns the model', function() {
 
     // Fresh service so the per-request memoization cache is empty —
     // forces a real DB probe.
-    $service = new \craftpulse\cortex\services\Tokens();
+    $service = new \craftpulse\herald\services\Tokens();
     $found = $service->lookup($issued['token']);
 
     expect($found)->not->toBeNull();
@@ -121,12 +121,12 @@ it('lookup() with a valid plaintext returns the model', function() {
 });
 
 it('lookup() with an unknown plaintext returns null', function() {
-    $service = new \craftpulse\cortex\services\Tokens();
+    $service = new \craftpulse\herald\services\Tokens();
     expect($service->lookup(str_repeat('x', 64)))->toBeNull();
 });
 
 it('lookup() with an empty string returns null without hitting the DB', function() {
-    $service = new \craftpulse\cortex\services\Tokens();
+    $service = new \craftpulse\herald\services\Tokens();
     expect($service->lookup(''))->toBeNull();
 });
 
@@ -134,7 +134,7 @@ it('lookup() on a soft-deleted token returns null', function() {
     $issued = $this->service->issue($this->userId, '_test_/lookup-revoked');
     $this->service->revoke($issued['model']->id);
 
-    $service = new \craftpulse\cortex\services\Tokens();
+    $service = new \craftpulse\herald\services\Tokens();
     expect($service->lookup($issued['token']))->toBeNull();
 });
 
@@ -145,7 +145,7 @@ it('lookup() on an expired token returns null', function() {
     $record->expiresAt = Carbon::now()->subSecond()->toDateTimeString();
     $record->save(false);
 
-    $service = new \craftpulse\cortex\services\Tokens();
+    $service = new \craftpulse\herald\services\Tokens();
     expect($service->lookup($issued['token']))->toBeNull();
 });
 
@@ -153,7 +153,7 @@ it('lookup() touches lastUsedAt on a hit', function() {
     $issued = $this->service->issue($this->userId, '_test_/lookup-touch');
     expect($issued['model']->lastUsedAt)->toBeNull();
 
-    $service = new \craftpulse\cortex\services\Tokens();
+    $service = new \craftpulse\herald\services\Tokens();
     $found = $service->lookup($issued['token']);
     expect($found)->not->toBeNull();
     expect($found->lastUsedAt)->not->toBeNull();
@@ -167,10 +167,10 @@ it('lookup() memoizes per-request — second lookup of the same plaintext does n
     $issued = $this->service->issue($this->userId, '_test_/lookup-memo');
 
     // Fresh service so we own the cache state for the assertion.
-    $service = new \craftpulse\cortex\services\Tokens();
+    $service = new \craftpulse\herald\services\Tokens();
 
-    [, $firstQueries] = cortex_count_queries(fn() => $service->lookup($issued['token']));
-    [, $secondQueries] = cortex_count_queries(fn() => $service->lookup($issued['token']));
+    [, $firstQueries] = herald_count_queries(fn() => $service->lookup($issued['token']));
+    [, $secondQueries] = herald_count_queries(fn() => $service->lookup($issued['token']));
 
     expect($firstQueries)->toBeGreaterThan(0);
     expect($secondQueries)->toBe(0);

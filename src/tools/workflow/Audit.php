@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tools\workflow;
+namespace craftpulse\herald\tools\workflow;
 
 use Craft;
 use craft\base\ElementInterface;
@@ -14,15 +14,15 @@ use craft\enums\PropagationMethod;
 use craft\helpers\DateTimeHelper;
 use craft\helpers\Db;
 use craft\models\Section;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\PermissionedToolTrait;
-use craftpulse\cortex\tools\StreamableToolInterface;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\PermissionedToolTrait;
+use craftpulse\herald\tools\StreamableToolInterface;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use Generator;
 use Throwable;
 
@@ -188,7 +188,7 @@ class Audit extends AbstractTool implements StreamableToolInterface
      */
     public static function getInputSchema(): array
     {
-        $modes = Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')
+        $modes = Herald::getInstance()->is(Herald::EDITION_PRO, '>=')
             ? array_merge(self::FREE_MODES, self::PRO_MODES)
             : self::FREE_MODES;
 
@@ -225,7 +225,7 @@ class Audit extends AbstractTool implements StreamableToolInterface
     {
         $schema = static::getInputSchema();
 
-        if ($user === null || !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+        if ($user === null || !Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             return $schema;
         }
 
@@ -301,7 +301,7 @@ class Audit extends AbstractTool implements StreamableToolInterface
             );
         }
 
-        if (in_array($mode, self::PRO_MODES, true) && !Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+        if (in_array($mode, self::PRO_MODES, true) && !Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             throw new ToolException("content_audit: mode `{$mode}` is unavailable on this edition.");
         }
 
@@ -364,7 +364,7 @@ class Audit extends AbstractTool implements StreamableToolInterface
             throw new ToolException("content_audit: mode `{$mode}` is not streamable.");
         }
 
-        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+        if (!Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             throw new ToolException("content_audit: mode `{$mode}` is unavailable on this edition.");
         }
 
@@ -606,10 +606,10 @@ class Audit extends AbstractTool implements StreamableToolInterface
             ->status(null)
             ->site('*')
             ->leftJoin(
-                ['cortex_relations' => Table::RELATIONS],
-                '[[cortex_relations.targetId]] = [[elements.id]]',
+                ['herald_relations' => Table::RELATIONS],
+                '[[herald_relations.targetId]] = [[elements.id]]',
             )
-            ->andWhere(['cortex_relations.id' => null]);
+            ->andWhere(['herald_relations.id' => null]);
 
         if (isset($arguments['volume']) && is_string($arguments['volume']) && $arguments['volume'] !== '') {
             $query->volume($arguments['volume']);

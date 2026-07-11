@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('entry_types');
+    $this->tool = Herald::getInstance()->tools->getByName('entry_types');
 });
 
 it('lists entry types with field-layout summary', function() {
@@ -58,5 +58,5 @@ it('returns count when count: true is passed', function() {
 });
 
 it('throws ToolException for an unknown entry type handle', function() {
-    $this->tool->execute(['handle' => '__cortex_no_such_entry_type__']);
+    $this->tool->execute(['handle' => '__herald_no_such_entry_type__']);
 })->throws(ToolException::class);

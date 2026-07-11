@@ -1,11 +1,11 @@
 <?php
 
-namespace craftpulse\cortex\services;
+namespace craftpulse\herald\services;
 
-use craftpulse\cortex\events\RegisterPromptsEvent;
-use craftpulse\cortex\prompts\PromptInterface;
-use craftpulse\cortex\prompts\SkillPrompt;
-use craftpulse\cortex\tools\support\RegistryLog;
+use craftpulse\herald\events\RegisterPromptsEvent;
+use craftpulse\herald\prompts\PromptInterface;
+use craftpulse\herald\prompts\SkillPrompt;
+use craftpulse\herald\tools\support\RegistryLog;
 use Michtio\CraftCmsClaudeSkills\Skills;
 use yii\base\Component;
 
@@ -44,7 +44,7 @@ class Prompts extends Component
      * Public MCP name + description per bundled skill. Skills not listed
      * here are silently skipped — that's deliberate. Adding a new skill
      * requires both the upstream skills package release AND an entry
-     * here so we own the public surface area on cortex's side.
+     * here so we own the public surface area on herald's side.
      *
      * **Element-stored skills are NOT auto-promoted to prompts** (Gate
      * 8.6, locked decision 17). An element-stored skill with a handle

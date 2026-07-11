@@ -14,8 +14,8 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\controllers\WellKnownController;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\controllers\WellKnownController;
+use craftpulse\herald\Herald;
 use yii\web\HeaderCollection;
 use yii\web\Response;
 
@@ -23,7 +23,7 @@ use yii\web\Response;
 // Harness
 // -----------------------------------------------------------------------------
 
-class _CortexWellKnownRequest
+class _HeraldWellKnownRequest
 {
     public HeaderCollection $headers;
 
@@ -58,7 +58,7 @@ class _CortexWellKnownRequest
     }
 }
 
-class _CortexWellKnownHarness extends WellKnownController
+class _HeraldWellKnownHarness extends WellKnownController
 {
     /**
      * Drive `beforeAction()` against a synthetic action so the
@@ -68,16 +68,16 @@ class _CortexWellKnownHarness extends WellKnownController
      */
     public function runBeforeAction(): bool
     {
-        $this->request = new _CortexWellKnownRequest('GET');
+        $this->request = new _HeraldWellKnownRequest('GET');
         return $this->beforeAction(new \yii\base\Action('authorization-server', $this));
     }
 }
 
 beforeEach(function() {
-    $this->controller = new WellKnownController('well-known', Cortex::getInstance());
+    $this->controller = new WellKnownController('well-known', Herald::getInstance());
     $this->controller->response = new \yii\web\Response();
 
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $this->originalHttpEnabled = $settings->httpEnabled;
     // The discovery actions are read directly in most tests, bypassing
     // `beforeAction()`; the kill-switch tests drive `beforeAction()`
@@ -86,13 +86,13 @@ beforeEach(function() {
 
     // Discovery serves the Pro-only HTTP transport (Gate 9.7) — pin
     // Pro for the file; the Free-edition test flips it inline.
-    $this->originalEdition = Cortex::getInstance()->edition;
-    Cortex::getInstance()->edition = Cortex::EDITION_PRO;
+    $this->originalEdition = Herald::getInstance()->edition;
+    Herald::getInstance()->edition = Herald::EDITION_PRO;
 });
 
 afterEach(function() {
-    Cortex::getInstance()->edition = $this->originalEdition;
-    Cortex::getInstance()->getSettings()->httpEnabled = $this->originalHttpEnabled;
+    Herald::getInstance()->edition = $this->originalEdition;
+    Herald::getInstance()->getSettings()->httpEnabled = $this->originalHttpEnabled;
 });
 
 // -----------------------------------------------------------------------------
@@ -123,7 +123,7 @@ it('authorization-server advertises only S256 PKCE', function() {
 
 it('authorization-server lists the capability scope vocabulary', function() {
     $response = $this->controller->actionAuthorizationServer();
-    expect($response->data['scopes_supported'])->toBe(Cortex::getInstance()->scopes->all());
+    expect($response->data['scopes_supported'])->toBe(Herald::getInstance()->scopes->all());
 });
 
 it('authorization-server lists only authorization_code and refresh_token grants', function() {
@@ -137,7 +137,7 @@ it('authorization-server lists response_types code only', function() {
 });
 
 it('authorization-server includes the registration_endpoint when DCR is enabled', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $original = $settings->dcrEnabled;
     $settings->dcrEnabled = true;
 
@@ -151,7 +151,7 @@ it('authorization-server includes the registration_endpoint when DCR is enabled'
 });
 
 it('authorization-server omits the registration_endpoint when DCR is disabled', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $original = $settings->dcrEnabled;
     $settings->dcrEnabled = false;
 
@@ -191,14 +191,14 @@ it('protected-resource lists bearer_methods_supported as header-only', function(
     expect($response->data['bearer_methods_supported'])->toBe(['header']);
 });
 
-it('protected-resource resource URL points at the cortex MCP endpoint', function() {
+it('protected-resource resource URL points at the herald MCP endpoint', function() {
     $response = $this->controller->actionProtectedResource();
-    expect($response->data['resource'])->toContain('/cortex/mcp');
+    expect($response->data['resource'])->toContain('/herald/mcp');
 });
 
 it('protected-resource lists the capability scope vocabulary', function() {
     $response = $this->controller->actionProtectedResource();
-    expect($response->data['scopes_supported'])->toBe(Cortex::getInstance()->scopes->all());
+    expect($response->data['scopes_supported'])->toBe(Herald::getInstance()->scopes->all());
 });
 
 // -----------------------------------------------------------------------------
@@ -206,9 +206,9 @@ it('protected-resource lists the capability scope vocabulary', function() {
 // -----------------------------------------------------------------------------
 
 it('returns 503 from beforeAction when httpEnabled is false', function() {
-    Cortex::getInstance()->getSettings()->httpEnabled = false;
+    Herald::getInstance()->getSettings()->httpEnabled = false;
 
-    $controller = new _CortexWellKnownHarness('well-known', Cortex::getInstance());
+    $controller = new _HeraldWellKnownHarness('well-known', Herald::getInstance());
     $controller->response = new Response();
     $proceeded = $controller->runBeforeAction();
 
@@ -218,9 +218,9 @@ it('returns 503 from beforeAction when httpEnabled is false', function() {
 });
 
 it('does not fire the 503 gate in beforeAction when httpEnabled is true', function() {
-    Cortex::getInstance()->getSettings()->httpEnabled = true;
+    Herald::getInstance()->getSettings()->httpEnabled = true;
 
-    $controller = new _CortexWellKnownHarness('well-known', Cortex::getInstance());
+    $controller = new _HeraldWellKnownHarness('well-known', Herald::getInstance());
     $controller->response = new Response();
     $controller->runBeforeAction();
 
@@ -232,14 +232,14 @@ it('does not fire the 503 gate in beforeAction when httpEnabled is true', functi
 // -----------------------------------------------------------------------------
 
 it('returns 403 from beforeAction on a Free install', function() {
-    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+    Herald::getInstance()->edition = Herald::EDITION_FREE;
 
-    $controller = new _CortexWellKnownHarness('well-known', Cortex::getInstance());
+    $controller = new _HeraldWellKnownHarness('well-known', Herald::getInstance());
     $controller->response = new Response();
     $proceeded = $controller->runBeforeAction();
 
     expect($proceeded)->toBeFalse();
     expect($controller->response->statusCode)->toBe(403);
     expect($controller->response->data)
-        ->toHaveKey('error', 'The HTTP transport requires the Cortex Pro edition.');
+        ->toHaveKey('error', 'The HTTP transport requires the Herald Pro edition.');
 });

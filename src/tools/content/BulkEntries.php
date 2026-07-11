@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tools\content;
+namespace craftpulse\herald\tools\content;
 
 use Craft;
 use craft\base\ElementInterface;
@@ -11,17 +11,17 @@ use craft\fields\BaseRelationField;
 use craft\helpers\DateTimeHelper;
 use craft\models\EntryType;
 use craft\models\Section;
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\IdempotencyTrait;
-use craftpulse\cortex\tools\PermissionedToolTrait;
-use craftpulse\cortex\tools\ProToolTrait;
-use craftpulse\cortex\tools\StreamableToolInterface;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\IdempotencyTrait;
+use craftpulse\herald\tools\PermissionedToolTrait;
+use craftpulse\herald\tools\ProToolTrait;
+use craftpulse\herald\tools\StreamableToolInterface;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use DateTime;
 use Generator;
 use Throwable;
@@ -30,7 +30,7 @@ use Throwable;
  * =========================================================================
  * `bulk_entries` Pro tool — query-driven bulk mutation across entries.
  *
- * Cortex's first streaming Pro tool. Resolves an `EntryQuery` from a
+ * Herald's first streaming Pro tool. Resolves an `EntryQuery` from a
  * compact filter object, walks results in 100-row batches via
  * `EntryQuery::each(100)`, and applies one of four mutation modes per
  * row. Yields `notifications/progress` frames every `progressInterval`
@@ -78,7 +78,7 @@ use Throwable;
  *     row when `onPermissionDenied: "fail"`.
  *
  * Idempotency contract:
- *   - Cache prefix `cortex:bulk_entries:idem:`. Whole-operation
+ *   - Cache prefix `herald:bulk_entries:idem:`. Whole-operation
  *     dedup keyed by `{userId, idempotencyKey}`.
  *   - 24h TTL.
  *   - Dry-run results are NOT cached — the operator's intent is to
@@ -118,7 +118,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      *
      * @since 5.0.0
      */
-    public const IDEMPOTENCY_CACHE_PREFIX = 'cortex:bulk_entries:idem:';
+    public const IDEMPOTENCY_CACHE_PREFIX = 'herald:bulk_entries:idem:';
 
     /**
      * Hard ceiling on the number of rows visited per call. Above this,

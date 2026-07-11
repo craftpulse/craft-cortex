@@ -1,7 +1,7 @@
-{% extends "cortex/_cp/_layout" %}
+{% extends "herald/_cp/_layout" %}
 
 {# =========================================================================
-   Cortex Tokens tab — VueAdminTable of live bearer tokens + Garnish.Slideout
+   Herald Tokens tab — VueAdminTable of live bearer tokens + Garnish.Slideout
    for "+ New token" issuance.
 
    Bearer tokens authenticate the Streamable HTTP transport. They are
@@ -11,10 +11,10 @@
    pattern locked by Allowlist (9.2).
 
    Data path:
-     - Table data : GET  cortex/settings/tokens-table-data    → JSON {pagination, data}
-     - Slideout   : GET  cortex/settings/token-issue-slideout → JSON {html, headHtml, bodyHtml}
-     - Issue      : POST cortex/settings/issue-token          → JSON {token, model, message}
-     - Revoke     : POST cortex/settings/revoke-token (VueAdminTable
+     - Table data : GET  herald/settings/tokens-table-data    → JSON {pagination, data}
+     - Slideout   : GET  herald/settings/token-issue-slideout → JSON {html, headHtml, bodyHtml}
+     - Issue      : POST herald/settings/issue-token          → JSON {token, model, message}
+     - Revoke     : POST herald/settings/revoke-token (VueAdminTable
                                                 deleteAction) → JSON {message}
 
    The row shape is locked in `SettingsController::_serializeTokenRow`:
@@ -23,7 +23,7 @@
 
 {% set selectedSubnavItem = 'tokens' %}
 
-{% do view.registerTranslations('cortex', [
+{% do view.registerTranslations('herald', [
     'Are you sure you want to revoke the token “{name}”?',
     'Created',
     'Expires',
@@ -43,15 +43,15 @@
 
 {% block content %}
     <p class="light">
-        {{ 'Bearer credentials for the Streamable HTTP transport. Issued by an administrator; the plaintext is shown once at issuance and cannot be retrieved afterwards.'|t('cortex') }}
+        {{ 'Bearer credentials for the Streamable HTTP transport. Issued by an administrator; the plaintext is shown once at issuance and cannot be retrieved afterwards.'|t('herald') }}
     </p>
 
-    <div id="cortex-tokens-vue-admin-table"></div>
+    <div id="herald-tokens-vue-admin-table"></div>
 {% endblock %}
 
 {% js %}
     (function() {
-        var tableContainer = '#cortex-tokens-vue-admin-table';
+        var tableContainer = '#herald-tokens-vue-admin-table';
 
         function renderNameCell(value) {
             if (!value) {
@@ -64,7 +64,7 @@
             if (!value) {
                 return '<span class="light">—</span>';
             }
-            return '<code class="cortex-token-prefix">' + Craft.escapeHtml(value) + '…</code>';
+            return '<code class="herald-token-prefix">' + Craft.escapeHtml(value) + '…</code>';
         }
 
         function renderUserCell(value) {
@@ -80,7 +80,7 @@
 
         function renderExpiresCell(value, row) {
             if (!value) {
-                return '<span class="light">' + Craft.t('cortex', 'Never') + '</span>';
+                return '<span class="light">' + Craft.t('herald', 'Never') + '</span>';
             }
 
             var expiresAt = new Date(value);
@@ -89,7 +89,7 @@
                 return (
                     '<span style="opacity:0.55">' +
                     Craft.escapeHtml(formatted) +
-                    ' <span class="light">(' + Craft.t('cortex', 'expired') + ')</span>' +
+                    ' <span class="light">(' + Craft.t('herald', 'expired') + ')</span>' +
                     '</span>'
                 );
             }
@@ -98,7 +98,7 @@
 
         function renderLastUsedCell(value) {
             if (!value) {
-                return '<span class="light">' + Craft.t('cortex', 'Never') + '</span>';
+                return '<span class="light">' + Craft.t('herald', 'Never') + '</span>';
             }
             var d = new Date(value);
             return Craft.escapeHtml(Craft.formatDate(d, 'short'));
@@ -115,35 +115,35 @@
         var columns = [
             {
                 name: 'name',
-                title: Craft.t('cortex', 'Name'),
+                title: Craft.t('herald', 'Name'),
                 sortField: 'name',
                 callback: renderNameCell,
             },
             {
                 name: 'tokenPrefix',
-                title: Craft.t('cortex', 'Token prefix'),
+                title: Craft.t('herald', 'Token prefix'),
                 callback: renderTokenPrefixCell,
             },
             {
                 name: 'user',
-                title: Craft.t('cortex', 'User'),
+                title: Craft.t('herald', 'User'),
                 callback: renderUserCell,
             },
             {
                 name: 'expiresAt',
-                title: Craft.t('cortex', 'Expires'),
+                title: Craft.t('herald', 'Expires'),
                 sortField: 'expiresAt',
                 callback: renderExpiresCell,
             },
             {
                 name: 'lastUsedAt',
-                title: Craft.t('cortex', 'Last used'),
+                title: Craft.t('herald', 'Last used'),
                 sortField: 'lastUsedAt',
                 callback: renderLastUsedCell,
             },
             {
                 name: 'dateCreated',
-                title: Craft.t('cortex', 'Created'),
+                title: Craft.t('herald', 'Created'),
                 sortField: 'dateCreated',
                 callback: renderDateCreatedCell,
             },
@@ -152,18 +152,18 @@
         var adminTable = new Craft.VueAdminTable({
             container: tableContainer,
             columns: columns,
-            tableDataEndpoint: 'cortex/settings/tokens-table-data',
-            deleteAction: 'cortex/settings/revoke-token',
-            deleteConfirmationMessage: Craft.t('cortex', 'Are you sure you want to revoke the token “{name}”?'),
-            deleteSuccessMessage: Craft.t('cortex', 'Token revoked.'),
-            emptyMessage: Craft.t('cortex', 'No tokens issued yet.'),
+            tableDataEndpoint: 'herald/settings/tokens-table-data',
+            deleteAction: 'herald/settings/revoke-token',
+            deleteConfirmationMessage: Craft.t('herald', 'Are you sure you want to revoke the token “{name}”?'),
+            deleteSuccessMessage: Craft.t('herald', 'Token revoked.'),
+            emptyMessage: Craft.t('herald', 'No tokens issued yet.'),
             search: true,
-            searchPlaceholder: Craft.t('cortex', 'Search tokens'),
+            searchPlaceholder: Craft.t('herald', 'Search tokens'),
             buttons: [
                 {
-                    label: Craft.t('cortex', 'Issue token'),
+                    label: Craft.t('herald', 'Issue token'),
                     icon: 'plus',
-                    href: '#cortex-tokens-issue',
+                    href: '#herald-tokens-issue',
                     enabled: function() { return true; },
                 },
             ],
@@ -174,16 +174,16 @@
         // that exact href so the handler is locale-proof (label-text
         // matching would break under a non-English CP).
         document.addEventListener('click', function(event) {
-            var target = event.target.closest('a[href="#cortex-tokens-issue"]');
+            var target = event.target.closest('a[href="#herald-tokens-issue"]');
             if (!target) {
                 return;
             }
             event.preventDefault();
-            window.Cortex.openTokenIssuanceSlideout(adminTable);
+            window.Herald.openTokenIssuanceSlideout(adminTable);
         });
 
         // Expose the table so the slideout can call .reload() after a
         // successful issuance. Per-tab scope only.
-        window.cortexTokensTable = adminTable;
+        window.heraldTokensTable = adminTable;
     })();
 {% endjs %}

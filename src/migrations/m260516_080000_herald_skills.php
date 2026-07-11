@@ -1,14 +1,14 @@
 <?php
 
-namespace craftpulse\cortex\migrations;
+namespace craftpulse\herald\migrations;
 
 use craft\db\Migration;
 use craft\db\Table as CraftTable;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Gate 8.6 retrofit migration — creates the `cortex_skills` table on
+ * Gate 8.6 retrofit migration — creates the `herald_skills` table on
  * existing installs.
  *
  * Fresh installs pick the table up via `Install.php`; this numbered
@@ -36,7 +36,7 @@ use craftpulse\cortex\db\Table;
  * @author Craftpulse
  * @since  5.0.0
  */
-class m260516_080000_cortex_skills extends Migration
+class m260516_080000_herald_skills extends Migration
 {
     // Public Methods
     // =========================================================================

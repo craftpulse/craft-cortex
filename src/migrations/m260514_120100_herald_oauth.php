@@ -1,27 +1,27 @@
 <?php
 
-namespace craftpulse\cortex\migrations;
+namespace craftpulse\herald\migrations;
 
 use craft\db\Migration;
 use craft\db\Table as CraftTable;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Gate 7.3 migration — creates the three `cortex_oauth_*` tables.
+ * Gate 7.3 migration — creates the three `herald_oauth_*` tables.
  *
- * `cortex_oauth_clients` holds registered OAuth clients (DCR per RFC
+ * `herald_oauth_clients` holds registered OAuth clients (DCR per RFC
  * 7591 inserts here; out-of-band seeding is fine too). Public clients
  * (`isPublic = 1`, PKCE-only per the AuthCodeGrant) have no
  * `clientSecretHash`; confidential clients store the hashed secret.
  * `redirectUris` is JSON-encoded.
  *
- * `cortex_oauth_codes` holds one-shot authorization codes. The grant
+ * `herald_oauth_codes` holds one-shot authorization codes. The grant
  * encrypts the code payload before handing it to the client; we keep
  * a row keyed by the unencrypted code id so `isAuthCodeRevoked()` can
  * flip it after the `/oauth/token` exchange.
  *
- * `cortex_oauth_tokens` holds access (JWT) and refresh (opaque)
+ * `herald_oauth_tokens` holds access (JWT) and refresh (opaque)
  * tokens. `tokenType` discriminates. `tokenHash` is the SHA-256 of
  * the access token's `jti` claim or the refresh token's opaque
  * identifier — never the plaintext bearer string. `audience` is the
@@ -32,8 +32,8 @@ use craftpulse\cortex\db\Table;
  * tokens / codes tables is tracked here as a logical FK only (a string
  * id, no hard DB constraint, to allow out-of-band client seeding). The
  * hard `ON DELETE CASCADE` FKs from `clientId` to
- * `cortex_oauth_clients` were added later in the Gate 7 review fix
- * `m260515_080000_cortex_oauth_client_fks`, so deleting a client now
+ * `herald_oauth_clients` were added later in the Gate 7 review fix
+ * `m260515_080000_herald_oauth_client_fks`, so deleting a client now
  * atomically revokes its in-flight codes and tokens.
  *
  * Idempotent: each `createTable` is guarded by `tableExists`.
@@ -43,7 +43,7 @@ use craftpulse\cortex\db\Table;
  * @author Craftpulse
  * @since  5.0.0
  */
-class m260514_120100_cortex_oauth extends Migration
+class m260514_120100_herald_oauth extends Migration
 {
     // Public Methods
     // =========================================================================

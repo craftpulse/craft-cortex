@@ -27,16 +27,16 @@
 
 use craft\elements\Entry as EntryElement;
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
-use craftpulse\cortex\tools\workflow\ImportExport;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
+use craftpulse\herald\tools\workflow\ImportExport;
 
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_imp_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_imp_' . bin2hex(random_bytes(4)) . '_';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -61,19 +61,19 @@ afterEach(function() {
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _cortex_imp_tool(): ImportExport
+function _herald_imp_tool(): ImportExport
 {
     return new ImportExport();
 }
 
-function _cortex_imp_section(): ?\craft\models\Section
+function _herald_imp_section(): ?\craft\models\Section
 {
     return Craft::$app->getEntries()->getSectionByHandle('heroes');
 }
 
-function _cortex_imp_seed_entry(string $titlePrefix): ?EntryElement
+function _herald_imp_seed_entry(string $titlePrefix): ?EntryElement
 {
-    $section = _cortex_imp_section();
+    $section = _herald_imp_section();
     if ($section === null) {
         return null;
     }
@@ -96,13 +96,13 @@ function _cortex_imp_seed_entry(string $titlePrefix): ?EntryElement
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor(null) returns the Free enum on Free', function() {
-    $schema = _cortex_imp_tool()->inputSchemaFor(null);
+    $schema = _herald_imp_tool()->inputSchemaFor(null);
     expect($schema['properties']['mode']['enum'])->toBe(['export']);
 });
 
 it('inputSchemaFor(null) returns the full static enum on Pro', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_imp_tool()->inputSchemaFor(null);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_imp_tool()->inputSchemaFor(null);
         expect($schema['properties']['mode']['enum'])->toBe(['export', 'import']);
     });
 });
@@ -112,7 +112,7 @@ it('inputSchemaFor(null) returns the full static enum on Pro', function() {
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor on Free returns the Free enum for admins', function() {
-    $schema = _cortex_imp_tool()->inputSchemaFor($this->admin);
+    $schema = _herald_imp_tool()->inputSchemaFor($this->admin);
     expect($schema['properties']['mode']['enum'])->toBe(['export']);
 });
 
@@ -121,15 +121,15 @@ it('inputSchemaFor on Free returns the Free enum for admins', function() {
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor on Pro returns the full enum for admins', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_imp_tool()->inputSchemaFor($this->admin);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_imp_tool()->inputSchemaFor($this->admin);
         expect($schema['properties']['mode']['enum'])->toBe(['export', 'import']);
     });
 });
 
 it('inputSchemaFor on Pro hides import from users without any saveEntries permission', function() {
     $user = new User();
-    $user->username = '__cortex_imp_noperm_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_imp_noperm_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -137,9 +137,9 @@ it('inputSchemaFor on Pro hides import from users without any saveEntries permis
         $this->markTestSkipped('Could not create fixture user.');
     }
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
             $reloaded = Craft::$app->getUsers()->getUserById((int) $user->id);
-            $schema = _cortex_imp_tool()->inputSchemaFor($reloaded);
+            $schema = _herald_imp_tool()->inputSchemaFor($reloaded);
             expect($schema['properties']['mode']['enum'])->toBe(['export']);
         });
     } finally {
@@ -152,19 +152,19 @@ it('inputSchemaFor on Pro hides import from users without any saveEntries permis
 // -----------------------------------------------------------------------------
 
 it('import dry-run validates the payload without writing and reports per-item success', function() {
-    $seed = _cortex_imp_seed_entry($this->fixturePrefix);
+    $seed = _herald_imp_seed_entry($this->fixturePrefix);
     if ($seed === null) {
         $this->markTestSkipped('Could not seed entry.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($seed) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($seed) {
         // Export the entry (Free mode, no edition needed but we're already in Pro).
-        $exportEnvelope = _cortex_imp_tool()->execute([
+        $exportEnvelope = _herald_imp_tool()->execute([
             'mode' => 'export',
             'id' => $seed->id,
         ]);
 
-        $result = _cortex_imp_tool()->execute([
+        $result = _herald_imp_tool()->execute([
             'mode' => 'import',
             'payload' => $exportEnvelope,
             // dryRun unset → defaults to true.
@@ -191,20 +191,20 @@ it('import dry-run validates the payload without writing and reports per-item su
 });
 
 it('import live commits writes when dryRun is false', function() {
-    $seed = _cortex_imp_seed_entry($this->fixturePrefix);
+    $seed = _herald_imp_seed_entry($this->fixturePrefix);
     if ($seed === null) {
         $this->markTestSkipped('Could not seed entry.');
     }
     $originalUid = $seed->uid;
     $originalId = (int) $seed->id;
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($seed, $originalUid, $originalId) {
-        $exportEnvelope = _cortex_imp_tool()->execute(['mode' => 'export', 'id' => $seed->id]);
+    herald_with_edition(Herald::EDITION_PRO, function() use ($seed, $originalUid, $originalId) {
+        $exportEnvelope = _herald_imp_tool()->execute(['mode' => 'export', 'id' => $seed->id]);
 
         // Mutate the title in the payload so we can detect the live write.
         $exportEnvelope['entries'][0]['title'] = $this->fixturePrefix . 'imported';
 
-        $result = _cortex_imp_tool()->execute([
+        $result = _herald_imp_tool()->execute([
             'mode' => 'import',
             'payload' => $exportEnvelope,
             'dryRun' => false,
@@ -230,7 +230,7 @@ it('import live commits writes when dryRun is false', function() {
 // -----------------------------------------------------------------------------
 
 it('import creates a new entry when the payload uid is absent from the DB', function() {
-    $section = _cortex_imp_section();
+    $section = _herald_imp_section();
     if ($section === null) {
         $this->markTestSkipped('No `heroes` section.');
     }
@@ -239,7 +239,7 @@ it('import creates a new entry when the payload uid is absent from the DB', func
         $this->markTestSkipped('No entry type.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($section, $entryType) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($section, $entryType) {
         $newUid = sprintf('%08x-%04x-%04x-%04x-%012x', random_int(0, 0xffffffff), random_int(0, 0xffff), random_int(0, 0xffff), random_int(0, 0xffff), random_int(0, 0xffffffffffff));
         $envelope = [
             'format' => ImportExport::FORMAT_VERSION,
@@ -257,7 +257,7 @@ it('import creates a new entry when the payload uid is absent from the DB', func
             ],
         ];
 
-        $result = _cortex_imp_tool()->execute([
+        $result = _herald_imp_tool()->execute([
             'mode' => 'import',
             'payload' => $envelope,
             'dryRun' => false,
@@ -279,7 +279,7 @@ it('import creates a new entry when the payload uid is absent from the DB', func
 // -----------------------------------------------------------------------------
 
 it('import skips items whose section handle does not resolve', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $envelope = [
             'format' => ImportExport::FORMAT_VERSION,
             'entries' => [
@@ -287,7 +287,7 @@ it('import skips items whose section handle does not resolve', function() {
             ],
         ];
 
-        $result = _cortex_imp_tool()->execute([
+        $result = _herald_imp_tool()->execute([
             'mode' => 'import',
             'payload' => $envelope,
         ]);
@@ -299,14 +299,14 @@ it('import skips items whose section handle does not resolve', function() {
 });
 
 it('import skips items where the caller lacks saveEntries on the target section', function() {
-    $section = _cortex_imp_section();
+    $section = _herald_imp_section();
     $entryType = $section !== null ? (Craft::$app->getEntries()->getEntryTypesBySectionId((int) $section->id)[0] ?? null) : null;
     if ($section === null || $entryType === null) {
         $this->markTestSkipped('`heroes` section + entry type required.');
     }
 
     $user = new User();
-    $user->username = '__cortex_imp_denied_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_imp_denied_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -315,7 +315,7 @@ it('import skips items where the caller lacks saveEntries on the target section'
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($section, $entryType, $user) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($section, $entryType, $user) {
             $reloaded = Craft::$app->getUsers()->getUserById((int) $user->id);
             Craft::$app->getUser()->setIdentity($reloaded);
 
@@ -332,7 +332,7 @@ it('import skips items where the caller lacks saveEntries on the target section'
                 ],
             ];
 
-            $result = _cortex_imp_tool()->execute([
+            $result = _herald_imp_tool()->execute([
                 'mode' => 'import',
                 'payload' => $envelope,
             ]);
@@ -355,8 +355,8 @@ it('import skips items where the caller lacks saveEntries on the target section'
 // -----------------------------------------------------------------------------
 
 it('import throws ToolException on format-version mismatch', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_imp_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_imp_tool()->execute([
             'mode' => 'import',
             'payload' => ['format' => 1, 'entries' => []],
         ]);
@@ -364,8 +364,8 @@ it('import throws ToolException on format-version mismatch', function() {
 })->throws(ToolException::class, 'format` mismatch');
 
 it('import throws ToolException when payload.entries is not an array', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_imp_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_imp_tool()->execute([
             'mode' => 'import',
             'payload' => ['format' => ImportExport::FORMAT_VERSION, 'entries' => 'nope'],
         ]);
@@ -373,8 +373,8 @@ it('import throws ToolException when payload.entries is not an array', function(
 })->throws(ToolException::class, 'entries` must be an array');
 
 it('import throws ToolException when payload is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_imp_tool()->execute(['mode' => 'import']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_imp_tool()->execute(['mode' => 'import']);
     });
 })->throws(ToolException::class, '`payload` is required');
 
@@ -383,7 +383,7 @@ it('import throws ToolException when payload is missing', function() {
 // -----------------------------------------------------------------------------
 
 it('import throws "mode unavailable on this edition" on Free', function() {
-    _cortex_imp_tool()->execute([
+    _herald_imp_tool()->execute([
         'mode' => 'import',
         'payload' => ['format' => ImportExport::FORMAT_VERSION, 'entries' => []],
     ]);

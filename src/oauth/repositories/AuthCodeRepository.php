@@ -1,10 +1,10 @@
 <?php
 
-namespace craftpulse\cortex\oauth\repositories;
+namespace craftpulse\herald\oauth\repositories;
 
 use Carbon\Carbon;
-use craftpulse\cortex\oauth\entities\AuthCodeEntity;
-use craftpulse\cortex\records\OauthCode as OauthCodeRecord;
+use craftpulse\herald\oauth\entities\AuthCodeEntity;
+use craftpulse\herald\records\OauthCode as OauthCodeRecord;
 use League\OAuth2\Server\Entities\AuthCodeEntityInterface;
 use League\OAuth2\Server\Exception\UniqueTokenIdentifierConstraintViolationException;
 use League\OAuth2\Server\Repositories\AuthCodeRepositoryInterface;
@@ -15,7 +15,7 @@ use League\OAuth2\Server\Repositories\AuthCodeRepositoryInterface;
  *
  * Persists one-shot authorization codes. The code identifier is a
  * 80-char random string league mints in `generateUniqueIdentifier()`;
- * we store it as the primary key on `cortex_oauth_codes` so
+ * we store it as the primary key on `herald_oauth_codes` so
  * `isAuthCodeRevoked()` is a single equality probe.
  *
  * `revokeAuthCode()` flips the `isRevoked` bit rather than deleting

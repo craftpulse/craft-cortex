@@ -1,7 +1,7 @@
-# Cortex Prompts
+# Herald Prompts
 
-Auto-generated reference for the cortex MCP prompt surface. Run
-`ddev craft cortex/docs/prompts` to refresh.
+Auto-generated reference for the herald MCP prompt surface. Run
+`ddev craft herald/docs/prompts` to refresh.
 
 - **Total prompts:** 10
 - **Generated:** 2026-06-10T08:12:17-07:00

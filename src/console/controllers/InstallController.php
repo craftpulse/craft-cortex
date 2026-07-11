@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\console\controllers;
+namespace craftpulse\herald\console\controllers;
 
 use craft\console\Controller;
 use yii\console\ExitCode;
@@ -8,46 +8,46 @@ use yii\helpers\Console;
 
 /**
  * =========================================================================
- * Cortex install commands — print copy-paste MCP client config snippets
- * (`cortex/install`), write them directly to the client's config file
- * (`cortex/install/apply`), and auto-detect installed clients on the
- * host filesystem (`cortex/install/detect` and `cortex/install/auto`).
+ * Herald install commands — print copy-paste MCP client config snippets
+ * (`herald/install`), write them directly to the client's config file
+ * (`herald/install/apply`), and auto-detect installed clients on the
+ * host filesystem (`herald/install/detect` and `herald/install/auto`).
  *
  * The default action prints snippets for the user to copy into their MCP
  * client's config manually (read-only — never writes). The `apply`
- * action resolves the client's per-platform config path, merges a cortex
+ * action resolves the client's per-platform config path, merges a herald
  * entry into it, and writes the result atomically with a timestamped
  * backup. The snippet form is the documented manual fallback whenever
- * apply can't proceed (config absent, parent dir missing, cortex entry
+ * apply can't proceed (config absent, parent dir missing, herald entry
  * already present without `--force`).
  *
  * The `detect` action scans the host for installed MCP clients and prints
  * a status table. The `auto` action runs detection plus per-client
- * confirm-and-apply in one pass — the Boost-style "I installed cortex,
+ * confirm-and-apply in one pass — the Boost-style "I installed herald,
  * now wire it up everywhere" flow. **Both refuse to run from inside any
  * container** (DDEV, plain Docker, Lando, Sail, Podman, LXC, Kubernetes)
  * because the container can't see the host's `/Applications`, `~/.cursor`,
  * etc. — false negatives are worse than no detection. The manual
- * `cortex/install` snippet flow works from inside DDEV and stays the
+ * `herald/install` snippet flow works from inside DDEV and stays the
  * documented fallback.
  *
  * Supported clients:
  *   - Claude Desktop (Anthropic, macOS / Windows / Linux)
  *   - Claude Code (Anthropic CLI; project-scoped `.mcp.json`)
  *   - Cursor (global `~/.cursor/mcp.json`)
- *   - Continue.dev (VS Code extension; standalone `cortex.yaml`)
+ *   - Continue.dev (VS Code extension; standalone `herald.yaml`)
  *   - Cline (VS Code extension; VS Code globalStorage path)
  *   - Zed (`settings.json`, `context_servers` key)
  *   - Windsurf (Codeium fork of VS Code; `mcp_config.json`)
  *
  * Usage:
- *   cortex/install                                  # print all snippets
- *   cortex/install --client=<name>                  # print one snippet
- *   cortex/install/apply --client=<name>            # write one config file
- *   cortex/install/detect                           # status table (host-only)
- *   cortex/install/auto                             # detect + confirm + apply per client (host-only)
+ *   herald/install                                  # print all snippets
+ *   herald/install --client=<name>                  # print one snippet
+ *   herald/install/apply --client=<name>            # write one config file
+ *   herald/install/detect                           # status table (host-only)
+ *   herald/install/auto                             # detect + confirm + apply per client (host-only)
  *
- * Use `--ddev` to emit the docker-exec invocation form (cortex running
+ * Use `--ddev` to emit the docker-exec invocation form (herald running
  * inside DDEV, MCP client on host). Auto-detected from `DDEV_PROJECT` /
  * `IS_DDEV_PROJECT` when present.
  * =========================================================================
@@ -148,7 +148,7 @@ class InstallController extends Controller
     public ?string $ddevProject = null;
 
     /**
-     * @var bool Apply-action only — overwrite an existing cortex entry
+     * @var bool Apply-action only — overwrite an existing herald entry
      *          when one is already registered in the target file. Default
      *          refuses (idempotent — re-running apply is a no-op).
      */
@@ -197,7 +197,7 @@ class InstallController extends Controller
     }
 
     /**
-     * Print MCP client config snippets for cortex.
+     * Print MCP client config snippets for herald.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -209,7 +209,7 @@ class InstallController extends Controller
         $command = $this->_buildCommand($isDdev, $project);
 
         $this->stdout("\n");
-        $this->stdout("Cortex — MCP client configuration\n", \yii\helpers\Console::FG_PURPLE);
+        $this->stdout("Herald — MCP client configuration\n", \yii\helpers\Console::FG_PURPLE);
         $this->stdout(str_repeat('=', 70) . "\n\n");
 
         if ($isDdev) {
@@ -241,7 +241,7 @@ class InstallController extends Controller
     }
 
     /**
-     * Write the cortex MCP server entry directly into the chosen client's
+     * Write the herald MCP server entry directly into the chosen client's
      * config file. Resolves the per-platform path, refuses to ghost-create
      * when the client isn't installed, backs the existing file up to
      * `<file>.bak.<unix-timestamp>`, and writes atomically (temp file +
@@ -251,9 +251,9 @@ class InstallController extends Controller
      *   - `--client=<name>` is required.
      *   - `--dry-run` prints the target path and a before / after diff
      *     without writing anything. Skips the confirm prompt.
-     *   - Without `--force`, an existing cortex entry causes the action
+     *   - Without `--force`, an existing herald entry causes the action
      *     to refuse — re-runs are idempotent.
-     *   - With `--force`, the existing cortex entry is replaced. Other
+     *   - With `--force`, the existing herald entry is replaced. Other
      *     servers in the file are preserved untouched.
      *   - All writes prompt for `y/N` confirmation. `--interactive=0`
      *     auto-rejects (safe default for CI).
@@ -288,7 +288,7 @@ class InstallController extends Controller
      * can't see the host's `/Applications`, `~/.cursor`, etc. and any
      * detection result would be a false negative.
      *
-     * Read-only — never writes. Pair with `cortex/install/auto` to detect
+     * Read-only — never writes. Pair with `herald/install/auto` to detect
      * and apply in one pass.
      *
      * @author Craftpulse
@@ -324,10 +324,10 @@ class InstallController extends Controller
         }
 
         if ($any) {
-            $this->stdout("Run `cortex/install/auto` to apply cortex config to detected clients.\n", Console::FG_GREEN);
+            $this->stdout("Run `herald/install/auto` to apply herald config to detected clients.\n", Console::FG_GREEN);
         } else {
             $this->stdout("No clients detected on this host.\n", Console::FG_YELLOW);
-            $this->stdout("If you have a client installed, run `cortex/install` for the manual snippet form.\n", Console::FG_GREY);
+            $this->stdout("If you have a client installed, run `herald/install` for the manual snippet form.\n", Console::FG_GREY);
         }
         $this->stdout("\n");
 
@@ -336,13 +336,13 @@ class InstallController extends Controller
 
     /**
      * Detect installed clients and walk them interactively — for each
-     * detected client, prompt to apply cortex config and run the same
+     * detected client, prompt to apply herald config and run the same
      * write pipeline `actionApply()` uses. **Refuses to run from inside
      * any container** (DDEV, plain Docker, Lando, Sail, Podman, LXC,
      * Kubernetes) for the same reason `actionDetect()` does.
      *
      * Honours `--dry-run` (no writes, prints before/after for each) and
-     * `--force` (overwrites an existing cortex entry instead of
+     * `--force` (overwrites an existing herald entry instead of
      * refusing). Per-client confirm prompt is the only prompt; the
      * underlying apply path skips its own confirm since auto already
      * gathered the decision.
@@ -369,7 +369,7 @@ class InstallController extends Controller
 
         if ($detected === []) {
             $this->stdout("\nNo MCP clients detected on this host.\n", Console::FG_YELLOW);
-            $this->stdout("Run `cortex/install` for the manual snippet form if you have a client installed.\n\n", Console::FG_GREY);
+            $this->stdout("Run `herald/install` for the manual snippet form if you have a client installed.\n\n", Console::FG_GREY);
             return ExitCode::OK;
         }
 
@@ -385,7 +385,7 @@ class InstallController extends Controller
             $this->stdout("{$label}\n", Console::FG_YELLOW);
             $this->stdout(str_repeat('-', 70) . "\n");
 
-            if (!$this->confirm("Apply cortex config for {$label}?")) {
+            if (!$this->confirm("Apply herald config for {$label}?")) {
                 $this->stdout("Skipped.\n\n", Console::FG_GREY);
                 continue;
             }
@@ -476,7 +476,7 @@ class InstallController extends Controller
      *     project scope is the documented committed-config pattern.
      *   - cursor: ~/.cursor/mcp.json across all platforms (Cursor uses
      *     home-relative paths uniformly).
-     *   - continue: standalone `~/.continue/mcpServers/cortex.yaml`,
+     *   - continue: standalone `~/.continue/mcpServers/herald.yaml`,
      *     leaving the user's `config.yaml` untouched. Standalone block
      *     files require `name` / `version` / `schema` metadata at the top
      *     level — verified against docs.continue.dev/reference.
@@ -507,7 +507,7 @@ class InstallController extends Controller
                 ? rtrim(getcwd(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . '.mcp.json'
                 : null,
             'cursor' => "{$home}/.cursor/mcp.json",
-            'continue' => "{$home}/.continue/mcpServers/cortex.yaml",
+            'continue' => "{$home}/.continue/mcpServers/herald.yaml",
             'cline' => match ($os) {
                 'Darwin' => "{$home}/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json",
                 'Windows' => $appData !== null
@@ -528,8 +528,8 @@ class InstallController extends Controller
 
     /**
      * Build the merged config string for a client given its existing file
-     * contents (or null) and the cortex invocation command. Returns
-     * `[contents, action-summary]` on success or `null` when the cortex
+     * contents (or null) and the herald invocation command. Returns
+     * `[contents, action-summary]` on success or `null` when the herald
      * entry already exists and `--force` is not set.
      *
      * @internal Public for test access only. Not part of the stable
@@ -622,7 +622,7 @@ class InstallController extends Controller
     }
 
     /**
-     * Refuse to run the detect-or-auto pipeline when cortex is invoked
+     * Refuse to run the detect-or-auto pipeline when herald is invoked
      * from inside any container (DDEV, plain Docker, Lando, Sail, Podman,
      * LXC, Kubernetes). Detection inside a container walks the container's
      * filesystem, not the host's — `/Applications`, `~/.cursor`, etc. don't
@@ -640,29 +640,29 @@ class InstallController extends Controller
         }
 
         $this->stderr("\n");
-        $this->stderr("cortex/install/{$action} cannot run from inside a container.\n", Console::FG_RED);
+        $this->stderr("herald/install/{$action} cannot run from inside a container.\n", Console::FG_RED);
         $this->stderr("\n");
-        $this->stderr("The cortex process can only see the container's filesystem —\n", Console::FG_GREY);
+        $this->stderr("The herald process can only see the container's filesystem —\n", Console::FG_GREY);
         $this->stderr("not your host's /Applications, ~/.cursor, etc. Detection from\n", Console::FG_GREY);
         $this->stderr("inside the container would produce false negatives.\n", Console::FG_GREY);
         $this->stderr("\n");
         $this->stderr("Run from your host's PHP instead:\n", Console::FG_GREY);
-        $this->stderr("  php /path/to/project/craft cortex/install/{$action}\n", Console::FG_CYAN);
+        $this->stderr("  php /path/to/project/craft herald/install/{$action}\n", Console::FG_CYAN);
         $this->stderr("\n");
 
         if ($this->_detectDdev()) {
             $this->stderr("Or use the manual snippet form (works from inside DDEV):\n", Console::FG_GREY);
-            $this->stderr("  ddev craft cortex/install [--client=<name>]\n\n", Console::FG_CYAN);
+            $this->stderr("  ddev craft herald/install [--client=<name>]\n\n", Console::FG_CYAN);
         } else {
             $this->stderr("Or use the manual snippet form:\n", Console::FG_GREY);
-            $this->stderr("  php craft cortex/install [--client=<name>]\n\n", Console::FG_CYAN);
+            $this->stderr("  php craft herald/install [--client=<name>]\n\n", Console::FG_CYAN);
         }
 
         return true;
     }
 
     /**
-     * Apply cortex config for a single client. Shared pipeline behind
+     * Apply herald config for a single client. Shared pipeline behind
      * `actionApply()` (interactive single-client) and `actionAuto()`
      * (per-detected-client loop). When `$skipConfirm` is true, the
      * write confirmation prompt is omitted — the caller has already
@@ -712,7 +712,7 @@ class InstallController extends Controller
                 $parent,
             ), Console::FG_RED);
             $this->stderr(sprintf(
-                "Install %s first, or use the manual snippet:\n  ddev craft cortex/install --client=%s\n",
+                "Install %s first, or use the manual snippet:\n  ddev craft herald/install --client=%s\n",
                 $label,
                 $client,
             ), Console::FG_GREY);
@@ -733,7 +733,7 @@ class InstallController extends Controller
 
         if ($result === null) {
             $this->stderr(sprintf(
-                "Cortex entry already present at %s. Re-run with --force to overwrite.\n",
+                "Herald entry already present at %s. Re-run with --force to overwrite.\n",
                 $path,
             ), Console::FG_YELLOW);
             return ExitCode::OK;
@@ -776,7 +776,7 @@ class InstallController extends Controller
             $this->stdout("<file>.bak.<unix-timestamp>\n");
         }
 
-        if (!$skipConfirm && !$this->confirm("\nWrite cortex MCP config to {$path}?")) {
+        if (!$skipConfirm && !$this->confirm("\nWrite herald MCP config to {$path}?")) {
             $this->stderr("Aborted.\n", Console::FG_YELLOW);
             return ExitCode::OK;
         }
@@ -788,7 +788,7 @@ class InstallController extends Controller
             return ExitCode::IOERR;
         }
 
-        $this->stdout(sprintf("\nWrote cortex config to %s.\n", $path), Console::FG_GREEN);
+        $this->stdout(sprintf("\nWrote herald config to %s.\n", $path), Console::FG_GREEN);
         $this->stdout("Reload {$label} to pick up the new server.\n", Console::FG_GREEN);
         return ExitCode::OK;
     }
@@ -872,10 +872,10 @@ class InstallController extends Controller
             // DDEV mounts the project root at /var/www/html in the web
             // container. If your `craft` script lives in a subdirectory
             // (e.g. `cms/craft`) adjust the path manually after pasting.
-            return "docker exec -i ddev-{$project}-web php /var/www/html/craft cortex/serve";
+            return "docker exec -i ddev-{$project}-web php /var/www/html/craft herald/serve";
         }
 
-        return 'php /PATH/TO/PROJECT/craft cortex/serve';
+        return 'php /PATH/TO/PROJECT/craft herald/serve';
     }
 
     /**
@@ -951,7 +951,7 @@ TXT;
         return <<<TXT
 Run from your project directory:
 
-  claude mcp add --transport stdio cortex -- {$command}
+  claude mcp add --transport stdio herald -- {$command}
 
 Or add to project-level `.mcp.json`:
 
@@ -991,7 +991,7 @@ TXT;
 
         return <<<TXT
 Config file: ~/.continue/config.yaml (or project-level .continue/config.yaml).
-Standalone form: ~/.continue/mcpServers/cortex.yaml with the same `mcpServers:`
+Standalone form: ~/.continue/mcpServers/herald.yaml with the same `mcpServers:`
 list at top level.
 
 Add under `mcpServers:`:
@@ -1072,7 +1072,7 @@ TXT;
         $cmdJson = json_encode($parts[0]);
 
         return <<<JSON
-  "cortex": {
+  "herald": {
     "command": {$cmdJson},
     "args": {$argsJson}
   }
@@ -1099,7 +1099,7 @@ JSON;
         }
 
         return rtrim(
-            "  - name: cortex\n" .
+            "  - name: herald\n" .
             "    command: " . $this->_yamlScalar($cmd) . "\n" .
             "    args:\n" .
             $argsYaml,
@@ -1181,7 +1181,7 @@ JSON;
     }
 
     /**
-     * Merge a cortex entry into a JSON config file using the `mcpServers`
+     * Merge a herald entry into a JSON config file using the `mcpServers`
      * top-level key (Claude Desktop, Claude Code `.mcp.json`, Cursor,
      * Cline, Windsurf).
      *
@@ -1197,7 +1197,7 @@ JSON;
     }
 
     /**
-     * Merge a cortex entry into a JSON config file using the top-level
+     * Merge a herald entry into a JSON config file using the top-level
      * `context_servers` key (Zed). Same merge semantics as the
      * `mcpServers` form, just under a different top-level name.
      *
@@ -1214,11 +1214,11 @@ JSON;
 
     /**
      * Generic JSON merger — reads the existing file (or starts from `{}`
-     * if absent), upserts a `cortex` entry under the given top-level
+     * if absent), upserts a `herald` entry under the given top-level
      * server-map key, and returns the re-encoded contents. Other entries
      * in the file are preserved untouched.
      *
-     * Refusal semantics: when a `cortex` entry already exists and
+     * Refusal semantics: when a `herald` entry already exists and
      * `--force` is not set, returns null so the caller can surface the
      * "already present, use --force" message without silently rewriting
      * the file.
@@ -1245,13 +1245,13 @@ JSON;
             throw new \RuntimeException("`{$serversKey}` is not an object");
         }
 
-        $alreadyPresent = array_key_exists('cortex', $servers);
+        $alreadyPresent = array_key_exists('herald', $servers);
         if ($alreadyPresent && !$this->force) {
             return null;
         }
 
         $parts = $this->_splitCommand($command);
-        $servers['cortex'] = [
+        $servers['herald'] = [
             'command' => $parts[0] ?? $command,
             'args' => array_slice($parts, 1),
         ];
@@ -1264,18 +1264,18 @@ JSON;
         }
 
         $action = $alreadyPresent
-            ? "overwrite cortex entry under `{$serversKey}`"
-            : ($existing !== null ? "add cortex entry under `{$serversKey}`" : "create file with cortex entry under `{$serversKey}`");
+            ? "overwrite herald entry under `{$serversKey}`"
+            : ($existing !== null ? "add herald entry under `{$serversKey}`" : "create file with herald entry under `{$serversKey}`");
 
         return [$encoded . "\n", $action];
     }
 
     /**
-     * Build the standalone `cortex.yaml` body for Continue.dev's
+     * Build the standalone `herald.yaml` body for Continue.dev's
      * `~/.continue/mcpServers/` directory. Standalone block files require
      * `name` / `version` / `schema` metadata at the top level (verified
      * against docs.continue.dev/reference). The file is single-purpose —
-     * cortex owns it — so refusal applies only when an existing file
+     * herald owns it — so refusal applies only when an existing file
      * differs from what we'd write and `--force` is not set.
      *
      * @return array{0: string, 1: string}|null
@@ -1288,7 +1288,7 @@ JSON;
         $body = $this->_renderContinueYaml($command);
 
         if ($existing === null) {
-            return [$body, 'create cortex.yaml standalone block'];
+            return [$body, 'create herald.yaml standalone block'];
         }
 
         if (rtrim($existing) === rtrim($body)) {
@@ -1297,14 +1297,14 @@ JSON;
             // hint the JSON path does. (Differing content + no --force
             // also lands here, which is the safe default.)
             return $this->force
-                ? [$body, 'overwrite cortex.yaml standalone block']
+                ? [$body, 'overwrite herald.yaml standalone block']
                 : null;
         }
 
         if (!$this->force) {
             return null;
         }
-        return [$body, 'overwrite cortex.yaml standalone block'];
+        return [$body, 'overwrite herald.yaml standalone block'];
     }
 
     /**
@@ -1326,11 +1326,11 @@ JSON;
             $argsYaml .= "      - " . $this->_yamlScalar($arg) . "\n";
         }
 
-        return "name: cortex\n"
+        return "name: herald\n"
             . "version: 0.0.1\n"
             . "schema: v1\n"
             . "mcpServers:\n"
-            . "  - name: cortex\n"
+            . "  - name: herald\n"
             . "    command: " . $this->_yamlScalar($cmd) . "\n"
             . "    args:\n"
             . $argsYaml;
@@ -1382,7 +1382,7 @@ JSON;
             $this->_pruneBackups($path);
         }
 
-        $temp = @tempnam($dir, 'cortex-mcp-');
+        $temp = @tempnam($dir, 'herald-mcp-');
         if ($temp === false) {
             throw new \RuntimeException("could not create temp file in {$dir}");
         }

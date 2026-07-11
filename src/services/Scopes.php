@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\services;
+namespace craftpulse\herald\services;
 
 use yii\base\Component;
 
@@ -9,7 +9,7 @@ use yii\base\Component;
  * Capability-scope vocabulary + tool→scope authority.
  *
  * Replaces the coarse two-valued `read` / `write` OAuth scope model with
- * a capability vocabulary that spans Cortex's tool surface. Every
+ * a capability vocabulary that spans Herald's tool surface. Every
  * registered tool maps to exactly one capability scope here; this class
  * is the single source of truth the rest of the OAuth + dispatch stack
  * reads:
@@ -189,7 +189,7 @@ class Scopes extends Component
         // Users.
         'users' => self::USERS_WRITE,
 
-        // Skills (Cortex's own element type — author-able).
+        // Skills (Herald's own element type — author-able).
         'skill' => self::CONTENT_WRITE,
 
         // System & diagnostics (read).

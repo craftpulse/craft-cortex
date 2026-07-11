@@ -1,23 +1,23 @@
 <?php
 
-namespace craftpulse\cortex\console\controllers;
+namespace craftpulse\herald\console\controllers;
 
 use Craft;
 use craft\console\Controller;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 use yii\console\ExitCode;
 use yii\helpers\Console;
 
 /**
  * =========================================================================
  * Console — issue, revoke, and list bearer tokens used by the HTTP
- * transport (`POST /cortex/mcp`). Admin-issued only; Gate 7.3 lands
+ * transport (`POST /herald/mcp`). Admin-issued only; Gate 7.3 lands
  * OAuth 2.1 for delegated / self-service flows.
  *
  * Usage:
- *   cortex/token/issue <user> [--name=<name>] [--ttl=<seconds>]
- *   cortex/token/revoke <id>
- *   cortex/token/list [--user=<email-or-username>]
+ *   herald/token/issue <user> [--name=<name>] [--ttl=<seconds>]
+ *   herald/token/revoke <id>
+ *   herald/token/list [--user=<email-or-username>]
  *
  * `<user>` accepts an email address or a username; resolved through
  * `Users::getUserByUsernameOrEmail()`. The plaintext token is printed
@@ -80,7 +80,7 @@ class TokenController extends Controller
      * Issue a fresh bearer token bound to the given user.
      *
      * Prints the plaintext exactly once. Operators that miss the
-     * output should revoke the just-issued token (`cortex/token/revoke
+     * output should revoke the just-issued token (`herald/token/revoke
      * <id>`) and re-issue.
      *
      * @author Craftpulse
@@ -97,7 +97,7 @@ class TokenController extends Controller
         $name = $this->name ?? ('cli-' . time());
 
         try {
-            $result = Cortex::getInstance()->tokens->issue(
+            $result = Herald::getInstance()->tokens->issue(
                 userId: (int) $resolved->id,
                 name: $name,
                 ttlSeconds: $this->ttl,
@@ -140,7 +140,7 @@ class TokenController extends Controller
      */
     public function actionRevoke(int $id): int
     {
-        $tokens = Cortex::getInstance()->tokens;
+        $tokens = Herald::getInstance()->tokens;
         $existing = $tokens->getById($id);
         if ($existing === null) {
             $this->stderr("No live token with id #{$id}.\n", Console::FG_RED);
@@ -176,7 +176,7 @@ class TokenController extends Controller
      */
     public function actionList(): int
     {
-        $tokens = Cortex::getInstance()->tokens;
+        $tokens = Herald::getInstance()->tokens;
 
         if ($this->user !== null) {
             $resolved = Craft::$app->getUsers()->getUserByUsernameOrEmail($this->user);

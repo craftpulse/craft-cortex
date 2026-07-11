@@ -4,12 +4,12 @@
    Temporary-grant issuance slideout body partial.
 
    Rendered by `actionAllowlistOverrideSlideout` and fetched via
-   `Craft.sendActionRequest('GET', 'cortex/settings/allowlist-override-slideout')`
-   from `Cortex.openAllowlistOverrideSlideout()`. The returned HTML is
+   `Craft.sendActionRequest('GET', 'herald/settings/allowlist-override-slideout')`
+   from `Herald.openAllowlistOverrideSlideout()`. The returned HTML is
    passed into `new Craft.Slideout(html, {containerElement: 'form', ...})`
    — the slideout container provides the `<form>` shell.
 
-   No `<html>` / `<body>` chrome — pure fragment. The `data-cortex-form`
+   No `<html>` / `<body>` chrome — pure fragment. The `data-herald-form`
    attribute on the body is the JS hook the slideout listener uses to
    find the submit/cancel handlers; the CSRF token is rendered inline
    because the slideout's form shell does not auto-inject it.
@@ -19,22 +19,22 @@
    no Vite.
    ========================================================================= #}
 
-<div class="so-body" data-cortex-form>
+<div class="so-body" data-herald-form>
     <header class="pane-header">
-        <h2 class="screen-title">{{ 'Issue grant'|t('cortex') }}</h2>
+        <h2 class="screen-title">{{ 'Issue grant'|t('herald') }}</h2>
     </header>
 
     <div class="so-content padded">
         <p class="light">
-            {{ 'Grant the {tool} tool a time-bound pattern that layers on top of the project-config defaults.'|t('cortex', { tool: '<code>craft_command</code>' })|raw }}
+            {{ 'Grant the {tool} tool a time-bound pattern that layers on top of the project-config defaults.'|t('herald', { tool: '<code>craft_command</code>' })|raw }}
         </p>
 
         {{ csrfInput() }}
 
         {{ forms.textField({
-            label: 'Pattern'|t('cortex'),
-            instructions: 'A glob the craft_command tool may dispatch. Uses fnmatch semantics: resave/* matches any resave/<x> route; up matches the literal command.'|t('cortex'),
-            id: 'cortex-override-pattern',
+            label: 'Pattern'|t('herald'),
+            instructions: 'A glob the craft_command tool may dispatch. Uses fnmatch semantics: resave/* matches any resave/<x> route; up matches the literal command.'|t('herald'),
+            id: 'herald-override-pattern',
             name: 'pattern',
             required: true,
             autofocus: true,
@@ -42,20 +42,20 @@
         }) }}
 
         {{ forms.textField({
-            label: 'Note'|t('cortex'),
-            instructions: 'Optional — surfaces in the audit history alongside the row.'|t('cortex'),
-            id: 'cortex-override-note',
+            label: 'Note'|t('herald'),
+            instructions: 'Optional — surfaces in the audit history alongside the row.'|t('herald'),
+            id: 'herald-override-note',
             name: 'note',
-            placeholder: 'ticket-1234'|t('cortex'),
+            placeholder: 'ticket-1234'|t('herald'),
         }) }}
 
         {{ forms.textField({
-            label: 'Expires in (seconds)'|t('cortex'),
-            instructions: 'Leave blank to use the plugin default ({default} = {asDays}).'|t('cortex', {
+            label: 'Expires in (seconds)'|t('herald'),
+            instructions: 'Leave blank to use the plugin default ({default} = {asDays}).'|t('herald', {
                 default: settings.runtimeOverrideTtl,
                 asDays: (settings.runtimeOverrideTtl // 86400) ~ ' days',
             }),
-            id: 'cortex-override-ttl',
+            id: 'herald-override-ttl',
             name: 'ttlSeconds',
             type: 'number',
             min: 60,
@@ -65,9 +65,9 @@
 
     <footer class="so-footer">
         <div class="flex flex-nowrap">
-            <button type="button" class="btn" data-cortex-cancel>{{ 'Cancel'|t('app') }}</button>
+            <button type="button" class="btn" data-herald-cancel>{{ 'Cancel'|t('app') }}</button>
             <div class="flex-grow"></div>
-            <button type="submit" class="btn submit" data-cortex-submit>{{ 'Issue grant'|t('cortex') }}</button>
+            <button type="submit" class="btn submit" data-herald-submit>{{ 'Issue grant'|t('herald') }}</button>
         </div>
     </footer>
 </div>

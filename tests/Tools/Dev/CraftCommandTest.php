@@ -5,11 +5,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('craft_command');
+    $this->tool = Herald::getInstance()->tools->getByName('craft_command');
 });
 
 it('lists the active allowlist', function() {
@@ -21,7 +21,7 @@ it('lists the active allowlist', function() {
     expect($result['count'])->toBe(count($result['patterns']));
 
     // Defaults from Settings::$allowedCommands must be present unless
-    // the playground overrode them in project config or config/cortex.php.
+    // the playground overrode them in project config or config/herald.php.
     expect($result['patterns'])->toContain('resave/*');
     expect($result['patterns'])->toContain('cache/*');
     expect($result['patterns'])->toContain('migrate/*');
@@ -71,6 +71,6 @@ it('matches glob patterns and dispatches via the console runner', function() {
 });
 
 it('exposes destructiveHint annotation', function() {
-    $annotations = \craftpulse\cortex\tools\support\AttributeReader::annotationsFor($this->tool);
+    $annotations = \craftpulse\herald\tools\support\AttributeReader::annotationsFor($this->tool);
     expect($annotations)->toHaveKey('destructiveHint', true);
 });

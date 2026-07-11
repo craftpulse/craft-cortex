@@ -1,16 +1,16 @@
 <?php
 
-namespace craftpulse\cortex\migrations;
+namespace craftpulse\herald\migrations;
 
 use craft\db\Migration;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Adds refresh-token rotation lineage to `cortex_oauth_tokens`.
+ * Adds refresh-token rotation lineage to `herald_oauth_tokens`.
  *
  * Refresh-token rotation (league rotates + revokes the old refresh
- * token on every exchange) was already happening, but Cortex had no way
+ * token on every exchange) was already happening, but Herald had no way
  * to detect a *replay* of an already-consumed refresh token — the
  * hallmark of a stolen token. RFC 6819 §5.2.2.3 / the OAuth 2.1
  * refresh-rotation BCP prescribe family-wide revocation on such a
@@ -35,7 +35,7 @@ use craftpulse\cortex\db\Table;
  * @author Craftpulse
  * @since  5.0.0
  */
-class m260620_120000_cortex_oauth_token_family extends Migration
+class m260620_120000_herald_oauth_token_family extends Migration
 {
     // Public Methods
     // =========================================================================

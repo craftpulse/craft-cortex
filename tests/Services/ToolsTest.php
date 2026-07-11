@@ -24,10 +24,10 @@
  */
 
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\events\RegisterToolsEvent;
-use craftpulse\cortex\services\Tools;
-use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\herald\events\RegisterToolsEvent;
+use craftpulse\herald\Herald;
+use craftpulse\herald\services\Tools;
+use craftpulse\herald\tools\AbstractTool;
 
 beforeEach(function() {
     // Resolve a playground admin user once — used as the "permitted"
@@ -50,7 +50,7 @@ beforeEach(function() {
  *                                                detach, original
  *                                                service for restore.
  */
-function _cortex_register_stub_tool(callable $factory): array
+function _herald_register_stub_tool(callable $factory): array
 {
     $listener = function(RegisterToolsEvent $event) use ($factory): void {
         $event->tools[] = $factory();
@@ -58,10 +58,10 @@ function _cortex_register_stub_tool(callable $factory): array
 
     \yii\base\Event::on(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
 
-    $original = Cortex::getInstance()->tools;
+    $original = Herald::getInstance()->tools;
     $fresh = new Tools();
     $fresh->init();
-    Cortex::getInstance()->set('tools', $fresh);
+    Herald::getInstance()->set('tools', $fresh);
 
     return [$fresh, $listener, $original];
 }
@@ -71,9 +71,9 @@ function _cortex_register_stub_tool(callable $factory): array
  * Always called from a `finally` block to keep the playground's
  * registry intact across tests.
  */
-function _cortex_restore_tools(Tools $original, \Closure $listener): void
+function _herald_restore_tools(Tools $original, \Closure $listener): void
 {
-    Cortex::getInstance()->set('tools', $original);
+    Herald::getInstance()->set('tools', $original);
     \yii\base\Event::off(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
 }
 
@@ -82,7 +82,7 @@ function _cortex_restore_tools(Tools $original, \Closure $listener): void
 // -----------------------------------------------------------------------------
 
 it('asListPayloadFor(null) equals asListPayload() — stdio invariant', function() {
-    $service = Cortex::getInstance()->tools;
+    $service = Herald::getInstance()->tools;
 
     $stdio = $service->asListPayload();
     $nullUser = $service->asListPayloadFor(null);
@@ -110,7 +110,7 @@ it('asListPayloadFor returns every tool when filterFor defaults to true for all'
     // whose `inputSchemaFor()` filters Pro modes out for HTTP callers
     // on Free installs. The tool-set invariant (every tool surfaces)
     // is the part that holds; schema-shape equality is not.
-    $service = Cortex::getInstance()->tools;
+    $service = Herald::getInstance()->tools;
 
     $stdio = $service->asListPayload();
     $admin = $service->asListPayloadFor($this->admin);
@@ -125,7 +125,7 @@ it('asListPayloadFor returns every tool when filterFor defaults to true for all'
 });
 
 it('asListPayloadFor omits tools whose filterFor returns false for the user', function() {
-    [$service, $listener, $original] = _cortex_register_stub_tool(fn() => new class() extends AbstractTool {
+    [$service, $listener, $original] = _herald_register_stub_tool(fn() => new class() extends AbstractTool {
         public static function getName(): string
         {
             return '_test_/admin-only-tool';
@@ -159,7 +159,7 @@ it('asListPayloadFor omits tools whose filterFor returns false for the user', fu
         $nullNames = array_column($forNull, 'name');
         expect($nullNames)->not->toContain('_test_/admin-only-tool');
     } finally {
-        _cortex_restore_tools($original, $listener);
+        _herald_restore_tools($original, $listener);
     }
 });
 
@@ -168,7 +168,7 @@ it('asListPayloadFor omits tools whose filterFor returns false for the user', fu
 // -----------------------------------------------------------------------------
 
 it('getByNameFor returns the tool when filterFor is true', function() {
-    [$service, $listener, $original] = _cortex_register_stub_tool(fn() => new class() extends AbstractTool {
+    [$service, $listener, $original] = _herald_register_stub_tool(fn() => new class() extends AbstractTool {
         public static function getName(): string
         {
             return '_test_/always-on-tool';
@@ -190,12 +190,12 @@ it('getByNameFor returns the tool when filterFor is true', function() {
         expect($tool)->not->toBeNull();
         expect($tool::getName())->toBe('_test_/always-on-tool');
     } finally {
-        _cortex_restore_tools($original, $listener);
+        _herald_restore_tools($original, $listener);
     }
 });
 
 it('getByNameFor returns null when filterFor is false for the user', function() {
-    [$service, $listener, $original] = _cortex_register_stub_tool(fn() => new class() extends AbstractTool {
+    [$service, $listener, $original] = _herald_register_stub_tool(fn() => new class() extends AbstractTool {
         public static function getName(): string
         {
             return '_test_/hidden-tool';
@@ -225,12 +225,12 @@ it('getByNameFor returns null when filterFor is false for the user', function() 
         $stdioTool = $service->getByNameFor('_test_/hidden-tool', null);
         expect($stdioTool)->toBeNull();
     } finally {
-        _cortex_restore_tools($original, $listener);
+        _herald_restore_tools($original, $listener);
     }
 });
 
 it('getByNameFor returns null for an unknown tool name regardless of user', function() {
-    $service = Cortex::getInstance()->tools;
+    $service = Herald::getInstance()->tools;
     expect($service->getByNameFor('_test_/no-such-tool', $this->admin))->toBeNull();
     expect($service->getByNameFor('_test_/no-such-tool', null))->toBeNull();
 });
@@ -240,7 +240,7 @@ it('getByNameFor returns null for an unknown tool name regardless of user', func
 // -----------------------------------------------------------------------------
 
 it('asListPayloadFor uses inputSchemaFor for the surviving tools', function() {
-    [$service, $listener, $original] = _cortex_register_stub_tool(fn() => new class() extends AbstractTool {
+    [$service, $listener, $original] = _herald_register_stub_tool(fn() => new class() extends AbstractTool {
         public static function getName(): string
         {
             return '_test_/mode-gated-tool';
@@ -299,6 +299,6 @@ it('asListPayloadFor uses inputSchemaFor for the surviving tools', function() {
         expect($nullEntry)->not->toBeFalse();
         expect($nullEntry['inputSchema']['x-marker'])->toBe('static-schema');
     } finally {
-        _cortex_restore_tools($original, $listener);
+        _herald_restore_tools($original, $listener);
     }
 });

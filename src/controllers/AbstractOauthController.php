@@ -1,11 +1,11 @@
 <?php
 
-namespace craftpulse\cortex\controllers;
+namespace craftpulse\herald\controllers;
 
 use craft\web\Controller;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\exceptions\RateLimitExceededException;
-use craftpulse\cortex\values\RateLimitStatus;
+use craftpulse\herald\exceptions\RateLimitExceededException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\values\RateLimitStatus;
 use yii\base\Action;
 use yii\web\Response;
 
@@ -70,12 +70,12 @@ abstract class AbstractOauthController extends Controller
      */
     public function beforeAction($action): bool
     {
-        if (!Cortex::getInstance()->getSettings()->httpEnabled) {
+        if (!Herald::getInstance()->getSettings()->httpEnabled) {
             $this->_httpDisabled();
             return false;
         }
 
-        if (!Cortex::getInstance()->is(Cortex::EDITION_PRO, '>=')) {
+        if (!Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             $this->_proRequired();
             return false;
         }
@@ -132,7 +132,7 @@ abstract class AbstractOauthController extends Controller
         }
 
         try {
-            Cortex::getInstance()->rateLimiter->consumeKey('oauth:ip:' . $ip);
+            Herald::getInstance()->rateLimiter->consumeKey('oauth:ip:' . $ip);
         } catch (RateLimitExceededException $e) {
             $this->_rateLimited($e->status);
             return false;
@@ -191,7 +191,7 @@ abstract class AbstractOauthController extends Controller
         $this->response->format = Response::FORMAT_JSON;
         $this->response->setStatusCode(403);
         $this->response->data = [
-            'error' => 'The HTTP transport requires the Cortex Pro edition.',
+            'error' => 'The HTTP transport requires the Herald Pro edition.',
         ];
         return $this->response;
     }

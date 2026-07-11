@@ -1,12 +1,12 @@
 <?php
 
-namespace craftpulse\cortex\resources;
+namespace craftpulse\herald\resources;
 
 /**
  * =========================================================================
  * Base class for MCP resources.
  *
- * Provides defaults for content types that apply across all cortex's bundled
+ * Provides defaults for content types that apply across all herald's bundled
  * resources. Skills are exclusively Markdown, so `text/markdown` is
  * the default MIME type — concrete classes override only when they
  * surface non-Markdown content.
@@ -23,7 +23,7 @@ abstract class AbstractResource implements ResourceInterface
     /**
      * @inheritdoc
      *
-     * Default: every cortex's bundled resource is a Markdown document.
+     * Default: every herald's bundled resource is a Markdown document.
      *
      * @author Craftpulse
      * @since  5.0.0

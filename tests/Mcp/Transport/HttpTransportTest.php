@@ -13,8 +13,8 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\mcp\transport\Http;
+use craftpulse\herald\mcp\Server;
+use craftpulse\herald\mcp\transport\Http;
 
 beforeEach(function() {
     $this->transport = new Http();

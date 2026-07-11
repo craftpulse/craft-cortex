@@ -17,7 +17,7 @@
 <html lang="{{ craft.app.language }}">
 <head>
     <meta charset="utf-8">
-    <title>{{ 'Confirm elevated access'|t('cortex') }}</title>
+    <title>{{ 'Confirm elevated access'|t('herald') }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         :root {
@@ -62,16 +62,16 @@
 <body>
 <div class="container">
     <div class="panel">
-        <h1>{{ 'Confirm elevated access'|t('cortex') }}</h1>
+        <h1>{{ 'Confirm elevated access'|t('herald') }}</h1>
         <p class="lead">
-            {{ 'High-stakes operations over the MCP HTTP transport — changing credentials, admin status, or publishing/deleting content — require a fresh re-authentication.'|t('cortex') }}
+            {{ 'High-stakes operations over the MCP HTTP transport — changing credentials, admin status, or publishing/deleting content — require a fresh re-authentication.'|t('herald') }}
         </p>
         <p class="lead">
-            {{ 'Re-enter your password to confirm. Elevated access lasts for a short window.'|t('cortex') }}
+            {{ 'Re-enter your password to confirm. Elevated access lasts for a short window.'|t('herald') }}
         </p>
 
         <div class="user-row">
-            {{ 'Signed in as'|t('cortex') }} <strong>{{ username }}</strong>
+            {{ 'Signed in as'|t('herald') }} <strong>{{ username }}</strong>
         </div>
 
         {% if error %}
@@ -80,15 +80,15 @@
 
         <form method="POST" action="{{ url('oauth/elevate') }}">
             <input type="hidden" name="{{ craft.app.config.general.csrfTokenName }}" value="{{ craft.app.request.csrfToken }}">
-            <label for="cortex-elevate-password">{{ 'Password'|t('cortex') }}</label>
-            <input type="password" id="cortex-elevate-password" name="password" autocomplete="current-password" autofocus required>
+            <label for="herald-elevate-password">{{ 'Password'|t('herald') }}</label>
+            <input type="password" id="herald-elevate-password" name="password" autocomplete="current-password" autofocus required>
             <div class="actions">
-                <button type="submit">{{ 'Confirm elevated access'|t('cortex') }}</button>
+                <button type="submit">{{ 'Confirm elevated access'|t('herald') }}</button>
             </div>
         </form>
 
         <div class="meta">
-            {{ 'Cortex OAuth — Powered by craftpulse/craft-cortex'|t('cortex') }}
+            {{ 'Herald OAuth — Powered by craftpulse/craft-herald'|t('herald') }}
         </div>
     </div>
 </div>

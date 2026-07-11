@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\attributes;
+namespace craftpulse\herald\attributes;
 
 use Attribute;
 

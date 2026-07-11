@@ -7,10 +7,10 @@
 
 use Craft;
 use craft\base\FieldInterface;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('field_types');
+    $this->tool = Herald::getInstance()->tools->getByName('field_types');
 });
 
 it('lists every registered field type class with capability flags', function() {

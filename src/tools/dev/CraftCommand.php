@@ -1,18 +1,18 @@
 <?php
 
-namespace craftpulse\cortex\tools\dev;
+namespace craftpulse\herald\tools\dev;
 
 use Craft;
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsOpenWorld;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\support\ConsoleRunner;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\support\SecretRedactor;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsOpenWorld;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\support\ConsoleRunner;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\support\SecretRedactor;
+use craftpulse\herald\tools\ToolException;
 
 /**
  * =========================================================================
@@ -33,8 +33,8 @@ use craftpulse\cortex\tools\ToolException;
  *                                        ->allowAdminChanges === true`.
  *
  * Allowlist precedence (highest → lowest):
- *   1. `config/cortex.php` overrides (standard Craft pattern; auto-merged).
- *   2. Project config under `plugins.cortex.settings.allowedCommands` /
+ *   1. `config/herald.php` overrides (standard Craft pattern; auto-merged).
+ *   2. Project config under `plugins.herald.settings.allowedCommands` /
  *      `adminLevelCommands`.
  *   3. Defaults baked into `Settings`.
  *   4. Runtime DB overrides (admin-editable, auto-expiring) layered on top
@@ -43,7 +43,7 @@ use craftpulse\cortex\tools\ToolException;
  * Patterns use `fnmatch()` semantics — `resave/*` matches any
  * `resave/<x>` route, `up` matches only the literal `up` command.
  *
- * Admin-changes-denied rejections still write a `cortex_invocations`
+ * Admin-changes-denied rejections still write a `herald_invocations`
  * row with `kind=tool_error` (the audit-log seam from Gate 7.5
  * audit-logs every thrown `ToolException` automatically — no manual
  * write needed). The audit trail captures both successful boundary
@@ -172,8 +172,8 @@ class CraftCommand extends AbstractTool
             throw new ToolException(
                 "Command '{$command}' is not in the allowlist. Allowed patterns: " .
                 implode(', ', $effective) .
-                '. Edit `cortex.allowedCommands` (or `cortex.adminLevelCommands`) in project config or ' .
-                '`config/cortex.php` to extend it.',
+                '. Edit `herald.allowedCommands` (or `herald.adminLevelCommands`) in project config or ' .
+                '`config/herald.php` to extend it.',
             );
         }
 
@@ -215,7 +215,7 @@ class CraftCommand extends AbstractTool
      */
     private function _allowlist(): array
     {
-        $patterns = Cortex::getInstance()->allowlist->getEffective();
+        $patterns = Herald::getInstance()->allowlist->getEffective();
 
         return array_values(array_filter(
             $patterns,
@@ -239,11 +239,11 @@ class CraftCommand extends AbstractTool
      */
     private function _contentPatterns(): array
     {
-        $settings = Cortex::getInstance()->getSettings();
+        $settings = Herald::getInstance()->getSettings();
         $defaults = $settings->allowedCommands;
         $overridePatterns = array_map(
             static fn(array $row): string => (string) $row['pattern'],
-            Cortex::getInstance()->allowlist->getActiveOverrides(),
+            Herald::getInstance()->allowlist->getActiveOverrides(),
         );
 
         return array_values(array_unique(array_filter(
@@ -265,7 +265,7 @@ class CraftCommand extends AbstractTool
      */
     private function _adminPatterns(): array
     {
-        $patterns = Cortex::getInstance()->getSettings()->adminLevelCommands;
+        $patterns = Herald::getInstance()->getSettings()->adminLevelCommands;
 
         return array_values(array_filter(
             $patterns,

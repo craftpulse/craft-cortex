@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('tag_groups');
+    $this->tool = Herald::getInstance()->tools->getByName('tag_groups');
 });
 
 it('lists tag groups (possibly empty)', function() {
@@ -32,5 +32,5 @@ it('returns the count when count: true is passed', function() {
 });
 
 it('throws ToolException for an unknown tag-group handle', function() {
-    $this->tool->execute(['handle' => '__cortex_no_such_tag_group__']);
+    $this->tool->execute(['handle' => '__herald_no_such_tag_group__']);
 })->throws(ToolException::class);

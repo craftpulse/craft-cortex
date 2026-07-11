@@ -1,21 +1,21 @@
 <?php
 
-namespace craftpulse\cortex\migrations;
+namespace craftpulse\herald\migrations;
 
 use craft\db\Migration;
 use craft\db\Table as CraftTable;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Gate 7.2 migration — creates the `cortex_tokens` table.
+ * Gate 7.2 migration — creates the `herald_tokens` table.
  *
  * Each row is one admin-issued bearer token bound to a Craft user. The
  * plaintext token is never stored; only its SHA-256 hex digest
  * (`tokenHash`, indexed unique for lookup) and the first 8 chars of the
  * plaintext (`tokenPrefix`, surfaced in the CP listing so operators can
  * identify a row without exposing the secret). Soft-delete via
- * `dateDeleted` mirrors `cortex_runtime_overrides`.
+ * `dateDeleted` mirrors `herald_runtime_overrides`.
  *
  * The `userId` FK cascades on user delete — a user disappearing takes
  * their tokens with them. The `scope` JSON column is reserved for a
@@ -28,7 +28,7 @@ use craftpulse\cortex\db\Table;
  * @author Craftpulse
  * @since  5.0.0
  */
-class m260514_120000_cortex_tokens extends Migration
+class m260514_120000_herald_tokens extends Migration
 {
     // Public Methods
     // =========================================================================

@@ -1,13 +1,13 @@
-# Configuring Cortex
+# Configuring Herald
 
-Cortex ships with sensible defaults; most projects don't need to touch the configuration. When you do, you have three layers of override available, applied in this order (highest priority first):
+Herald ships with sensible defaults; most projects don't need to touch the configuration. When you do, you have three layers of override available, applied in this order (highest priority first):
 
-1. **`config/cortex.php`** — file-based overrides, environment-aware. Versioned alongside your project.
+1. **`config/herald.php`** — file-based overrides, environment-aware. Versioned alongside your project.
 2. **Runtime overrides** — admin-issued, auto-expiring entries via the CP. Applies to the `craft_command` allowlist only.
-3. **Project config** — synced across environments; edited via the CP **Settings → Cortex** page.
+3. **Project config** — synced across environments; edited via the CP **Settings → Herald** page.
 4. **Defaults** — baked into `models/Settings`.
 
-This document covers each setting in detail, then explains how to use the CP UI and the `config/cortex.php` file.
+This document covers each setting in detail, then explains how to use the CP UI and the `config/herald.php` file.
 
 - [Settings reference](#settings-reference)
   - [`allowedCommands`](#allowedcommands)
@@ -25,7 +25,7 @@ This document covers each setting in detail, then explains how to use the CP UI 
 - [HTTP transport](#http-transport)
 - [The CP settings page](#the-cp-settings-page)
 - [Audit log](#audit-log)
-- [`config/cortex.php`](#configcortexphp)
+- [`config/herald.php`](#configheraldphp)
 - [Logging](#logging)
 
 ## Settings reference
@@ -48,13 +48,13 @@ db/restore          utils/*             clear-deprecations
 mailer/test
 ```
 
-These cover the dev / ops surface most teams need without exposing dangerous commands. To lock things down further (or open more up), override per-environment via [`config/cortex.php`](#configcortexphp). For short-lived grants without a deploy, use the [runtime override UI](#the-cp-settings-page).
+These cover the dev / ops surface most teams need without exposing dangerous commands. To lock things down further (or open more up), override per-environment via [`config/herald.php`](#configheraldphp). For short-lived grants without a deploy, use the [runtime override UI](#the-cp-settings-page).
 
 ### `execEnabled`
 
 **Type:** `bool` &nbsp;&nbsp; **Default:** `true`
 
-Whether the `craft_exec` tool is registered at all. The tool is stdio-only and runs through six security gates ([see security docs](SECURITY.md#craft_exec-six-security-gates)) — but if your team doesn't want it on the menu, set this to `false` and Cortex removes it from `tools/list` entirely.
+Whether the `craft_exec` tool is registered at all. The tool is stdio-only and runs through six security gates ([see security docs](SECURITY.md#craft_exec-six-security-gates)) — but if your team doesn't want it on the menu, set this to `false` and Herald removes it from `tools/list` entirely.
 
 The recommended posture for production is `execEnabled = false`, since `craft_exec` is intentionally a development tool and the HTTP transport rejects it regardless.
 
@@ -62,7 +62,7 @@ The recommended posture for production is `execEnabled = false`, since `craft_ex
 
 **Type:** `bool` &nbsp;&nbsp; **Default:** `true`
 
-Whether `craft_exec` defaults to dry-run mode. With this on (default), the LLM has to explicitly pass `confirm: true` in the tool call to actually evaluate an expression — without `confirm`, Cortex returns the parsed expression and proposed effect and skips execution.
+Whether `craft_exec` defaults to dry-run mode. With this on (default), the LLM has to explicitly pass `confirm: true` in the tool call to actually evaluate an expression — without `confirm`, Herald returns the parsed expression and proposed effect and skips execution.
 
 Flipping this to `false` makes evaluation the default. This is **not** a security override — destructive expressions (`delete*`, `drop*`, `truncate*`, `Elements::deleteElement`, `migrate/down`) still require both `confirm: true` AND `dangerous: true`. The destructive-op guard runs regardless of this setting.
 
@@ -72,7 +72,7 @@ Flipping this to `false` makes evaluation the default. This is **not** a securit
 
 The default TTL applied to a new runtime override when no expiry is supplied at creation time. Shorter values produce a tighter security posture (overrides expire faster, fewer surprise grants in the system); longer values reduce friction for teams that often need short-term command grants.
 
-Runtime overrides are admin-issued through the CP and stored in the `cortex_runtime_overrides` DB table. Expired overrides remain in the table (soft-delete) but no longer count toward the effective allowlist. Expired non-deleted overrides are hard-deleted inline during Craft's regular garbage-collection sweep.
+Runtime overrides are admin-issued through the CP and stored in the `herald_runtime_overrides` DB table. Expired overrides remain in the table (soft-delete) but no longer count toward the effective allowlist. Expired non-deleted overrides are hard-deleted inline during Craft's regular garbage-collection sweep.
 
 ### `stdioMaxMessageBytes`
 
@@ -80,23 +80,23 @@ Runtime overrides are admin-issued through the CP and stored in the `cortex_runt
 
 Maximum size of a single newline-delimited JSON-RPC message the stdio transport will buffer before rejecting it with a JSON-RPC `-32600` Invalid Request. The reader reassembles each line in bounded chunks; if one line's accumulated bytes exceed the cap before a newline arrives, the reader drains the rest of the line, emits the error envelope, and continues with the next message rather than buffering an unbounded payload into memory.
 
-The 4 MiB default is comfortably larger than any legitimate `tools/call` argument blob, but small enough that a hostile client streaming one giant line can't OOM the long-running `cortex/serve` process. stdio is a trusted-local transport, but a trusted local *user* is not the same as a trusted client *implementation* (cf. the `craft_exec` threat model), so the cap holds regardless.
+The 4 MiB default is comfortably larger than any legitimate `tools/call` argument blob, but small enough that a hostile client streaming one giant line can't OOM the long-running `herald/serve` process. stdio is a trusted-local transport, but a trusted local *user* is not the same as a trusted client *implementation* (cf. the `craft_exec` threat model), so the cap holds regardless.
 
 ### `httpEnabled`
 
 **Type:** `bool` &nbsp;&nbsp; **Default:** `false`
 
-Whether the HTTP transport (`POST/GET/DELETE /cortex/mcp`) accepts requests. Defaults to off — the transport is opt-in, not because it is unfinished but because most installs only need stdio. When you do enable it, it enforces full authentication on every request (bearer token or OAuth 2.1 — see [HTTP transport](#http-transport) and [SECURITY.md](SECURITY.md)); it is **not** an anonymous endpoint.
+Whether the HTTP transport (`POST/GET/DELETE /herald/mcp`) accepts requests. Defaults to off — the transport is opt-in, not because it is unfinished but because most installs only need stdio. When you do enable it, it enforces full authentication on every request (bearer token or OAuth 2.1 — see [HTTP transport](#http-transport) and [SECURITY.md](SECURITY.md)); it is **not** an anonymous endpoint.
 
-When this flag is `false`, every request to `/cortex/mcp` returns `503 Service Unavailable` regardless of headers or credentials.
+When this flag is `false`, every request to `/herald/mcp` returns `503 Service Unavailable` regardless of headers or credentials.
 
 ### `allowedOrigins`
 
 **Type:** `string[]` &nbsp;&nbsp; **Default:** `[]`
 
-Allowlist of `Origin` header values the HTTP transport accepts. The MCP spec mandates Origin validation as DNS-rebinding defense — when a request's `Origin` header does not match an entry in this list, Cortex rejects it with `403 Forbidden`.
+Allowlist of `Origin` header values the HTTP transport accepts. The MCP spec mandates Origin validation as DNS-rebinding defense — when a request's `Origin` header does not match an entry in this list, Herald rejects it with `403 Forbidden`.
 
-Empty means permissive (every Origin accepted). That's fine for local development; it is **not** fine for any deployed environment. Cortex logs a warning to the `cortex` channel on every request when the allowlist is empty and `httpEnabled` is `true`, so configuration drift is visible in your logs.
+Empty means permissive (every Origin accepted). That's fine for local development; it is **not** fine for any deployed environment. Herald logs a warning to the `herald` channel on every request when the allowlist is empty and `httpEnabled` is `true`, so configuration drift is visible in your logs.
 
 Set this to the explicit URLs of every client that talks to the endpoint — Claude Desktop's local proxy, Cursor's HTTP setup, etc.
 
@@ -134,12 +134,12 @@ Lifetime of an elevation marker minted by the in-band `/oauth/elevate` re-authen
 
 ## HTTP transport
 
-The Streamable HTTP transport at `/cortex/mcp` is **authenticated on every request** — there is no anonymous access. Setting `httpEnabled = true` opens the endpoint; the controller's `beforeAction` pipeline then enforces, in order: method allowlist, `MCP-Protocol-Version` validation, **bearer-token / OAuth 2.1 authentication**, and per-user rate limiting before the JSON-RPC dispatcher ever sees the request. An unauthenticated request gets `401 Unauthorized` with `WWW-Authenticate: Bearer realm="cortex"` per RFC 6750. See [INSTALL.md](INSTALL.md) for issuing tokens and [SECURITY.md](SECURITY.md) for the full auth model.
+The Streamable HTTP transport at `/herald/mcp` is **authenticated on every request** — there is no anonymous access. Setting `httpEnabled = true` opens the endpoint; the controller's `beforeAction` pipeline then enforces, in order: method allowlist, `MCP-Protocol-Version` validation, **bearer-token / OAuth 2.1 authentication**, and per-user rate limiting before the JSON-RPC dispatcher ever sees the request. An unauthenticated request gets `401 Unauthorized` with `WWW-Authenticate: Bearer realm="herald"` per RFC 6750. See [INSTALL.md](INSTALL.md) for issuing tokens and [SECURITY.md](SECURITY.md) for the full auth model.
 
 Two credential shapes are accepted, disambiguated by format:
 
-- **Opaque bearer tokens** — 64-char hex, no dots; issued via `cortex/token/issue`, stored hashed, bound to a Craft user.
-- **OAuth 2.1 access tokens** — JWTs (contain dots); audience-bound to the canonical `/cortex/mcp` URL (RFC 8707 confused-deputy defense), minted through the Dynamic Client Registration + authorization-code flow.
+- **Opaque bearer tokens** — 64-char hex, no dots; issued via `herald/token/issue`, stored hashed, bound to a Craft user.
+- **OAuth 2.1 access tokens** — JWTs (contain dots); audience-bound to the canonical `/herald/mcp` URL (RFC 8707 confused-deputy defense), minted through the Dynamic Client Registration + authorization-code flow.
 
 The endpoint supports three methods:
 
@@ -155,15 +155,15 @@ The endpoint supports three methods:
 
 ## The CP section
 
-Cortex registers a top-level Control Panel section, **Cortex**, in the global sidebar. Its subnav is permission- and edition-gated (`Cortex::getCpNavItem()`): Free installs see **Settings** and **Temporary grants**; Pro adds **Tokens**, **Clients**, **Activity**, and **Connection**. The **Clients** screen lists registered OAuth clients and is where an admin approves or revokes them (the DCR approval gate). Saving the **Settings** screen writes to project config so changes sync across environments via your normal `project-config/apply` flow; the other screens read and mutate runtime DB state.
+Herald registers a top-level Control Panel section, **Herald**, in the global sidebar. Its subnav is permission- and edition-gated (`Herald::getCpNavItem()`): Free installs see **Settings** and **Temporary grants**; Pro adds **Tokens**, **Clients**, **Activity**, and **Connection**. The **Clients** screen lists registered OAuth clients and is where an admin approves or revokes them (the DCR approval gate). Saving the **Settings** screen writes to project config so changes sync across environments via your normal `project-config/apply` flow; the other screens read and mutate runtime DB state.
 
-The plugin Settings screen also stays reachable the usual way, from **Settings → Plugins → Cortex**.
+The plugin Settings screen also stays reachable the usual way, from **Settings → Plugins → Herald**.
 
 ### Settings
 
 Editable form fields for the project-config-synced plugin defaults.
 
-- **Allowed commands** — a grouped toggle browser over the `allowedCommands` patterns. Every console command on the install (core Craft plus installed plugins) is enumerated and grouped by controller. Flip a whole group on to allow `group/*`; expand a group and flip individual actions to allow exact route ids; a partially-allowed group shows an "N/total allowed" badge. A filter box narrows the list live. Patterns that don't map to a listed command — custom wildcards like `resave/ent*`, or commands for plugins not installed here — appear in a **Custom patterns** table and are preserved verbatim. When `allowedCommands` is set in `config/cortex.php` the browser renders read-only with a "defined in config" warning.
+- **Allowed commands** — a grouped toggle browser over the `allowedCommands` patterns. Every console command on the install (core Craft plus installed plugins) is enumerated and grouped by controller. Flip a whole group on to allow `group/*`; expand a group and flip individual actions to allow exact route ids; a partially-allowed group shows an "N/total allowed" badge. A filter box narrows the list live. Patterns that don't map to a listed command — custom wildcards like `resave/ent*`, or commands for plugins not installed here — appear in a **Custom patterns** table and are preserved verbatim. When `allowedCommands` is set in `config/herald.php` the browser renders read-only with a "defined in config" warning.
 - **`craft_exec` enabled** — toggle for `execEnabled`.
 - **`craft_exec` dry-run by default** — toggle for `execDryRunDefault`.
 - **Temporary grant TTL (seconds)** — integer input for `runtimeOverrideTtl`.
@@ -188,15 +188,15 @@ Issue, list, and revoke long-lived HTTP-transport bearer tokens. Each token is b
 
 ### Activity
 
-Browse the `cortex_invocations` audit log — one row per tool invocation, with tool name, transport, user, duration, outcome, and a redacted argument / response excerpt. Gated on the `cortex:viewActivity` permission (`Cortex::PERMISSION_VIEW_ACTIVITY`) rather than admin, so you can grant audit visibility without granting settings access.
+Browse the `herald_invocations` audit log — one row per tool invocation, with tool name, transport, user, duration, outcome, and a redacted argument / response excerpt. Gated on the `herald:viewActivity` permission (`Herald::PERMISSION_VIEW_ACTIVITY`) rather than admin, so you can grant audit visibility without granting settings access.
 
 ### Connection
 
 Read-only connection helper — the stdio command and the HTTP endpoint URL, ready to paste into a client config.
 
-## `config/cortex.php`
+## `config/herald.php`
 
-For environment-specific overrides, copy `vendor/craftpulse/craft-cortex/src/config/cortex.php` to `<project-root>/config/cortex.php`. The file is heavily commented and shows the precedence rules.
+For environment-specific overrides, copy `vendor/craftpulse/craft-herald/src/config/herald.php` to `<project-root>/config/herald.php`. The file is heavily commented and shows the precedence rules.
 
 The file follows Craft's standard multi-environment pattern: top-level wildcard `*` applies everywhere; named-environment keys (`production`, `staging`, `dev`) override the wildcard.
 
@@ -234,8 +234,8 @@ return [
 
 When the same setting appears in multiple layers, this is what wins (highest priority first):
 
-1. `config/cortex.php` environment-specific block (e.g. `production`)
-2. `config/cortex.php` wildcard block (`*`)
+1. `config/herald.php` environment-specific block (e.g. `production`)
+2. `config/herald.php` wildcard block (`*`)
 3. Project config (CP **Defaults** form, synced via `project-config/apply`)
 4. `models/Settings` defaults
 
@@ -243,7 +243,7 @@ Runtime DB overrides layer **on top of** `allowedCommands` only. They don't over
 
 ## Logging
 
-Cortex emits one structured audit-log line per tool invocation under the `cortex` log channel. The line shape is locked across both transports:
+Herald emits one structured audit-log line per tool invocation under the `herald` log channel. The line shape is locked across both transports:
 
 ```
 tool=<name> kind=<success|tool_error|internal_error> duration_ms=<int>
@@ -255,7 +255,7 @@ Unknown / not-yet-populated fields emit `-` (Apache common-log convention). stdi
 
 Arguments are passed through `tools/support/SecretRedactor` before serialisation. The redactor catches keys named like secrets (`password`, `token`, `apiKey`, `secret`, `accessKey`, `privateKey`, `salt`, `cookieValidationKey`, `webhookSecret`, `jwt`, `oauth`, `bearer`) and replaces values with `[REDACTED]`. Inline `KEY=value` / `KEY: value` patterns in flat strings are also redacted.
 
-To route Cortex logs to a dedicated file, configure a Yii log target in `config/app.php`:
+To route Herald logs to a dedicated file, configure a Yii log target in `config/app.php`:
 
 ```php
 return [
@@ -265,8 +265,8 @@ return [
                 [
                     'class' => yii\log\FileTarget::class,
                     'levels' => ['info', 'warning', 'error'],
-                    'categories' => ['cortex'],
-                    'logFile' => '@storage/logs/cortex.log',
+                    'categories' => ['herald'],
+                    'logFile' => '@storage/logs/herald.log',
                 ],
             ],
         ],
@@ -276,11 +276,11 @@ return [
 
 ## Audit log
 
-Alongside the log-channel line above, Cortex persists every tool invocation to the DB-backed `cortex_invocations` table and surfaces it on the [Activity tab](#activity) of the CP settings page. Each row carries the tool name, transport, resolving user (HTTP), JSON-RPC request id, client name, duration, outcome (`success` / `tool_error` / `internal_error` / `rate_limited`), and a redacted argument / response excerpt.
+Alongside the log-channel line above, Herald persists every tool invocation to the DB-backed `herald_invocations` table and surfaces it on the [Activity tab](#activity) of the CP settings page. Each row carries the tool name, transport, resolving user (HTTP), JSON-RPC request id, client name, duration, outcome (`success` / `tool_error` / `internal_error` / `rate_limited`), and a redacted argument / response excerpt.
 
 Two settings tune the table:
 
-- **`auditResponseExcerptBytes`** (`int`, default `2048`, max `65535`) — bytes of the post-redaction JSON-encoded tool response stored in `cortex_invocations.responseExcerpt`. The full response still goes over the wire to the client; the excerpt is for the audit dashboard only.
+- **`auditResponseExcerptBytes`** (`int`, default `2048`, max `65535`) — bytes of the post-redaction JSON-encoded tool response stored in `herald_invocations.responseExcerpt`. The full response still goes over the wire to the client; the excerpt is for the audit dashboard only.
 - **`auditRetentionDays`** (`int|null`, default `null`) — retention window. `null` keeps audit history forever (the compliance-friendly default); set e.g. `90` to prune rows older than 90 days during Craft's `gc` sweep.
 
 The log-channel line and the table share the same field shape, so external SIEM forwarders pinned against the log lines and dashboards reading the table see a consistent record.

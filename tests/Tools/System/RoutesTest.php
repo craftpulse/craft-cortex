@@ -5,10 +5,10 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('routes');
+    $this->tool = Herald::getInstance()->tools->getByName('routes');
 });
 
 it('returns the four route categories plus site count', function() {

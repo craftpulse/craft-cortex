@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\plugin;
+namespace craftpulse\herald\plugin;
 
 use Craft;
 use craft\events\RegisterComponentTypesEvent;
@@ -10,19 +10,19 @@ use craft\services\Elements;
 use craft\services\Gc;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\elements\Skill;
-use craftpulse\cortex\events\LogCallEvent;
-use craftpulse\cortex\generator\Tool as ToolGenerator;
-use craftpulse\cortex\services\Invocations;
-use craftpulse\cortex\services\Skills;
-use craftpulse\cortex\tools\support\InvocationLogger;
+use craftpulse\herald\elements\Skill;
+use craftpulse\herald\events\LogCallEvent;
+use craftpulse\herald\generator\Tool as ToolGenerator;
+use craftpulse\herald\Herald;
+use craftpulse\herald\services\Invocations;
+use craftpulse\herald\services\Skills;
+use craftpulse\herald\tools\support\InvocationLogger;
 use Throwable;
 use yii\base\Event;
 
 /**
  * =========================================================================
- * Cortex plugin-boot trait.
+ * Herald plugin-boot trait.
  *
  * Centralises every event-listener and project-config handler the
  * plugin wires at `init()` time. Companion to the `Services` trait —
@@ -30,14 +30,14 @@ use yii\base\Event;
  * `PluginTrait` wires the static `Event::on()` listeners and the PC
  * field-layout handlers.
  *
- * `Cortex::init()` parent-boots and then calls `onPluginInit()` once;
+ * `Herald::init()` parent-boots and then calls `onPluginInit()` once;
  * that method dispatches to the private `_register*()` methods below.
  * Listeners are split per concern so the init flow is greppable and
  * each registration is testable in isolation if a future regression
  * forces it.
  *
  * Per `.claude/rules/architecture.md`, event registrations live here
- * rather than inline in the plugin class — keeping `Cortex.php` to
+ * rather than inline in the plugin class — keeping `Herald.php` to
  * the Plugin Store contract (`config`, `editions`, settings) and the
  * trait composition.
  * =========================================================================
@@ -52,7 +52,7 @@ trait PluginTrait
 
     /**
      * Wires every event listener and project-config handler the
-     * plugin needs at boot. Idempotent at the call site — Cortex
+     * plugin needs at boot. Idempotent at the call site — Herald
      * only invokes this from its own `init()` after `parent::init()`.
      *
      * @author Craftpulse
@@ -64,7 +64,7 @@ trait PluginTrait
         $this->_registerGcListener();
         $this->_registerAuditLogListener();
         $this->_registerSkillElementType();
-        $this->_registerCortexPermissions();
+        $this->_registerHeraldPermissions();
         $this->_registerSkillProjectConfigHandlers();
         $this->_registerUrlRules();
     }
@@ -73,7 +73,7 @@ trait PluginTrait
     // =========================================================================
 
     /**
-     * Registers the `cortex-tool` generator with Craft's `make`
+     * Registers the `herald-tool` generator with Craft's `make`
      * command when the generator package is available (dev /
      * playground installs only — production strips the dev
      * dependency). Class-exists guard keeps the plugin bootable
@@ -98,7 +98,7 @@ trait PluginTrait
     }
 
     /**
-     * Prunes expired runtime-override rows, old `cortex_invocations`
+     * Prunes expired runtime-override rows, old `herald_invocations`
      * rows (when audit retention is configured), and dead OAuth codes /
      * tokens during Craft's gc sweep. Every delete is a single indexed
      * `deleteAll`, cheaper than the overhead of a queue job. Audit
@@ -117,7 +117,7 @@ trait PluginTrait
             Gc::class,
             Gc::EVENT_RUN,
             static function(): void {
-                $plugin = Cortex::getInstance();
+                $plugin = Herald::getInstance();
                 $plugin->allowlist->pruneExpired();
                 $plugin->invocations->prune();
                 $plugin->oauth->pruneExpired();
@@ -143,7 +143,7 @@ trait PluginTrait
             InvocationLogger::EVENT_LOG_CALL,
             static function(LogCallEvent $event): void {
                 try {
-                    Cortex::getInstance()->invocations->record($event->entry);
+                    Herald::getInstance()->invocations->record($event->entry);
                 } catch (Throwable $e) {
                     Craft::error(
                         sprintf(
@@ -159,7 +159,7 @@ trait PluginTrait
     }
 
     /**
-     * Registers the Cortex Skill element type so the Elements
+     * Registers the Herald Skill element type so the Elements
      * service includes it in `getAllElementTypes()` /
      * `ElementTypes` tool discovery and so Craft's
      * element-condition / GraphQL surfaces pick it up.
@@ -179,13 +179,13 @@ trait PluginTrait
     }
 
     /**
-     * Registers every Cortex permission under a shared Cortex
+     * Registers every Herald permission under a shared Herald
      * heading on the user-permissions screen.
      *
-     *   - `Skill::PERMISSION_MANAGE` (`manageCortexSkills`) — global
+     *   - `Skill::PERMISSION_MANAGE` (`manageHeraldSkills`) — global
      *     (no per-instance ACL); the element's `canSave / canDelete /
      *     canView / canDuplicate` overrides consult it directly.
-     *   - `Cortex::PERMISSION_VIEW_ACTIVITY` (`cortex:viewActivity`) —
+     *   - `Herald::PERMISSION_VIEW_ACTIVITY` (`herald:viewActivity`) —
      *     gates the Activity tab (Gate 9.3); the controller scopes
      *     queries to the caller's own rows when the user is non-admin.
      *
@@ -195,27 +195,27 @@ trait PluginTrait
      * @author Craftpulse
      * @since  5.0.0
      */
-    private function _registerCortexPermissions(): void
+    private function _registerHeraldPermissions(): void
     {
         Event::on(
             UserPermissions::class,
             UserPermissions::EVENT_REGISTER_PERMISSIONS,
             static function(RegisterUserPermissionsEvent $event): void {
                 $event->permissions[] = [
-                    'heading' => 'Cortex',
+                    'heading' => 'Herald',
                     'permissions' => [
                         Skill::PERMISSION_MANAGE => [
-                            'label' => Craft::t('cortex', 'Manage Cortex skills'),
+                            'label' => Craft::t('herald', 'Manage Herald skills'),
                             'info' => Craft::t(
-                                'cortex',
-                                'Allows creating, updating, and deleting Cortex skill elements through the MCP server.',
+                                'herald',
+                                'Allows creating, updating, and deleting Herald skill elements through the MCP server.',
                             ),
                         ],
-                        Cortex::PERMISSION_VIEW_ACTIVITY => [
-                            'label' => Craft::t('cortex', 'View Cortex activity log'),
+                        Herald::PERMISSION_VIEW_ACTIVITY => [
+                            'label' => Craft::t('herald', 'View Herald activity log'),
                             'info' => Craft::t(
-                                'cortex',
-                                'Allows viewing the Activity tab in Cortex CP. Non-admins only see their own invocations; admins see every row.',
+                                'herald',
+                                'Allows viewing the Activity tab in Herald CP. Non-admins only see their own invocations; admins see every row.',
                             ),
                         ],
                     ],
@@ -226,7 +226,7 @@ trait PluginTrait
 
     /**
      * Wires the PC field-layout change handlers for the single
-     * `plugins.cortex.skillFieldLayout` path. Mirrors Craft's own
+     * `plugins.herald.skillFieldLayout` path. Mirrors Craft's own
      * `ApplicationTrait::_registerConfigListeners()` shape for
      * `PATH_ADDRESS_FIELD_LAYOUTS`. The handler runs on add /
      * update / remove so the field layout stays in sync between
@@ -245,17 +245,17 @@ trait PluginTrait
     }
 
     /**
-     * Registers the HTTP transport endpoint at `/cortex/mcp` and the
-     * CP-side routes for the tabbed Cortex settings screen.
+     * Registers the HTTP transport endpoint at `/herald/mcp` and the
+     * CP-side routes for the tabbed Herald settings screen.
      *
      * Two events fire — `EVENT_REGISTER_SITE_URL_RULES` for the
-     * front-end `cortex/mcp` + OAuth + `.well-known/*` routes, and
+     * front-end `herald/mcp` + OAuth + `.well-known/*` routes, and
      * `EVENT_REGISTER_CP_URL_RULES` for the CP-side tabs introduced
      * in Gate 9. The events fire at different stages of the URL
      * manager bootstrap; mixing them in one handler silently drops
      * half the routes.
      *
-     * **Site rules** (POST/GET/DELETE `cortex/mcp`, `oauth/*`,
+     * **Site rules** (POST/GET/DELETE `herald/mcp`, `oauth/*`,
      * `.well-known/*`): MCP clients hit a stable public URL that
      * doesn't move with cpTrigger reconfiguration. POST is the
      * JSON-RPC entry point; GET is reserved for SSE upgrade; DELETE
@@ -267,14 +267,14 @@ trait PluginTrait
      * registering these routes unconditionally is safe — feature
      * gating happens at the controller layer, not at the route layer.
      * OAuth endpoints sit
-     * at `/oauth/*` (not under `/cortex/`) for client compatibility;
+     * at `/oauth/*` (not under `/herald/`) for client compatibility;
      * the `.well-known/*` discovery endpoints land at the site root
      * per RFC 8414 §3 and RFC 9728 §3 — both RFCs explicitly require
      * the well-known paths to be at the root of the issuer URL.
      *
-     * **CP rules** (Gate 9.1): `settings/plugins/cortex` is the
-     * redirect target from `Cortex::getSettingsResponse()` and the
-     * Settings → Plugins → Cortex nav link. The `cortex/{tab}` URLs
+     * **CP rules** (Gate 9.1): `settings/plugins/herald` is the
+     * redirect target from `Herald::getSettingsResponse()` and the
+     * Settings → Plugins → Herald nav link. The `herald/{tab}` URLs
      * are the per-tab routes (locked decision 2 — per-tab routes
      * over anchor-based tabs for bookmarking, deep links, and
      * independent badge counts). Table-data + mutation routes
@@ -290,20 +290,20 @@ trait PluginTrait
             UrlManager::class,
             UrlManager::EVENT_REGISTER_SITE_URL_RULES,
             static function(RegisterUrlRulesEvent $event): void {
-                $event->rules['POST cortex/mcp'] = 'cortex/mcp/index';
-                $event->rules['GET cortex/mcp'] = 'cortex/mcp/index';
-                $event->rules['DELETE cortex/mcp'] = 'cortex/mcp/index';
+                $event->rules['POST herald/mcp'] = 'herald/mcp/index';
+                $event->rules['GET herald/mcp'] = 'herald/mcp/index';
+                $event->rules['DELETE herald/mcp'] = 'herald/mcp/index';
 
-                $event->rules['GET oauth/authorize'] = 'cortex/oauth/authorize';
-                $event->rules['POST oauth/authorize'] = 'cortex/oauth/authorize';
-                $event->rules['GET oauth/elevate'] = 'cortex/oauth/elevate';
-                $event->rules['POST oauth/elevate'] = 'cortex/oauth/elevate';
-                $event->rules['POST oauth/token'] = 'cortex/oauth/token';
-                $event->rules['POST oauth/register'] = 'cortex/oauth/register';
-                $event->rules['POST oauth/revoke'] = 'cortex/oauth/revoke';
+                $event->rules['GET oauth/authorize'] = 'herald/oauth/authorize';
+                $event->rules['POST oauth/authorize'] = 'herald/oauth/authorize';
+                $event->rules['GET oauth/elevate'] = 'herald/oauth/elevate';
+                $event->rules['POST oauth/elevate'] = 'herald/oauth/elevate';
+                $event->rules['POST oauth/token'] = 'herald/oauth/token';
+                $event->rules['POST oauth/register'] = 'herald/oauth/register';
+                $event->rules['POST oauth/revoke'] = 'herald/oauth/revoke';
 
-                $event->rules['GET .well-known/oauth-authorization-server'] = 'cortex/well-known/authorization-server';
-                $event->rules['GET .well-known/oauth-protected-resource'] = 'cortex/well-known/protected-resource';
+                $event->rules['GET .well-known/oauth-authorization-server'] = 'herald/well-known/authorization-server';
+                $event->rules['GET .well-known/oauth-protected-resource'] = 'herald/well-known/protected-resource';
             },
         );
 
@@ -311,38 +311,38 @@ trait PluginTrait
             UrlManager::class,
             UrlManager::EVENT_REGISTER_CP_URL_RULES,
             static function(RegisterUrlRulesEvent $event): void {
-                // Prepend so the literal `settings/plugins/cortex` pattern beats
+                // Prepend so the literal `settings/plugins/herald` pattern beats
                 // Craft's wildcard `settings/plugins/<handle>` rule from
                 // `vendor/craftcms/cms/src/config/cproutes/common.php:66`. Yii
                 // matches rules in array order — the wildcard is loaded first
                 // and would otherwise route to `plugins/edit-plugin-settings`,
-                // which calls `Cortex::getSettingsResponse()` and redirects
+                // which calls `Herald::getSettingsResponse()` and redirects
                 // back to the same URL (infinite loop).
                 $event->rules = array_merge([
-                    'settings/plugins/cortex' => 'cortex/settings/index',
-                    // The CP section root (`/cortex`) and the Settings
+                    'settings/plugins/herald' => 'herald/settings/index',
+                    // The CP section root (`/herald`) and the Settings
                     // subnav item both land on the Settings screen. The
                     // section gained a `getCpNavItem()` subnav in the Gate 9
                     // CP rework — clicking the sidebar section lands on
                     // Settings, the first subnav entry.
-                    'cortex' => 'cortex/settings/index',
-                    'cortex/settings' => 'cortex/settings/index',
-                    'cortex/tokens' => 'cortex/settings/tokens',
-                    'cortex/tokens/table-data' => 'cortex/settings/tokens-table-data',
-                    'cortex/tokens/issue-slideout' => 'cortex/settings/token-issue-slideout',
-                    'cortex/tokens/issue' => 'cortex/settings/issue-token',
-                    'cortex/tokens/revoke' => 'cortex/settings/revoke-token',
-                    'cortex/allowlist' => 'cortex/settings/allowlist',
-                    'cortex/allowlist/table-data' => 'cortex/settings/allowlist-table-data',
-                    'cortex/allowlist/override-slideout' => 'cortex/settings/allowlist-override-slideout',
-                    'cortex/activity' => 'cortex/settings/activity',
-                    'cortex/activity/table-data' => 'cortex/settings/activity-table-data',
-                    'cortex/activity/row' => 'cortex/settings/activity-row',
-                    'cortex/connection' => 'cortex/settings/connection',
-                    'cortex/clients' => 'cortex/settings/clients',
-                    'cortex/clients/table-data' => 'cortex/settings/clients-table-data',
-                    'cortex/clients/approve' => 'cortex/settings/approve-client',
-                    'cortex/clients/revoke' => 'cortex/settings/revoke-client',
+                    'herald' => 'herald/settings/index',
+                    'herald/settings' => 'herald/settings/index',
+                    'herald/tokens' => 'herald/settings/tokens',
+                    'herald/tokens/table-data' => 'herald/settings/tokens-table-data',
+                    'herald/tokens/issue-slideout' => 'herald/settings/token-issue-slideout',
+                    'herald/tokens/issue' => 'herald/settings/issue-token',
+                    'herald/tokens/revoke' => 'herald/settings/revoke-token',
+                    'herald/allowlist' => 'herald/settings/allowlist',
+                    'herald/allowlist/table-data' => 'herald/settings/allowlist-table-data',
+                    'herald/allowlist/override-slideout' => 'herald/settings/allowlist-override-slideout',
+                    'herald/activity' => 'herald/settings/activity',
+                    'herald/activity/table-data' => 'herald/settings/activity-table-data',
+                    'herald/activity/row' => 'herald/settings/activity-row',
+                    'herald/connection' => 'herald/settings/connection',
+                    'herald/clients' => 'herald/settings/clients',
+                    'herald/clients/table-data' => 'herald/settings/clients-table-data',
+                    'herald/clients/approve' => 'herald/settings/approve-client',
+                    'herald/clients/revoke' => 'herald/settings/revoke-client',
                 ], $event->rules);
             },
         );

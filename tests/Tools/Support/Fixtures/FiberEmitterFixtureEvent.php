@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tests\Tools\Support\Fixtures;
+namespace craftpulse\herald\tests\Tools\Support\Fixtures;
 
 use yii\base\Event;
 

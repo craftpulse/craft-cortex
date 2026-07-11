@@ -1,17 +1,17 @@
 <?php
 
-namespace craftpulse\cortex\tools\dev;
+namespace craftpulse\herald\tools\dev;
 
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsOpenWorld;
-use craftpulse\cortex\attributes\IsStdioOnly;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\support\SecretRedactor;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsOpenWorld;
+use craftpulse\herald\attributes\IsStdioOnly;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\support\SecretRedactor;
+use craftpulse\herald\tools\ToolException;
 use ParseError;
 use Throwable;
 
@@ -145,12 +145,12 @@ class CraftExec extends AbstractTool
      */
     public function execute(array $arguments): array
     {
-        $settings = Cortex::getInstance()->getSettings();
+        $settings = Herald::getInstance()->getSettings();
         if (!$settings->execEnabled) {
             throw new ToolException(
                 'craft_exec is disabled by configuration. Enable it via ' .
-                '`plugins.cortex.settings.execEnabled` in project config or set ' .
-                '`execEnabled => true` in `config/cortex.php`.',
+                '`plugins.herald.settings.execEnabled` in project config or set ' .
+                '`execEnabled => true` in `config/herald.php`.',
             );
         }
 

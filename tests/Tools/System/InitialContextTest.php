@@ -12,10 +12,10 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('get_initial_context');
+    $this->tool = Herald::getInstance()->tools->getByName('get_initial_context');
 });
 
 it('is registered under the get_initial_context name', function() {
@@ -24,30 +24,30 @@ it('is registered under the get_initial_context name', function() {
 });
 
 it('appears first in tools/list so fresh agents see it first', function() {
-    $payload = Cortex::getInstance()->tools->asListPayload();
+    $payload = Herald::getInstance()->tools->asListPayload();
     expect($payload[0]['name'])->toBe('get_initial_context');
 });
 
-it('returns craft / cortex / sites / sections / elementTypes / skillPrompts / exec / allowlist / hints', function() {
+it('returns craft / herald / sites / sections / elementTypes / skillPrompts / exec / allowlist / hints', function() {
     $result = $this->tool->execute([]);
 
     expect($result)->toHaveKeys([
-        'craft', 'cortex', 'sites', 'sections', 'elementTypes',
+        'craft', 'herald', 'sites', 'sections', 'elementTypes',
         'skillPrompts', 'exec', 'allowlist', 'hints',
     ]);
 });
 
-it('exposes the active Cortex edition under cortex.edition (Gate 9.7)', function() {
+it('exposes the active Herald edition under herald.edition (Gate 9.7)', function() {
     // Distinct from `craft.edition` (the CMS tier) — agents read this
     // to know whether write tools / the HTTP transport exist here.
     $result = $this->tool->execute([]);
-    expect($result['cortex'])->toHaveKey('edition', Cortex::getInstance()->edition);
+    expect($result['herald'])->toHaveKey('edition', Herald::getInstance()->edition);
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect($this->tool->execute([])['cortex']['edition'])->toBe('pro');
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect($this->tool->execute([])['herald']['edition'])->toBe('pro');
     });
-    cortex_with_edition(Cortex::EDITION_FREE, function() {
-        expect($this->tool->execute([])['cortex']['edition'])->toBe('free');
+    herald_with_edition(Herald::EDITION_FREE, function() {
+        expect($this->tool->execute([])['herald']['edition'])->toBe('free');
     });
 });
 
@@ -90,22 +90,22 @@ it('includes the bundled skill prompts so the LLM knows the moat content exists'
     }
 
     // Cross-check: skillPrompts count matches the prompt registry.
-    expect($result['skillPrompts'])->toHaveCount(Cortex::getInstance()->prompts->getCount());
+    expect($result['skillPrompts'])->toHaveCount(Herald::getInstance()->prompts->getCount());
 });
 
 it('surfaces the craft_exec posture (enabled + dryRunDefault) from settings', function() {
     $result = $this->tool->execute([]);
 
     expect($result['exec'])->toHaveKeys(['enabled', 'dryRunDefault']);
-    expect($result['exec']['enabled'])->toBe(Cortex::getInstance()->getSettings()->execEnabled);
-    expect($result['exec']['dryRunDefault'])->toBe(Cortex::getInstance()->getSettings()->execDryRunDefault);
+    expect($result['exec']['enabled'])->toBe(Herald::getInstance()->getSettings()->execEnabled);
+    expect($result['exec']['dryRunDefault'])->toBe(Herald::getInstance()->getSettings()->execDryRunDefault);
 });
 
 it('returns the effective command allowlist (defaults + active runtime overrides)', function() {
     $result = $this->tool->execute([]);
 
     expect($result['allowlist'])->toBeArray()->not->toBeEmpty();
-    expect($result['allowlist'])->toBe(Cortex::getInstance()->allowlist->getEffective());
+    expect($result['allowlist'])->toBe(Herald::getInstance()->allowlist->getEffective());
 });
 
 it('declares an outputSchema covering the full payload', function() {

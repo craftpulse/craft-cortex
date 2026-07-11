@@ -1,14 +1,14 @@
 <?php
 
-namespace craftpulse\cortex\services;
+namespace craftpulse\herald\services;
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\events\RegisterResourcesEvent;
-use craftpulse\cortex\resources\AgentResource;
-use craftpulse\cortex\resources\ResourceInterface;
-use craftpulse\cortex\resources\ResourceTemplateInterface;
-use craftpulse\cortex\resources\SkillResource;
-use craftpulse\cortex\tools\support\RegistryLog;
+use craftpulse\herald\events\RegisterResourcesEvent;
+use craftpulse\herald\Herald;
+use craftpulse\herald\resources\AgentResource;
+use craftpulse\herald\resources\ResourceInterface;
+use craftpulse\herald\resources\ResourceTemplateInterface;
+use craftpulse\herald\resources\SkillResource;
+use craftpulse\herald\tools\support\RegistryLog;
 use Michtio\CraftCmsClaudeSkills\Skills;
 use yii\base\Component;
 
@@ -243,11 +243,11 @@ class Resources extends Component
         // in `resources/list` and resolves on `resources/read`.
         //
         // The boot-time element query is fail-soft: if the
-        // `cortex_skills` table doesn't exist yet (fresh install
+        // `herald_skills` table doesn't exist yet (fresh install
         // pre-migration) the call returns an empty array. A defensive
         // try/catch lets the registry boot cleanly in that window.
         try {
-            $elementHandles = Cortex::getInstance()->skills->allHandles();
+            $elementHandles = Herald::getInstance()->skills->allHandles();
         } catch (\Throwable) {
             $elementHandles = [];
         }
@@ -263,7 +263,7 @@ class Resources extends Component
         // surface alongside skills. The companion package's helper
         // returns `[]` from agentNames() if the package is older than
         // 1.4.2 or the agents/ directory is absent — the loop is a
-        // no-op in that case, so cortex still boots cleanly against an
+        // no-op in that case, so herald still boots cleanly against an
         // older install.
         foreach (Skills::agentNames() as $agent) {
             $registry[] = new AgentResource(agent: $agent);

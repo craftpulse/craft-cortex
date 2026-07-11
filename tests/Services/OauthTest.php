@@ -15,29 +15,29 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\oauth\entities\AccessTokenEntity;
-use craftpulse\cortex\oauth\entities\ClientEntity;
-use craftpulse\cortex\oauth\entities\ScopeEntity;
-use craftpulse\cortex\oauth\repositories\ClientRepository;
-use craftpulse\cortex\oauth\repositories\ScopeRepository;
-use craftpulse\cortex\records\OauthClient as OauthClientRecord;
-use craftpulse\cortex\records\OauthCode as OauthCodeRecord;
-use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
+use craftpulse\herald\Herald;
+use craftpulse\herald\oauth\entities\AccessTokenEntity;
+use craftpulse\herald\oauth\entities\ClientEntity;
+use craftpulse\herald\oauth\entities\ScopeEntity;
+use craftpulse\herald\oauth\repositories\ClientRepository;
+use craftpulse\herald\oauth\repositories\ScopeRepository;
+use craftpulse\herald\records\OauthClient as OauthClientRecord;
+use craftpulse\herald\records\OauthCode as OauthCodeRecord;
+use craftpulse\herald\records\OauthToken as OauthTokenRecord;
 use League\OAuth2\Server\CryptKey;
 
 beforeEach(function() {
-    $this->service = Cortex::getInstance()->oauth;
+    $this->service = Herald::getInstance()->oauth;
     // Auto-approve registered clients for this file so the
     // ClientRepository hydrate / validateClient tests see a visible
     // client. The WS3 approval gate itself is covered in
     // `ClientApprovalTest`.
-    $this->originalAutoApprove = Cortex::getInstance()->getSettings()->dcrAutoApprove;
-    Cortex::getInstance()->getSettings()->dcrAutoApprove = true;
+    $this->originalAutoApprove = Herald::getInstance()->getSettings()->dcrAutoApprove;
+    Herald::getInstance()->getSettings()->dcrAutoApprove = true;
 });
 
 afterEach(function() {
-    Cortex::getInstance()->getSettings()->dcrAutoApprove = $this->originalAutoApprove;
+    Herald::getInstance()->getSettings()->dcrAutoApprove = $this->originalAutoApprove;
     // Clean up any registrations made by the test suite.
     OauthClientRecord::deleteAll(['like', 'clientName', '_test_/%', false]);
     // Clean up tokens minted into orphaned client rows.
@@ -202,9 +202,9 @@ it('lookupAccessToken() rejects a token whose audience does not match the expect
     // Build a JWT manually carrying audience = https://a.test.invalid/mcp,
     // persist a corresponding row, and verify the lookup returns the
     // audience back so the controller's match check can reject it.
-    $client = _cortex_oauth_mint_client();
+    $client = _herald_oauth_mint_client();
 
-    $jwt = _cortex_oauth_mint_jwt(
+    $jwt = _herald_oauth_mint_jwt(
         clientId: $client->clientId,
         audience: 'https://a.test.invalid/mcp',
         userId: 1,
@@ -221,15 +221,15 @@ it('lookupAccessToken() rejects a token whose audience does not match the expect
 });
 
 it('lookupAccessToken() returns null on a parsed-but-revoked token', function() {
-    $client = _cortex_oauth_mint_client();
-    $jwt = _cortex_oauth_mint_jwt(
+    $client = _herald_oauth_mint_client();
+    $jwt = _herald_oauth_mint_jwt(
         clientId: $client->clientId,
         audience: 'https://test-audience.invalid/a',
         userId: 1,
     );
 
     // Revoke the corresponding token row.
-    $hash = hash('sha256', _cortex_oauth_jti_for($jwt));
+    $hash = hash('sha256', _herald_oauth_jti_for($jwt));
     OauthTokenRecord::updateAll(
         ['dateRevoked' => date('Y-m-d H:i:s')],
         ['tokenHash' => $hash],
@@ -239,8 +239,8 @@ it('lookupAccessToken() returns null on a parsed-but-revoked token', function() 
 });
 
 it('lookupAccessToken() returns null for an expired token', function() {
-    $client = _cortex_oauth_mint_client();
-    $jwt = _cortex_oauth_mint_jwt(
+    $client = _herald_oauth_mint_client();
+    $jwt = _herald_oauth_mint_jwt(
         clientId: $client->clientId,
         audience: 'https://test-audience.invalid/b',
         userId: 1,
@@ -255,8 +255,8 @@ it('lookupAccessToken() returns null on a syntactically broken JWT', function() 
 });
 
 it('lookupAccessToken() returns clientId as empty string when cid claim is absent', function() {
-    $client = _cortex_oauth_mint_client();
-    $jwt = _cortex_oauth_mint_jwt_without_cid(
+    $client = _herald_oauth_mint_client();
+    $jwt = _herald_oauth_mint_jwt_without_cid(
         clientId: $client->clientId,
         audience: 'https://test-audience.invalid/no-cid',
         userId: 1,
@@ -268,8 +268,8 @@ it('lookupAccessToken() returns clientId as empty string when cid claim is absen
 });
 
 it('lookupAccessToken() returns null for a token whose nbf is in the future', function() {
-    $client = _cortex_oauth_mint_client();
-    $jwt = _cortex_oauth_mint_jwt(
+    $client = _herald_oauth_mint_client();
+    $jwt = _herald_oauth_mint_jwt(
         clientId: $client->clientId,
         audience: 'https://test-audience.invalid/nbf',
         userId: 1,
@@ -285,11 +285,11 @@ it('lookupAccessToken() returns null for a token whose nbf is in the future', fu
 // -----------------------------------------------------------------------------
 
 it('deleting a client row cascades to its oauth codes and tokens', function() {
-    $client = _cortex_oauth_mint_client();
+    $client = _herald_oauth_mint_client();
 
     // Mint a code row directly — simulates an in-flight auth code.
     \Craft::$app->getDb()->createCommand()->insert(
-        \craftpulse\cortex\db\Table::OAUTH_CODES,
+        \craftpulse\herald\db\Table::OAUTH_CODES,
         [
             'code' => bin2hex(random_bytes(20)),
             'clientId' => $client->clientId,
@@ -320,7 +320,7 @@ it('deleting a client row cascades to its oauth codes and tokens', function() {
 
     // Verify the code row is gone.
     $codeCount = (int) \Craft::$app->getDb()->createCommand(
-        'SELECT COUNT(*) FROM {{%cortex_oauth_codes}} WHERE clientId = :cid',
+        'SELECT COUNT(*) FROM {{%herald_oauth_codes}} WHERE clientId = :cid',
         [':cid' => $client->clientId],
     )->queryScalar();
     expect($codeCount)->toBe(0);
@@ -331,7 +331,7 @@ it('deleting a client row cascades to its oauth codes and tokens', function() {
 // -----------------------------------------------------------------------------
 
 it('revokeToken() flips dateRevoked for a known refresh token', function() {
-    $client = _cortex_oauth_mint_client();
+    $client = _herald_oauth_mint_client();
     $opaque = bin2hex(random_bytes(40));
     $hash = hash('sha256', $opaque);
 
@@ -431,7 +431,7 @@ it('pruneExpired() deletes expired codes and expired/revoked tokens but keeps li
 /**
  * Mint a transient OAuth client row used by audience-binding tests.
  */
-function _cortex_oauth_mint_client(): OauthClientRecord
+function _herald_oauth_mint_client(): OauthClientRecord
 {
     $record = new OauthClientRecord();
     $record->clientId = bin2hex(random_bytes(16));
@@ -453,7 +453,7 @@ function _cortex_oauth_mint_client(): OauthClientRecord
  *                       a positive value to produce a future-`nbf`
  *                       token that should be rejected at validation.
  */
-function _cortex_oauth_mint_jwt(string $clientId, string $audience, int $userId, int $expiresIn = 3600, int $nbfOffset = 0): string
+function _herald_oauth_mint_jwt(string $clientId, string $audience, int $userId, int $expiresIn = 3600, int $nbfOffset = 0): string
 {
     $clientEntity = new ClientEntity();
     $clientEntity->setIdentifier($clientId);
@@ -468,7 +468,7 @@ function _cortex_oauth_mint_jwt(string $clientId, string $audience, int $userId,
     $entity->setExpiryDateTime(new \DateTimeImmutable('@' . (time() + $expiresIn)));
     $entity->setAudience($audience);
     $entity->setPrivateKey(new CryptKey(
-        'file://' . Cortex::getInstance()->oauth->getPrivateKeyPath(),
+        'file://' . Herald::getInstance()->oauth->getPrivateKeyPath(),
     ));
 
     // When a future nbf is requested, build the JWT directly via
@@ -476,7 +476,7 @@ function _cortex_oauth_mint_jwt(string $clientId, string $audience, int $userId,
     // AccessTokenEntity::toString() always stamps nbf = now, which is
     // correct at issuance — the nbf test needs a non-default nbf.
     if ($nbfOffset !== 0) {
-        $privateKeyContent = file_get_contents(Cortex::getInstance()->oauth->getPrivateKeyPath());
+        $privateKeyContent = file_get_contents(Herald::getInstance()->oauth->getPrivateKeyPath());
         $signer = new \Lcobucci\JWT\Signer\Rsa\Sha256();
         $config = \Lcobucci\JWT\Configuration::forAsymmetricSigner(
             $signer,
@@ -515,9 +515,9 @@ function _cortex_oauth_mint_jwt(string $clientId, string $audience, int $userId,
  * Mint a JWT without the `cid` claim — simulates tokens issued by a
  * system that doesn't stamp the client id as a custom claim.
  */
-function _cortex_oauth_mint_jwt_without_cid(string $clientId, string $audience, int $userId, int $expiresIn = 3600): string
+function _herald_oauth_mint_jwt_without_cid(string $clientId, string $audience, int $userId, int $expiresIn = 3600): string
 {
-    $privateKeyContent = file_get_contents(Cortex::getInstance()->oauth->getPrivateKeyPath());
+    $privateKeyContent = file_get_contents(Herald::getInstance()->oauth->getPrivateKeyPath());
     $signer = new \Lcobucci\JWT\Signer\Rsa\Sha256();
     $config = \Lcobucci\JWT\Configuration::forAsymmetricSigner(
         $signer,
@@ -552,7 +552,7 @@ function _cortex_oauth_mint_jwt_without_cid(string $clientId, string $audience, 
 /**
  * Extract the `jti` claim from a JWT string.
  */
-function _cortex_oauth_jti_for(string $jwt): string
+function _herald_oauth_jti_for(string $jwt): string
 {
     $parts = explode('.', $jwt);
     $payload = json_decode(base64_decode(strtr($parts[1], '-_', '+/')), true);

@@ -17,7 +17,7 @@
  *   3. Hit `/oauth/authorize` as a logged-in CP user, approve.
  *   4. Capture the code from the redirect.
  *   5. Exchange code+verifier at `/oauth/token`.
- *   6. Hit `cortex/mcp` with the resulting access token.
+ *   6. Hit `herald/mcp` with the resulting access token.
  *   7. Refresh, repeat MCP call.
  * =========================================================================
  *
@@ -25,11 +25,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\controllers\OauthController;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\records\OauthClient as OauthClientRecord;
-use craftpulse\cortex\records\OauthCode as OauthCodeRecord;
-use craftpulse\cortex\records\OauthToken as OauthTokenRecord;
+use craftpulse\herald\controllers\OauthController;
+use craftpulse\herald\Herald;
+use craftpulse\herald\records\OauthClient as OauthClientRecord;
+use craftpulse\herald\records\OauthCode as OauthCodeRecord;
+use craftpulse\herald\records\OauthToken as OauthTokenRecord;
 use yii\web\HeaderCollection;
 use yii\web\Response;
 
@@ -37,7 +37,7 @@ use yii\web\Response;
 // Harness
 // -----------------------------------------------------------------------------
 
-class _CortexOauthRequest
+class _HeraldOauthRequest
 {
     public HeaderCollection $headers;
 
@@ -145,7 +145,7 @@ class _CortexOauthRequest
     }
 }
 
-class _CortexOauthControllerHarness extends OauthController
+class _HeraldOauthControllerHarness extends OauthController
 {
     /**
      * Captured template + variables from the last elevate render, so
@@ -156,7 +156,7 @@ class _CortexOauthControllerHarness extends OauthController
      */
     public ?array $renderedElevate = null;
 
-    public function withRequest(_CortexOauthRequest $req): self
+    public function withRequest(_HeraldOauthRequest $req): self
     {
         $this->request = $req;
         return $this;
@@ -203,7 +203,7 @@ class _CortexOauthControllerHarness extends OauthController
  * @param array<string,mixed> $bodyParams
  * @param array<string,string> $headers
  */
-function _cortex_oauth_request(
+function _herald_oauth_request(
     string $method = 'GET',
     array $queryParams = [],
     array $bodyParams = [],
@@ -212,9 +212,9 @@ function _cortex_oauth_request(
     string $url = 'https://test.invalid/oauth/authorize',
     string $userIp = '203.0.113.7',
     bool $csrfValid = true,
-): _CortexOauthControllerHarness {
-    $controller = new _CortexOauthControllerHarness('oauth', Cortex::getInstance());
-    $controller->withRequest(new _CortexOauthRequest(
+): _HeraldOauthControllerHarness {
+    $controller = new _HeraldOauthControllerHarness('oauth', Herald::getInstance());
+    $controller->withRequest(new _HeraldOauthRequest(
         method: $method,
         queryParams: $queryParams,
         bodyParams: $bodyParams,
@@ -233,7 +233,7 @@ function _cortex_oauth_request(
  *
  * @return array{verifier:string,challenge:string}
  */
-function _cortex_pkce(): array
+function _herald_pkce(): array
 {
     // 43 base64url chars = 32 bytes of entropy.
     $verifier = rtrim(strtr(base64_encode(random_bytes(32)), '+/', '-_'), '=');
@@ -248,7 +248,7 @@ beforeEach(function() {
     $this->admin = $admin;
     $this->userId = (int) $admin->id;
 
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $this->originalHttpEnabled = $settings->httpEnabled;
     // The OAuth surface is gated behind `httpEnabled` on
     // `AbstractOauthController`. Enable it for the action-level tests
@@ -265,14 +265,14 @@ beforeEach(function() {
 
     // OAuth serves the Pro-only HTTP transport (Gate 9.7) — pin Pro
     // for the file; the dedicated Free-edition test flips it inline.
-    $this->originalEdition = Cortex::getInstance()->edition;
-    Cortex::getInstance()->edition = Cortex::EDITION_PRO;
+    $this->originalEdition = Herald::getInstance()->edition;
+    Herald::getInstance()->edition = Herald::EDITION_PRO;
 });
 
 afterEach(function() {
-    Cortex::getInstance()->edition = $this->originalEdition;
-    Cortex::getInstance()->getSettings()->httpEnabled = $this->originalHttpEnabled;
-    Cortex::getInstance()->getSettings()->dcrAutoApprove = $this->originalAutoApprove;
+    Herald::getInstance()->edition = $this->originalEdition;
+    Herald::getInstance()->getSettings()->httpEnabled = $this->originalHttpEnabled;
+    Herald::getInstance()->getSettings()->dcrAutoApprove = $this->originalAutoApprove;
     OauthClientRecord::deleteAll(['like', 'clientName', '_test_/%', false]);
     OauthCodeRecord::deleteAll(['like', 'clientId', '%', false]);
     OauthTokenRecord::deleteAll(['like', 'clientId', '%', false]);
@@ -288,7 +288,7 @@ it('POST /oauth/register returns 201 with the client_id for a public client', fu
         'redirect_uris' => ['https://example.com/callback'],
         'token_endpoint_auth_method' => 'none',
     ]);
-    $controller = _cortex_oauth_request('POST', [], [], (string) $payload, [], 'https://test.invalid/oauth/register');
+    $controller = _herald_oauth_request('POST', [], [], (string) $payload, [], 'https://test.invalid/oauth/register');
     $response = $controller->actionRegister();
 
     expect($response->statusCode)->toBe(201);
@@ -301,7 +301,7 @@ it('POST /oauth/register returns 400 on invalid redirect URI', function() {
         'client_name' => '_test_/bad-uri',
         'redirect_uris' => ['http://example.com/callback'],
     ]);
-    $controller = _cortex_oauth_request('POST', [], [], (string) $payload, [], 'https://test.invalid/oauth/register');
+    $controller = _herald_oauth_request('POST', [], [], (string) $payload, [], 'https://test.invalid/oauth/register');
     $response = $controller->actionRegister();
 
     expect($response->statusCode)->toBe(400);
@@ -310,7 +310,7 @@ it('POST /oauth/register returns 400 on invalid redirect URI', function() {
 });
 
 it('POST /oauth/register returns 404 when DCR is disabled', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $original = $settings->dcrEnabled;
     $settings->dcrEnabled = false;
 
@@ -319,7 +319,7 @@ it('POST /oauth/register returns 404 when DCR is disabled', function() {
             'client_name' => '_test_/dcr-disabled',
             'redirect_uris' => ['https://example.com/callback'],
         ]);
-        $controller = _cortex_oauth_request('POST', [], [], (string) $payload, [], 'https://test.invalid/oauth/register');
+        $controller = _herald_oauth_request('POST', [], [], (string) $payload, [], 'https://test.invalid/oauth/register');
         $response = $controller->actionRegister();
         expect($response->statusCode)->toBe(404);
     } finally {
@@ -328,7 +328,7 @@ it('POST /oauth/register returns 404 when DCR is disabled', function() {
 });
 
 it('POST /oauth/register returns 400 on malformed JSON', function() {
-    $controller = _cortex_oauth_request('POST', [], [], '{not-json}', [], 'https://test.invalid/oauth/register');
+    $controller = _herald_oauth_request('POST', [], [], '{not-json}', [], 'https://test.invalid/oauth/register');
     $response = $controller->actionRegister();
     expect($response->statusCode)->toBe(400);
 });
@@ -352,14 +352,14 @@ it('POST /oauth/register returns 400 on malformed JSON', function() {
 it('GET /oauth/authorize rejects plain PKCE with an OAuth error redirect', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
-    $pkce = _cortex_pkce();
-    $client = Cortex::getInstance()->oauth->registerClient([
+    $pkce = _herald_pkce();
+    $client = Herald::getInstance()->oauth->registerClient([
         'client_name' => '_test_/plain-pkce',
         'redirect_uris' => ['https://example.com/cb'],
         'token_endpoint_auth_method' => 'none',
     ]);
 
-    $controller = _cortex_oauth_request('GET', [
+    $controller = _herald_oauth_request('GET', [
         'response_type' => 'code',
         'client_id' => $client['client_id'],
         'redirect_uri' => 'https://example.com/cb',
@@ -419,14 +419,14 @@ it('HTML-escapes a script payload in the consent-screen client name', function()
 it('POST /oauth/authorize with approve=0 surfaces an access_denied error', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
-    $pkce = _cortex_pkce();
-    $client = Cortex::getInstance()->oauth->registerClient([
+    $pkce = _herald_pkce();
+    $client = Herald::getInstance()->oauth->registerClient([
         'client_name' => '_test_/deny-flow',
         'redirect_uris' => ['https://example.com/cb'],
         'token_endpoint_auth_method' => 'none',
     ]);
 
-    $controller = _cortex_oauth_request(
+    $controller = _herald_oauth_request(
         method: 'POST',
         queryParams: [
             'response_type' => 'code',
@@ -455,7 +455,7 @@ it('POST /oauth/authorize with approve=0 surfaces an access_denied error', funct
 it('rejects the authorize consent POST when the CSRF token is invalid', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
-    $controller = _cortex_oauth_request(
+    $controller = _herald_oauth_request(
         method: 'POST',
         bodyParams: ['approve' => '1'],
         url: 'https://test.invalid/oauth/authorize',
@@ -469,7 +469,7 @@ it('rejects the authorize consent POST when the CSRF token is invalid', function
 it('allows the authorize consent POST through beforeAction with a valid CSRF token', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
-    $controller = _cortex_oauth_request(
+    $controller = _herald_oauth_request(
         method: 'POST',
         bodyParams: ['approve' => '1'],
         url: 'https://test.invalid/oauth/authorize',
@@ -483,7 +483,7 @@ it('leaves token / register / revoke CSRF-exempt in beforeAction', function(stri
     // No CSRF token, POST — these anonymous token-proof endpoints must
     // still pass beforeAction (the consent POST is the only CSRF-gated
     // action). httpEnabled is true via beforeEach.
-    $controller = _cortex_oauth_request(
+    $controller = _herald_oauth_request(
         method: 'POST',
         url: "https://test.invalid/oauth/{$actionId}",
         csrfValid: false,
@@ -499,18 +499,18 @@ it('leaves token / register / revoke CSRF-exempt in beforeAction', function(stri
 it('full PKCE flow: register → authorize → token → MCP call', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
-    $pkce = _cortex_pkce();
-    $client = Cortex::getInstance()->oauth->registerClient([
+    $pkce = _herald_pkce();
+    $client = Herald::getInstance()->oauth->registerClient([
         'client_name' => '_test_/full-pkce',
         'redirect_uris' => ['https://example.com/cb'],
         'token_endpoint_auth_method' => 'none',
     ]);
 
-    $resource = 'https://test.invalid/cortex/mcp';
+    $resource = 'https://test.invalid/herald/mcp';
 
     // Step 1: POST /oauth/authorize with approve=1 captures the code
     // in the redirect.
-    $authController = _cortex_oauth_request(
+    $authController = _herald_oauth_request(
         method: 'POST',
         queryParams: [
             'response_type' => 'code',
@@ -538,7 +538,7 @@ it('full PKCE flow: register → authorize → token → MCP call', function() {
     $code = (string) $params['code'];
 
     // Step 2: POST /oauth/token to exchange the code for tokens.
-    $tokenController = _cortex_oauth_request(
+    $tokenController = _herald_oauth_request(
         method: 'POST',
         bodyParams: [
             'grant_type' => 'authorization_code',
@@ -561,7 +561,7 @@ it('full PKCE flow: register → authorize → token → MCP call', function() {
     $accessToken = $tokenBody['access_token'];
 
     // Step 3: lookupAccessToken() resolves the JWT to the bound user.
-    $resolved = Cortex::getInstance()->oauth->lookupAccessToken($accessToken);
+    $resolved = Herald::getInstance()->oauth->lookupAccessToken($accessToken);
     expect($resolved)->not->toBeNull();
     expect($resolved['userId'])->toBe($this->userId);
     expect($resolved['audience'])->toBe($resource);
@@ -571,14 +571,14 @@ it('full PKCE flow: register → authorize → token → MCP call', function() {
 it('code re-use returns invalid_grant on the second exchange', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
-    $pkce = _cortex_pkce();
-    $client = Cortex::getInstance()->oauth->registerClient([
+    $pkce = _herald_pkce();
+    $client = Herald::getInstance()->oauth->registerClient([
         'client_name' => '_test_/code-reuse',
         'redirect_uris' => ['https://example.com/cb'],
         'token_endpoint_auth_method' => 'none',
     ]);
 
-    $authController = _cortex_oauth_request(
+    $authController = _herald_oauth_request(
         method: 'POST',
         queryParams: [
             'response_type' => 'code',
@@ -588,7 +588,7 @@ it('code re-use returns invalid_grant on the second exchange', function() {
             'code_challenge_method' => 'S256',
             'scope' => 'read',
             'state' => 'abc',
-            'resource' => 'https://test.invalid/cortex/mcp',
+            'resource' => 'https://test.invalid/herald/mcp',
         ],
         bodyParams: ['approve' => '1'],
         url: 'https://test.invalid/oauth/authorize',
@@ -598,7 +598,7 @@ it('code re-use returns invalid_grant on the second exchange', function() {
     $code = (string) $params['code'];
 
     // First exchange — succeeds.
-    $firstToken = _cortex_oauth_request(
+    $firstToken = _herald_oauth_request(
         method: 'POST',
         bodyParams: [
             'grant_type' => 'authorization_code',
@@ -613,7 +613,7 @@ it('code re-use returns invalid_grant on the second exchange', function() {
     expect($firstResponse->statusCode)->toBe(200);
 
     // Second exchange — same code, must reject.
-    $secondToken = _cortex_oauth_request(
+    $secondToken = _herald_oauth_request(
         method: 'POST',
         bodyParams: [
             'grant_type' => 'authorization_code',
@@ -631,15 +631,15 @@ it('code re-use returns invalid_grant on the second exchange', function() {
 it('PKCE S256 verifier mismatch rejects at the token endpoint', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
-    $pkce = _cortex_pkce();
-    $wrongPkce = _cortex_pkce();
-    $client = Cortex::getInstance()->oauth->registerClient([
+    $pkce = _herald_pkce();
+    $wrongPkce = _herald_pkce();
+    $client = Herald::getInstance()->oauth->registerClient([
         'client_name' => '_test_/pkce-mismatch',
         'redirect_uris' => ['https://example.com/cb'],
         'token_endpoint_auth_method' => 'none',
     ]);
 
-    $authController = _cortex_oauth_request(
+    $authController = _herald_oauth_request(
         method: 'POST',
         queryParams: [
             'response_type' => 'code',
@@ -657,7 +657,7 @@ it('PKCE S256 verifier mismatch rejects at the token endpoint', function() {
     parse_str((string) parse_url((string) $authResponse->headers->get('Location'), PHP_URL_QUERY), $params);
     $code = (string) $params['code'];
 
-    $tokenController = _cortex_oauth_request(
+    $tokenController = _herald_oauth_request(
         method: 'POST',
         bodyParams: [
             'grant_type' => 'authorization_code',
@@ -677,7 +677,7 @@ it('PKCE S256 verifier mismatch rejects at the token endpoint', function() {
 // -----------------------------------------------------------------------------
 
 it('POST /oauth/revoke returns 200 even for unknown tokens (RFC 7009 §2.2)', function() {
-    $controller = _cortex_oauth_request(
+    $controller = _herald_oauth_request(
         method: 'POST',
         bodyParams: ['token' => 'unknown-token'],
         url: 'https://test.invalid/oauth/revoke',
@@ -688,7 +688,7 @@ it('POST /oauth/revoke returns 200 even for unknown tokens (RFC 7009 §2.2)', fu
 
 it('POST /oauth/revoke flips the dateRevoked on a known refresh token', function() {
     // Register a real client so the FK constraint on clientId is satisfied.
-    $clientResp = Cortex::getInstance()->oauth->registerClient([
+    $clientResp = Herald::getInstance()->oauth->registerClient([
         'client_name' => '_test_/revoke-controller-refresh',
         'redirect_uris' => ['https://example.com/cb'],
         'token_endpoint_auth_method' => 'none',
@@ -704,7 +704,7 @@ it('POST /oauth/revoke flips the dateRevoked on a known refresh token', function
     $record->expiresAt = date('Y-m-d H:i:s', time() + 86400);
     $record->save(false);
 
-    $controller = _cortex_oauth_request(
+    $controller = _herald_oauth_request(
         method: 'POST',
         bodyParams: ['token' => $opaque],
         url: 'https://test.invalid/oauth/revoke',
@@ -724,7 +724,7 @@ it('POST /oauth/revoke flips the dateRevoked on a known refresh token', function
  * Create an active user with a known password so the elevate flow's
  * `User::authenticate()` call can be exercised against real credentials.
  */
-function _cortex_elevate_user(string $password): craft\elements\User
+function _herald_elevate_user(string $password): craft\elements\User
 {
     $user = new craft\elements\User();
     $user->username = '_test_elevate_' . bin2hex(random_bytes(4));
@@ -759,19 +759,19 @@ function _cortex_elevate_user(string $password): craft\elements\User
 
 it('elevate POST does NOT mint without a password and stays refused', function() {
     $password = 'correct-horse-battery-staple-1';
-    $user = _cortex_elevate_user($password);
-    $oauth = Cortex::getInstance()->oauth;
+    $user = _herald_elevate_user($password);
+    $oauth = Herald::getInstance()->oauth;
     Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
 
     try {
         Craft::$app->getUser()->setIdentity($user);
 
-        $controller = _cortex_oauth_request(method: 'POST', bodyParams: [], url: 'https://test.invalid/oauth/elevate');
+        $controller = _herald_oauth_request(method: 'POST', bodyParams: [], url: 'https://test.invalid/oauth/elevate');
         $controller->actionElevate();
 
         expect($oauth->isElevated((int) $user->id))->toBeFalse();
         // Re-renders the challenge screen with an error, not the success.
-        expect($controller->renderedElevate['template'])->toBe('cortex/oauth/elevate');
+        expect($controller->renderedElevate['template'])->toBe('herald/oauth/elevate');
         expect($controller->renderedElevate['variables']['error'])->not->toBeNull();
     } finally {
         Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
@@ -780,14 +780,14 @@ it('elevate POST does NOT mint without a password and stays refused', function()
 });
 
 it('elevate POST rejects a wrong password and does NOT mint', function() {
-    $user = _cortex_elevate_user('correct-horse-battery-staple-2');
-    $oauth = Cortex::getInstance()->oauth;
+    $user = _herald_elevate_user('correct-horse-battery-staple-2');
+    $oauth = Herald::getInstance()->oauth;
     Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
 
     try {
         Craft::$app->getUser()->setIdentity($user);
 
-        $controller = _cortex_oauth_request(
+        $controller = _herald_oauth_request(
             method: 'POST',
             bodyParams: ['password' => 'this-is-not-the-password'],
             url: 'https://test.invalid/oauth/elevate',
@@ -795,7 +795,7 @@ it('elevate POST rejects a wrong password and does NOT mint', function() {
         $controller->actionElevate();
 
         expect($oauth->isElevated((int) $user->id))->toBeFalse();
-        expect($controller->renderedElevate['template'])->toBe('cortex/oauth/elevate');
+        expect($controller->renderedElevate['template'])->toBe('herald/oauth/elevate');
         expect($controller->renderedElevate['variables']['error'])->not->toBeNull();
     } finally {
         Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
@@ -805,8 +805,8 @@ it('elevate POST rejects a wrong password and does NOT mint', function() {
 
 it('elevate POST mints on the correct password and unlocks the user', function() {
     $password = 'correct-horse-battery-staple-3';
-    $user = _cortex_elevate_user($password);
-    $oauth = Cortex::getInstance()->oauth;
+    $user = _herald_elevate_user($password);
+    $oauth = Herald::getInstance()->oauth;
     Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
 
     try {
@@ -814,7 +814,7 @@ it('elevate POST mints on the correct password and unlocks the user', function()
 
         expect($oauth->isElevated((int) $user->id))->toBeFalse();
 
-        $controller = _cortex_oauth_request(
+        $controller = _herald_oauth_request(
             method: 'POST',
             bodyParams: ['password' => $password],
             url: 'https://test.invalid/oauth/elevate',
@@ -822,7 +822,7 @@ it('elevate POST mints on the correct password and unlocks the user', function()
         $controller->actionElevate();
 
         expect($oauth->isElevated((int) $user->id))->toBeTrue();
-        expect($controller->renderedElevate['template'])->toBe('cortex/oauth/elevated');
+        expect($controller->renderedElevate['template'])->toBe('herald/oauth/elevated');
     } finally {
         Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
         Craft::$app->getElements()->deleteElement($user, true);
@@ -835,8 +835,8 @@ it('elevate POST still requires the password when elevatedSessionDuration is 0 (
     // flow built on `requireElevatedSession()` would mint with no fresh
     // challenge. Ours must still demand — and verify — the password.
     $password = 'correct-horse-battery-staple-4';
-    $user = _cortex_elevate_user($password);
-    $oauth = Cortex::getInstance()->oauth;
+    $user = _herald_elevate_user($password);
+    $oauth = Herald::getInstance()->oauth;
     $generalConfig = Craft::$app->getConfig()->getGeneral();
     $originalDuration = $generalConfig->elevatedSessionDuration;
     $generalConfig->elevatedSessionDuration = 0;
@@ -847,12 +847,12 @@ it('elevate POST still requires the password when elevatedSessionDuration is 0 (
 
         // No password supplied — must NOT mint despite the ambient
         // "elevated" session state.
-        $noPw = _cortex_oauth_request(method: 'POST', bodyParams: [], url: 'https://test.invalid/oauth/elevate');
+        $noPw = _herald_oauth_request(method: 'POST', bodyParams: [], url: 'https://test.invalid/oauth/elevate');
         $noPw->actionElevate();
         expect($oauth->isElevated((int) $user->id))->toBeFalse();
 
         // Correct password — now it mints.
-        $withPw = _cortex_oauth_request(
+        $withPw = _herald_oauth_request(
             method: 'POST',
             bodyParams: ['password' => $password],
             url: 'https://test.invalid/oauth/elevate',
@@ -870,16 +870,16 @@ it('elevation does not cross users — a token bound to a different user is not 
     // MAJOR 4e in the user-keyed model: user A elevates, but the MCP
     // dispatcher gates on the userId the access token is bound to. A token
     // bound to user B therefore sees no elevation from A's grant.
-    $userA = _cortex_elevate_user('correct-horse-battery-staple-5a');
-    $userB = _cortex_elevate_user('correct-horse-battery-staple-5b');
-    $oauth = Cortex::getInstance()->oauth;
+    $userA = _herald_elevate_user('correct-horse-battery-staple-5a');
+    $userB = _herald_elevate_user('correct-horse-battery-staple-5b');
+    $oauth = Herald::getInstance()->oauth;
     Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $userA->id));
     Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $userB->id));
 
     try {
         Craft::$app->getUser()->setIdentity($userA);
 
-        $controller = _cortex_oauth_request(
+        $controller = _herald_oauth_request(
             method: 'POST',
             bodyParams: ['password' => 'correct-horse-battery-staple-5a'],
             url: 'https://test.invalid/oauth/elevate',
@@ -902,14 +902,14 @@ it('elevate has no token query param path (Blocker 2 — no token in URL)', func
     // keyed by the logged-in user, and the action never reads a token
     // param. With no password, it must not mint even with a token in the
     // query string.
-    $user = _cortex_elevate_user('correct-horse-battery-staple-6');
-    $oauth = Cortex::getInstance()->oauth;
+    $user = _herald_elevate_user('correct-horse-battery-staple-6');
+    $oauth = Herald::getInstance()->oauth;
     Craft::$app->getCache()->delete($oauth->elevationCacheKey((int) $user->id));
 
     try {
         Craft::$app->getUser()->setIdentity($user);
 
-        $controller = _cortex_oauth_request(
+        $controller = _herald_oauth_request(
             method: 'POST',
             queryParams: ['token' => 'some-access-token-value'],
             bodyParams: [],
@@ -936,9 +936,9 @@ dataset('oauth endpoints', [
 ]);
 
 it('returns 503 from beforeAction when httpEnabled is false', function(string $method, string $url) {
-    Cortex::getInstance()->getSettings()->httpEnabled = false;
+    Herald::getInstance()->getSettings()->httpEnabled = false;
 
-    $controller = _cortex_oauth_request(method: $method, url: $url);
+    $controller = _herald_oauth_request(method: $method, url: $url);
     $proceeded = $controller->runBeforeAction();
 
     expect($proceeded)->toBeFalse();
@@ -948,9 +948,9 @@ it('returns 503 from beforeAction when httpEnabled is false', function(string $m
 
 it('does not fire the 503 gate in beforeAction when httpEnabled is true', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
-    Cortex::getInstance()->getSettings()->httpEnabled = true;
+    Herald::getInstance()->getSettings()->httpEnabled = true;
 
-    $controller = _cortex_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/token');
+    $controller = _herald_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/token');
     $controller->runBeforeAction();
 
     // The kill switch did not populate a 503 — parent::beforeAction()
@@ -963,15 +963,15 @@ it('does not fire the 503 gate in beforeAction when httpEnabled is true', functi
 // -----------------------------------------------------------------------------
 
 it('returns 403 from beforeAction on a Free install', function(string $method, string $url) {
-    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+    Herald::getInstance()->edition = Herald::EDITION_FREE;
 
-    $controller = _cortex_oauth_request(method: $method, url: $url);
+    $controller = _herald_oauth_request(method: $method, url: $url);
     $proceeded = $controller->runBeforeAction();
 
     expect($proceeded)->toBeFalse();
     expect($controller->response->statusCode)->toBe(403);
     expect($controller->response->data)
-        ->toHaveKey('error', 'The HTTP transport requires the Cortex Pro edition.');
+        ->toHaveKey('error', 'The HTTP transport requires the Herald Pro edition.');
 })->with('oauth endpoints');
 
 // -----------------------------------------------------------------------------
@@ -979,7 +979,7 @@ it('returns 403 from beforeAction on a Free install', function(string $method, s
 // -----------------------------------------------------------------------------
 
 it('429s anonymous /oauth/register from the same IP after the burst is exhausted', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $settings->httpEnabled = true;
     // Tight burst so the loop trips fast; refill 1/sec so a single
     // tight loop can't be saved by an accrued refill.
@@ -989,14 +989,14 @@ it('429s anonymous /oauth/register from the same IP after the burst is exhausted
     $settings->rateLimitPerSecond = 1;
 
     $ip = '198.51.100.42';
-    Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ip);
+    Herald::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ip);
 
     try {
         $blocked = false;
         // Burst is 3; the 4th request inside the same wall-clock second
         // must trip the throttle.
         for ($i = 0; $i < 5; $i++) {
-            $controller = _cortex_oauth_request(
+            $controller = _herald_oauth_request(
                 method: 'POST',
                 url: 'https://test.invalid/oauth/register',
                 userIp: $ip,
@@ -1010,36 +1010,36 @@ it('429s anonymous /oauth/register from the same IP after the burst is exhausted
         }
         expect($blocked)->toBeTrue();
     } finally {
-        Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ip);
+        Herald::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ip);
         $settings->rateLimitBurst = $originalBurst;
         $settings->rateLimitPerSecond = $originalRate;
     }
 });
 
 it('does not throttle a different IP sharing the same window', function() {
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $settings->httpEnabled = true;
     $originalBurst = $settings->rateLimitBurst;
     $settings->rateLimitBurst = 1;
 
     $ipA = '198.51.100.10';
     $ipB = '198.51.100.11';
-    Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipA);
-    Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipB);
+    Herald::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipA);
+    Herald::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipB);
 
     try {
         // Drain IP A's single-token bucket.
-        $a = _cortex_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/register', userIp: $ipA);
+        $a = _herald_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/register', userIp: $ipA);
         expect($a->runBeforeAction('register'))->toBeTrue();
-        $a2 = _cortex_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/register', userIp: $ipA);
+        $a2 = _herald_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/register', userIp: $ipA);
         expect($a2->runBeforeAction('register'))->toBeFalse();
 
         // IP B still has its own full bucket.
-        $b = _cortex_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/register', userIp: $ipB);
+        $b = _herald_oauth_request(method: 'POST', url: 'https://test.invalid/oauth/register', userIp: $ipB);
         expect($b->runBeforeAction('register'))->toBeTrue();
     } finally {
-        Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipA);
-        Cortex::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipB);
+        Herald::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipA);
+        Herald::getInstance()->rateLimiter->clearKey('oauth:ip:' . $ipB);
         $settings->rateLimitBurst = $originalBurst;
     }
 });

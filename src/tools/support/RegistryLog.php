@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tools\support;
+namespace craftpulse\herald\tools\support;
 
 use Craft;
 
@@ -11,7 +11,7 @@ use Craft;
  * The `Tools`, `Prompts`, and `Resources` services all apply
  * first-registration-wins semantics on their respective keys (tool name,
  * prompt name, resource URI, resource-template URI). Each emits a
- * `Craft::warning()` line in the `cortex` channel when a third-party
+ * `Craft::warning()` line in the `herald` channel when a third-party
  * registration tries to shadow an existing entry. This helper centralises
  * the wording so all three services use the same shape — locked by
  * `project_locked_decisions.md` under "Collision behavior".
@@ -27,7 +27,7 @@ final class RegistryLog
 
     /**
      * Emit a first-registration-wins collision warning to Craft's
-     * logger under the `cortex` category. `$kind` and `$field` describe
+     * logger under the `herald` category. `$kind` and `$field` describe
      * what kind of registry rejected the duplicate (e.g. "Tool" /
      * "name", "Resource" / "URI"). `$key` is the colliding value.
      *
@@ -50,7 +50,7 @@ final class RegistryLog
                 $existing::class,
                 $incoming::class,
             ),
-            'cortex',
+            'herald',
         );
     }
 }

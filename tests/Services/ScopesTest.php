@@ -14,11 +14,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\services\Scopes;
+use craftpulse\herald\Herald;
+use craftpulse\herald\services\Scopes;
 
 it('advertises the full capability vocabulary', function() {
-    $all = Cortex::getInstance()->scopes->all();
+    $all = Herald::getInstance()->scopes->all();
 
     expect($all)->toContain(Scopes::CONTENT_READ)
         ->and($all)->toContain(Scopes::CONTENT_WRITE)
@@ -34,21 +34,21 @@ it('does not advertise the dead content:publish / content:delete scopes', functi
     // dispatcher never enforces a distinct publish / delete scope.
     // Advertising them would claim granular capabilities the consent
     // screen can't honour, so they're dropped from the vocabulary.
-    $all = Cortex::getInstance()->scopes->all();
+    $all = Herald::getInstance()->scopes->all();
 
     expect($all)->not->toContain('content:publish')
         ->and($all)->not->toContain('content:delete');
 });
 
 it('does not advertise the legacy coarse scopes', function() {
-    $all = Cortex::getInstance()->scopes->all();
+    $all = Herald::getInstance()->scopes->all();
 
     expect($all)->not->toContain('read')
         ->and($all)->not->toContain('write');
 });
 
 it('accepts capability and legacy scopes as known', function() {
-    $scopes = Cortex::getInstance()->scopes;
+    $scopes = Herald::getInstance()->scopes;
 
     expect($scopes->isKnown(Scopes::CONTENT_WRITE))->toBeTrue()
         ->and($scopes->isKnown('read'))->toBeTrue()
@@ -63,10 +63,10 @@ it('maps every registered tool to an EXPLICIT scope key (no fail-open gaps)', fu
     // the latter passes even for an unmapped tool because the (former)
     // fallback was itself a known scope. An explicit key is the only thing
     // that proves a tool isn't silently riding the fail-closed default.
-    $scopes = Cortex::getInstance()->scopes;
+    $scopes = Herald::getInstance()->scopes;
 
-    cortex_with_pro_registry(function() use ($scopes): void {
-        foreach (Cortex::getInstance()->tools->getAll() as $tool) {
+    herald_with_pro_registry(function() use ($scopes): void {
+        foreach (Herald::getInstance()->tools->getAll() as $tool) {
             $name = $tool::getName();
             expect(array_key_exists($name, Scopes::TOOL_SCOPES))->toBeTrue(
                 sprintf('Tool %s is not an explicit key in Scopes::TOOL_SCOPES', $name),
@@ -80,7 +80,7 @@ it('maps every registered tool to an EXPLICIT scope key (no fail-open gaps)', fu
 });
 
 it('maps content read and write tools to distinct scopes', function() {
-    $scopes = Cortex::getInstance()->scopes;
+    $scopes = Herald::getInstance()->scopes;
 
     expect($scopes->scopeForTool('entries'))->toBe(Scopes::CONTENT_READ)
         ->and($scopes->scopeForTool('entry'))->toBe(Scopes::CONTENT_WRITE)
@@ -92,7 +92,7 @@ it('fails closed for an unmapped tool — returns the ungrantable NONE scope', f
     // MAJOR 6: an unmapped tool must NOT default to a read scope. It maps
     // to the NONE sentinel, which is ungrantable (isKnown() rejects it),
     // so no token can ever cover it and grantsTool() denies it over HTTP.
-    $scopes = Cortex::getInstance()->scopes;
+    $scopes = Herald::getInstance()->scopes;
 
     expect($scopes->scopeForTool('totally_unknown_tool'))->toBe(Scopes::NONE)
         ->and($scopes->isKnown(Scopes::NONE))->toBeFalse()
@@ -101,14 +101,14 @@ it('fails closed for an unmapped tool — returns the ungrantable NONE scope', f
 });
 
 it('grants every tool when the scope set is null (stdio)', function() {
-    $scopes = Cortex::getInstance()->scopes;
+    $scopes = Herald::getInstance()->scopes;
 
     expect($scopes->grantsTool('entry', null))->toBeTrue()
         ->and($scopes->grantsTool('users', null))->toBeTrue();
 });
 
 it('gates a tool whose scope is not in the granted set', function() {
-    $scopes = Cortex::getInstance()->scopes;
+    $scopes = Herald::getInstance()->scopes;
 
     // A read-only grant cannot reach the content:write `entry` tool.
     expect($scopes->grantsTool('entry', [Scopes::CONTENT_READ]))->toBeFalse()
@@ -116,7 +116,7 @@ it('gates a tool whose scope is not in the granted set', function() {
 });
 
 it('expands the legacy read scope to the read cluster', function() {
-    $scopes = Cortex::getInstance()->scopes;
+    $scopes = Herald::getInstance()->scopes;
     $expanded = $scopes->expandLegacyScopes(['read']);
 
     expect($expanded)->toContain(Scopes::CONTENT_READ)
@@ -127,7 +127,7 @@ it('expands the legacy read scope to the read cluster', function() {
 });
 
 it('expands the legacy write scope to every scope', function() {
-    $scopes = Cortex::getInstance()->scopes;
+    $scopes = Herald::getInstance()->scopes;
     $expanded = $scopes->expandLegacyScopes(['write']);
 
     foreach ($scopes->all() as $scope) {
@@ -136,21 +136,21 @@ it('expands the legacy write scope to every scope', function() {
 });
 
 it('grants a write tool via the legacy write scope', function() {
-    $scopes = Cortex::getInstance()->scopes;
+    $scopes = Herald::getInstance()->scopes;
 
     expect($scopes->grantsTool('entry', ['write']))->toBeTrue()
         ->and($scopes->grantsTool('entry', ['read']))->toBeFalse();
 });
 
 it('filters a requested scope list to known scopes', function() {
-    $scopes = Cortex::getInstance()->scopes;
+    $scopes = Herald::getInstance()->scopes;
     $filtered = $scopes->filterKnown([Scopes::CONTENT_READ, 'bogus', 'read', Scopes::CONTENT_READ]);
 
     expect($filtered)->toBe([Scopes::CONTENT_READ, 'read']);
 });
 
 it('describes every capability scope in plain English', function() {
-    $scopes = Cortex::getInstance()->scopes;
+    $scopes = Herald::getInstance()->scopes;
 
     foreach ($scopes->all() as $scope) {
         expect($scopes->describe($scope))->toBeString()->not->toBeEmpty();

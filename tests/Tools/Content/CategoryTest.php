@@ -27,16 +27,16 @@
 
 use craft\elements\Category as CategoryElement;
 use craft\elements\User;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\content\Category;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\content\Category;
+use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_categorytest_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_categorytest_' . bin2hex(random_bytes(4)) . '_';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -64,7 +64,7 @@ afterEach(function() {
 /**
  * Direct instantiation sidesteps the boot-time registry gate.
  */
-function _cortex_category_tool(): Category
+function _herald_category_tool(): Category
 {
     return new Category();
 }
@@ -73,7 +73,7 @@ function _cortex_category_tool(): Category
  * Pick the first category group available in the playground. Returns
  * null when none exist.
  */
-function _cortex_category_group(): ?\craft\models\CategoryGroup
+function _herald_category_group(): ?\craft\models\CategoryGroup
 {
     $groups = Craft::$app->getCategories()->getAllGroups();
     return $groups[0] ?? null;
@@ -84,11 +84,11 @@ function _cortex_category_group(): ?\craft\models\CategoryGroup
 // -----------------------------------------------------------------------------
 
 it('is NOT registered on Free installs', function() {
-    expect(Cortex::getInstance()->tools->getByName('category'))->toBeNull();
+    expect(Herald::getInstance()->tools->getByName('category'))->toBeNull();
 
     $names = array_map(
         static fn(array $entry): string => $entry['name'],
-        Cortex::getInstance()->tools->asListPayload(),
+        Herald::getInstance()->tools->asListPayload(),
     );
     expect($names)->not->toContain('category');
 });
@@ -96,7 +96,7 @@ it('is NOT registered on Free installs', function() {
 it('shouldRegister() returns true on Pro and false on Free', function() {
     expect(Category::shouldRegister())->toBeFalse();
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect(Category::shouldRegister())->toBeTrue();
     });
 });
@@ -106,14 +106,14 @@ it('shouldRegister() returns true on Pro and false on Free', function() {
 // -----------------------------------------------------------------------------
 
 it('throws ToolException when mode is missing', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_category_tool()->execute([]);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_category_tool()->execute([]);
     });
 })->throws(ToolException::class);
 
 it('throws ToolException on unknown mode', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_category_tool()->execute(['mode' => 'frobnicate']);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_category_tool()->execute(['mode' => 'frobnicate']);
     });
 })->throws(ToolException::class);
 
@@ -122,21 +122,21 @@ it('throws ToolException on unknown mode', function() {
 // -----------------------------------------------------------------------------
 
 it('filterFor(null) returns true — stdio is trusted', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        expect(_cortex_category_tool()->filterFor(null))->toBeTrue();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        expect(_herald_category_tool()->filterFor(null))->toBeTrue();
     });
 });
 
 it('filterFor returns true for admin users', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         expect($this->admin)->toBeInstanceOf(User::class);
-        expect(_cortex_category_tool()->filterFor($this->admin))->toBeTrue();
+        expect(_herald_category_tool()->filterFor($this->admin))->toBeTrue();
     });
 });
 
 it('filterFor returns false for users with no category permissions on any group', function() {
     $user = new User();
-    $user->username = '__cortex_no_perms_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_no_perms_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -146,8 +146,8 @@ it('filterFor returns false for users with no category permissions on any group'
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($user) {
-            expect(_cortex_category_tool()->filterFor($user))->toBeFalse();
+        herald_with_edition(Herald::EDITION_PRO, function() use ($user) {
+            expect(_herald_category_tool()->filterFor($user))->toBeFalse();
         });
     } finally {
         Craft::$app->getElements()->deleteElement($user, hardDelete: true);
@@ -159,15 +159,15 @@ it('filterFor returns false for users with no category permissions on any group'
 // -----------------------------------------------------------------------------
 
 it('inputSchemaFor returns the full mode enum for admins', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_category_tool()->inputSchemaFor($this->admin);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_category_tool()->inputSchemaFor($this->admin);
         expect($schema['properties']['mode']['enum'])->toBe(['create', 'update', 'delete']);
     });
 });
 
 it('inputSchemaFor returns the full mode enum for stdio (null user)', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $schema = _cortex_category_tool()->inputSchemaFor(null);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $schema = _herald_category_tool()->inputSchemaFor(null);
         expect($schema['properties']['mode']['enum'])->toBe(['create', 'update', 'delete']);
     });
 });
@@ -177,14 +177,14 @@ it('inputSchemaFor returns the full mode enum for stdio (null user)', function()
 // -----------------------------------------------------------------------------
 
 it('create mode round-trips against a test group as admin', function() {
-    $group = _cortex_category_group();
+    $group = _herald_category_group();
     if ($group === null) {
         $this->markTestSkipped('No category groups in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group) {
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
         $title = $this->fixturePrefix . 'happy';
-        $result = _cortex_category_tool()->execute([
+        $result = _herald_category_tool()->execute([
             'mode' => 'create',
             'groupHandle' => $group->handle,
             'title' => $title,
@@ -207,8 +207,8 @@ it('create mode round-trips against a test group as admin', function() {
 // -----------------------------------------------------------------------------
 
 it('create mode throws when no group-identifying argument is given', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_category_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_category_tool()->execute([
             'mode' => 'create',
             'title' => $this->fixturePrefix . 'nogroup',
         ]);
@@ -216,8 +216,8 @@ it('create mode throws when no group-identifying argument is given', function() 
 })->throws(ToolException::class);
 
 it('create mode throws when groupHandle does not resolve', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_category_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_category_tool()->execute([
             'mode' => 'create',
             'groupHandle' => '__not_a_real_group_handle_x9z__',
             'title' => $this->fixturePrefix . 'bogus',
@@ -237,8 +237,8 @@ it('create mode rejects a parent from a different group via validation envelope'
 
     [$groupA, $groupB] = $groups;
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($groupA, $groupB) {
-        $tool = _cortex_category_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($groupA, $groupB) {
+        $tool = _herald_category_tool();
 
         // Create a parent in group B.
         $parent = $tool->execute([
@@ -268,13 +268,13 @@ it('create mode rejects a parent from a different group via validation envelope'
 // -----------------------------------------------------------------------------
 
 it('update mode mutates an existing category and persists changes', function() {
-    $group = _cortex_category_group();
+    $group = _herald_category_group();
     if ($group === null) {
         $this->markTestSkipped('No category groups in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group) {
-        $tool = _cortex_category_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
+        $tool = _herald_category_tool();
 
         $created = $tool->execute([
             'mode' => 'create',
@@ -299,8 +299,8 @@ it('update mode mutates an existing category and persists changes', function() {
 });
 
 it('update mode throws when the category does not exist', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        _cortex_category_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        _herald_category_tool()->execute([
             'mode' => 'update',
             'id' => 99999999,
             'title' => $this->fixturePrefix . 'phantom',
@@ -309,13 +309,13 @@ it('update mode throws when the category does not exist', function() {
 })->throws(ToolException::class);
 
 it('update mode refuses a trashed category with a hardDelete-hint message', function() {
-    $group = _cortex_category_group();
+    $group = _herald_category_group();
     if ($group === null) {
         $this->markTestSkipped('No category groups in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group) {
-        $tool = _cortex_category_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
+        $tool = _herald_category_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'groupHandle' => $group->handle,
@@ -351,13 +351,13 @@ it('update mode refuses a trashed category with a hardDelete-hint message', func
 // -----------------------------------------------------------------------------
 
 it('delete mode soft-deletes by default; category reappears with trashed()', function() {
-    $group = _cortex_category_group();
+    $group = _herald_category_group();
     if ($group === null) {
         $this->markTestSkipped('No category groups in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group) {
-        $tool = _cortex_category_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
+        $tool = _herald_category_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'groupHandle' => $group->handle,
@@ -380,13 +380,13 @@ it('delete mode soft-deletes by default; category reappears with trashed()', fun
 });
 
 it('delete mode with hardDelete=true removes the row entirely', function() {
-    $group = _cortex_category_group();
+    $group = _herald_category_group();
     if ($group === null) {
         $this->markTestSkipped('No category groups in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group) {
-        $tool = _cortex_category_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
+        $tool = _herald_category_tool();
         $created = $tool->execute([
             'mode' => 'create',
             'groupHandle' => $group->handle,
@@ -406,13 +406,13 @@ it('delete mode with hardDelete=true removes the row entirely', function() {
 // -----------------------------------------------------------------------------
 
 it('the same idempotencyKey returns the cached envelope without re-saving', function() {
-    $group = _cortex_category_group();
+    $group = _herald_category_group();
     if ($group === null) {
         $this->markTestSkipped('No category groups in the playground.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($group) {
-        $tool = _cortex_category_tool();
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
+        $tool = _herald_category_tool();
         $idempotencyKey = 'idem_' . bin2hex(random_bytes(8));
 
         $args = [
@@ -443,13 +443,13 @@ it('the same idempotencyKey returns the cached envelope without re-saving', func
 // -----------------------------------------------------------------------------
 
 it('create mode throws ToolException for a user without saveCategories permission', function() {
-    $group = _cortex_category_group();
+    $group = _herald_category_group();
     if ($group === null) {
         $this->markTestSkipped('No category groups in the playground.');
     }
 
     $user = new User();
-    $user->username = '__cortex_noperm_' . bin2hex(random_bytes(4));
+    $user->username = '__herald_noperm_' . bin2hex(random_bytes(4));
     $user->email = $user->username . '@example.test';
     $user->admin = false;
     $user->pending = true;
@@ -459,11 +459,11 @@ it('create mode throws ToolException for a user without saveCategories permissio
     }
 
     try {
-        cortex_with_edition(Cortex::EDITION_PRO, function() use ($group, $user) {
+        herald_with_edition(Herald::EDITION_PRO, function() use ($group, $user) {
             Craft::$app->getUser()->setIdentity($user);
 
             try {
-                _cortex_category_tool()->execute([
+                _herald_category_tool()->execute([
                     'mode' => 'create',
                     'groupHandle' => $group->handle,
                     'title' => $this->fixturePrefix . 'denied',

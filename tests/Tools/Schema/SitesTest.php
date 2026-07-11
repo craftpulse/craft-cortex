@@ -6,11 +6,11 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('sites');
+    $this->tool = Herald::getInstance()->tools->getByName('sites');
 });
 
 it('lists sites with their groups + the primary site handle', function() {
@@ -51,5 +51,5 @@ it('returns a single site when handle is passed', function() {
 });
 
 it('throws ToolException for an unknown site handle', function() {
-    $this->tool->execute(['handle' => '__cortex_no_such_site__']);
+    $this->tool->execute(['handle' => '__herald_no_such_site__']);
 })->throws(ToolException::class);

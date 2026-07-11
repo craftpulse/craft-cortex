@@ -1,11 +1,11 @@
 <?php
 
-namespace craftpulse\cortex\services;
+namespace craftpulse\herald\services;
 
 use Carbon\Carbon;
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\mcp\Session;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Session;
 use yii\base\Component;
 use yii\caching\CacheInterface;
 
@@ -14,7 +14,7 @@ use yii\caching\CacheInterface;
  * HTTP-transport session store. PSR-16 cache backed.
  *
  * Sessions live in Craft's PSR-16 cache (`Craft::$app->getCache()`),
- * keyed by `cortex:session:{id}`. The session id is opaque and
+ * keyed by `herald:session:{id}`. The session id is opaque and
  * cryptographically random; clients echo it back on every POST via the
  * `Mcp-Session-Id` header. Sliding TTL — every `touch()` resets the
  * cache entry's expiry — means an active session stays alive while
@@ -29,7 +29,7 @@ use yii\caching\CacheInterface;
  * primitive, so a "currently-connected" or "live streaming" view
  * cannot be built from the cache, and a global force-disconnect
  * cannot be retrofitted here. This matches the Gate 9 plan: the CP
- * Activity tab is historical-only (it reads the `cortex_invocations`
+ * Activity tab is historical-only (it reads the `herald_invocations`
  * audit log), and there is deliberately no live-session view.
  *
  * Operator-side revocation therefore runs through bearer-token
@@ -68,14 +68,14 @@ class Sessions extends Component
     // =========================================================================
 
     /**
-     * Prefix for cache keys. Namespaced under `cortex:session:` so we
+     * Prefix for cache keys. Namespaced under `herald:session:` so we
      * never collide with another component's keys and so a future
-     * `Cache::deleteByPattern(cortex:session:*)` style sweep stays
+     * `Cache::deleteByPattern(herald:session:*)` style sweep stays
      * cheap.
      *
      * @since 5.0.0
      */
-    public const CACHE_KEY_PREFIX = 'cortex:session:';
+    public const CACHE_KEY_PREFIX = 'herald:session:';
 
     /**
      * Bytes of entropy when generating a session id. 16 random bytes
@@ -229,7 +229,7 @@ class Sessions extends Component
      */
     private function _persist(Session $session): void
     {
-        $ttl = Cortex::getInstance()->getSettings()->sessionTtl;
+        $ttl = Herald::getInstance()->getSettings()->sessionTtl;
         $this->_cache()->set(
             self::CACHE_KEY_PREFIX . $session->id,
             $session->toArray(),
@@ -256,7 +256,7 @@ class Sessions extends Component
     {
         $cache = Craft::$app->getCache();
         if ($cache === null) {
-            throw new \RuntimeException('Craft cache component is not configured; cortex sessions cannot persist.');
+            throw new \RuntimeException('Craft cache component is not configured; herald sessions cannot persist.');
         }
         return $cache;
     }

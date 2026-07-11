@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\mcp\transport;
+namespace craftpulse\herald\mcp\transport;
 
 /**
  * =========================================================================

@@ -6,10 +6,10 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('permissions_and_groups');
+    $this->tool = Herald::getInstance()->tools->getByName('permissions_and_groups');
 });
 
 it('returns the permissions tree, flat name list, and groups', function() {

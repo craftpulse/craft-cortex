@@ -24,16 +24,16 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\controllers\SettingsController;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\records\OauthClient as OauthClientRecord;
+use craftpulse\herald\controllers\SettingsController;
+use craftpulse\herald\Herald;
+use craftpulse\herald\records\OauthClient as OauthClientRecord;
 use yii\web\Response;
 
 // -----------------------------------------------------------------------------
 // Harness
 // -----------------------------------------------------------------------------
 
-class _CortexClientsHarness extends SettingsController
+class _HeraldClientsHarness extends SettingsController
 {
     /** @var array<string,mixed> */
     public array $params = [];
@@ -56,7 +56,7 @@ class _CortexClientsHarness extends SettingsController
     public function withParams(array $params): self
     {
         $this->params = $params;
-        $this->request = new _CortexClientsRequest($params);
+        $this->request = new _HeraldClientsRequest($params);
         $this->response = new Response();
         $this->response->formatters[Response::FORMAT_JSON] = \yii\web\JsonResponseFormatter::class;
         return $this;
@@ -70,7 +70,7 @@ class _CortexClientsHarness extends SettingsController
  * admin-only denial is genuinely exercised rather than asserted by
  * inspection.
  */
-class _CortexClientsRealAdminHarness extends SettingsController
+class _HeraldClientsRealAdminHarness extends SettingsController
 {
     public function requirePostRequest(): void
     {
@@ -85,14 +85,14 @@ class _CortexClientsRealAdminHarness extends SettingsController
      */
     public function withParams(array $params): self
     {
-        $this->request = new _CortexClientsRequest($params);
+        $this->request = new _HeraldClientsRequest($params);
         $this->response = new Response();
         $this->response->formatters[Response::FORMAT_JSON] = \yii\web\JsonResponseFormatter::class;
         return $this;
     }
 }
 
-class _CortexClientsRequest
+class _HeraldClientsRequest
 {
     public bool $isCpRequest = true;
 
@@ -142,7 +142,7 @@ class _CortexClientsRequest
 /**
  * Persist a client row for the controller tests.
  */
-function _cortexMakeClient(string $name, bool $approved): OauthClientRecord
+function _heraldMakeClient(string $name, bool $approved): OauthClientRecord
 {
     $record = new OauthClientRecord();
     $record->clientId = bin2hex(random_bytes(16));
@@ -156,13 +156,13 @@ function _cortexMakeClient(string $name, bool $approved): OauthClientRecord
 
 beforeEach(function() {
     OauthClientRecord::deleteAll(['like', 'clientName', '_test_/%', false]);
-    $this->originalEdition = Cortex::getInstance()->edition;
-    Cortex::getInstance()->edition = Cortex::EDITION_PRO;
+    $this->originalEdition = Herald::getInstance()->edition;
+    Herald::getInstance()->edition = Herald::EDITION_PRO;
 });
 
 afterEach(function() {
     OauthClientRecord::deleteAll(['like', 'clientName', '_test_/%', false]);
-    Cortex::getInstance()->edition = $this->originalEdition;
+    Herald::getInstance()->edition = $this->originalEdition;
 });
 
 // -----------------------------------------------------------------------------
@@ -177,9 +177,9 @@ it('declares the Clients endpoints', function() {
 });
 
 it('every Clients action is Pro-gated — 403 on Free', function(string $method, array $params) {
-    Cortex::getInstance()->edition = Cortex::EDITION_FREE;
+    Herald::getInstance()->edition = Herald::EDITION_FREE;
 
-    $controller = new _CortexClientsHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldClientsHarness('settings', Herald::getInstance());
     $controller->withParams($params);
 
     expect(fn() => $controller->{$method}())
@@ -212,7 +212,7 @@ it('approve / revoke deny a non-admin via the REAL requireAdmin gate', function(
         Craft::$app->getUser()->setIdentity($nonAdmin);
         expect(Craft::$app->getUser()->getIsAdmin())->toBeFalse();
 
-        $controller = new _CortexClientsRealAdminHarness('settings', Cortex::getInstance());
+        $controller = new _HeraldClientsRealAdminHarness('settings', Herald::getInstance());
         $controller->withParams(['id' => 1]);
 
         expect(fn() => $controller->{$method}())
@@ -231,9 +231,9 @@ it('approve / revoke deny a non-admin via the REAL requireAdmin gate', function(
 // -----------------------------------------------------------------------------
 
 it('clients-table-data returns the locked row tuple', function() {
-    _cortexMakeClient('_test_/row-shape', false);
+    _heraldMakeClient('_test_/row-shape', false);
 
-    $controller = new _CortexClientsHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldClientsHarness('settings', Herald::getInstance());
     $response = $controller->withParams([])->actionClientsTableData();
 
     expect($response->data)->toHaveKeys(['pagination', 'data']);
@@ -257,9 +257,9 @@ it('clients-table-data returns the locked row tuple', function() {
 // -----------------------------------------------------------------------------
 
 it('approve-client flips the client to approved', function() {
-    $client = _cortexMakeClient('_test_/approve-controller', false);
+    $client = _heraldMakeClient('_test_/approve-controller', false);
 
-    $controller = new _CortexClientsHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldClientsHarness('settings', Herald::getInstance());
     $response = $controller->withParams(['id' => $client->id])->actionApproveClient();
 
     expect($response->getStatusCode())->toBe(200);
@@ -269,16 +269,16 @@ it('approve-client flips the client to approved', function() {
 });
 
 it('approve-client 404s for an unknown id', function() {
-    $controller = new _CortexClientsHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldClientsHarness('settings', Herald::getInstance());
     $response = $controller->withParams(['id' => 999999999])->actionApproveClient();
 
     expect($response->getStatusCode())->toBe(404);
 });
 
 it('revoke-client flips the client back to unapproved', function() {
-    $client = _cortexMakeClient('_test_/revoke-controller', true);
+    $client = _heraldMakeClient('_test_/revoke-controller', true);
 
-    $controller = new _CortexClientsHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldClientsHarness('settings', Herald::getInstance());
     $response = $controller->withParams(['id' => $client->id])->actionRevokeClient();
 
     expect($response->getStatusCode())->toBe(200);
@@ -288,7 +288,7 @@ it('revoke-client flips the client back to unapproved', function() {
 });
 
 it('revoke-client 404s for an unknown id', function() {
-    $controller = new _CortexClientsHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldClientsHarness('settings', Herald::getInstance());
     $response = $controller->withParams(['id' => 999999999])->actionRevokeClient();
 
     expect($response->getStatusCode())->toBe(404);

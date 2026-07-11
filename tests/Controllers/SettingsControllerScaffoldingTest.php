@@ -19,7 +19,7 @@
  *     Gate 9 locked decision 7.
  *   - `actionSave` body smoke — POST `settings[execEnabled]=false`
  *     flips the value on the live settings model after the save call.
- *   - Route registration — CP URL rules resolve `settings/plugins/cortex`
+ *   - Route registration — CP URL rules resolve `settings/plugins/herald`
  *     and the three per-tab URLs through Craft's url manager.
  *
  * Real CP rendering lives in the manual gate-9.1 verification step
@@ -39,8 +39,8 @@
 
 use Craft;
 use craft\web\Controller;
-use craftpulse\cortex\controllers\SettingsController;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\controllers\SettingsController;
+use craftpulse\herald\Herald;
 use yii\web\Response;
 
 // -----------------------------------------------------------------------------
@@ -52,7 +52,7 @@ use yii\web\Response;
  * `requirePermission` / `redirectToPostedUrl` — lets the action body
  * run against the console-bootstrapped Craft.
  */
-class _CortexScaffoldingSettingsHarness extends SettingsController
+class _HeraldScaffoldingSettingsHarness extends SettingsController
 {
     /** @var array<string,mixed> */
     public array $body = [];
@@ -76,14 +76,14 @@ class _CortexScaffoldingSettingsHarness extends SettingsController
     {
         $response = new Response();
         $response->setStatusCode(302);
-        $response->headers->set('Location', '/cortex/settings');
+        $response->headers->set('Location', '/herald/settings');
         return $response;
     }
 
     public function withBody(array $body): self
     {
         $this->body = $body;
-        $this->request = new _CortexScaffoldingRequest($body);
+        $this->request = new _HeraldScaffoldingRequest($body);
         return $this;
     }
 }
@@ -92,7 +92,7 @@ class _CortexScaffoldingSettingsHarness extends SettingsController
  * Tiny request stub that satisfies the SettingsController body-param
  * surface (`getBodyParam`, `getRequiredBodyParam`).
  */
-class _CortexScaffoldingRequest
+class _HeraldScaffoldingRequest
 {
     public function __construct(private array $body)
     {
@@ -118,7 +118,7 @@ class _CortexScaffoldingRequest
  * the architecture invariant to confirm the action enters its
  * permission gate first via a regex anchor.
  */
-function _cortex_controller_method_body(string $method): string
+function _herald_controller_method_body(string $method): string
 {
     $rm = (new ReflectionClass(SettingsController::class))->getMethod($method);
     $contents = file_get_contents($rm->getFileName());
@@ -165,7 +165,7 @@ it('_cp/_layout extends _layouts/cp directly', function() {
 
 it('_cp/_layout drives the standard CP subnav, not an in-page tab bar', function() {
     // The Gate 9 CP rework replaced the in-page tab bar with Craft's
-    // global-sidebar subnav (`Cortex::getCpNavItem()`). The layout now
+    // global-sidebar subnav (`Herald::getCpNavItem()`). The layout now
     // highlights the active subnav item via `selectedSubnavItem` and no
     // longer builds its own `tabs` map.
     $contents = (string) file_get_contents(__DIR__ . '/../../src/templates/_cp/_layout.twig');
@@ -175,18 +175,18 @@ it('_cp/_layout drives the standard CP subnav, not an in-page tab bar', function
 
 it('getCpNavItem gates the Pro subnav entries behind the edition', function() {
     // Presentation-side mirror of the `_requirePro()` action gates lives
-    // in `Cortex::getCpNavItem()` now — the source must reference each Pro
+    // in `Herald::getCpNavItem()` now — the source must reference each Pro
     // subnav URL only under an `is(EDITION_PRO, '>=')` check. We assert the
     // gating method carries the Pro edition comparison and every Pro
     // subnav URL, and that the Free-always entries (Settings + Temporary
     // grants) are present too.
-    $contents = (string) file_get_contents(__DIR__ . '/../../src/Cortex.php');
+    $contents = (string) file_get_contents(__DIR__ . '/../../src/Herald.php');
     expect($contents)->toContain("is(self::EDITION_PRO, '>=')");
-    foreach (['cortex/tokens', 'cortex/clients', 'cortex/activity', 'cortex/connection'] as $proUrl) {
+    foreach (['herald/tokens', 'herald/clients', 'herald/activity', 'herald/connection'] as $proUrl) {
         expect($contents)->toContain($proUrl);
     }
-    expect($contents)->toContain("'cortex/settings'")
-        ->toContain("'cortex/allowlist'");
+    expect($contents)->toContain("'herald/settings'")
+        ->toContain("'herald/allowlist'");
 });
 
 // Locks the locale-undefined bug found in the 9.1 manual smoke. The
@@ -217,7 +217,7 @@ it('templates never reference an undeclared locale variable in |date filter', fu
         expect($contents)->not->toBeFalse();
         expect($contents)->not->toMatch(
             '/\|\s*date\s*\([^)]*,\s*locale\s*\)/',
-            "Template {$template} passes `locale` to |date — the variable is not in scope on Cortex CP templates. Drop the locale arg; Craft falls back to the app locale automatically.",
+            "Template {$template} passes `locale` to |date — the variable is not in scope on Herald CP templates. Drop the locale arg; Craft falls back to the app locale automatically.",
         );
     }
 });
@@ -227,32 +227,32 @@ it('templates never reference an undeclared locale variable in |date filter', fu
 // -----------------------------------------------------------------------------
 
 it('actionIndex first statement is requireAdmin', function() {
-    $body = _cortex_controller_method_body('actionIndex');
+    $body = _herald_controller_method_body('actionIndex');
     expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
 });
 
 it('actionTokens first statement is requireAdmin', function() {
-    $body = _cortex_controller_method_body('actionTokens');
+    $body = _herald_controller_method_body('actionTokens');
     expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
 });
 
 it('actionAllowlist first statement is requireAdmin', function() {
-    $body = _cortex_controller_method_body('actionAllowlist');
+    $body = _herald_controller_method_body('actionAllowlist');
     expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
 });
 
 it('actionActivity first statement is requirePermission(viewActivity)', function() {
-    $body = _cortex_controller_method_body('actionActivity');
-    expect($body)->toMatch('/^\s*\$this->requirePermission\s*\(\s*Cortex::PERMISSION_VIEW_ACTIVITY\s*\)/m');
+    $body = _herald_controller_method_body('actionActivity');
+    expect($body)->toMatch('/^\s*\$this->requirePermission\s*\(\s*Herald::PERMISSION_VIEW_ACTIVITY\s*\)/m');
 });
 
 it('actionConnection first statement is requireAdmin', function() {
-    $body = _cortex_controller_method_body('actionConnection');
+    $body = _herald_controller_method_body('actionConnection');
     expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
 });
 
 it('actionSave first statement is requirePostRequest', function() {
-    $body = _cortex_controller_method_body('actionSave');
+    $body = _herald_controller_method_body('actionSave');
     expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
     // And the second statement is requireAdmin(requireAdminChanges: true).
     expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
@@ -265,16 +265,16 @@ it('actionSave first statement is requirePostRequest', function() {
 beforeEach(function() {
     $this->originalApp = \Yii::$app;
     // Snapshot the current settings so we can restore in afterEach.
-    $this->originalExecEnabled = Cortex::getInstance()->getSettings()->execEnabled;
+    $this->originalExecEnabled = Herald::getInstance()->getSettings()->execEnabled;
 });
 
 beforeEach(function() {
-    $this->originalAllowedCommands = Cortex::getInstance()->getSettings()->allowedCommands;
+    $this->originalAllowedCommands = Herald::getInstance()->getSettings()->allowedCommands;
     // `actionSave` now folds BOTH the content (`allowedCommands`) and the
     // admin-level (`adminLevelCommands`) toggle buckets. These tests post
     // no admin toggles, so a save would persist `adminLevelCommands = []`
     // and wipe it for the rest of the suite — snapshot + restore it too.
-    $this->originalAdminLevelCommands = Cortex::getInstance()->getSettings()->adminLevelCommands;
+    $this->originalAdminLevelCommands = Herald::getInstance()->getSettings()->adminLevelCommands;
 });
 
 afterEach(function() {
@@ -282,7 +282,7 @@ afterEach(function() {
     // Restore execEnabled + both command buckets to the snapshotted
     // values via PC write so the suite's other tests inherit the same
     // baseline.
-    $settings = Cortex::getInstance()->getSettings();
+    $settings = Herald::getInstance()->getSettings();
     $needsRestore = false;
     if ($settings->execEnabled !== $this->originalExecEnabled) {
         $settings->execEnabled = $this->originalExecEnabled;
@@ -297,7 +297,7 @@ afterEach(function() {
         $needsRestore = true;
     }
     if ($needsRestore) {
-        Craft::$app->getPlugins()->savePluginSettings(Cortex::getInstance(), $settings->toArray());
+        Craft::$app->getPlugins()->savePluginSettings(Herald::getInstance(), $settings->toArray());
     }
 });
 
@@ -342,7 +342,7 @@ it('actionSave persists settings[execEnabled] through the plugins service', func
         }
     };
 
-    $controller = new _CortexScaffoldingSettingsHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldScaffoldingSettingsHarness('settings', Herald::getInstance());
     $controller->withBody([
         'settings' => [
             'execEnabled' => $targetValue ? '1' : '',
@@ -355,7 +355,7 @@ it('actionSave persists settings[execEnabled] through the plugins service', func
 
     // Re-read the settings — savePluginSettings round-trips through PC,
     // so getSettings() reflects the persisted value on the next call.
-    $reloaded = Cortex::getInstance()->getSettings();
+    $reloaded = Herald::getInstance()->getSettings();
     expect($reloaded->execEnabled)->toBe($targetValue);
 });
 
@@ -396,7 +396,7 @@ it('actionSave flattens the editableTable 2D submission for allowedCommands', fu
         }
     };
 
-    $controller = new _CortexScaffoldingSettingsHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldScaffoldingSettingsHarness('settings', Herald::getInstance());
     $controller->withBody([
         'settings' => [
             'allowedCommands' => [
@@ -411,7 +411,7 @@ it('actionSave flattens the editableTable 2D submission for allowedCommands', fu
     $response = $controller->actionSave();
     expect($response->statusCode)->toBe(302);
 
-    $reloaded = Cortex::getInstance()->getSettings();
+    $reloaded = Herald::getInstance()->getSettings();
     expect($reloaded->allowedCommands)->toBe([
         'resave/*',
         'cache/*',
@@ -423,8 +423,8 @@ it('actionSave flattens the editableTable 2D submission for allowedCommands', fu
 // Route registration — CP URL rules resolve through the url manager
 // -----------------------------------------------------------------------------
 
-it('resolves settings/plugins/cortex through the CP url manager', function() {
-    $url = \craft\helpers\UrlHelper::cpUrl('settings/plugins/cortex');
+it('resolves settings/plugins/herald through the CP url manager', function() {
+    $url = \craft\helpers\UrlHelper::cpUrl('settings/plugins/herald');
     expect($url)->toBeString();
     expect($url)->not->toBe('');
     // Verify it's a CP URL (contains the cpTrigger or is admin-style).
@@ -432,11 +432,11 @@ it('resolves settings/plugins/cortex through the CP url manager', function() {
     if ($cpTrigger !== null && $cpTrigger !== '') {
         expect($url)->toContain($cpTrigger);
     }
-    expect($url)->toContain('settings/plugins/cortex');
+    expect($url)->toContain('settings/plugins/herald');
 });
 
 it('resolves the four per-tab CP URLs', function() {
-    foreach (['cortex/tokens', 'cortex/allowlist', 'cortex/activity', 'cortex/connection'] as $path) {
+    foreach (['herald/tokens', 'herald/allowlist', 'herald/activity', 'herald/connection'] as $path) {
         $url = \craft\helpers\UrlHelper::cpUrl($path);
         expect($url)->toBeString();
         expect($url)->not->toBe('');
@@ -455,32 +455,32 @@ it('declares actionAllowlistTableData + actionAllowlistOverrideSlideout', functi
 });
 
 it('actionAllowlistTableData first statements are requireAcceptsJson + requireAdmin', function() {
-    $body = _cortex_controller_method_body('actionAllowlistTableData');
+    $body = _herald_controller_method_body('actionAllowlistTableData');
     expect($body)->toMatch('/^\s*\$this->requireAcceptsJson\s*\(\s*\)/m');
     expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*false\s*\)/');
 });
 
 it('actionAllowlistOverrideSlideout first statement is requireAdmin', function() {
-    $body = _cortex_controller_method_body('actionAllowlistOverrideSlideout');
+    $body = _herald_controller_method_body('actionAllowlistOverrideSlideout');
     expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
 });
 
 it('actionAddOverride first statements are requirePostRequest + requireAcceptsJson + requireAdmin', function() {
-    $body = _cortex_controller_method_body('actionAddOverride');
+    $body = _herald_controller_method_body('actionAddOverride');
     expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
     expect($body)->toMatch('/\$this->requireAcceptsJson\s*\(\s*\)/');
     expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
 });
 
 it('actionRemoveOverride first statements are requirePostRequest + requireAcceptsJson + requireAdmin', function() {
-    $body = _cortex_controller_method_body('actionRemoveOverride');
+    $body = _herald_controller_method_body('actionRemoveOverride');
     expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
     expect($body)->toMatch('/\$this->requireAcceptsJson\s*\(\s*\)/');
     expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
 });
 
 it('resolves the Allowlist data + slideout CP URLs', function() {
-    foreach (['cortex/allowlist/table-data', 'cortex/allowlist/override-slideout'] as $path) {
+    foreach (['herald/allowlist/table-data', 'herald/allowlist/override-slideout'] as $path) {
         $url = \craft\helpers\UrlHelper::cpUrl($path);
         expect($url)->toBeString();
         expect($url)->not->toBe('');
@@ -506,8 +506,8 @@ it('allowlist tab template instantiates a Craft.VueAdminTable', function() {
     // Action routes, not the CP URL aliases — VueAdminTable resolves
     // `tableDataEndpoint` via `Craft.getActionUrl`, which never consults
     // CP URL rules (the gate-9 smoke caught the alias 404ing).
-    expect($contents)->toContain('cortex/settings/allowlist-table-data');
-    expect($contents)->toContain('cortex/settings/remove-override');
+    expect($contents)->toContain('herald/settings/allowlist-table-data');
+    expect($contents)->toContain('herald/settings/remove-override');
 });
 
 // -----------------------------------------------------------------------------
@@ -536,7 +536,7 @@ it('every Pro action opens with the _requirePro() edition gate', function() {
     ];
 
     foreach ($proActions as $method) {
-        $body = _cortex_controller_method_body($method);
+        $body = _herald_controller_method_body($method);
         expect($body)->toMatch(
             '/\A\s*\{\s*\$this->_requirePro\(\);/',
             "{$method} must open with \$this->_requirePro()",
@@ -546,7 +546,7 @@ it('every Pro action opens with the _requirePro() edition gate', function() {
 
 it('Free-tier actions carry no edition gate', function() {
     foreach (['actionIndex', 'actionSave', 'actionAllowlist', 'actionAllowlistTableData', 'actionAllowlistOverrideSlideout', 'actionAddOverride', 'actionRemoveOverride'] as $method) {
-        $body = _cortex_controller_method_body($method);
+        $body = _herald_controller_method_body($method);
         expect($body)->not->toContain('_requirePro', "{$method} must stay Free");
     }
 });
@@ -559,32 +559,32 @@ it('declares the Tokens data + slideout + mutation actions', function() {
 });
 
 it('actionTokensTableData first statements are requireAcceptsJson + requireAdmin', function() {
-    $body = _cortex_controller_method_body('actionTokensTableData');
+    $body = _herald_controller_method_body('actionTokensTableData');
     expect($body)->toMatch('/^\s*\$this->requireAcceptsJson\s*\(\s*\)/m');
     expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*false\s*\)/');
 });
 
 it('actionTokenIssueSlideout first statement is requireAdmin', function() {
-    $body = _cortex_controller_method_body('actionTokenIssueSlideout');
+    $body = _herald_controller_method_body('actionTokenIssueSlideout');
     expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
 });
 
 it('actionIssueToken first statements are requirePostRequest + requireAcceptsJson + requireAdmin', function() {
-    $body = _cortex_controller_method_body('actionIssueToken');
+    $body = _herald_controller_method_body('actionIssueToken');
     expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
     expect($body)->toMatch('/\$this->requireAcceptsJson\s*\(\s*\)/');
     expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
 });
 
 it('actionRevokeToken first statements are requirePostRequest + requireAcceptsJson + requireAdmin', function() {
-    $body = _cortex_controller_method_body('actionRevokeToken');
+    $body = _herald_controller_method_body('actionRevokeToken');
     expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
     expect($body)->toMatch('/\$this->requireAcceptsJson\s*\(\s*\)/');
     expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
 });
 
 it('resolves the Tokens data + slideout + mutation CP URLs', function() {
-    foreach (['cortex/tokens/table-data', 'cortex/tokens/issue-slideout', 'cortex/tokens/issue', 'cortex/tokens/revoke'] as $path) {
+    foreach (['herald/tokens/table-data', 'herald/tokens/issue-slideout', 'herald/tokens/issue', 'herald/tokens/revoke'] as $path) {
         $url = \craft\helpers\UrlHelper::cpUrl($path);
         expect($url)->toBeString();
         expect($url)->not->toBe('');
@@ -601,9 +601,9 @@ it('ships the token-issue slideout partial with form fields + one-time reveal', 
     expect($contents)->toContain("name: 'userId'");
     expect($contents)->toContain("name: 'ttlSeconds'");
     // The one-time reveal panel + copy control + polite live region.
-    expect($contents)->toContain('data-cortex-reveal');
-    expect($contents)->toContain('data-cortex-token');
-    expect($contents)->toContain('data-cortex-copy');
+    expect($contents)->toContain('data-herald-reveal');
+    expect($contents)->toContain('data-herald-token');
+    expect($contents)->toContain('data-herald-copy');
     expect($contents)->toContain('aria-live="polite"');
 });
 
@@ -614,7 +614,7 @@ it('tokens tab template instantiates a Craft.VueAdminTable wired to the token en
     expect($contents)->toContain('Craft.VueAdminTable');
     // Action routes, not the CP URL aliases — see the allowlist variant
     // of this invariant for the why.
-    expect($contents)->toContain('cortex/settings/tokens-table-data');
-    expect($contents)->toContain('cortex/settings/revoke-token');
+    expect($contents)->toContain('herald/settings/tokens-table-data');
+    expect($contents)->toContain('herald/settings/revoke-token');
     expect($contents)->toContain('openTokenIssuanceSlideout');
 });

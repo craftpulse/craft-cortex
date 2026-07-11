@@ -1,18 +1,18 @@
 <?php
 
-namespace craftpulse\cortex\tools\system;
+namespace craftpulse\herald\tools\system;
 
 use Craft;
 use craft\base\ElementInterface;
 use craft\enums\CmsEdition;
 use craft\models\Section;
 use craft\models\Site;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\support\Schema;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\support\Schema;
 
 /**
  * =========================================================================
@@ -20,7 +20,7 @@ use craftpulse\cortex\tools\support\Schema;
  *
  * The MCP `tools/list` payload tells a client every tool that exists,
  * but it doesn't tell the LLM **what kind of Craft install it's looking
- * at** or which of cortex's other surfaces are worth invoking first. A
+ * at** or which of herald's other surfaces are worth invoking first. A
  * model picking up a fresh conversation often wastes turns calling
  * `system_info`, `sites`, `sections`, and `permissions_and_groups` just
  * to orient itself before doing real work.
@@ -73,7 +73,7 @@ class InitialContext extends AbstractTool
     {
         return 'Bootstrap snapshot for an AI agent picking up a fresh conversation against ' .
             'this Craft install. Returns Craft version + edition + environment, the primary ' .
-            'site handle, a thin sites/sections/element-types index, the bundled cortex ' .
+            'site handle, a thin sites/sections/element-types index, the bundled herald ' .
             'skill prompts (the moat content the LLM should consult when authoring against ' .
             'Craft), the `craft_exec` posture, and the effective command allowlist. Call ' .
             'this first — it replaces three or four orientation tool calls with one.';
@@ -96,9 +96,9 @@ class InitialContext extends AbstractTool
                 'devMode' => Schema::boolean()->required(),
                 'primarySiteHandle' => Schema::string()->required(),
             ])->required(),
-            'cortex' => Schema::object([
+            'herald' => Schema::object([
                 'edition' => Schema::string()->required(),
-            ])->required()->description('The active Cortex edition (`free` or `pro`). Pro adds the write tools, the Skill element, and the Streamable HTTP transport; on `free`, plan around the read-only stdio surface.'),
+            ])->required()->description('The active Herald edition (`free` or `pro`). Pro adds the write tools, the Skill element, and the Streamable HTTP transport; on `free`, plan around the read-only stdio surface.'),
             'sites' => Schema::array(Schema::object([
                 'handle' => Schema::string()->required(),
                 'name' => Schema::string()->required(),
@@ -120,7 +120,7 @@ class InitialContext extends AbstractTool
             'skillPrompts' => Schema::array(Schema::object([
                 'name' => Schema::string()->required(),
                 'description' => Schema::string()->required(),
-            ]))->required()->description('Bundled cortex prompts that return authored Craft expertise. Invoke `prompts/get` with one of these names when authoring against Craft.'),
+            ]))->required()->description('Bundled herald prompts that return authored Craft expertise. Invoke `prompts/get` with one of these names when authoring against Craft.'),
             'exec' => Schema::object([
                 'enabled' => Schema::boolean()->required(),
                 'dryRunDefault' => Schema::boolean()->required(),
@@ -143,7 +143,7 @@ class InitialContext extends AbstractTool
         $sitesService = Craft::$app->getSites();
         $entriesService = Craft::$app->getEntries();
         $info = Craft::$app->getInfo();
-        $settings = Cortex::getInstance()->getSettings();
+        $settings = Herald::getInstance()->getSettings();
 
         return [
             'craft' => [
@@ -157,8 +157,8 @@ class InitialContext extends AbstractTool
             // The PLUGIN edition, distinct from `craft.edition` above —
             // the agent needs it to know whether write tools and the
             // HTTP transport exist on this install (Gate 9.7).
-            'cortex' => [
-                'edition' => Cortex::getInstance()->edition,
+            'herald' => [
+                'edition' => Herald::getInstance()->edition,
             ],
             'sites' => array_map(
                 static fn(Site $s): array => [
@@ -184,7 +184,7 @@ class InitialContext extends AbstractTool
                 'enabled' => $settings->execEnabled,
                 'dryRunDefault' => $settings->execDryRunDefault,
             ],
-            'allowlist' => Cortex::getInstance()->allowlist->getEffective(),
+            'allowlist' => Herald::getInstance()->allowlist->getEffective(),
             'hints' => $this->_hints(),
         ];
     }
@@ -222,7 +222,7 @@ class InitialContext extends AbstractTool
      * Snapshot the bundled-skills prompt registry so the AI sees the
      * moat content from the bootstrap response without a separate
      * `prompts/list` call. We pull straight from the Prompts registry
-     * — cortex authoritative, no string duplication.
+     * — herald authoritative, no string duplication.
      *
      * @return array<int,array<string,string>>
      *
@@ -236,7 +236,7 @@ class InitialContext extends AbstractTool
                 'name' => (string) $entry['name'],
                 'description' => (string) $entry['description'],
             ],
-            Cortex::getInstance()->prompts->asListPayload(),
+            Herald::getInstance()->prompts->asListPayload(),
         );
     }
 
@@ -255,7 +255,7 @@ class InitialContext extends AbstractTool
     {
         return [
             'Invoke the `craftcms_extending` prompt before authoring plugin or module PHP — it carries reverse-engineered internals you will not find in the public docs.',
-            'Invoke `craftcms_templates` for Twig / front-end work; `craftcms_php_standards` and `craftcms_twig_standards` carry the coding conventions cortex itself enforces.',
+            'Invoke `craftcms_templates` for Twig / front-end work; `craftcms_php_standards` and `craftcms_twig_standards` carry the coding conventions herald itself enforces.',
             'Use `search_skills` to find specific guidance across the bundled corpus without listing every resource.',
             '`craft_exec` is stdio-only and dry-run-by-default — pass `confirm: true` to actually evaluate, plus `dangerous: true` for destructive expressions.',
             '`craft_command` only dispatches commands matching the effective allowlist (see `allowlist` above). Adding patterns requires admin access via the CP settings.',

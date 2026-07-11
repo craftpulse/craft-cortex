@@ -19,22 +19,22 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\oauth\repositories\ClientRepository;
-use craftpulse\cortex\records\OauthClient as OauthClientRecord;
+use craftpulse\herald\Herald;
+use craftpulse\herald\oauth\repositories\ClientRepository;
+use craftpulse\herald\records\OauthClient as OauthClientRecord;
 
 beforeEach(function() {
-    $this->service = Cortex::getInstance()->oauth;
-    $this->originalAutoApprove = Cortex::getInstance()->getSettings()->dcrAutoApprove;
+    $this->service = Herald::getInstance()->oauth;
+    $this->originalAutoApprove = Herald::getInstance()->getSettings()->dcrAutoApprove;
 });
 
 afterEach(function() {
-    Cortex::getInstance()->getSettings()->dcrAutoApprove = $this->originalAutoApprove;
+    Herald::getInstance()->getSettings()->dcrAutoApprove = $this->originalAutoApprove;
     OauthClientRecord::deleteAll(['like', 'clientName', '_test_/%', false]);
 });
 
 it('registerClient() lands a new DCR client unapproved by default', function() {
-    Cortex::getInstance()->getSettings()->dcrAutoApprove = false;
+    Herald::getInstance()->getSettings()->dcrAutoApprove = false;
 
     $response = $this->service->registerClient([
         'client_name' => '_test_/approval-default',
@@ -47,7 +47,7 @@ it('registerClient() lands a new DCR client unapproved by default', function() {
 });
 
 it('registerClient() auto-approves when dcrAutoApprove is on', function() {
-    Cortex::getInstance()->getSettings()->dcrAutoApprove = true;
+    Herald::getInstance()->getSettings()->dcrAutoApprove = true;
 
     $response = $this->service->registerClient([
         'client_name' => '_test_/approval-auto',
@@ -60,7 +60,7 @@ it('registerClient() auto-approves when dcrAutoApprove is on', function() {
 });
 
 it('an unapproved client is invisible to getClientEntity (authorize flow)', function() {
-    Cortex::getInstance()->getSettings()->dcrAutoApprove = false;
+    Herald::getInstance()->getSettings()->dcrAutoApprove = false;
 
     $response = $this->service->registerClient([
         'client_name' => '_test_/approval-authorize',
@@ -73,7 +73,7 @@ it('an unapproved client is invisible to getClientEntity (authorize flow)', func
 });
 
 it('an unapproved confidential client fails validateClient (token flow)', function() {
-    Cortex::getInstance()->getSettings()->dcrAutoApprove = false;
+    Herald::getInstance()->getSettings()->dcrAutoApprove = false;
 
     $response = $this->service->registerClient([
         'client_name' => '_test_/approval-token',
@@ -87,7 +87,7 @@ it('an unapproved confidential client fails validateClient (token flow)', functi
 });
 
 it('approveClient() makes the client visible to both flows', function() {
-    Cortex::getInstance()->getSettings()->dcrAutoApprove = false;
+    Herald::getInstance()->getSettings()->dcrAutoApprove = false;
 
     $response = $this->service->registerClient([
         'client_name' => '_test_/approval-flip',
@@ -108,7 +108,7 @@ it('approveClient() returns false for an unknown id', function() {
 });
 
 it('revokeClient() flips an approved client back to unapproved', function() {
-    Cortex::getInstance()->getSettings()->dcrAutoApprove = true;
+    Herald::getInstance()->getSettings()->dcrAutoApprove = true;
 
     $response = $this->service->registerClient([
         'client_name' => '_test_/approval-revoke',

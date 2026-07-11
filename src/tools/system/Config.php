@@ -1,14 +1,14 @@
 <?php
 
-namespace craftpulse\cortex\tools\system;
+namespace craftpulse\herald\tools\system;
 
 use Craft;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\support\SecretRedactor;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\support\SecretRedactor;
+use craftpulse\herald\tools\ToolException;
 
 /**
  * =========================================================================
@@ -20,7 +20,7 @@ use craftpulse\cortex\tools\ToolException;
  *
  * Hard rules:
  *   - No secrets in any output. Key-based redaction is delegated to
- *     `SecretRedactor` (the single source of truth across cortex tools);
+ *     `SecretRedactor` (the single source of truth across herald tools);
  *     any matching key gets replaced with the literal string
  *     `"<redacted>"`.
  *   - The general-config payload is a curated whitelist, not the full

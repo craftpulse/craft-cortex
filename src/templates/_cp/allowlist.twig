@@ -1,7 +1,7 @@
-{% extends "cortex/_cp/_layout" %}
+{% extends "herald/_cp/_layout" %}
 
 {# =========================================================================
-   Cortex Temporary grants screen — VueAdminTable of admin-issued runtime
+   Herald Temporary grants screen — VueAdminTable of admin-issued runtime
    allowlist grants + Garnish.Slideout for "Issue grant", plus a read-only
    "Effective allowlist right now" panel.
 
@@ -9,14 +9,14 @@
    calls runtime allowlist overrides: time-bound additions an admin issues
    on top of the project-config Settings allowlist that expire
    automatically. Internal route paths, permission names, controller action
-   names, and the `cortex_runtime_overrides` table keep the
+   names, and the `herald_runtime_overrides` table keep the
    `allowlist` / `override` wording — this is a label-and-copy rename only.
 
    Data path:
-     - Table data : GET  cortex/settings/allowlist-table-data → JSON {pagination, data}
-     - Slideout   : GET  cortex/settings/allowlist-override-slideout → HTML fragment
-     - Add        : POST cortex/settings/add-override  → JSON {model, message}
-     - Remove     : POST cortex/settings/remove-override (VueAdminTable
+     - Table data : GET  herald/settings/allowlist-table-data → JSON {pagination, data}
+     - Slideout   : GET  herald/settings/allowlist-override-slideout → HTML fragment
+     - Add        : POST herald/settings/add-override  → JSON {model, message}
+     - Remove     : POST herald/settings/remove-override (VueAdminTable
                                                           deleteAction) → JSON {message}
 
    The row shape is locked in `SettingsController::_serializeOverrideRow`:
@@ -31,7 +31,7 @@
 
 {% set selectedSubnavItem = 'grants' %}
 
-{% do view.registerTranslations('cortex', [
+{% do view.registerTranslations('herald', [
     'Are you sure you want to remove the grant “{name}”?',
     'Could not add grant.',
     'Could not open the grant form.',
@@ -51,10 +51,10 @@
 
 {% block content %}
     <p class="light">
-        {{ 'Time-bound additions an administrator issues on top of the Settings allowlist. Grants extend the patterns the `craft_command` tool may dispatch, and expire automatically — revoke one early with the trash action.'|t('cortex') }}
+        {{ 'Time-bound additions an administrator issues on top of the Settings allowlist. Grants extend the patterns the `craft_command` tool may dispatch, and expire automatically — revoke one early with the trash action.'|t('herald') }}
     </p>
 
-    <div id="cortex-allowlist-vue-admin-table"></div>
+    <div id="herald-allowlist-vue-admin-table"></div>
 
     {# ---------------------------------------------------------------------
        Effective allowlist right now — the combined, deduplicated result the
@@ -63,22 +63,22 @@
        expiry. Read-only — this is a status panel, not an editor.
        --------------------------------------------------------------------- #}
     <div class="pane" style="margin-top: 24px;">
-        <h2>{{ 'Effective allowlist right now'|t('cortex') }}</h2>
+        <h2>{{ 'Effective allowlist right now'|t('herald') }}</h2>
         <p class="light">
-            {{ 'The deduplicated set of patterns the `craft_command` tool may dispatch this moment: the Settings allowlist plus every active grant below.'|t('cortex') }}
+            {{ 'The deduplicated set of patterns the `craft_command` tool may dispatch this moment: the Settings allowlist plus every active grant below.'|t('herald') }}
         </p>
         <p class="light">
-            {{ 'Admin-level patterns only appear here while `allowAdminChanges` is enabled — it is currently {state}.'|t('cortex', {
-                state: allowAdminChanges ? 'on'|t('cortex') : 'off'|t('cortex'),
+            {{ 'Admin-level patterns only appear here while `allowAdminChanges` is enabled — it is currently {state}.'|t('herald', {
+                state: allowAdminChanges ? 'on'|t('herald') : 'off'|t('herald'),
             }) }}
         </p>
 
-        <table class="data fullwidth cortex-table">
+        <table class="data fullwidth herald-table">
             <thead>
                 <tr>
-                    <th scope="col">{{ 'Pattern'|t('cortex') }}</th>
-                    <th scope="col">{{ 'Source'|t('cortex') }}</th>
-                    <th scope="col">{{ 'Expires'|t('cortex') }}</th>
+                    <th scope="col">{{ 'Pattern'|t('herald') }}</th>
+                    <th scope="col">{{ 'Source'|t('herald') }}</th>
+                    <th scope="col">{{ 'Expires'|t('herald') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -86,14 +86,14 @@
                     {% set grantExpiry = grantExpiryByPattern[pattern] ?? null %}
                     {% set isAdminLevel = adminLevelPatterns[pattern] ?? false %}
                     <tr>
-                        <td><code class="cortex-token-prefix">{{ pattern }}</code></td>
+                        <td><code class="herald-token-prefix">{{ pattern }}</code></td>
                         <td>
                             {% if grantExpiry is not null %}
-                                {{ 'Grant'|t('cortex') }}
+                                {{ 'Grant'|t('herald') }}
                             {% elseif isAdminLevel %}
-                                {{ 'Admin-level'|t('cortex') }}
+                                {{ 'Admin-level'|t('herald') }}
                             {% else %}
-                                <span class="light">{{ 'Settings'|t('cortex') }}</span>
+                                <span class="light">{{ 'Settings'|t('herald') }}</span>
                             {% endif %}
                         </td>
                         <td>
@@ -112,7 +112,7 @@
 
 {% js %}
     (function() {
-        var tableContainer = '#cortex-allowlist-vue-admin-table';
+        var tableContainer = '#herald-allowlist-vue-admin-table';
 
         function renderPatternCell(value) {
             // VueAdminTable callbacks receive ONLY the cell value — the
@@ -120,7 +120,7 @@
             // the expired flag travels inside the value.
             var pattern = Craft.escapeHtml((value && value.pattern) || '');
             var muted = value && value.isExpired ? ' style="opacity:0.55"' : '';
-            return '<code class="cortex-token-prefix"' + muted + '>' + pattern + '</code>';
+            return '<code class="herald-token-prefix"' + muted + '>' + pattern + '</code>';
         }
 
         function renderNoteCell(value) {
@@ -134,7 +134,7 @@
             // `value` is the `{value, isExpired}` composite from
             // `_serializeOverrideRow` — null `value.value` means never.
             if (!value || !value.value) {
-                return '<span class="light">' + Craft.t('cortex', 'Never') + '</span>';
+                return '<span class="light">' + Craft.t('herald', 'Never') + '</span>';
             }
 
             var expiresAt = new Date(value.value);
@@ -143,7 +143,7 @@
                 return (
                     '<span style="opacity:0.55">' +
                     Craft.escapeHtml(formatted) +
-                    ' <span class="light">(' + Craft.t('cortex', 'expired') + ')</span>' +
+                    ' <span class="light">(' + Craft.t('herald', 'expired') + ')</span>' +
                     '</span>'
                 );
             }
@@ -172,29 +172,29 @@
         var columns = [
             {
                 name: 'pattern',
-                title: Craft.t('cortex', 'Pattern'),
+                title: Craft.t('herald', 'Pattern'),
                 sortField: 'pattern',
                 callback: renderPatternCell,
             },
             {
                 name: 'note',
-                title: Craft.t('cortex', 'Note'),
+                title: Craft.t('herald', 'Note'),
                 callback: renderNoteCell,
             },
             {
                 name: 'expiresAt',
-                title: Craft.t('cortex', 'Expires'),
+                title: Craft.t('herald', 'Expires'),
                 sortField: 'expiresAt',
                 callback: renderExpiresCell,
             },
             {
                 name: 'createdBy',
-                title: Craft.t('cortex', 'Created by'),
+                title: Craft.t('herald', 'Created by'),
                 callback: renderCreatedByCell,
             },
             {
                 name: 'dateCreated',
-                title: Craft.t('cortex', 'Created'),
+                title: Craft.t('herald', 'Created'),
                 sortField: 'dateCreated',
                 callback: renderDateCreatedCell,
             },
@@ -203,18 +203,18 @@
         var adminTable = new Craft.VueAdminTable({
             container: tableContainer,
             columns: columns,
-            tableDataEndpoint: 'cortex/settings/allowlist-table-data',
-            deleteAction: 'cortex/settings/remove-override',
-            deleteConfirmationMessage: Craft.t('cortex', 'Are you sure you want to remove the grant “{name}”?'),
-            deleteSuccessMessage: Craft.t('cortex', 'Grant removed.'),
-            emptyMessage: Craft.t('cortex', 'No grants issued yet.'),
+            tableDataEndpoint: 'herald/settings/allowlist-table-data',
+            deleteAction: 'herald/settings/remove-override',
+            deleteConfirmationMessage: Craft.t('herald', 'Are you sure you want to remove the grant “{name}”?'),
+            deleteSuccessMessage: Craft.t('herald', 'Grant removed.'),
+            emptyMessage: Craft.t('herald', 'No grants issued yet.'),
             search: true,
-            searchPlaceholder: Craft.t('cortex', 'Search grants'),
+            searchPlaceholder: Craft.t('herald', 'Search grants'),
             buttons: [
                 {
-                    label: Craft.t('cortex', 'Issue grant'),
+                    label: Craft.t('herald', 'Issue grant'),
                     icon: 'plus',
-                    href: '#cortex-allowlist-add-override',
+                    href: '#herald-allowlist-add-override',
                     enabled: function() { return true; },
                 },
             ],
@@ -225,17 +225,17 @@
         // for clicks on that exact href so the handler is locale-proof
         // (label-text matching would break under non-English CP).
         document.addEventListener('click', function(event) {
-            var target = event.target.closest('a[href="#cortex-allowlist-add-override"]');
+            var target = event.target.closest('a[href="#herald-allowlist-add-override"]');
             if (!target) {
                 return;
             }
             event.preventDefault();
-            window.Cortex.openAllowlistOverrideSlideout(adminTable);
+            window.Herald.openAllowlistOverrideSlideout(adminTable);
         });
 
         // Expose the table on the window so the slideout can call
         // .reload() after a successful issuance. Per-tab scope only —
         // 9.5 (Tokens) gets its own handle on its own tab.
-        window.cortexAllowlistTable = adminTable;
+        window.heraldAllowlistTable = adminTable;
     })();
 {% endjs %}

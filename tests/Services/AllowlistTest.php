@@ -6,7 +6,7 @@
  * expiry semantics, and pruning.
  *
  * Each test cleans up its overrides at the end so the table is left in
- * the same state it started in. The playground keeps cortex installed
+ * the same state it started in. The playground keeps herald installed
  * across runs, so isolation matters.
  * =========================================================================
  *
@@ -15,12 +15,12 @@
  */
 
 use Carbon\Carbon;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\records\RuntimeOverride;
+use craftpulse\herald\Herald;
+use craftpulse\herald\records\RuntimeOverride;
 use yii\base\Exception;
 
 beforeEach(function() {
-    $this->service = Cortex::getInstance()->allowlist;
+    $this->service = Herald::getInstance()->allowlist;
 });
 
 afterEach(function() {
@@ -146,7 +146,7 @@ it('remove() throws when the soft-delete save fails', function() {
 it('craft_command tool resolves allowlist through the service', function() {
     $this->service->add('_test_/special-route');
 
-    $tool = Cortex::getInstance()->tools->getByName('craft_command');
+    $tool = Herald::getInstance()->tools->getByName('craft_command');
     $result = $tool->execute(['mode' => 'list']);
 
     expect($result['patterns'])->toContain('_test_/special-route');
@@ -255,11 +255,11 @@ it('classifies the pc alias as admin-level so it cannot bypass the gate via proj
 it('getCommandGroups includes enabled-plugin console commands', function() {
     $groups = $this->service->getCommandGroups();
 
-    // Cortex itself ships console controllers under
-    // `craftpulse\cortex\console\controllers` — at minimum `cortex/serve`.
-    expect($groups)->toHaveKey('cortex');
-    $ids = array_column($groups['cortex']['actions'], 'id');
-    expect($ids)->toContain('cortex/serve');
+    // Herald itself ships console controllers under
+    // `craftpulse\herald\console\controllers` — at minimum `herald/serve`.
+    expect($groups)->toHaveKey('herald');
+    $ids = array_column($groups['herald']['actions'], 'id');
+    expect($ids)->toContain('herald/serve');
 });
 
 it('mapPatternsToToggleState flags a group/* glob as fullToggle', function() {
@@ -491,7 +491,7 @@ it('pruneExpired caps the per-call delete count at PRUNE_BATCH_LIMIT', function(
     // pruneExpired, assert the return is exactly PRUNE_BATCH_LIMIT
     // (the LIMIT short-circuits), then call again and assert the
     // remainder (5) is pruned.
-    $cap = \craftpulse\cortex\services\Allowlist::PRUNE_BATCH_LIMIT;
+    $cap = \craftpulse\herald\services\Allowlist::PRUNE_BATCH_LIMIT;
     $surplus = 5;
     $past = Carbon::now()->subSecond()->toDateTimeString();
 

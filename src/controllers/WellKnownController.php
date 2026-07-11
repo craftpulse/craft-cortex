@@ -1,9 +1,9 @@
 <?php
 
-namespace craftpulse\cortex\controllers;
+namespace craftpulse\herald\controllers;
 
 use craft\helpers\UrlHelper;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 use yii\web\Response;
 
 /**
@@ -13,14 +13,14 @@ use yii\web\Response;
  * endpoints.
  *
  * Both are open, anonymous-allowed reads. Both return static JSON
- * derived from cortex's settings + Craft's absolute-URL helper —
+ * derived from herald's settings + Craft's absolute-URL helper —
  * no DB hits, no session, no auth. CSRF stays disabled because the
  * endpoints are GET-only and the responses carry no client state.
  *
  * RFC 8414 §3 and RFC 9728 §3 both mandate that the metadata sit at
  * the root of the issuer URL — under `/.well-known/...`, not under
  * any path prefix. The plugin URL rules register them at site root
- * accordingly (`Cortex::init()`).
+ * accordingly (`Herald::init()`).
  *
  * Extends `AbstractOauthController` for the shared `httpEnabled` kill
  * switch — both metadata documents return 503 when the HTTP transport
@@ -53,7 +53,7 @@ class WellKnownController extends AbstractOauthController
 
     /**
      * RFC 8414 Authorization Server Metadata. Static JSON describing
-     * cortex's OAuth surface — issuer URL, supported scopes, grant
+     * herald's OAuth surface — issuer URL, supported scopes, grant
      * types, PKCE methods, etc. Clients use this for discovery
      * before initiating the AuthCode flow.
      *
@@ -73,7 +73,7 @@ class WellKnownController extends AbstractOauthController
      */
     public function actionAuthorizationServer(): Response
     {
-        $settings = Cortex::getInstance()->getSettings();
+        $settings = Herald::getInstance()->getSettings();
         $issuer = UrlHelper::baseSiteUrl();
         $issuer = rtrim($issuer, '/');
 
@@ -82,7 +82,7 @@ class WellKnownController extends AbstractOauthController
             'authorization_endpoint' => UrlHelper::siteUrl('oauth/authorize'),
             'token_endpoint' => UrlHelper::siteUrl('oauth/token'),
             'revocation_endpoint' => UrlHelper::siteUrl('oauth/revoke'),
-            'scopes_supported' => Cortex::getInstance()->scopes->all(),
+            'scopes_supported' => Herald::getInstance()->scopes->all(),
             'response_types_supported' => ['code'],
             'grant_types_supported' => ['authorization_code', 'refresh_token'],
             'code_challenge_methods_supported' => ['S256'],
@@ -115,11 +115,11 @@ class WellKnownController extends AbstractOauthController
     public function actionProtectedResource(): Response
     {
         $metadata = [
-            'resource' => UrlHelper::siteUrl('cortex/mcp'),
+            'resource' => UrlHelper::siteUrl('herald/mcp'),
             'authorization_servers' => [rtrim(UrlHelper::baseSiteUrl(), '/')],
-            'scopes_supported' => Cortex::getInstance()->scopes->all(),
+            'scopes_supported' => Herald::getInstance()->scopes->all(),
             'bearer_methods_supported' => ['header'],
-            'resource_documentation' => 'https://github.com/craftpulse/craft-cortex',
+            'resource_documentation' => 'https://github.com/craftpulse/craft-herald',
         ];
 
         return $this->asJson($metadata);

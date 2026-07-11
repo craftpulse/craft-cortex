@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tools\support;
+namespace craftpulse\herald\tools\support;
 
 use Closure;
 use Fiber;
@@ -67,7 +67,7 @@ use yii\base\Event;
  *
  * # PHP Fiber availability
  *
- * Fibers require PHP >= 8.1. Cortex declares `>=8.2` in composer.json
+ * Fibers require PHP >= 8.1. Herald declares `>=8.2` in composer.json
  * so the language feature is always present.
  *
  * # Hard invariants

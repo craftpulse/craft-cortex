@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tools\support;
+namespace craftpulse\herald\tools\support;
 
 use php_user_filter;
 
@@ -19,7 +19,7 @@ use php_user_filter;
  * and detaches it after, so JSON-RPC output passes through unfiltered
  * outside of tool dispatch.
  *
- * Registered with `stream_filter_register('cortex.capture', ...)` lazily
+ * Registered with `stream_filter_register('herald.capture', ...)` lazily
  * inside `ConsoleRunner::run()` on first use; subsequent runs reuse the
  * same registration. The HTTP transport runs in PHP-FPM where STDOUT
  * capture is irrelevant, but the same helper is used there for

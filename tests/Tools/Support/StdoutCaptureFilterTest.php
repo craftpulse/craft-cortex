@@ -6,7 +6,7 @@
  * `ConsoleRunner` re-entrancy guard (FIX 6).
  *
  * The filter is what keeps a dispatched console command's stdout/stderr
- * off the JSON-RPC channel `cortex/serve` owns: during a capturing
+ * off the JSON-RPC channel `herald/serve` owns: during a capturing
  * window it buffers writes and suppresses the underlying write; outside
  * the window it passes through. Its static `$capturing` / `$buffer`
  * assume strict single-flight, so a nested `ConsoleRunner::run()` would
@@ -17,11 +17,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\tools\support\ConsoleRunner;
-use craftpulse\cortex\tools\support\StdoutCaptureFilter;
+use craftpulse\herald\tools\support\ConsoleRunner;
+use craftpulse\herald\tools\support\StdoutCaptureFilter;
 
 beforeEach(function() {
-    stream_filter_register('cortex.capture.test', StdoutCaptureFilter::class);
+    stream_filter_register('herald.capture.test', StdoutCaptureFilter::class);
     StdoutCaptureFilter::$buffer = '';
     StdoutCaptureFilter::$capturing = false;
 });
@@ -33,7 +33,7 @@ afterEach(function() {
 
 it('suppresses the underlying write and buffers during a capturing window', function() {
     $stream = fopen('php://temp', 'r+');
-    $filter = stream_filter_append($stream, 'cortex.capture.test', STREAM_FILTER_WRITE);
+    $filter = stream_filter_append($stream, 'herald.capture.test', STREAM_FILTER_WRITE);
 
     StdoutCaptureFilter::$capturing = true;
     fwrite($stream, 'captured-output');
@@ -51,7 +51,7 @@ it('suppresses the underlying write and buffers during a capturing window', func
 
 it('passes through to the underlying stream outside a capturing window', function() {
     $stream = fopen('php://temp', 'r+');
-    $filter = stream_filter_append($stream, 'cortex.capture.test', STREAM_FILTER_WRITE);
+    $filter = stream_filter_append($stream, 'herald.capture.test', STREAM_FILTER_WRITE);
 
     StdoutCaptureFilter::$capturing = false;
     fwrite($stream, 'normal-output');

@@ -4,8 +4,8 @@
    Token-issuance slideout body partial.
 
    Rendered by `actionTokenIssueSlideout` and fetched via
-   `Craft.sendActionRequest('GET', 'cortex/settings/token-issue-slideout')` from
-   `Cortex.openTokenIssuanceSlideout()`. The action returns
+   `Craft.sendActionRequest('GET', 'herald/settings/token-issue-slideout')` from
+   `Herald.openTokenIssuanceSlideout()`. The action returns
    `{html, headHtml, bodyHtml}` JSON: `html` is this fragment (passed into
    `new Craft.Slideout(html, {containerElement: 'form', ...})` — the
    slideout container supplies the `<form>` shell) and the head/body
@@ -13,11 +13,11 @@
    the view (a bare-fragment response would ship the user picker dead).
 
    Two states share one fragment:
-     1. `[data-cortex-issue-form]` — the issue form (name, user, TTL).
+     1. `[data-herald-issue-form]` — the issue form (name, user, TTL).
         Visible on open.
-     2. `[data-cortex-reveal]`     — the one-time plaintext reveal.
+     2. `[data-herald-reveal]`     — the one-time plaintext reveal.
         Hidden on open; the JS un-hides it and injects the plaintext
-        into `[data-cortex-token]` after `cortex/settings/issue-token` returns
+        into `[data-herald-token]` after `herald/settings/issue-token` returns
         200. The plaintext lives ONLY in this DOM node and the JSON
         response that produced it — never in a URL, a flash, or a log.
 
@@ -26,46 +26,46 @@
    it.
    ========================================================================= #}
 
-<div class="so-body" data-cortex-form>
+<div class="so-body" data-herald-form>
     {# ---- State 1: issue form ------------------------------------------ #}
-    <div data-cortex-issue-form>
+    <div data-herald-issue-form>
         <header class="pane-header">
-            <h2 class="screen-title">{{ 'Issue bearer token'|t('cortex') }}</h2>
+            <h2 class="screen-title">{{ 'Issue bearer token'|t('herald') }}</h2>
         </header>
 
         <div class="so-content padded">
             <p class="light">
-                {{ 'Mint a credential for the Streamable HTTP transport, bound to a Craft user. The plaintext is revealed once on the next screen and cannot be retrieved again.'|t('cortex') }}
+                {{ 'Mint a credential for the Streamable HTTP transport, bound to a Craft user. The plaintext is revealed once on the next screen and cannot be retrieved again.'|t('herald') }}
             </p>
 
             {{ csrfInput() }}
 
             {{ forms.textField({
-                label: 'Name'|t('cortex'),
-                instructions: 'A human-readable label for the token. Leave blank to auto-name it.'|t('cortex'),
-                id: 'cortex-token-name',
+                label: 'Name'|t('herald'),
+                instructions: 'A human-readable label for the token. Leave blank to auto-name it.'|t('herald'),
+                id: 'herald-token-name',
                 name: 'name',
                 autofocus: true,
-                placeholder: 'claude-desktop'|t('cortex'),
+                placeholder: 'claude-desktop'|t('herald'),
             }) }}
 
             {{ forms.elementSelectField({
-                label: 'User'|t('cortex'),
-                instructions: 'The Craft user this token authenticates as. Tool calls run with this user’s permissions.'|t('cortex'),
-                id: 'cortex-token-user',
+                label: 'User'|t('herald'),
+                instructions: 'The Craft user this token authenticates as. Tool calls run with this user’s permissions.'|t('herald'),
+                id: 'herald-token-user',
                 name: 'userId',
                 elementType: 'craft\\elements\\User',
                 limit: 1,
                 required: true,
-                selectionLabel: 'Choose a user'|t('cortex'),
+                selectionLabel: 'Choose a user'|t('herald'),
             }) }}
 
             {{ forms.textField({
-                label: 'Expires in (seconds)'|t('cortex'),
-                instructions: 'Leave blank to use the plugin default ({default}).'|t('cortex', {
-                    default: settings.tokenTtlDefault ?? 'no expiry'|t('cortex'),
+                label: 'Expires in (seconds)'|t('herald'),
+                instructions: 'Leave blank to use the plugin default ({default}).'|t('herald', {
+                    default: settings.tokenTtlDefault ?? 'no expiry'|t('herald'),
                 }),
-                id: 'cortex-token-ttl',
+                id: 'herald-token-ttl',
                 name: 'ttlSeconds',
                 type: 'number',
                 min: 60,
@@ -75,45 +75,45 @@
 
         <footer class="so-footer">
             <div class="flex flex-nowrap">
-                <button type="button" class="btn" data-cortex-cancel>{{ 'Cancel'|t('app') }}</button>
+                <button type="button" class="btn" data-herald-cancel>{{ 'Cancel'|t('app') }}</button>
                 <div class="flex-grow"></div>
-                <button type="submit" class="btn submit" data-cortex-submit>{{ 'Issue token'|t('cortex') }}</button>
+                <button type="submit" class="btn submit" data-herald-submit>{{ 'Issue token'|t('herald') }}</button>
             </div>
         </footer>
     </div>
 
     {# ---- State 2: one-time plaintext reveal --------------------------- #}
-    <div data-cortex-reveal hidden>
+    <div data-herald-reveal hidden>
         <header class="pane-header">
-            <h2 class="screen-title">{{ 'Token issued'|t('cortex') }}</h2>
+            <h2 class="screen-title">{{ 'Token issued'|t('herald') }}</h2>
         </header>
 
         <div class="so-content padded">
             <div class="readable">
                 <blockquote class="note warning" role="alert">
-                    {{ 'Copy this token now — it will not be shown again. Cortex stores only a hash; there is no way to recover the plaintext later.'|t('cortex') }}
+                    {{ 'Copy this token now — it will not be shown again. Herald stores only a hash; there is no way to recover the plaintext later.'|t('herald') }}
                 </blockquote>
             </div>
 
             <div class="field">
                 <div class="heading">
-                    <label id="cortex-token-plaintext-label">{{ 'Bearer token'|t('cortex') }}</label>
+                    <label id="herald-token-plaintext-label">{{ 'Bearer token'|t('herald') }}</label>
                 </div>
                 <div class="input">
-                    <div class="flex flex-nowrap cortex-token-reveal">
+                    <div class="flex flex-nowrap herald-token-reveal">
                         <code
-                            class="cortex-token-plaintext"
-                            data-cortex-token
-                            aria-labelledby="cortex-token-plaintext-label"
+                            class="herald-token-plaintext"
+                            data-herald-token
+                            aria-labelledby="herald-token-plaintext-label"
                         ></code>
                         <button
                             type="button"
                             class="btn"
-                            data-cortex-copy
-                            aria-label="{{ 'Copy token to clipboard'|t('cortex') }}"
+                            data-herald-copy
+                            aria-label="{{ 'Copy token to clipboard'|t('herald') }}"
                         >
                             <span data-icon="clipboard" aria-hidden="true"></span>
-                            {{ 'Copy'|t('cortex') }}
+                            {{ 'Copy'|t('herald') }}
                         </button>
                     </div>
                 </div>
@@ -124,14 +124,14 @@
             <p
                 class="visually-hidden"
                 aria-live="polite"
-                data-cortex-copy-status
+                data-herald-copy-status
             ></p>
         </div>
 
         <footer class="so-footer">
             <div class="flex flex-nowrap">
                 <div class="flex-grow"></div>
-                <button type="button" class="btn submit" data-cortex-done>{{ 'Done'|t('cortex') }}</button>
+                <button type="button" class="btn submit" data-herald-done>{{ 'Done'|t('herald') }}</button>
             </div>
         </footer>
     </div>

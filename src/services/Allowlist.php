@@ -1,11 +1,11 @@
 <?php
 
-namespace craftpulse\cortex\services;
+namespace craftpulse\herald\services;
 
 use Carbon\Carbon;
 use Craft;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\records\RuntimeOverride;
+use craftpulse\herald\Herald;
+use craftpulse\herald\records\RuntimeOverride;
 use ReflectionClass;
 use ReflectionMethod;
 use Throwable;
@@ -22,12 +22,12 @@ use yii\helpers\Inflector;
  * patterns it may dispatch. The list is the union of:
  *
  *   1. `Settings::$allowedCommands` — defaults baked into the plugin
- *      and overridable from project config or `config/cortex.php`.
+ *      and overridable from project config or `config/herald.php`.
  *   2. Active runtime overrides — DB rows that haven't been
  *      soft-deleted and whose `expiresAt` is null or in the future.
  *
  * The CP allowlist UI drives the runtime-override surface — admins
- * add a pattern with an optional note and TTL; cortex grants the
+ * add a pattern with an optional note and TTL; herald grants the
  * pattern until expiry; `pruneExpired()` sweeps expired rows during
  * Craft's gc.
  *
@@ -102,7 +102,7 @@ class Allowlist extends Component
      *
      * @since 5.0.0
      */
-    public const COMMAND_GROUPS_CACHE_KEY = 'cortex.commandGroups.v1';
+    public const COMMAND_GROUPS_CACHE_KEY = 'herald.commandGroups.v1';
 
     /**
      * TTL (seconds) for the enumerated command-groups cache. One hour —
@@ -154,7 +154,7 @@ class Allowlist extends Component
      */
     public function getEffective(): array
     {
-        $settings = Cortex::getInstance()->getSettings();
+        $settings = Herald::getInstance()->getSettings();
         $defaults = $settings->allowedCommands;
 
         if (Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
@@ -228,7 +228,7 @@ class Allowlist extends Component
      * `Application` cannot be spun up inside a live web request (Craft's
      * bootstrap is single-application per process), and `ConsoleRunner`
      * attaches stream filters to `STDOUT`/`STDERR` — fine under
-     * `cortex/serve`, corrupting in a CP page render. Instead we walk the
+     * `herald/serve`, corrupting in a CP page render. Instead we walk the
      * same sources Yii's `HelpController::getModuleCommands()` walks —
      * controller directories resolved from known namespaces — and reflect
      * each controller's public `action*` methods exactly as
@@ -564,7 +564,7 @@ class Allowlist extends Component
         ?string $note = null,
         ?int $ttlSeconds = null,
     ): RuntimeOverride {
-        $ttl = $ttlSeconds ?? Cortex::getInstance()->getSettings()->runtimeOverrideTtl;
+        $ttl = $ttlSeconds ?? Herald::getInstance()->getSettings()->runtimeOverrideTtl;
 
         $override = new RuntimeOverride();
         $override->pattern = $pattern;
@@ -599,7 +599,7 @@ class Allowlist extends Component
 
     /**
      * Hard-delete expired overrides in capped batches. Invoked during
-     * Craft's gc sweep via the listener registered in `Cortex::init()`.
+     * Craft's gc sweep via the listener registered in `Herald::init()`.
      * Returns the number of rows pruned in this call.
      *
      * The cap (`PRUNE_BATCH_LIMIT`) bounds gc's worst-case runtime when
@@ -771,7 +771,7 @@ class Allowlist extends Component
      * Craft commands, `{pluginHandle}/` for plugin commands. It mirrors
      * `HelpController::getModuleCommands()`'s `$module->getUniqueId() . '/'`
      * prefix so the enumerated route ids match what the dispatcher and the
-     * `fnmatch` allowlist actually see (`cortex/serve`, not `serve`).
+     * `fnmatch` allowlist actually see (`herald/serve`, not `serve`).
      *
      * @param array<string,array{source:string,actions:array<string,array{id:string,action:string}>}> $groups
      *
@@ -874,7 +874,7 @@ class Allowlist extends Component
      * the file-scan path and the `coreCommands()`-alias path agree:
      *
      *   - The default `index` action dispatches as the bare controller id
-     *     (`up`, or `cortex/serve` under a plugin prefix).
+     *     (`up`, or `herald/serve` under a plugin prefix).
      *   - A non-`index` action that IS the controller's `$defaultAction`
      *     (e.g. `GcController::$defaultAction = 'run'`) is registered
      *     under BOTH its explicit `{controllerId}/{action}` route AND a
@@ -1012,7 +1012,7 @@ class Allowlist extends Component
     /**
      * Top-level package namespace for a plugin class — the segment before
      * `\` boundaries that holds `console\controllers`. For
-     * `craftpulse\cortex\Cortex` returns `craftpulse\cortex`. Returns null
+     * `craftpulse\herald\Herald` returns `craftpulse\herald`. Returns null
      * when the class is not namespaced (defensive — every Craft plugin is).
      *
      * @author Craftpulse

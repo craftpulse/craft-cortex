@@ -6,10 +6,10 @@
  */
 
 use craft\base\ElementInterface;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('element_types');
+    $this->tool = Herald::getInstance()->tools->getByName('element_types');
 });
 
 it('lists every registered element type with capability flags', function() {

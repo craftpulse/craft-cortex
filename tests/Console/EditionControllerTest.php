@@ -2,7 +2,7 @@
 
 /**
  * =========================================================================
- * EditionController tests — verify `cortex/edition/show` prints the
+ * EditionController tests — verify `herald/edition/show` prints the
  * active edition handle, the full editions list, and the `is(pro)`
  * flag on a default Free install, and that flipping to Pro flips the
  * output.
@@ -18,8 +18,8 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\console\controllers\EditionController;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\console\controllers\EditionController;
+use craftpulse\herald\Herald;
 
 // -----------------------------------------------------------------------------
 // Harness
@@ -30,7 +30,7 @@ use craftpulse\cortex\Cortex;
  * public buffer instead of the file descriptors so tests can read
  * what the action printed.
  */
-class _CortexEditionControllerHarness extends EditionController
+class _HeraldEditionControllerHarness extends EditionController
 {
     public string $captured = '';
 
@@ -47,9 +47,9 @@ class _CortexEditionControllerHarness extends EditionController
     }
 }
 
-function _cortex_edition_harness(): _CortexEditionControllerHarness
+function _herald_edition_harness(): _HeraldEditionControllerHarness
 {
-    return new _CortexEditionControllerHarness('edition', Craft::$app);
+    return new _HeraldEditionControllerHarness('edition', Craft::$app);
 }
 
 // -----------------------------------------------------------------------------
@@ -57,11 +57,11 @@ function _cortex_edition_harness(): _CortexEditionControllerHarness
 // -----------------------------------------------------------------------------
 
 it('show exits OK and prints the current edition on a default Free install', function() {
-    $controller = _cortex_edition_harness();
+    $controller = _herald_edition_harness();
     $exit = $controller->actionShow();
 
     expect($exit)->toBe(0);
-    expect($controller->captured)->toContain('Cortex edition');
+    expect($controller->captured)->toContain('Herald edition');
     expect($controller->captured)->toContain('edition:');
     expect($controller->captured)->toContain('free');
     expect($controller->captured)->toContain('is(pro):');
@@ -69,20 +69,20 @@ it('show exits OK and prints the current edition on a default Free install', fun
 });
 
 it('show prints the full editions list', function() {
-    $controller = _cortex_edition_harness();
+    $controller = _herald_edition_harness();
     $exit = $controller->actionShow();
 
     expect($exit)->toBe(0);
     // The list shape is `[free, pro]` — assert both handles appear
     // inside the line so a future Commerce edition appended to
-    // `Cortex::editions()` doesn't silently break the contract.
-    expect($controller->captured)->toContain(Cortex::EDITION_FREE);
-    expect($controller->captured)->toContain(Cortex::EDITION_PRO);
+    // `Herald::editions()` doesn't silently break the contract.
+    expect($controller->captured)->toContain(Herald::EDITION_FREE);
+    expect($controller->captured)->toContain(Herald::EDITION_PRO);
 });
 
 it('show prints pro / is(pro): true when the edition is flipped', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $controller = _cortex_edition_harness();
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $controller = _herald_edition_harness();
         $exit = $controller->actionShow();
 
         expect($exit)->toBe(0);

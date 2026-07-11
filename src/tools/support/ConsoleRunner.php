@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tools\support;
+namespace craftpulse\herald\tools\support;
 
 use Craft;
 use RuntimeException;
@@ -12,7 +12,7 @@ use Throwable;
  *
  * Used by `craft_command`, `resave`, and `craft_exec` to execute a
  * console action while keeping its stdout/stderr off the JSON-RPC
- * channel that cortex/serve owns. The capture is achieved by attaching
+ * channel that herald/serve owns. The capture is achieved by attaching
  * a write filter to STDOUT and STDERR for the duration of the dispatch
  * (see `StdoutCaptureFilter`). Outside of dispatch, the filter is
  * detached so JSON-RPC output flows normally.
@@ -72,8 +72,8 @@ class ConsoleRunner
         StdoutCaptureFilter::$buffer = '';
         StdoutCaptureFilter::$capturing = true;
 
-        $stdoutFilter = stream_filter_append(STDOUT, 'cortex.capture', STREAM_FILTER_WRITE);
-        $stderrFilter = stream_filter_append(STDERR, 'cortex.capture', STREAM_FILTER_WRITE);
+        $stdoutFilter = stream_filter_append(STDOUT, 'herald.capture', STREAM_FILTER_WRITE);
+        $stderrFilter = stream_filter_append(STDERR, 'herald.capture', STREAM_FILTER_WRITE);
 
         $error = null;
         $exitCode = null;
@@ -119,7 +119,7 @@ class ConsoleRunner
             return;
         }
 
-        stream_filter_register('cortex.capture', StdoutCaptureFilter::class);
+        stream_filter_register('herald.capture', StdoutCaptureFilter::class);
         self::$_filterRegistered = true;
     }
 

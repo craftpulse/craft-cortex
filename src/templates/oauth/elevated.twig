@@ -18,7 +18,7 @@
 <html lang="{{ craft.app.language }}">
 <head>
     <meta charset="utf-8">
-    <title>{{ 'Elevated access granted'|t('cortex') }}</title>
+    <title>{{ 'Elevated access granted'|t('herald') }}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         :root {
@@ -49,12 +49,12 @@
 <body>
 <div class="container">
     <div class="panel">
-        <h1>{{ 'Elevated access granted'|t('cortex') }}</h1>
+        <h1>{{ 'Elevated access granted'|t('herald') }}</h1>
         <p class="lead">
-            {{ 'Your access token is now elevated for the next {minutes} minute(s). You can return to your MCP client and retry the high-stakes operation.'|t('cortex', { minutes: (ttl / 60)|round }) }}
+            {{ 'Your access token is now elevated for the next {minutes} minute(s). You can return to your MCP client and retry the high-stakes operation.'|t('herald', { minutes: (ttl / 60)|round }) }}
         </p>
         <div class="meta">
-            {{ 'Cortex OAuth — Powered by craftpulse/craft-cortex'|t('cortex') }}
+            {{ 'Herald OAuth — Powered by craftpulse/craft-herald'|t('herald') }}
         </div>
     </div>
 </div>

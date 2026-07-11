@@ -1,11 +1,11 @@
 <?php
 
-namespace craftpulse\cortex\tools\dev;
+namespace craftpulse\herald\tools\dev;
 
 use craft\helpers\App;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\StreamableToolInterface;
-use craftpulse\cortex\tools\support\InvocationContext;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\StreamableToolInterface;
+use craftpulse\herald\tools\support\InvocationContext;
 use Generator;
 
 /**
@@ -16,7 +16,7 @@ use Generator;
  * payload. Cooperatively checks the `CancellationToken` between
  * yields so `notifications/cancelled` mid-stream short-circuits.
  *
- * Gated behind the `CORTEX_STREAMING_FIXTURE` env var via
+ * Gated behind the `HERALD_STREAMING_FIXTURE` env var via
  * `shouldRegister()` — production installs leave the env var unset and
  * the tool never appears in `tools/list`. Operators flipping the env
  * var to truthy get a known-shape streaming endpoint they can hit with
@@ -69,14 +69,14 @@ final class StreamingFixtureTool extends AbstractTool implements StreamableToolI
      */
     public static function getDescription(): string
     {
-        return 'Operator-facing streaming smoke-test fixture (Gate 7.7). Gated behind the CORTEX_STREAMING_FIXTURE env var.';
+        return 'Operator-facing streaming smoke-test fixture (Gate 7.7). Gated behind the HERALD_STREAMING_FIXTURE env var.';
     }
 
     /**
      * @inheritdoc
      *
      * Opt-in registration. The fixture only joins the registry when an
-     * operator explicitly flips `CORTEX_STREAMING_FIXTURE=1` in their
+     * operator explicitly flips `HERALD_STREAMING_FIXTURE=1` in their
      * environment — production installs that never set the var never
      * see the tool surface in `tools/list`.
      *
@@ -85,7 +85,7 @@ final class StreamingFixtureTool extends AbstractTool implements StreamableToolI
      */
     public static function shouldRegister(): bool
     {
-        return (bool) App::env('CORTEX_STREAMING_FIXTURE');
+        return (bool) App::env('HERALD_STREAMING_FIXTURE');
     }
 
     /**

@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\services;
+namespace craftpulse\herald\services;
 
 use Craft;
 use craft\base\MemoizableArray;
@@ -8,18 +8,18 @@ use craft\events\ConfigEvent;
 use craft\helpers\ProjectConfig as ProjectConfigHelper;
 use craft\models\FieldLayout;
 use craft\models\FieldLayoutTab;
-use craftpulse\cortex\elements\Skill;
+use craftpulse\herald\elements\Skill;
 use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
 use yii\base\Component;
 
 /**
  * =========================================================================
- * Cortex skills service.
+ * Herald skills service.
  *
  * Three responsibilities:
  *
  *   1. **Field-layout management** for the `Skill` element. The layout
- *      is PC-stored at `plugins.cortex.skillFieldLayout` (single UID,
+ *      is PC-stored at `plugins.herald.skillFieldLayout` (single UID,
  *      single layout — mirroring `Addresses::handleChangedAddressFieldLayout`).
  *      `getFieldLayout()` is lazy-seeding: on first access it returns
  *      the persisted layout if one exists, or a fresh in-memory layout
@@ -58,7 +58,7 @@ class Skills extends Component
      *
      * @since 5.0.0
      */
-    public const CONFIG_FIELDLAYOUT_PATH = 'plugins.cortex.skillFieldLayout';
+    public const CONFIG_FIELDLAYOUT_PATH = 'plugins.herald.skillFieldLayout';
 
     /**
      * Default body-field handle on the seeded field layout. Plain-text
@@ -106,7 +106,7 @@ class Skills extends Component
     // =========================================================================
 
     /**
-     * Returns the Cortex Skill field layout, seeding a default in-
+     * Returns the Herald Skill field layout, seeding a default in-
      * memory layout when none exists yet. The seeded layout is NOT
      * automatically persisted to PC — callers either re-save through
      * `saveFieldLayout()` (which writes to PC) or accept the in-memory
@@ -139,7 +139,7 @@ class Skills extends Component
         if (!$firstTab) {
             $firstTab = new FieldLayoutTab([
                 'layout' => $fieldLayout,
-                'name' => Craft::t('cortex', 'Content'),
+                'name' => Craft::t('herald', 'Content'),
             ]);
             $fieldLayout->setTabs([$firstTab]);
         }
@@ -148,7 +148,7 @@ class Skills extends Component
     }
 
     /**
-     * Persist the Cortex Skill field layout to project config. Single
+     * Persist the Herald Skill field layout to project config. Single
      * layout, single UID, single PC entry — same shape as Addresses.
      *
      * @param FieldLayout $layout
@@ -167,7 +167,7 @@ class Skills extends Component
         Craft::$app->getProjectConfig()->set(
             self::CONFIG_FIELDLAYOUT_PATH,
             [$layout->uid => $layout->getConfig()],
-            'Save the Cortex skill field layout',
+            'Save the Herald skill field layout',
         );
 
         return true;

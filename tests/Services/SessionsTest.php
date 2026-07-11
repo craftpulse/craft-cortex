@@ -16,12 +16,12 @@
  */
 
 use Carbon\Carbon;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\mcp\Session;
-use craftpulse\cortex\services\Sessions;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Session;
+use craftpulse\herald\services\Sessions;
 
 beforeEach(function() {
-    $this->service = Cortex::getInstance()->sessions;
+    $this->service = Herald::getInstance()->sessions;
 });
 
 it('create() generates a fresh id and round-trips through get()', function() {
@@ -124,8 +124,8 @@ it('Session::toArray() / fromArray() round-trips with no drift', function() {
     expect($rebuilt->createdAt->getTimestamp())->toBe($session->createdAt->getTimestamp());
 });
 
-it('the cache key prefix is namespaced under cortex:session:', function() {
+it('the cache key prefix is namespaced under herald:session:', function() {
     // Defensive — if the constant ever drifts, lookups will break
     // across deploys; pin the value.
-    expect(Sessions::CACHE_KEY_PREFIX)->toBe('cortex:session:');
+    expect(Sessions::CACHE_KEY_PREFIX)->toBe('herald:session:');
 });

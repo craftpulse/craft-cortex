@@ -6,7 +6,7 @@
  * tools, prompts, and resources via class-level Yii events.
  *
  * Each test instantiates a fresh service (not the singleton on
- * Cortex::getInstance()) so the event fires in init() with the listener
+ * Herald::getInstance()) so the event fires in init() with the listener
  * already attached. Listeners are detached in afterEach to avoid leakage
  * across tests.
  * =========================================================================
@@ -15,15 +15,15 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\events\RegisterPromptsEvent;
-use craftpulse\cortex\events\RegisterResourcesEvent;
-use craftpulse\cortex\events\RegisterToolsEvent;
-use craftpulse\cortex\prompts\PromptInterface;
-use craftpulse\cortex\resources\ResourceInterface;
-use craftpulse\cortex\services\Prompts;
-use craftpulse\cortex\services\Resources;
-use craftpulse\cortex\services\Tools;
-use craftpulse\cortex\tools\AbstractTool;
+use craftpulse\herald\events\RegisterPromptsEvent;
+use craftpulse\herald\events\RegisterResourcesEvent;
+use craftpulse\herald\events\RegisterToolsEvent;
+use craftpulse\herald\prompts\PromptInterface;
+use craftpulse\herald\resources\ResourceInterface;
+use craftpulse\herald\services\Prompts;
+use craftpulse\herald\services\Resources;
+use craftpulse\herald\services\Tools;
+use craftpulse\herald\tools\AbstractTool;
 use yii\base\Event;
 
 // -----------------------------------------------------------------------------
@@ -149,7 +149,7 @@ it('does not let a third-party tool shadow a bundled tool name', function() {
 
         // The bundled `sites` tool wins.
         $sites = $service->getByName('sites');
-        expect($sites)->toBeInstanceOf(\craftpulse\cortex\tools\schema\Sites::class);
+        expect($sites)->toBeInstanceOf(\craftpulse\herald\tools\schema\Sites::class);
     } finally {
         Event::off(Tools::class, Tools::EVENT_REGISTER_TOOLS, $listener);
     }
@@ -245,7 +245,7 @@ it('omits outputSchema in tools/list when a tool returns []', function() {
     // Tools/list entries should carry `outputSchema` if and only if the
     // tool's static `outputSchema()` returns a non-empty array. Iterate
     // every bundled tool and verify the presence/absence matches.
-    $tools = \craftpulse\cortex\Cortex::getInstance()->tools;
+    $tools = \craftpulse\herald\Herald::getInstance()->tools;
     $payload = $tools->asListPayload();
     $byName = [];
     foreach ($payload as $entry) {
@@ -314,7 +314,7 @@ it('lets a listener append a third-party resource via EVENT_REGISTER_RESOURCES',
 
 it('skips a third-party resource that collides with a bundled URI', function() {
     // Pick the first bundled resource URI to collide with.
-    $bundledUri = \craftpulse\cortex\Cortex::getInstance()->resources->getAll()[0]->getUri();
+    $bundledUri = \craftpulse\herald\Herald::getInstance()->resources->getAll()[0]->getUri();
 
     $listener = function(RegisterResourcesEvent $event) use ($bundledUri): void {
         $event->resources[] = new class($bundledUri) implements ResourceInterface {
@@ -355,7 +355,7 @@ it('skips a third-party resource that collides with a bundled URI', function() {
         $service->init();
 
         $resource = $service->getByUri($bundledUri);
-        expect($resource)->toBeInstanceOf(\craftpulse\cortex\resources\SkillResource::class);
+        expect($resource)->toBeInstanceOf(\craftpulse\herald\resources\SkillResource::class);
     } finally {
         Event::off(Resources::class, Resources::EVENT_REGISTER_RESOURCES, $listener);
     }

@@ -22,7 +22,7 @@
  * VueAdminTable column callbacks receive only the cell value, never the
  * row.
  *
- * Tests bypass HTTP plumbing via the `_CortexAllowlistHarness` subclass.
+ * Tests bypass HTTP plumbing via the `_HeraldAllowlistHarness` subclass.
  * Real CP smoke lives in the gate-9.2 manual verification step.
  * =========================================================================
  *
@@ -31,10 +31,10 @@
  */
 
 use craft\db\Query;
-use craftpulse\cortex\controllers\SettingsController;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\db\Table;
-use craftpulse\cortex\records\RuntimeOverride;
+use craftpulse\herald\controllers\SettingsController;
+use craftpulse\herald\db\Table;
+use craftpulse\herald\Herald;
+use craftpulse\herald\records\RuntimeOverride;
 use yii\web\Response;
 
 // -----------------------------------------------------------------------------
@@ -49,7 +49,7 @@ use yii\web\Response;
  * `asFailure` can call `setStatusCode()` (console Response does not
  * declare the method).
  */
-class _CortexAllowlistHarness extends SettingsController
+class _HeraldAllowlistHarness extends SettingsController
 {
     /** @var array<string,mixed> */
     public array $params = [];
@@ -80,14 +80,14 @@ class _CortexAllowlistHarness extends SettingsController
     public function withParams(array $params): self
     {
         $this->params = $params;
-        $this->request = new _CortexAllowlistRequest($params);
+        $this->request = new _HeraldAllowlistRequest($params);
         $this->response = new \yii\web\Response();
         $this->response->formatters[\yii\web\Response::FORMAT_JSON] = \yii\web\JsonResponseFormatter::class;
         return $this;
     }
 }
 
-class _CortexAllowlistRequest
+class _HeraldAllowlistRequest
 {
     public bool $isCpRequest = true;
 
@@ -174,11 +174,11 @@ it('actionAllowlistTableData returns the locked {pagination, data} contract', fu
     // Seed three overrides: one active, one expired, one with a null
     // expiry ("never expires"). Exercises every branch of
     // _serializeOverrideRow.
-    Cortex::getInstance()->allowlist->add(pattern: 'resave/*', userId: null, note: 'baseline', ttlSeconds: 3600);
-    Cortex::getInstance()->allowlist->add(pattern: 'mailer/test', userId: null, note: 'ticket-1', ttlSeconds: 3600);
-    Cortex::getInstance()->allowlist->add(pattern: 'up', userId: null, note: null, ttlSeconds: 3600);
+    Herald::getInstance()->allowlist->add(pattern: 'resave/*', userId: null, note: 'baseline', ttlSeconds: 3600);
+    Herald::getInstance()->allowlist->add(pattern: 'mailer/test', userId: null, note: 'ticket-1', ttlSeconds: 3600);
+    Herald::getInstance()->allowlist->add(pattern: 'up', userId: null, note: null, ttlSeconds: 3600);
 
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams([]);
 
     $response = $controller->actionAllowlistTableData();
@@ -191,9 +191,9 @@ it('actionAllowlistTableData returns the locked {pagination, data} contract', fu
 });
 
 it('actionAllowlistTableData data[0] keys equal the locked tuple exactly', function() {
-    Cortex::getInstance()->allowlist->add(pattern: 'resave/*', userId: null, note: 'baseline', ttlSeconds: 3600);
+    Herald::getInstance()->allowlist->add(pattern: 'resave/*', userId: null, note: 'baseline', ttlSeconds: 3600);
 
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams([]);
     $response = $controller->actionAllowlistTableData();
 
@@ -219,7 +219,7 @@ it('actionAllowlistTableData marks expired rows with isExpired=true', function()
     $override->expiresAt = (new \DateTime('-1 hour'))->format('Y-m-d H:i:s');
     $override->save();
 
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams([]);
     $response = $controller->actionAllowlistTableData();
 
@@ -236,7 +236,7 @@ it('actionAllowlistTableData handles a never-expiring override (expiresAt null)'
     $override->expiresAt = null;
     $override->save();
 
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams([]);
     $response = $controller->actionAllowlistTableData();
 
@@ -246,11 +246,11 @@ it('actionAllowlistTableData handles a never-expiring override (expiresAt null)'
 });
 
 it('actionAllowlistTableData search filters by pattern substring', function() {
-    Cortex::getInstance()->allowlist->add(pattern: 'resave/*', userId: null, note: null, ttlSeconds: 3600);
-    Cortex::getInstance()->allowlist->add(pattern: 'mailer/test', userId: null, note: null, ttlSeconds: 3600);
-    Cortex::getInstance()->allowlist->add(pattern: 'up', userId: null, note: null, ttlSeconds: 3600);
+    Herald::getInstance()->allowlist->add(pattern: 'resave/*', userId: null, note: null, ttlSeconds: 3600);
+    Herald::getInstance()->allowlist->add(pattern: 'mailer/test', userId: null, note: null, ttlSeconds: 3600);
+    Herald::getInstance()->allowlist->add(pattern: 'up', userId: null, note: null, ttlSeconds: 3600);
 
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams(['search' => 'mailer']);
     $response = $controller->actionAllowlistTableData();
 
@@ -276,7 +276,7 @@ it('actionAllowlistTableData sort dateCreated DESC reverses default order', func
     $r2->dateCreated = $later;
     $r2->save();
 
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams(['sort.0.field' => 'dateCreated', 'sort.0.direction' => 'desc']);
     $response = $controller->actionAllowlistTableData();
 
@@ -286,10 +286,10 @@ it('actionAllowlistTableData sort dateCreated DESC reverses default order', func
 
 it('actionAllowlistTableData pagination respects per_page', function() {
     for ($i = 1; $i <= 5; $i++) {
-        Cortex::getInstance()->allowlist->add(pattern: "page/{$i}", userId: null, note: null, ttlSeconds: 3600);
+        Herald::getInstance()->allowlist->add(pattern: "page/{$i}", userId: null, note: null, ttlSeconds: 3600);
     }
 
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams(['per_page' => 2, 'page' => 1]);
     $response = $controller->actionAllowlistTableData();
 
@@ -304,9 +304,9 @@ it('actionAllowlistTableData serialises createdBy from the user record', functio
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
     expect($user)->not->toBeNull();
 
-    Cortex::getInstance()->allowlist->add(pattern: 'audit/*', userId: (int) $user->id, note: 'attributed', ttlSeconds: 3600);
+    Herald::getInstance()->allowlist->add(pattern: 'audit/*', userId: (int) $user->id, note: 'attributed', ttlSeconds: 3600);
 
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams([]);
     $response = $controller->actionAllowlistTableData();
 
@@ -321,7 +321,7 @@ it('actionAllowlistTableData serialises createdBy from the user record', functio
 // -----------------------------------------------------------------------------
 
 it('actionAddOverride JSON happy path returns the serialised row', function() {
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams([
         'pattern' => 'mailer/test',
         'note' => 'ticket-123',
@@ -354,7 +354,7 @@ it('actionAddOverride JSON happy path returns the serialised row', function() {
 });
 
 it('actionAddOverride empty pattern returns 400 with message', function() {
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams(['pattern' => '   ']);
 
     $response = $controller->actionAddOverride();
@@ -368,9 +368,9 @@ it('actionAddOverride empty pattern returns 400 with message', function() {
 // -----------------------------------------------------------------------------
 
 it('actionRemoveOverride JSON happy path soft-deletes the row', function() {
-    $override = Cortex::getInstance()->allowlist->add(pattern: 'gone/*', userId: null, note: null, ttlSeconds: 3600);
+    $override = Herald::getInstance()->allowlist->add(pattern: 'gone/*', userId: null, note: null, ttlSeconds: 3600);
 
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams(['id' => (int) $override->id]);
 
     $response = $controller->actionRemoveOverride();
@@ -380,12 +380,12 @@ it('actionRemoveOverride JSON happy path soft-deletes the row', function() {
 
     // Row soft-deleted — still in the table but `getAllOverrides()`
     // skips dateDeleted rows.
-    $remaining = Cortex::getInstance()->allowlist->getAllOverrides(includeExpired: true);
+    $remaining = Herald::getInstance()->allowlist->getAllOverrides(includeExpired: true);
     expect($remaining)->toBeArray()->toBeEmpty();
 });
 
 it('actionRemoveOverride unknown id returns 404', function() {
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams(['id' => 999999]);
 
     $response = $controller->actionRemoveOverride();
@@ -404,7 +404,7 @@ it('actionAddOverride success row carries the locked row keys', function() {
     // hands the new row back to the table without a refresh round-trip
     // (future enhancement; for now the table reload picks it up but
     // the shape is contracted regardless).
-    $controller = new _CortexAllowlistHarness('settings', Cortex::getInstance());
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
     $controller->withParams(['pattern' => 'shape/*']);
 
     $response = $controller->actionAddOverride();

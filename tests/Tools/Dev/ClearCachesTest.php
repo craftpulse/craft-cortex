@@ -5,11 +5,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ToolException;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('clear_caches');
+    $this->tool = Herald::getInstance()->tools->getByName('clear_caches');
 });
 
 it('lists registered cache keys when mode is `list`', function() {

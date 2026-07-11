@@ -26,17 +26,17 @@ use craft\db\Table;
 use craft\elements\Asset;
 use craft\elements\Entry as EntryElement;
 use craft\helpers\Db;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\tools\support\CancellationToken;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\workflow\Audit;
+use craftpulse\herald\Herald;
+use craftpulse\herald\tools\support\CancellationToken;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\workflow\Audit;
 
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $this->fixturePrefix = '__cortex_audfxstream_' . bin2hex(random_bytes(4)) . '_';
+    $this->fixturePrefix = '__herald_audfxstream_' . bin2hex(random_bytes(4)) . '_';
 
     $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
         ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
@@ -76,7 +76,7 @@ afterEach(function() {
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _cortex_audfxstream_tool(): Audit
+function _herald_audfxstream_tool(): Audit
 {
     return new Audit();
 }
@@ -86,7 +86,7 @@ function _cortex_audfxstream_tool(): Audit
  *
  * @return array{0: list<array<string,mixed>>, 1: array<string,mixed>}
  */
-function _cortex_audfxstream_drain(Generator $gen): array
+function _herald_audfxstream_drain(Generator $gen): array
 {
     $frames = [];
     while ($gen->valid()) {
@@ -103,7 +103,7 @@ function _cortex_audfxstream_drain(Generator $gen): array
  *
  * @return list<int> The seeded fixture entry ids.
  */
-function _cortex_audfxstream_seed_broken_relations(string $titlePrefix, int $n, int $sortOrderSentinel): array
+function _herald_audfxstream_seed_broken_relations(string $titlePrefix, int $n, int $sortOrderSentinel): array
 {
     $section = Craft::$app->getEntries()->getSectionByHandle('heroes');
     if ($section === null) {
@@ -143,7 +143,7 @@ function _cortex_audfxstream_seed_broken_relations(string $titlePrefix, int $n, 
     return $ids;
 }
 
-function _cortex_audfxstream_seed_unused_asset(string $titlePrefix): ?int
+function _herald_audfxstream_seed_unused_asset(string $titlePrefix): ?int
 {
     $volume = Craft::$app->getVolumes()->getAllVolumes()[0] ?? null;
     if ($volume === null) {
@@ -174,13 +174,13 @@ function _cortex_audfxstream_seed_unused_asset(string $titlePrefix): ?int
 // -----------------------------------------------------------------------------
 
 it('stream(fix_relations) yields one frame per progressInterval rows and returns a structured envelope', function() {
-    $ids = _cortex_audfxstream_seed_broken_relations($this->fixturePrefix, 3, 9101);
+    $ids = _herald_audfxstream_seed_broken_relations($this->fixturePrefix, 3, 9101);
     if ($ids === []) {
         $this->markTestSkipped('Could not seed fixture relations.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() use ($ids) {
-        $gen = _cortex_audfxstream_tool()->stream(
+    herald_with_edition(Herald::EDITION_PRO, function() use ($ids) {
+        $gen = _herald_audfxstream_tool()->stream(
             [
                 'mode' => 'fix_relations',
                 'limit' => 200,
@@ -188,7 +188,7 @@ it('stream(fix_relations) yields one frame per progressInterval rows and returns
             ],
             new InvocationContext(),
         );
-        [$frames, $terminal] = _cortex_audfxstream_drain($gen);
+        [$frames, $terminal] = _herald_audfxstream_drain($gen);
 
         // At least one frame per seeded row (additional pre-existing
         // broken relations on the playground may push the count higher).
@@ -211,12 +211,12 @@ it('stream(fix_relations) yields one frame per progressInterval rows and returns
 });
 
 it('stream(fix_relations) reports cancelled=true when the token flips mid-stream', function() {
-    $ids = _cortex_audfxstream_seed_broken_relations($this->fixturePrefix, 5, 9101);
+    $ids = _herald_audfxstream_seed_broken_relations($this->fixturePrefix, 5, 9101);
     if (count($ids) < 5) {
         $this->markTestSkipped('Could not seed 5 fixture relations.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $callCount = 0;
         // Flip after the first poll so the loop's mid-iteration check
         // trips before the second row gets visited.
@@ -226,7 +226,7 @@ it('stream(fix_relations) reports cancelled=true when the token flips mid-stream
         });
         $ctx = new InvocationContext(cancellationToken: $token);
 
-        $gen = _cortex_audfxstream_tool()->stream(
+        $gen = _herald_audfxstream_tool()->stream(
             [
                 'mode' => 'fix_relations',
                 'limit' => 200,
@@ -234,7 +234,7 @@ it('stream(fix_relations) reports cancelled=true when the token flips mid-stream
             ],
             $ctx,
         );
-        [, $terminal] = _cortex_audfxstream_drain($gen);
+        [, $terminal] = _herald_audfxstream_drain($gen);
 
         expect($terminal['cancelled'])->toBeTrue();
         expect($terminal['success'])->toBeFalse();
@@ -243,23 +243,23 @@ it('stream(fix_relations) reports cancelled=true when the token flips mid-stream
 });
 
 it('execute(fix_relations) drains stream() and returns the same terminal envelope shape', function() {
-    _cortex_audfxstream_seed_broken_relations($this->fixturePrefix, 2, 9101);
+    _herald_audfxstream_seed_broken_relations($this->fixturePrefix, 2, 9101);
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $viaExecute = _cortex_audfxstream_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $viaExecute = _herald_audfxstream_tool()->execute([
             'mode' => 'fix_relations',
             'limit' => 200,
         ]);
 
         // Re-seed so the streamed run finds work too — execute() above
         // already deleted the previous fixture rows.
-        _cortex_audfxstream_seed_broken_relations($this->fixturePrefix, 2, 9101);
+        _herald_audfxstream_seed_broken_relations($this->fixturePrefix, 2, 9101);
 
-        $gen = _cortex_audfxstream_tool()->stream(
+        $gen = _herald_audfxstream_tool()->stream(
             ['mode' => 'fix_relations', 'limit' => 200],
             new InvocationContext(),
         );
-        [, $viaStream] = _cortex_audfxstream_drain($gen);
+        [, $viaStream] = _herald_audfxstream_drain($gen);
 
         expect(array_keys($viaExecute))->toBe(array_keys($viaStream));
         expect($viaExecute['mode'])->toBe('fix_relations');
@@ -274,13 +274,13 @@ it('execute(fix_relations) drains stream() and returns the same terminal envelop
 // -----------------------------------------------------------------------------
 
 it('stream(prune_unused_assets) yields progress frames and returns a structured envelope', function() {
-    $assetId = _cortex_audfxstream_seed_unused_asset($this->fixturePrefix);
+    $assetId = _herald_audfxstream_seed_unused_asset($this->fixturePrefix);
     if ($assetId === null) {
         $this->markTestSkipped('Could not seed orphan asset.');
     }
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $gen = _cortex_audfxstream_tool()->stream(
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $gen = _herald_audfxstream_tool()->stream(
             [
                 'mode' => 'prune_unused_assets',
                 'limit' => 200,
@@ -288,7 +288,7 @@ it('stream(prune_unused_assets) yields progress frames and returns a structured 
             ],
             new InvocationContext(),
         );
-        [$frames, $terminal] = _cortex_audfxstream_drain($gen);
+        [$frames, $terminal] = _herald_audfxstream_drain($gen);
 
         expect(count($frames))->toBeGreaterThanOrEqual(1);
         $previous = -1;
@@ -308,10 +308,10 @@ it('stream(prune_unused_assets) yields progress frames and returns a structured 
 
 it('stream(prune_unused_assets) reports cancelled=true when the token flips mid-stream', function() {
     // Seed two assets so the loop has at least two rows to cancel between.
-    _cortex_audfxstream_seed_unused_asset($this->fixturePrefix);
-    _cortex_audfxstream_seed_unused_asset($this->fixturePrefix . 'b');
+    _herald_audfxstream_seed_unused_asset($this->fixturePrefix);
+    _herald_audfxstream_seed_unused_asset($this->fixturePrefix . 'b');
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
         $callCount = 0;
         $token = new CancellationToken(static function() use (&$callCount): bool {
             $callCount++;
@@ -319,7 +319,7 @@ it('stream(prune_unused_assets) reports cancelled=true when the token flips mid-
         });
         $ctx = new InvocationContext(cancellationToken: $token);
 
-        $gen = _cortex_audfxstream_tool()->stream(
+        $gen = _herald_audfxstream_tool()->stream(
             [
                 'mode' => 'prune_unused_assets',
                 'limit' => 200,
@@ -327,7 +327,7 @@ it('stream(prune_unused_assets) reports cancelled=true when the token flips mid-
             ],
             $ctx,
         );
-        [, $terminal] = _cortex_audfxstream_drain($gen);
+        [, $terminal] = _herald_audfxstream_drain($gen);
 
         expect($terminal['cancelled'])->toBeTrue();
         expect($terminal['success'])->toBeFalse();
@@ -335,21 +335,21 @@ it('stream(prune_unused_assets) reports cancelled=true when the token flips mid-
 });
 
 it('execute(prune_unused_assets) drains stream() and returns the same terminal envelope shape', function() {
-    _cortex_audfxstream_seed_unused_asset($this->fixturePrefix);
+    _herald_audfxstream_seed_unused_asset($this->fixturePrefix);
 
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $viaExecute = _cortex_audfxstream_tool()->execute([
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $viaExecute = _herald_audfxstream_tool()->execute([
             'mode' => 'prune_unused_assets',
             'limit' => 200,
         ]);
 
-        _cortex_audfxstream_seed_unused_asset($this->fixturePrefix);
+        _herald_audfxstream_seed_unused_asset($this->fixturePrefix);
 
-        $gen = _cortex_audfxstream_tool()->stream(
+        $gen = _herald_audfxstream_tool()->stream(
             ['mode' => 'prune_unused_assets', 'limit' => 200],
             new InvocationContext(),
         );
-        [, $viaStream] = _cortex_audfxstream_drain($gen);
+        [, $viaStream] = _herald_audfxstream_drain($gen);
 
         expect(array_keys($viaExecute))->toBe(array_keys($viaStream));
         expect($viaExecute['mode'])->toBe('prune_unused_assets');
@@ -362,12 +362,12 @@ it('execute(prune_unused_assets) drains stream() and returns the same terminal e
 // -----------------------------------------------------------------------------
 
 it('stream(repair_propagation) returns the envelope shape (no gaps on single-site)', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $gen = _cortex_audfxstream_tool()->stream(
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $gen = _herald_audfxstream_tool()->stream(
             ['mode' => 'repair_propagation', 'limit' => 10],
             new InvocationContext(),
         );
-        [$frames, $terminal] = _cortex_audfxstream_drain($gen);
+        [$frames, $terminal] = _herald_audfxstream_drain($gen);
 
         // Playground is single-site → no multi-site sections → zero gaps.
         // Loop never iterates, so no progress frames emit.
@@ -384,14 +384,14 @@ it('stream(repair_propagation) returns the envelope shape (no gaps on single-sit
 });
 
 it('execute(repair_propagation) drains stream() and returns the same terminal envelope shape', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $viaExecute = _cortex_audfxstream_tool()->execute(['mode' => 'repair_propagation', 'limit' => 10]);
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $viaExecute = _herald_audfxstream_tool()->execute(['mode' => 'repair_propagation', 'limit' => 10]);
 
-        $gen = _cortex_audfxstream_tool()->stream(
+        $gen = _herald_audfxstream_tool()->stream(
             ['mode' => 'repair_propagation', 'limit' => 10],
             new InvocationContext(),
         );
-        [, $viaStream] = _cortex_audfxstream_drain($gen);
+        [, $viaStream] = _herald_audfxstream_drain($gen);
 
         expect(array_keys($viaExecute))->toBe(array_keys($viaStream));
         expect($viaExecute['mode'])->toBe('repair_propagation');
@@ -406,13 +406,13 @@ it('execute(repair_propagation) drains stream() and returns the same terminal en
 // -----------------------------------------------------------------------------
 
 it('stream() rejects read modes', function() {
-    cortex_with_edition(Cortex::EDITION_PRO, function() {
-        $gen = _cortex_audfxstream_tool()->stream(['mode' => 'relations'], new InvocationContext());
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $gen = _herald_audfxstream_tool()->stream(['mode' => 'relations'], new InvocationContext());
         iterator_to_array($gen);
     });
-})->throws(\craftpulse\cortex\tools\ToolException::class, 'is not streamable');
+})->throws(\craftpulse\herald\tools\ToolException::class, 'is not streamable');
 
 it('stream() rejects Pro modes on Free installs', function() {
-    $gen = _cortex_audfxstream_tool()->stream(['mode' => 'fix_relations'], new InvocationContext());
+    $gen = _herald_audfxstream_tool()->stream(['mode' => 'fix_relations'], new InvocationContext());
     iterator_to_array($gen);
-})->throws(\craftpulse\cortex\tools\ToolException::class, 'unavailable on this edition');
+})->throws(\craftpulse\herald\tools\ToolException::class, 'unavailable on this edition');

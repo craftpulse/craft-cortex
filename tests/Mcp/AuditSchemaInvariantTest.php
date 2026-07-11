@@ -2,11 +2,11 @@
 
 /**
  * =========================================================================
- * Architecture invariant — `cortex_invocations` schema ⊇ KV log fields.
+ * Architecture invariant — `herald_invocations` schema ⊇ KV log fields.
  *
  * Locked decision 5 (Gate 7.5): every field
  * `InvocationLogger::formatEntry()` emits as a KV token has a matching
- * column on the `cortex_invocations` table. Drift between the wire
+ * column on the `herald_invocations` table. Drift between the wire
  * format and the DB column set will break SIEM forwarders and the Pro
  * audit dashboard's column-by-column display. This test catches the
  * drift at the test layer before it lands in production.
@@ -26,11 +26,11 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\db\Table;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\support\InvocationLogger;
+use craftpulse\herald\db\Table;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\InvocationLogger;
 
-it('every KV field on the formatted log line has a matching cortex_invocations column', function() {
+it('every KV field on the formatted log line has a matching herald_invocations column', function() {
     // Wire-format token → DB column. The KV uses snake_case for
     // human-readable log tailing; the DB uses camelCase Craft
     // conventions. The mapping is explicit so a future column rename

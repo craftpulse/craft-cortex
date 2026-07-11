@@ -10,14 +10,14 @@
  * @since  5.0.0
  */
 
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\IsOpenWorld;
-use craftpulse\cortex\attributes\IsReadOnly;
-use craftpulse\cortex\attributes\IsStdioOnly;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\support\AttributeReader;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\IsOpenWorld;
+use craftpulse\herald\attributes\IsReadOnly;
+use craftpulse\herald\attributes\IsStdioOnly;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\support\AttributeReader;
 
 // -----------------------------------------------------------------------------
 // Test fixtures — minimal anonymous-ish tool classes
@@ -139,7 +139,7 @@ it('reports stdio-only false when the attribute is absent', function() {
 // -----------------------------------------------------------------------------
 
 it('reads CraftExec annotations from class-level attributes', function() {
-    $annotations = AttributeReader::annotationsFor(\craftpulse\cortex\tools\dev\CraftExec::class);
+    $annotations = AttributeReader::annotationsFor(\craftpulse\herald\tools\dev\CraftExec::class);
 
     expect($annotations)->toBe([
         'destructiveHint' => true,
@@ -147,11 +147,11 @@ it('reads CraftExec annotations from class-level attributes', function() {
         'openWorldHint' => false,
         'title' => 'Evaluate Craft Expression',
     ]);
-    expect(AttributeReader::isStdioOnly(\craftpulse\cortex\tools\dev\CraftExec::class))->toBeTrue();
+    expect(AttributeReader::isStdioOnly(\craftpulse\herald\tools\dev\CraftExec::class))->toBeTrue();
 });
 
 it('reads CraftCommand annotations from class-level attributes', function() {
-    $annotations = AttributeReader::annotationsFor(\craftpulse\cortex\tools\dev\CraftCommand::class);
+    $annotations = AttributeReader::annotationsFor(\craftpulse\herald\tools\dev\CraftCommand::class);
 
     expect($annotations)->toBe([
         'destructiveHint' => true,
@@ -159,11 +159,11 @@ it('reads CraftCommand annotations from class-level attributes', function() {
         'openWorldHint' => false,
         'title' => 'Run Craft Command',
     ]);
-    expect(AttributeReader::isStdioOnly(\craftpulse\cortex\tools\dev\CraftCommand::class))->toBeFalse();
+    expect(AttributeReader::isStdioOnly(\craftpulse\herald\tools\dev\CraftCommand::class))->toBeFalse();
 });
 
 it('reads Resave annotations from class-level attributes', function() {
-    $annotations = AttributeReader::annotationsFor(\craftpulse\cortex\tools\dev\Resave::class);
+    $annotations = AttributeReader::annotationsFor(\craftpulse\herald\tools\dev\Resave::class);
 
     expect($annotations)->toBe([
         'destructiveHint' => true,

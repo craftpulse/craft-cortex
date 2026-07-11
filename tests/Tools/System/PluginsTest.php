@@ -6,10 +6,10 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('plugins');
+    $this->tool = Herald::getInstance()->tools->getByName('plugins');
 });
 
 it('returns plugins list with handle / name / version / enabled', function() {
@@ -25,20 +25,20 @@ it('returns plugins list with handle / name / version / enabled', function() {
     }
 });
 
-it('reports cortex itself as enabled and installed', function() {
+it('reports herald itself as enabled and installed', function() {
     $result = $this->tool->execute([]);
 
-    $cortex = null;
+    $herald = null;
     foreach ($result['plugins'] as $plugin) {
-        if ($plugin['handle'] === 'cortex') {
-            $cortex = $plugin;
+        if ($plugin['handle'] === 'herald') {
+            $herald = $plugin;
             break;
         }
     }
 
-    expect($cortex)->not->toBeNull();
-    expect($cortex['isInstalled'])->toBeTrue();
-    expect($cortex['isEnabled'])->toBeTrue();
+    expect($herald)->not->toBeNull();
+    expect($herald['isInstalled'])->toBeTrue();
+    expect($herald['isEnabled'])->toBeTrue();
 });
 
 it('count matches the number of plugin info entries known to Craft', function() {

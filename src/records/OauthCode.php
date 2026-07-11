@@ -1,13 +1,13 @@
 <?php
 
-namespace craftpulse\cortex\records;
+namespace craftpulse\herald\records;
 
 use craft\db\ActiveRecord;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
- * Active record for `cortex_oauth_codes`.
+ * Active record for `herald_oauth_codes`.
  *
  * One-shot authorization codes. Primary key is the `code` identifier
  * minted by league's grant (`generateUniqueIdentifier()`), not an

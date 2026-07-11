@@ -6,10 +6,10 @@
  */
 
 use Craft;
-use craftpulse\cortex\Cortex;
+use craftpulse\herald\Herald;
 
 beforeEach(function() {
-    $this->tool = Cortex::getInstance()->tools->getByName('volumes_and_filesystems');
+    $this->tool = Herald::getInstance()->tools->getByName('volumes_and_filesystems');
 });
 
 it('returns volumes annotated with filesystems plus orphans plus the type registry', function() {

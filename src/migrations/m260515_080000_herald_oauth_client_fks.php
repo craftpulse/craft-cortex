@@ -1,17 +1,17 @@
 <?php
 
-namespace craftpulse\cortex\migrations;
+namespace craftpulse\herald\migrations;
 
 use craft\db\Migration;
-use craftpulse\cortex\db\Table;
+use craftpulse\herald\db\Table;
 
 /**
  * =========================================================================
  * Gate 7 review fix — add missing FK constraints on
- * `cortex_oauth_codes.clientId` and `cortex_oauth_tokens.clientId`
- * referencing `cortex_oauth_clients.clientId`.
+ * `herald_oauth_codes.clientId` and `herald_oauth_tokens.clientId`
+ * referencing `herald_oauth_clients.clientId`.
  *
- * The original Gate 7.3 migration (`m260514_120100_cortex_oauth`)
+ * The original Gate 7.3 migration (`m260514_120100_herald_oauth`)
  * tracked `clientId` as a logical FK only (comment noted "out-of-band
  * seeding"). This migration promotes both to hard DB FKs with
  * `ON DELETE CASCADE` so that deleting a client atomically revokes all
@@ -26,7 +26,7 @@ use craftpulse\cortex\db\Table;
  * @author Craftpulse
  * @since  5.0.0
  */
-class m260515_080000_cortex_oauth_client_fks extends Migration
+class m260515_080000_herald_oauth_client_fks extends Migration
 {
     // Public Methods
     // =========================================================================
@@ -40,7 +40,7 @@ class m260515_080000_cortex_oauth_client_fks extends Migration
     public function safeUp(): bool
     {
         // Purge any orphaned rows that reference a `clientId` not
-        // present in `cortex_oauth_clients`. The original migration
+        // present in `herald_oauth_clients`. The original migration
         // had no FK, so test harnesses and dev installs may have
         // accumulated rows whose clients were later deleted. Adding the
         // FK without cleaning first causes an integrity violation.
@@ -108,7 +108,7 @@ class m260515_080000_cortex_oauth_client_fks extends Migration
      * `$toTable.$toCol` already exists. Inspects the live schema so
      * re-running the migration is safe.
      *
-     * @param string $fromTable Bracketed table name, e.g. `{{%cortex_oauth_codes}}`.
+     * @param string $fromTable Bracketed table name, e.g. `{{%herald_oauth_codes}}`.
      * @param string $fromCol   Local column name without brackets.
      * @param string $toTable   Referenced table name (bracketed).
      * @param string $toCol     Referenced column name without brackets.

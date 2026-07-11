@@ -1,6 +1,6 @@
 <?php
 
-namespace craftpulse\cortex\tools\system;
+namespace craftpulse\herald\tools\system;
 
 use Craft;
 use craft\elements\Address as AddressElement;
@@ -8,19 +8,19 @@ use craft\elements\db\UserQuery;
 use craft\elements\User as UserElement;
 use craft\helpers\DateTimeHelper;
 use craft\models\UserGroup;
-use craftpulse\cortex\attributes\IsDestructive;
-use craftpulse\cortex\attributes\IsIdempotent;
-use craftpulse\cortex\attributes\Title;
-use craftpulse\cortex\Cortex;
-use craftpulse\cortex\mcp\Server;
-use craftpulse\cortex\tools\AbstractTool;
-use craftpulse\cortex\tools\ContextAwareToolInterface;
-use craftpulse\cortex\tools\IdempotencyTrait;
-use craftpulse\cortex\tools\PermissionedToolTrait;
-use craftpulse\cortex\tools\ProToolTrait;
-use craftpulse\cortex\tools\support\InvocationContext;
-use craftpulse\cortex\tools\support\Schema;
-use craftpulse\cortex\tools\ToolException;
+use craftpulse\herald\attributes\IsDestructive;
+use craftpulse\herald\attributes\IsIdempotent;
+use craftpulse\herald\attributes\Title;
+use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
+use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\ContextAwareToolInterface;
+use craftpulse\herald\tools\IdempotencyTrait;
+use craftpulse\herald\tools\PermissionedToolTrait;
+use craftpulse\herald\tools\ProToolTrait;
+use craftpulse\herald\tools\support\InvocationContext;
+use craftpulse\herald\tools\support\Schema;
+use craftpulse\herald\tools\ToolException;
 use DateTimeInterface;
 use Throwable;
 
@@ -108,7 +108,7 @@ use Throwable;
  *     self `newPassword` does.
  *
  * Idempotency contract: `idempotencyKey` server-side dedup for
- * `create` and `update`. Cache prefix `cortex:users:idem:`. TTL 24h.
+ * `create` and `update`. Cache prefix `herald:users:idem:`. TTL 24h.
  * Skipped on stdio. Not exposed on `delete` (idempotent at the DB
  * level for soft-delete; a re-`delete` on a re-created user with the
  * same numeric id reuse would surprise).
@@ -125,7 +125,7 @@ use Throwable;
  * Known gaps documented for future work:
  *   - HTTP transport has no elevated-session model. Craft's CP
  *     requires elevation for email / password / admin-promotion
- *     mutations — Cortex accepts this for 8.5 and defers the
+ *     mutations — Herald accepts this for 8.5 and defers the
  *     elevation model to a later gate.
  *   - `inheritorOnDelete` is deprecated in Craft 5.10.0 with no
  *     replacement yet shipped. Single seam in `_delete()` — swap when
@@ -166,7 +166,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      *
      * @since 5.0.0
      */
-    public const IDEMPOTENCY_CACHE_PREFIX = 'cortex:users:idem:';
+    public const IDEMPOTENCY_CACHE_PREFIX = 'herald:users:idem:';
 
     /**
      * Sensitive fields that require `administrateUsers` on `update`
@@ -758,7 +758,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
 
         // Admin promotion / demotion — caller must be admin. Matches
         // UsersController::actionSavePermissions line 1288. Demotion
-        // is also caller-admin-only per the safer Cortex posture
+        // is also caller-admin-only per the safer Herald posture
         // (locked decision 18).
         if (array_key_exists('admin', $arguments) && is_bool($arguments['admin'])) {
             $newAdmin = $arguments['admin'];
@@ -769,7 +769,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
                         (
                             $newAdmin
                                 ? 'Admin promotion is admin-only.'
-                                : 'Admin demotion is also admin-only per Cortex policy.'
+                                : 'Admin demotion is also admin-only per Herald policy.'
                         )
                 );
             }
@@ -1395,7 +1395,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      */
     private function _serializeAllowlistedFields(UserElement $target): array
     {
-        $plugin = Cortex::getInstance();
+        $plugin = Herald::getInstance();
         $settings = $plugin->getSettings();
         $allowlist = $settings->userCustomFieldAllowlist ?? [];
         if ($allowlist === []) {
