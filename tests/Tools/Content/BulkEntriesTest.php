@@ -51,6 +51,7 @@ beforeEach(function() {
         $this->markTestSkipped('minorHeroes seed not applied; run `ddev craft migrate/up --track=content`.');
     }
     $this->section = $section;
+    $this->primarySiteUid = Craft::$app->getSites()->getPrimarySite()->uid;
 });
 
 afterEach(function() {
@@ -833,9 +834,14 @@ it('partial section permission routes rows to succeeded vs skipped per section',
         // (`UserPermissions::_filterOrphanedPermissions()`), so we
         // grant the whole chain. `savePeerEntries` is required because
         // the caller doesn't author the seeded minorHeroes rows.
+        // `editSite:{primary site uid}` is required separately —
+        // `Elements::canSave()` gates every localized element on
+        // `_siteAuthCheck()` before it even reaches `Entry::canSave()`'s
+        // section-permission logic, and the playground is multi-site.
         Craft::$app->getUserPermissions()->saveUserPermissions(
             (int) $user->id,
             [
+                "editSite:{$this->primarySiteUid}",
                 "viewEntries:{$this->section->uid}",
                 "saveEntries:{$this->section->uid}",
                 "viewPeerEntries:{$this->section->uid}",
@@ -915,9 +921,14 @@ it('partial section permission with onPermissionDenied=fail aborts on first deni
         // (`UserPermissions::_filterOrphanedPermissions()`), so we
         // grant the whole chain. `savePeerEntries` is required because
         // the caller doesn't author the seeded minorHeroes rows.
+        // `editSite:{primary site uid}` is required separately —
+        // `Elements::canSave()` gates every localized element on
+        // `_siteAuthCheck()` before it even reaches `Entry::canSave()`'s
+        // section-permission logic, and the playground is multi-site.
         Craft::$app->getUserPermissions()->saveUserPermissions(
             (int) $user->id,
             [
+                "editSite:{$this->primarySiteUid}",
                 "viewEntries:{$this->section->uid}",
                 "saveEntries:{$this->section->uid}",
                 "viewPeerEntries:{$this->section->uid}",
