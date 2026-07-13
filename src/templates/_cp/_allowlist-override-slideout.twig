@@ -123,7 +123,7 @@
             name: 'customTtlSeconds',
             type: 'number',
             min: 60,
-            placeholder: settings.runtimeOverrideTtl,
+            placeholder: settings.getRuntimeOverrideTtl(),
         }) }}
 
         {{ forms.textareaField({

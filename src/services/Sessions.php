@@ -229,7 +229,7 @@ class Sessions extends Component
      */
     private function _persist(Session $session): void
     {
-        $ttl = Herald::getInstance()->getSettings()->sessionTtl;
+        $ttl = Herald::getInstance()->getSettings()->getSessionTtl();
         $this->_cache()->set(
             self::CACHE_KEY_PREFIX . $session->id,
             $session->toArray(),

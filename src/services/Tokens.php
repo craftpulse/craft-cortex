@@ -85,7 +85,7 @@ class Tokens extends Component
      */
     public function issue(int $userId, string $name, ?int $ttlSeconds = null): array
     {
-        $ttl = $ttlSeconds ?? Herald::getInstance()->getSettings()->tokenTtlDefault;
+        $ttl = $ttlSeconds ?? Herald::getInstance()->getSettings()->getTokenTtlDefault();
 
         $plaintext = $this->_generatePlaintext();
         $hash = hash('sha256', $plaintext);

@@ -451,7 +451,7 @@ class OauthController extends AbstractOauthController
         Herald::getInstance()->oauth->grantElevation((int) $identity->id);
 
         return $this->_renderElevateTemplate('herald/oauth/elevated', [
-            'ttl' => Herald::getInstance()->getSettings()->elevationTtl,
+            'ttl' => Herald::getInstance()->getSettings()->getElevationTtl(),
         ]);
     }
 

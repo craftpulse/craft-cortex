@@ -63,13 +63,13 @@
             {{ forms.textField({
                 label: 'Expires in (seconds)'|t('herald'),
                 instructions: 'Leave blank to use the plugin default ({default}).'|t('herald', {
-                    default: settings.tokenTtlDefault ?? 'no expiry'|t('herald'),
+                    default: settings.getTokenTtlDefault() ?? 'no expiry'|t('herald'),
                 }),
                 id: 'herald-token-ttl',
                 name: 'ttlSeconds',
                 type: 'number',
                 min: 60,
-                placeholder: settings.tokenTtlDefault,
+                placeholder: settings.getTokenTtlDefault(),
             }) }}
         </div>
 

@@ -146,7 +146,7 @@ class Invocations extends Component
      */
     public function prune(): int
     {
-        $retentionDays = Herald::getInstance()->getSettings()->auditRetentionDays;
+        $retentionDays = Herald::getInstance()->getSettings()->getAuditRetentionDays();
         if ($retentionDays === null) {
             return 0;
         }

@@ -111,7 +111,7 @@ class ServeController extends Controller
 
         stream_set_blocking($stdin, true);
 
-        $maxBytes = Herald::getInstance()->getSettings()->stdioMaxMessageBytes;
+        $maxBytes = Herald::getInstance()->getSettings()->getStdioMaxMessageBytes();
 
         while (!$this->_shouldStop && ($read = $this->_readMessage($stdin, $maxBytes)) !== null) {
             [$line, $oversized] = $read;

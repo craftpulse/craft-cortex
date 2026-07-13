@@ -96,14 +96,13 @@
         disabled: not allowAdminChanges,
     }) }}
 
-    {{ forms.textField({
+    {{ forms.autosuggestField({
         label: 'Temporary grant TTL (seconds)'|t('herald'),
-        instructions: 'Default expiry applied to a new temporary grant when none is supplied at creation time. Default 7 days (604800).'|t('herald'),
+        instructions: 'Default expiry applied to a new temporary grant when none is supplied at creation time. Default 7 days (604800). Accepts a whole number of seconds or an environment variable that resolves to one.'|t('herald'),
         id: 'runtimeOverrideTtl',
         name: 'settings[runtimeOverrideTtl]',
         value: settings.runtimeOverrideTtl,
-        type: 'number',
-        min: 60,
+        suggestEnvVars: true,
         disabled: not allowAdminChanges,
     }) }}
 

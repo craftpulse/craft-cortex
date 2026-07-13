@@ -434,7 +434,7 @@ class RateLimiter extends Component
      */
     private function _burst(): int
     {
-        return Herald::getInstance()->getSettings()->rateLimitBurst;
+        return Herald::getInstance()->getSettings()->getRateLimitBurst();
     }
 
     /**
@@ -443,6 +443,6 @@ class RateLimiter extends Component
      */
     private function _refillRate(): float
     {
-        return (float) Herald::getInstance()->getSettings()->rateLimitPerSecond;
+        return (float) Herald::getInstance()->getSettings()->getRateLimitPerSecond();
     }
 }

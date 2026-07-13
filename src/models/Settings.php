@@ -4,6 +4,7 @@ namespace craftpulse\herald\models;
 
 use Craft;
 use craft\base\Model;
+use craft\helpers\App;
 use craftpulse\herald\services\Allowlist;
 use DateInterval;
 use Throwable;
@@ -134,7 +135,7 @@ class Settings extends Model
     public bool $execDryRunDefault = true;
 
     /**
-     * @var int Default TTL (in seconds) applied to a new runtime
+     * @var int|string Default TTL (in seconds) applied to a new runtime
      *          allowlist override when none is supplied at creation
      *          time. Default: 7 days. Expired overrides are still
      *          stored but no longer count toward the effective
@@ -142,7 +143,7 @@ class Settings extends Model
      *          cycle (see `Allowlist::pruneExpired()` wired to
      *          `Gc::EVENT_RUN` in `Herald::init()`).
      */
-    public int $runtimeOverrideTtl = 604800;
+    public int|string $runtimeOverrideTtl = 604800;
 
     /**
      * @var bool Whether the HTTP transport (`POST/GET/DELETE
@@ -171,7 +172,7 @@ class Settings extends Model
     public array $allowedOrigins = [];
 
     /**
-     * @var int Sliding TTL (in seconds) applied to HTTP-transport
+     * @var int|string Sliding TTL (in seconds) applied to HTTP-transport
      *          sessions in cache. Every `Sessions::touch()` resets the
      *          expiry, so an active client stays alive while idle
      *          clients evict naturally. Default: 1 hour. Override
@@ -189,10 +190,10 @@ class Settings extends Model
      *          magnitude. Do not lower it below your longest expected
      *          stream.
      */
-    public int $sessionTtl = 3600;
+    public int|string $sessionTtl = 3600;
 
     /**
-     * @var int|null Default TTL (in seconds) applied to a new bearer
+     * @var int|string|null Default TTL (in seconds) applied to a new bearer
      *               token when `herald/token/issue` is invoked without
      *               an explicit `--ttl=<seconds>` flag. Null (the
      *               default) means tokens have no expiry — admin-
@@ -200,7 +201,7 @@ class Settings extends Model
      *               with a tighter rotation policy set this to e.g.
      *               2592000 (30 days) to force regular re-issuance.
      */
-    public ?int $tokenTtlDefault = null;
+    public int|string|null $tokenTtlDefault = null;
 
     /**
      * @var bool Whether RFC 7591 Dynamic Client Registration is open
@@ -229,7 +230,7 @@ class Settings extends Model
     public bool $dcrAutoApprove = false;
 
     /**
-     * @var int Default TTL (in seconds) of an elevated marker minted by
+     * @var int|string Default TTL (in seconds) of an elevated marker minted by
      *          the in-band `/oauth/elevate` re-authentication flow.
      *          After fresh re-auth (Craft login + 2FA) a short-lived
      *          elevated marker is bound to the access token; high-stakes
@@ -241,7 +242,7 @@ class Settings extends Model
      *          later. Elevation is tracked server-side, never trusted
      *          from a client claim.
      */
-    public int $elevationTtl = 300;
+    public int|string $elevationTtl = 300;
 
     /**
      * @var string ISO 8601 `DateInterval` string defining the OAuth
@@ -263,7 +264,7 @@ class Settings extends Model
     public string $oauthRefreshTokenTtl = 'P30D';
 
     /**
-     * @var int Number of bytes of the (post-redaction) JSON-encoded tool
+     * @var int|string Number of bytes of the (post-redaction) JSON-encoded tool
      *          response to persist in `herald_invocations.responseExcerpt`.
      *          The DB column is `text`, so values up to 65535 fit; the
      *          default 2048 keeps the audit table footprint small while
@@ -271,10 +272,10 @@ class Settings extends Model
      *          still goes over the wire to the MCP client — this excerpt
      *          is for the audit dashboard only.
      */
-    public int $auditResponseExcerptBytes = 2048;
+    public int|string $auditResponseExcerptBytes = 2048;
 
     /**
-     * @var int|null Retention window (in days) for `herald_invocations`
+     * @var int|string|null Retention window (in days) for `herald_invocations`
      *               rows. Null (the default) means audit history is
      *               retained forever — a regulatory-friendly posture
      *               that punts the eviction decision to operators with
@@ -282,10 +283,10 @@ class Settings extends Model
      *               prune rows older than 90 days during Craft's `gc`
      *               sweep.
      */
-    public ?int $auditRetentionDays = null;
+    public int|string|null $auditRetentionDays = null;
 
     /**
-     * @var int Maximum size (in bytes) of a single newline-delimited
+     * @var int|string Maximum size (in bytes) of a single newline-delimited
      *          JSON-RPC message the stdio transport will buffer before
      *          rejecting it with a JSON-RPC `-32600` Invalid Request.
      *          The stdio reader reassembles a line in bounded chunks; if
@@ -301,10 +302,10 @@ class Settings extends Model
      *          trusted client *implementation* (cf. the `craft_exec`
      *          threat model), so the cap holds regardless.
      */
-    public int $stdioMaxMessageBytes = 4194304;
+    public int|string $stdioMaxMessageBytes = 4194304;
 
     /**
-     * @var int Burst capacity for the per-user HTTP rate limiter — the
+     * @var int|string Burst capacity for the per-user HTTP rate limiter — the
      *          maximum tokens a single Craft user's bucket can hold at
      *          any one time. Each authenticated POST to
      *          `/herald/mcp` consumes one token; refills accrue at
@@ -313,17 +314,185 @@ class Settings extends Model
      *          throttling interactive use, while bounding a runaway
      *          agent loop to ~60 + sustained * elapsed.
      */
-    public int $rateLimitBurst = 60;
+    public int|string $rateLimitBurst = 60;
 
     /**
-     * @var int Sustained refill rate (tokens per second) for the per-
+     * @var int|string Sustained refill rate (tokens per second) for the per-
      *          user HTTP rate limiter. The bucket refills linearly at
      *          this rate, clamped to `$rateLimitBurst`. Default 5/sec
      *          tightens the steady-state pace a single caller can
      *          drive against the HTTP transport without throttling
      *          normal interactive use.
      */
-    public int $rateLimitPerSecond = 5;
+    public int|string $rateLimitPerSecond = 5;
+
+    // Public Methods
+    // =========================================================================
+
+    /**
+     * Resolved default TTL (seconds) for a new runtime grant.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getRuntimeOverrideTtl(): int
+    {
+        return $this->_resolveInt($this->runtimeOverrideTtl);
+    }
+
+    /**
+     * Resolved sliding TTL (seconds) for HTTP-transport sessions.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getSessionTtl(): int
+    {
+        return $this->_resolveInt($this->sessionTtl);
+    }
+
+    /**
+     * Resolved TTL (seconds) of an elevated marker minted by
+     * `/oauth/elevate`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getElevationTtl(): int
+    {
+        return $this->_resolveInt($this->elevationTtl);
+    }
+
+    /**
+     * Resolved bytes of the redacted tool response persisted to the audit
+     * log's `responseExcerpt` column.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getAuditResponseExcerptBytes(): int
+    {
+        return $this->_resolveInt($this->auditResponseExcerptBytes);
+    }
+
+    /**
+     * Resolved maximum size (bytes) of a single newline-delimited JSON-RPC
+     * message the stdio transport will buffer.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getStdioMaxMessageBytes(): int
+    {
+        return $this->_resolveInt($this->stdioMaxMessageBytes);
+    }
+
+    /**
+     * Resolved burst capacity for the per-user HTTP rate limiter.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getRateLimitBurst(): int
+    {
+        return $this->_resolveInt($this->rateLimitBurst);
+    }
+
+    /**
+     * Resolved sustained refill rate (tokens per second) for the per-user
+     * HTTP rate limiter.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getRateLimitPerSecond(): int
+    {
+        return $this->_resolveInt($this->rateLimitPerSecond);
+    }
+
+    /**
+     * Resolved default bearer-token TTL (seconds), or null for "no expiry"
+     * (the default). A blank / null value, or an env var that resolves to
+     * one, means tokens live until revoked.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getTokenTtlDefault(): ?int
+    {
+        return $this->_resolveNullableInt($this->tokenTtlDefault);
+    }
+
+    /**
+     * Resolved audit-log retention window (days), or null for "forever"
+     * (the default).
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function getAuditRetentionDays(): ?int
+    {
+        return $this->_resolveNullableInt($this->auditRetentionDays);
+    }
+
+    /**
+     * Validates an environment-aware numeric tunable by resolving it first
+     * and range-checking the resolved value, so a literal integer and an
+     * environment-variable reference are held to the same bounds. A value
+     * that resolves to something non-numeric (an undefined or misspelled
+     * env var) fails with a clear message rather than a confusing range
+     * error. Mirrors the Warp settings pattern.
+     *
+     * @param string $attribute the attribute under validation
+     * @param array<string,int>|null $params the `min` / `max` bounds for the resolved value
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function validateResolvedInt(string $attribute, ?array $params = null): void
+    {
+        $resolved = App::parseEnv((string) $this->$attribute);
+
+        if ($resolved === null || !is_numeric($resolved)) {
+            $this->addError($attribute, Craft::t('herald', '{attribute} must be a whole number, or an environment variable that resolves to one.', [
+                'attribute' => $this->getAttributeLabel($attribute),
+            ]));
+
+            return;
+        }
+
+        $this->_checkResolvedBounds($attribute, (int) $resolved, $params);
+    }
+
+    /**
+     * As `validateResolvedInt`, but a blank / null value is valid and
+     * means "no limit" (used for `tokenTtlDefault` and `auditRetentionDays`,
+     * whose default null means no expiry / retain forever).
+     *
+     * @param string $attribute the attribute under validation
+     * @param array<string,int>|null $params the `min` / `max` bounds for the resolved value
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function validateNullableResolvedInt(string $attribute, ?array $params = null): void
+    {
+        $raw = $this->$attribute;
+        if ($raw === null || $raw === '') {
+            return;
+        }
+
+        $resolved = App::parseEnv((string) $raw);
+        if ($resolved === null || !is_numeric($resolved)) {
+            $this->addError($attribute, Craft::t('herald', '{attribute} must be a whole number, an environment variable that resolves to one, or blank.', [
+                'attribute' => $this->getAttributeLabel($attribute),
+            ]));
+
+            return;
+        }
+
+        $this->_checkResolvedBounds($attribute, (int) $resolved, $params);
+    }
 
     // Protected Methods
     // =========================================================================
@@ -339,17 +508,16 @@ class Settings extends Model
     protected function defineRules(): array
     {
         $rules = parent::defineRules();
-        $rules[] = [['runtimeOverrideTtl', 'sessionTtl', 'elevationTtl'], 'integer', 'min' => 1];
-        $rules[] = [['stdioMaxMessageBytes'], 'integer', 'min' => 1024];
-        $rules[] = [['tokenTtlDefault'], 'integer', 'min' => 1];
+        $rules[] = [['runtimeOverrideTtl', 'sessionTtl', 'elevationTtl'], 'validateResolvedInt', 'params' => ['min' => 1], 'skipOnEmpty' => false];
+        $rules[] = [['stdioMaxMessageBytes'], 'validateResolvedInt', 'params' => ['min' => 1024], 'skipOnEmpty' => false];
+        $rules[] = [['auditResponseExcerptBytes'], 'validateResolvedInt', 'params' => ['min' => 1, 'max' => 65535], 'skipOnEmpty' => false];
+        $rules[] = [['rateLimitBurst'], 'validateResolvedInt', 'params' => ['min' => 1, 'max' => 10000], 'skipOnEmpty' => false];
+        $rules[] = [['rateLimitPerSecond'], 'validateResolvedInt', 'params' => ['min' => 1, 'max' => 1000], 'skipOnEmpty' => false];
+        $rules[] = [['tokenTtlDefault', 'auditRetentionDays'], 'validateNullableResolvedInt', 'params' => ['min' => 1]];
         $rules[] = [['execEnabled', 'execDryRunDefault', 'httpEnabled', 'dcrEnabled', 'dcrAutoApprove'], 'boolean'];
         $rules[] = [['allowedCommands', 'adminLevelCommands', 'userCustomFieldAllowlist', 'allowedOrigins'], 'each', 'rule' => ['string', 'min' => 1]];
         $rules[] = [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl'], 'string', 'min' => 2];
         $rules[] = [['oauthAccessTokenTtl', 'oauthRefreshTokenTtl'], 'validateDateInterval'];
-        $rules[] = [['auditResponseExcerptBytes'], 'integer', 'min' => 1, 'max' => 65535];
-        $rules[] = [['auditRetentionDays'], 'integer', 'min' => 1];
-        $rules[] = [['rateLimitBurst'], 'integer', 'min' => 1, 'max' => 10000];
-        $rules[] = [['rateLimitPerSecond'], 'integer', 'min' => 1, 'max' => 1000];
         return $rules;
     }
 
@@ -380,6 +548,67 @@ class Settings extends Model
                 '“{value}” is not a valid ISO-8601 duration (e.g. PT1H, P30D).',
                 ['value' => $value],
             ));
+        }
+    }
+
+    // Private Methods
+    // =========================================================================
+
+    /**
+     * Resolve a numeric tunable's raw value (a literal or an env-var
+     * reference) to a concrete integer via `App::parseEnv`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _resolveInt(int|string $value): int
+    {
+        return (int) App::parseEnv((string) $value);
+    }
+
+    /**
+     * Resolve a nullable numeric tunable: null / blank stays null (meaning
+     * "no limit"), otherwise resolve the literal or env-var reference to an
+     * integer. A value that resolves to something non-numeric collapses to
+     * null (validation reports the malformed input separately).
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _resolveNullableInt(int|string|null $value): ?int
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        $resolved = App::parseEnv((string) $value);
+        if ($resolved === null || $resolved === '' || !is_numeric($resolved)) {
+            return null;
+        }
+
+        return (int) $resolved;
+    }
+
+    /**
+     * Add a range error when a resolved integer falls outside the supplied
+     * `min` / `max` bounds. Shared by the resolved-int validators.
+     *
+     * @param array<string,int>|null $params
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _checkResolvedBounds(string $attribute, int $value, ?array $params): void
+    {
+        $min = $params['min'] ?? null;
+        $max = $params['max'] ?? null;
+
+        if (($min !== null && $value < $min) || ($max !== null && $value > $max)) {
+            $this->addError($attribute, Craft::t('herald', '{attribute} must resolve to a value between {min} and {max}.', [
+                'attribute' => $this->getAttributeLabel($attribute),
+                'min' => $min,
+                'max' => $max,
+            ]));
         }
     }
 }

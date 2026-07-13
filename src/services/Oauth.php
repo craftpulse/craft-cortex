@@ -519,7 +519,7 @@ class Oauth extends Component
         if ($cache === null) {
             return;
         }
-        $ttl = Herald::getInstance()->getSettings()->elevationTtl;
+        $ttl = Herald::getInstance()->getSettings()->getElevationTtl();
         $cache->set($this->elevationCacheKey($userId), true, $ttl);
     }
 

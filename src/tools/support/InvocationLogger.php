@@ -307,7 +307,7 @@ final class InvocationLogger
     private static function _excerptResponse(string $payload): string
     {
         $plugin = Herald::getInstance();
-        $bytes = $plugin !== null ? $plugin->getSettings()->auditResponseExcerptBytes : 2048;
+        $bytes = $plugin !== null ? $plugin->getSettings()->getAuditResponseExcerptBytes() : 2048;
         if (strlen($payload) <= $bytes) {
             return $payload;
         }

@@ -596,7 +596,7 @@ class Allowlist extends Component
         ?int $ttlSeconds = null,
         ?int $subjectUserId = null,
     ): RuntimeOverride {
-        $ttl = $ttlSeconds ?? Herald::getInstance()->getSettings()->runtimeOverrideTtl;
+        $ttl = $ttlSeconds ?? Herald::getInstance()->getSettings()->getRuntimeOverrideTtl();
 
         $override = new RuntimeOverride();
         $override->pattern = $pattern;
