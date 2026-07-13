@@ -466,7 +466,7 @@ it('defaults to dateCreated DESC', function() {
 
     Craft::$app->getDb()->createCommand()->update(
         Table::INVOCATIONS,
-        ['dateCreated' => (new DateTime('-1 hour'))->format('Y-m-d H:i:s')],
+        ['dateCreated' => (new DateTime('-1 hour', new DateTimeZone('UTC')))->format('Y-m-d H:i:s')],
         ['id' => $first->id],
     )->execute();
 

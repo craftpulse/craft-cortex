@@ -52,7 +52,12 @@ it('add() persists a runtime override and getEffective reflects it', function() 
 it('expired overrides do not appear in getEffective', function() {
     $override = $this->service->add('_test_/expired-command');
     // Force expiry into the past.
-    $override->expiresAt = Carbon::now()->subSecond()->toDateTimeString();
+    // Seed expiry in UTC — the service stores (via add()) and compares
+    // (getActiveOverrides / pruneExpired) in UTC, matching Craft's DB
+    // datetime convention. A bare Carbon::now() would seed in the app's
+    // local timezone, landing the "expired" row in the UTC future on any
+    // non-UTC install and defeating the expiry filter.
+    $override->expiresAt = Carbon::now('UTC')->subSecond()->toDateTimeString();
     $override->save(false);
 
     $effective = $this->service->getEffective();
@@ -70,7 +75,7 @@ it('soft-deleted overrides do not appear in getEffective', function() {
 it('getActiveOverrides excludes expired and soft-deleted rows', function() {
     $live = $this->service->add('_test_/active');
     $expired = $this->service->add('_test_/expired');
-    $expired->expiresAt = Carbon::now()->subSecond()->toDateTimeString();
+    $expired->expiresAt = Carbon::now('UTC')->subSecond()->toDateTimeString();
     $expired->save(false);
 
     $active = $this->service->getActiveOverrides();
@@ -82,7 +87,7 @@ it('getActiveOverrides excludes expired and soft-deleted rows', function() {
 
 it('getAllOverrides returns expired rows when includeExpired = true', function() {
     $expired = $this->service->add('_test_/all-expired');
-    $expired->expiresAt = Carbon::now()->subSecond()->toDateTimeString();
+    $expired->expiresAt = Carbon::now('UTC')->subSecond()->toDateTimeString();
     $expired->save(false);
 
     $all = $this->service->getAllOverrides(includeExpired: true);
@@ -93,7 +98,7 @@ it('getAllOverrides returns expired rows when includeExpired = true', function()
 
 it('pruneExpired hard-deletes expired non-deleted rows', function() {
     $expired = $this->service->add('_test_/prune-me');
-    $expired->expiresAt = Carbon::now()->subSecond()->toDateTimeString();
+    $expired->expiresAt = Carbon::now('UTC')->subSecond()->toDateTimeString();
     $expired->save(false);
 
     $live = $this->service->add('_test_/keep-me');
@@ -493,7 +498,7 @@ it('pruneExpired caps the per-call delete count at PRUNE_BATCH_LIMIT', function(
     // remainder (5) is pruned.
     $cap = \craftpulse\herald\services\Allowlist::PRUNE_BATCH_LIMIT;
     $surplus = 5;
-    $past = Carbon::now()->subSecond()->toDateTimeString();
+    $past = Carbon::now('UTC')->subSecond()->toDateTimeString();
 
     // Bulk-insert via the query builder — fastest path to many rows.
     $rows = [];

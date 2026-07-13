@@ -216,7 +216,11 @@ it('actionAllowlistTableData marks expired rows with isExpired=true', function()
     $override = new RuntimeOverride();
     $override->pattern = 'expired/*';
     $override->note = 'manually expired';
-    $override->expiresAt = (new \DateTime('-1 hour'))->format('Y-m-d H:i:s');
+    // UTC-anchored — the controller's isExpired computation reads the
+    // stored value as UTC (Craft's DB datetime convention). A local-time
+    // seed lands in the UTC future on any non-UTC install and reads as
+    // not-yet-expired.
+    $override->expiresAt = (new \DateTime('-1 hour', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s');
     $override->save();
 
     $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
