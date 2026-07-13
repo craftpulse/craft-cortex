@@ -59,6 +59,12 @@ class _HeraldSettingsControllerHarness extends SettingsController
         // no-op
     }
 
+    public function requirePermission(string $permission): void
+    {
+        // no-op — grant actions now gate on herald:manageGrants; the
+        // harness runs the body without a logged-in identity.
+    }
+
     /**
      * Swap the inherited `$request` slot for whatever the test supplies.
      * Both action bodies call `$this->request->getRequiredBodyParam()` /
@@ -137,6 +143,7 @@ class _HeraldThrowingAllowlist extends Allowlist
         ?int $userId = null,
         ?string $note = null,
         ?int $ttlSeconds = null,
+        ?int $subjectUserId = null,
     ): \craftpulse\herald\records\RuntimeOverride {
         throw new Exception('boom: add failed');
     }

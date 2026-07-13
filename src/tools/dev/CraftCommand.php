@@ -9,7 +9,9 @@ use craftpulse\herald\attributes\IsOpenWorld;
 use craftpulse\herald\attributes\Title;
 use craftpulse\herald\Herald;
 use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\ContextAwareToolInterface;
 use craftpulse\herald\tools\support\ConsoleRunner;
+use craftpulse\herald\tools\support\InvocationContext;
 use craftpulse\herald\tools\support\Schema;
 use craftpulse\herald\tools\support\SecretRedactor;
 use craftpulse\herald\tools\ToolException;
@@ -57,10 +59,39 @@ use craftpulse\herald\tools\ToolException;
 #[IsDestructive]
 #[IsIdempotent(false)]
 #[IsOpenWorld(false)]
-class CraftCommand extends AbstractTool
+class CraftCommand extends AbstractTool implements ContextAwareToolInterface
 {
+    // Private Properties
+    // =========================================================================
+
+    /**
+     * @var InvocationContext|null Per-invocation context injected by the
+     *                             dispatcher immediately before `execute()`.
+     *                             Carries the resolved calling user, whose
+     *                             id scopes per-user runtime grants at the
+     *                             dispatch gate. Null on call paths that
+     *                             bypass the dispatcher (stdio single-process
+     *                             / direct test calls) — treated as the
+     *                             global-only allowlist view (no per-user
+     *                             grant applies).
+     */
+    private ?InvocationContext $_invocationContext = null;
+
     // Public Methods
     // =========================================================================
+
+    /**
+     * Store the per-invocation context the dispatcher injects before
+     * `execute()`. Read for the resolved user id when resolving the
+     * per-user effective allowlist.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function setInvocationContext(InvocationContext $ctx): void
+    {
+        $this->_invocationContext = $ctx;
+    }
 
     /**
      * @inheritdoc
@@ -215,7 +246,7 @@ class CraftCommand extends AbstractTool
      */
     private function _allowlist(): array
     {
-        $patterns = Herald::getInstance()->allowlist->getEffective();
+        $patterns = Herald::getInstance()->allowlist->getEffective($this->_callingUserId());
 
         return array_values(array_filter(
             $patterns,
@@ -243,13 +274,27 @@ class CraftCommand extends AbstractTool
         $defaults = $settings->allowedCommands;
         $overridePatterns = array_map(
             static fn(array $row): string => (string) $row['pattern'],
-            Herald::getInstance()->allowlist->getActiveOverrides(),
+            Herald::getInstance()->allowlist->getActiveOverrides($this->_callingUserId()),
         );
 
         return array_values(array_unique(array_filter(
             array_merge($defaults, $overridePatterns),
             static fn($p): bool => is_string($p) && $p !== '',
         )));
+    }
+
+    /**
+     * The resolved calling user id for the current dispatch, or null when
+     * no context was injected (stdio single-process / direct test call).
+     * Scopes per-user runtime grants so the dispatch gate honours a grant
+     * only for the user it was issued to; a null id sees only global grants.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _callingUserId(): ?int
+    {
+        return $this->_invocationContext?->userId;
     }
 
     /**

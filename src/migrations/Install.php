@@ -52,6 +52,11 @@ class Install extends Migration
                 'note' => $this->string(255)->null(),
                 'expiresAt' => $this->dateTime()->null(),
                 'createdByUserId' => $this->integer()->null(),
+                // The user a per-user temporary grant applies to. NULL means
+                // a global grant (applies to every caller); a non-null value
+                // scopes the grant to exactly that user. See the
+                // `m260714_120000_herald_grant_subject` migration.
+                'subjectUserId' => $this->integer()->null(),
                 'dateCreated' => $this->dateTime()->notNull(),
                 'dateUpdated' => $this->dateTime()->notNull(),
                 'dateDeleted' => $this->dateTime()->null(),
@@ -61,6 +66,7 @@ class Install extends Migration
             $this->createIndex(null, Table::RUNTIME_OVERRIDES, ['pattern']);
             $this->createIndex(null, Table::RUNTIME_OVERRIDES, ['expiresAt']);
             $this->createIndex(null, Table::RUNTIME_OVERRIDES, ['dateDeleted']);
+            $this->createIndex(null, Table::RUNTIME_OVERRIDES, ['subjectUserId']);
 
             $this->addForeignKey(
                 null,
@@ -69,6 +75,15 @@ class Install extends Migration
                 CraftTable::USERS,
                 ['id'],
                 'SET NULL',
+                null,
+            );
+            $this->addForeignKey(
+                null,
+                Table::RUNTIME_OVERRIDES,
+                ['subjectUserId'],
+                CraftTable::USERS,
+                ['id'],
+                'CASCADE',
                 null,
             );
         }

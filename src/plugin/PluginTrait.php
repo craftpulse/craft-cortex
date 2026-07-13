@@ -187,6 +187,10 @@ trait PluginTrait
      *     (`herald:manageSettings`) — gates the Settings screen
      *     (`actionIndex` / `actionSave`) per the estate settings-permission
      *     doctrine; `allowAdminChanges` still gates whether a save writes.
+     *   - `SettingsController::PERMISSION_MANAGE_GRANTS`
+     *     (`herald:manageGrants`) — gates the Temporary grants screen and
+     *     its issue / revoke actions. Its own permission because issuing a
+     *     grant widens the `craft_command` allowlist for a user.
      *   - `Skill::PERMISSION_MANAGE` (`manageHeraldSkills`) — global
      *     (no per-instance ACL); the element's `canSave / canDelete /
      *     canView / canDuplicate` overrides consult it directly.
@@ -214,6 +218,13 @@ trait PluginTrait
                             'info' => Craft::t(
                                 'herald',
                                 'Allows viewing and editing the Herald Settings screen. Editing still requires allowAdminChanges to be enabled in the environment.',
+                            ),
+                        ],
+                        SettingsController::PERMISSION_MANAGE_GRANTS => [
+                            'label' => Craft::t('herald', 'Manage Herald temporary grants'),
+                            'info' => Craft::t(
+                                'herald',
+                                'Allows issuing and revoking temporary command-execution grants for a user. Issuing a grant widens what the craft_command tool may run for the granted user until the grant expires.',
                             ),
                         ],
                         Skill::PERMISSION_MANAGE => [

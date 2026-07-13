@@ -239,9 +239,12 @@ it('actionTokens first statement is requireAdmin', function() {
     expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
 });
 
-it('actionAllowlist first statement is requireAdmin', function() {
+it('actionAllowlist first statement is requirePermission(manageGrants)', function() {
+    // Temporary grants is gated by its own dedicated permission, not
+    // requireAdmin: issuing a grant widens the craft_command allowlist for
+    // a user, so an operator may delegate it independently.
     $body = _herald_controller_method_body('actionAllowlist');
-    expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
+    expect($body)->toMatch('/^\s*\$this->requirePermission\s*\(\s*self::PERMISSION_MANAGE_GRANTS\s*\)/m');
 });
 
 it('actionActivity first statement is requirePermission(viewActivity)', function() {
@@ -460,29 +463,29 @@ it('declares actionAllowlistTableData + actionAllowlistOverrideSlideout', functi
     expect($rc->hasMethod('actionAllowlistOverrideSlideout'))->toBeTrue();
 });
 
-it('actionAllowlistTableData first statements are requireAcceptsJson + requireAdmin', function() {
+it('actionAllowlistTableData first statements are requireAcceptsJson + requirePermission(manageGrants)', function() {
     $body = _herald_controller_method_body('actionAllowlistTableData');
     expect($body)->toMatch('/^\s*\$this->requireAcceptsJson\s*\(\s*\)/m');
-    expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*false\s*\)/');
+    expect($body)->toMatch('/\$this->requirePermission\s*\(\s*self::PERMISSION_MANAGE_GRANTS\s*\)/');
 });
 
-it('actionAllowlistOverrideSlideout first statement is requireAdmin', function() {
+it('actionAllowlistOverrideSlideout first statement is requirePermission(manageGrants)', function() {
     $body = _herald_controller_method_body('actionAllowlistOverrideSlideout');
-    expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
+    expect($body)->toMatch('/^\s*\$this->requirePermission\s*\(\s*self::PERMISSION_MANAGE_GRANTS\s*\)/m');
 });
 
-it('actionAddOverride first statements are requirePostRequest + requireAcceptsJson + requireAdmin', function() {
+it('actionAddOverride first statements are requirePostRequest + requireAcceptsJson + requirePermission(manageGrants)', function() {
     $body = _herald_controller_method_body('actionAddOverride');
     expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
     expect($body)->toMatch('/\$this->requireAcceptsJson\s*\(\s*\)/');
-    expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
+    expect($body)->toMatch('/\$this->requirePermission\s*\(\s*self::PERMISSION_MANAGE_GRANTS\s*\)/');
 });
 
-it('actionRemoveOverride first statements are requirePostRequest + requireAcceptsJson + requireAdmin', function() {
+it('actionRemoveOverride first statements are requirePostRequest + requireAcceptsJson + requirePermission(manageGrants)', function() {
     $body = _herald_controller_method_body('actionRemoveOverride');
     expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
     expect($body)->toMatch('/\$this->requireAcceptsJson\s*\(\s*\)/');
-    expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
+    expect($body)->toMatch('/\$this->requirePermission\s*\(\s*self::PERMISSION_MANAGE_GRANTS\s*\)/');
 });
 
 it('resolves the Allowlist data + slideout CP URLs', function() {

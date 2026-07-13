@@ -119,16 +119,17 @@ class Allowlist extends Component
     // =========================================================================
 
     /**
-     * Per-request memoization of `getActiveOverrides()`. The same
-     * request can resolve `getEffective()` multiple times (once for
-     * the registry lookup, once for the audit-log line, plus inside
-     * `craft_command` itself) — caching trims the DB round-trips
-     * without persisting across requests. Mutating methods
-     * (`add()` / `remove()` / `pruneExpired()`) reset the cache.
+     * Per-request memoization of `getActiveOverrides()`, keyed by the
+     * subject-scope string (`'*'` for the global-only view, or the
+     * caller's user id). The same request can resolve `getEffective()`
+     * multiple times (once for the registry lookup, once for the
+     * audit-log line, plus inside `craft_command` itself) — caching trims
+     * the DB round-trips without persisting across requests. Mutating
+     * methods (`add()` / `remove()` / `pruneExpired()`) reset every key.
      *
-     * @var array<int,array<string,mixed>>|null
+     * @var array<string,array<int,array<string,mixed>>>
      */
-    private ?array $_activeOverridesCache = null;
+    private array $_activeOverridesCache = [];
 
     // Public Methods — Read
     // =========================================================================
@@ -147,12 +148,19 @@ class Allowlist extends Component
      * the `get_initial_context` tool's `allowlist` field, so flipping
      * `allowAdminChanges` is visible to both surfaces in lockstep.
      *
+     * `$userId` scopes the runtime-grant contribution: a global grant
+     * (`subjectUserId` null) always applies; a per-user grant applies
+     * only when its subject matches `$userId`. Pass the resolved calling
+     * user so the dispatch gate honours a grant only for the user it was
+     * issued to; pass null (stdio / unidentified caller) to see the
+     * global-only view.
+     *
      * @return string[]
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public function getEffective(): array
+    public function getEffective(?int $userId = null): array
     {
         $settings = Herald::getInstance()->getSettings();
         $defaults = $settings->allowedCommands;
@@ -163,36 +171,52 @@ class Allowlist extends Component
 
         $overridePatterns = array_map(
             static fn(array $row): string => (string) $row['pattern'],
-            $this->getActiveOverrides(),
+            $this->getActiveOverrides($userId),
         );
         return array_values(array_unique(array_merge($defaults, $overridePatterns)));
     }
 
     /**
-     * Currently-active overrides (unexpired and not soft-deleted).
-     * Memoized per-request — mutations invalidate the cache so a
-     * single request that adds + reads back gets the up-to-date row.
+     * Currently-active grants (unexpired and not soft-deleted), scoped to
+     * the given subject. A global grant (`subjectUserId` null) is always
+     * included; a per-user grant is included only when its subject equals
+     * `$userId`. When `$userId` is null (stdio / unidentified caller) only
+     * global grants are returned, so a per-user grant can never be used by
+     * a caller it was not issued to.
+     *
+     * Memoized per-request, keyed by subject scope — mutations invalidate
+     * every key so a single request that adds + reads back gets the
+     * up-to-date row.
      *
      * @return array<int,array<string,mixed>>
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public function getActiveOverrides(): array
+    public function getActiveOverrides(?int $userId = null): array
     {
-        if ($this->_activeOverridesCache !== null) {
-            return $this->_activeOverridesCache;
+        // Prefix the per-user key so it stays a non-numeric string — a bare
+        // numeric string array key would coerce to int and break the
+        // declared `array<string,...>` cache shape.
+        $key = $userId === null ? '*' : 'u' . $userId;
+        if (isset($this->_activeOverridesCache[$key])) {
+            return $this->_activeOverridesCache[$key];
         }
 
         $now = Carbon::now('UTC')->toDateTimeString();
-        /** @var array<int,array<string,mixed>> $rows */
-        $rows = RuntimeOverride::find()
+        $query = RuntimeOverride::find()
             ->where(['dateDeleted' => null])
-            ->andWhere(['or', ['expiresAt' => null], ['>', 'expiresAt', $now]])
-            ->orderBy(['expiresAt' => SORT_ASC])
-            ->asArray()
-            ->all();
-        return $this->_activeOverridesCache = $rows;
+            ->andWhere(['or', ['expiresAt' => null], ['>', 'expiresAt', $now]]);
+
+        if ($userId === null) {
+            $query->andWhere(['subjectUserId' => null]);
+        } else {
+            $query->andWhere(['or', ['subjectUserId' => null], ['subjectUserId' => $userId]]);
+        }
+
+        /** @var array<int,array<string,mixed>> $rows */
+        $rows = $query->orderBy(['expiresAt' => SORT_ASC])->asArray()->all();
+        return $this->_activeOverridesCache[$key] = $rows;
     }
 
     /**
@@ -550,8 +574,15 @@ class Allowlist extends Component
     // =========================================================================
 
     /**
-     * Add a runtime override. Returns the saved record. `ttlSeconds`
-     * defaults to `Settings::$runtimeOverrideTtl` when null.
+     * Add a runtime grant. Returns the saved record. `ttlSeconds`
+     * defaults to `Settings::getRuntimeOverrideTtl()` when null.
+     *
+     * `$subjectUserId` names the user the grant applies to: null issues a
+     * GLOBAL grant (applies to every caller, the legacy semantics); a
+     * non-null value scopes the grant to exactly that user, so the
+     * dispatch gate honours it only for them. `$userId` is the grantor
+     * (recorded on `createdByUserId` for the audit trail), distinct from
+     * the subject.
      *
      * @throws Exception when the underlying record fails validation or save.
      *
@@ -563,6 +594,7 @@ class Allowlist extends Component
         ?int $userId = null,
         ?string $note = null,
         ?int $ttlSeconds = null,
+        ?int $subjectUserId = null,
     ): RuntimeOverride {
         $ttl = $ttlSeconds ?? Herald::getInstance()->getSettings()->runtimeOverrideTtl;
 
@@ -570,9 +602,10 @@ class Allowlist extends Component
         $override->pattern = $pattern;
         $override->note = $note;
         $override->createdByUserId = $userId;
+        $override->subjectUserId = $subjectUserId;
         $override->expiresAt = Carbon::now('UTC')->addSeconds($ttl)->toDateTimeString();
         $this->_saveOrThrow($override, 'save', $pattern);
-        $this->_activeOverridesCache = null;
+        $this->_activeOverridesCache = [];
 
         return $override;
     }
@@ -593,7 +626,7 @@ class Allowlist extends Component
         }
         $override->dateDeleted = Carbon::now('UTC')->toDateTimeString();
         $this->_saveOrThrow($override, 'soft-delete', "#{$id}");
-        $this->_activeOverridesCache = null;
+        $this->_activeOverridesCache = [];
         return true;
     }
 
@@ -632,7 +665,7 @@ class Allowlist extends Component
         }
 
         $deleted = RuntimeOverride::deleteAll(['id' => $ids]);
-        $this->_activeOverridesCache = null;
+        $this->_activeOverridesCache = [];
         return $deleted;
     }
 

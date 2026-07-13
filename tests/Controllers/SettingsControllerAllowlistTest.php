@@ -69,6 +69,12 @@ class _HeraldAllowlistHarness extends SettingsController
         // no-op
     }
 
+    public function requirePermission(string $permission): void
+    {
+        // no-op — grant actions gate on herald:manageGrants; the harness
+        // runs the body without a logged-in identity.
+    }
+
     /**
      * Swap request + response for ones the controller's JSON branch can
      * exercise. `withParams` is intentionally generic — the table-data
@@ -204,6 +210,7 @@ it('actionAllowlistTableData data[0] keys equal the locked tuple exactly', funct
         'note',
         'expiresAt',
         'createdBy',
+        'subject',
         'dateCreated',
     ]);
     expect(array_keys($row['pattern']))->toBe(['pattern', 'isExpired']);
@@ -344,6 +351,7 @@ it('actionAddOverride JSON happy path returns the serialised row', function() {
         'note',
         'expiresAt',
         'createdBy',
+        'subject',
         'dateCreated',
     ]);
     expect($response->data['model']['pattern']['pattern'])->toBe('mailer/test');
@@ -364,7 +372,7 @@ it('actionAddOverride empty pattern returns 400 with message', function() {
     $response = $controller->actionAddOverride();
 
     expect($response->statusCode)->toBe(400);
-    expect($response->data)->toBeArray()->toHaveKey('message', 'Pattern is required.');
+    expect($response->data)->toBeArray()->toHaveKey('message', 'At least one command pattern is required.');
 });
 
 // -----------------------------------------------------------------------------
@@ -418,6 +426,7 @@ it('actionAddOverride success row carries the locked row keys', function() {
         'note',
         'expiresAt',
         'createdBy',
+        'subject',
         'dateCreated',
     ]);
     expect(array_keys($response->data['model']['pattern']))->toBe(['pattern', 'isExpired']);

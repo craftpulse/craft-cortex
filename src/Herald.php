@@ -103,7 +103,7 @@ class Herald extends BasePlugin
     /**
      * @inheritdoc
      */
-    public string $schemaVersion = '1.0.0';
+    public string $schemaVersion = '1.1.0';
 
     /**
      * @inheritdoc
@@ -252,9 +252,9 @@ class Herald extends BasePlugin
      *
      * Subnav map (in display order):
      *   - Settings          — `herald:manageSettings` permission, all editions.
-     *   - Temporary grants   — admin, all editions (the runtime allowlist
-     *                          override surface; route handle stays
-     *                          `allowlist`).
+     *   - Temporary grants   — `herald:manageGrants` permission, all
+     *                          editions (the per-user runtime grant surface;
+     *                          route handle stays `allowlist`).
      *   - Tokens            — admin + Pro.
      *   - Clients           — admin + Pro (OAuth client approval gate).
      *   - Activity          — `herald:viewActivity` + Pro (admins pass
@@ -296,7 +296,10 @@ class Herald extends BasePlugin
             ];
         }
 
-        if ($user->admin) {
+        // Temporary grants is gated by its own manage-grants permission
+        // (delegatable independently of settings), matching the controller
+        // gate. Admins hold it implicitly.
+        if ($user->can(SettingsController::PERMISSION_MANAGE_GRANTS)) {
             $subnav['grants'] = [
                 'label' => Craft::t('herald', 'Temporary grants'),
                 'url' => 'herald/allowlist',

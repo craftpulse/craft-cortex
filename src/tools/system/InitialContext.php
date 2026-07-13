@@ -12,6 +12,8 @@ use craftpulse\herald\attributes\IsReadOnly;
 use craftpulse\herald\attributes\Title;
 use craftpulse\herald\Herald;
 use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\ContextAwareToolInterface;
+use craftpulse\herald\tools\support\InvocationContext;
 use craftpulse\herald\tools\support\Schema;
 
 /**
@@ -47,10 +49,36 @@ use craftpulse\herald\tools\support\Schema;
 #[Title('Get Initial Context')]
 #[IsReadOnly]
 #[IsIdempotent]
-class InitialContext extends AbstractTool
+class InitialContext extends AbstractTool implements ContextAwareToolInterface
 {
+    // Private Properties
+    // =========================================================================
+
+    /**
+     * @var InvocationContext|null Per-invocation context injected by the
+     *                             dispatcher before `execute()`. Its
+     *                             resolved user id scopes the advertised
+     *                             `allowlist` so the LLM-visible view
+     *                             matches what the dispatch gate will honour
+     *                             for this caller. Null (stdio / direct
+     *                             call) shows the global-only view.
+     */
+    private ?InvocationContext $_invocationContext = null;
+
     // Public Methods
     // =========================================================================
+
+    /**
+     * Store the per-invocation context the dispatcher injects before
+     * `execute()`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function setInvocationContext(InvocationContext $ctx): void
+    {
+        $this->_invocationContext = $ctx;
+    }
 
     /**
      * @inheritdoc
@@ -184,7 +212,7 @@ class InitialContext extends AbstractTool
                 'enabled' => $settings->execEnabled,
                 'dryRunDefault' => $settings->execDryRunDefault,
             ],
-            'allowlist' => Herald::getInstance()->allowlist->getEffective(),
+            'allowlist' => Herald::getInstance()->allowlist->getEffective($this->_invocationContext?->userId),
             'hints' => $this->_hints(),
         ];
     }

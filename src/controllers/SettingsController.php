@@ -81,6 +81,24 @@ class SettingsController extends Controller
      */
     public const PERMISSION_MANAGE_SETTINGS = 'herald:manageSettings';
 
+    /**
+     * Permission that grants access to the Temporary grants screen and the
+     * issue / revoke actions behind it. Its own permission (not folded
+     * under `manageSettings`) because issuing a grant widens the
+     * `craft_command` execution allowlist for a user, a privileged
+     * operation an operator may want to delegate independently of settings
+     * management. Admin-only by default: the permission defaults to
+     * not-granted and admins hold every permission implicitly, so nothing
+     * changes until an operator deliberately delegates it.
+     *
+     * Declared on the enforcing controller as the single source of truth,
+     * referenced from `PluginTrait`'s registration, the action gates, and
+     * the CP nav gate in `Herald::getCpNavItem()`.
+     *
+     * @since 5.0.0
+     */
+    public const PERMISSION_MANAGE_GRANTS = 'herald:manageGrants';
+
     // Public Methods
     // =========================================================================
 
@@ -437,7 +455,7 @@ class SettingsController extends Controller
      */
     public function actionAllowlist(): Response
     {
-        $this->requireAdmin(false);
+        $this->requirePermission(self::PERMISSION_MANAGE_GRANTS);
 
         $allowlist = Herald::getInstance()->allowlist;
 
@@ -511,7 +529,7 @@ class SettingsController extends Controller
     public function actionAllowlistTableData(): Response
     {
         $this->requireAcceptsJson();
-        $this->requireAdmin(false);
+        $this->requirePermission(self::PERMISSION_MANAGE_GRANTS);
 
         $page = max(1, (int) $this->request->getParam('page', 1));
         $perPage = (int) $this->request->getParam('per_page', 50);
@@ -583,10 +601,11 @@ class SettingsController extends Controller
      */
     public function actionAllowlistOverrideSlideout(): Response
     {
-        $this->requireAdmin(false);
+        $this->requirePermission(self::PERMISSION_MANAGE_GRANTS);
 
         return $this->renderTemplate('herald/_cp/_allowlist-override-slideout', [
             'settings' => Herald::getInstance()->getSettings(),
+            'commandGroups' => Herald::getInstance()->allowlist->getCommandGroups(),
         ]);
     }
 
@@ -1131,28 +1150,55 @@ class SettingsController extends Controller
     {
         $this->requirePostRequest();
         $this->requireAcceptsJson();
-        $this->requireAdmin(requireAdminChanges: true);
+        $this->requirePermission(self::PERMISSION_MANAGE_GRANTS);
 
         $request = $this->request;
 
-        $pattern = trim((string) $request->getRequiredBodyParam('pattern'));
+        // Command scope: one or more fnmatch patterns. The guided slideout
+        // posts `patterns[]` from the grouped command picker; the legacy
+        // single-field path posts `pattern`. Normalise to a de-duped list.
+        $patterns = $this->_postedGrantPatterns();
+        if ($patterns === []) {
+            return $this->asFailure(Craft::t('herald', 'At least one command pattern is required.'));
+        }
+
+        // Subject: the user the grant is for. Optional — null issues a
+        // global grant (applies to every caller). When present it MUST
+        // resolve to a real user; a crafted id fails closed.
+        $subjectUserId = null;
+        $subjectParam = $request->getBodyParam('subjectUserId');
+        if (is_array($subjectParam)) {
+            $subjectParam = reset($subjectParam);
+        }
+        if ($subjectParam !== null && $subjectParam !== '') {
+            $candidate = (int) $subjectParam;
+            if ($candidate <= 0 || User::find()->id($candidate)->status(null)->one() === null) {
+                return $this->asFailure(Craft::t('herald', 'The selected user could not be found.'));
+            }
+            $subjectUserId = $candidate;
+        }
+
         $note = $request->getBodyParam('note');
         $note = is_string($note) && $note !== '' ? trim($note) : null;
         $ttl = $request->getBodyParam('ttlSeconds');
         $ttlSeconds = is_numeric($ttl) && (int) $ttl > 0 ? (int) $ttl : null;
 
-        if ($pattern === '') {
-            return $this->asFailure(Craft::t('herald', 'Pattern is required.'));
-        }
+        $grantorId = Craft::$app->getUser()->getId();
+        $grantorId = is_int($grantorId) ? $grantorId : null;
 
-        $userId = Craft::$app->getUser()->getId();
+        $created = [];
         try {
-            $override = Herald::getInstance()->allowlist->add(
-                pattern: $pattern,
-                userId: is_int($userId) ? $userId : null,
-                note: $note,
-                ttlSeconds: $ttlSeconds,
-            );
+            foreach ($patterns as $pattern) {
+                $override = Herald::getInstance()->allowlist->add(
+                    pattern: $pattern,
+                    userId: $grantorId,
+                    note: $note,
+                    ttlSeconds: $ttlSeconds,
+                    subjectUserId: $subjectUserId,
+                );
+                $created[] = $this->_serializeOverrideRow($override->toArray());
+                $this->_auditGrant('issue', (int) $override->id, $pattern, $subjectUserId, $grantorId);
+            }
         } catch (Exception $e) {
             Craft::error($e->getMessage(), 'herald');
             return $this->asFailure(Craft::t('herald', 'Could not add grant.'));
@@ -1160,7 +1206,10 @@ class SettingsController extends Controller
 
         return $this->asSuccess(
             message: Craft::t('herald', 'Grant issued.'),
-            data: ['model' => $this->_serializeOverrideRow($override->toArray())],
+            data: [
+                'model' => $created[0] ?? null,
+                'models' => $created,
+            ],
         );
     }
 
@@ -1184,7 +1233,7 @@ class SettingsController extends Controller
     {
         $this->requirePostRequest();
         $this->requireAcceptsJson();
-        $this->requireAdmin(requireAdminChanges: true);
+        $this->requirePermission(self::PERMISSION_MANAGE_GRANTS);
 
         $id = (int) $this->request->getRequiredBodyParam('id');
 
@@ -1200,7 +1249,10 @@ class SettingsController extends Controller
             return $this->asJson(['message' => Craft::t('herald', 'Override not found.')]);
         }
 
-        return $this->asSuccess(Craft::t('herald', 'Override removed.'));
+        $actorId = Craft::$app->getUser()->getId();
+        $this->_auditGrant('revoke', $id, null, null, is_int($actorId) ? $actorId : null);
+
+        return $this->asSuccess(Craft::t('herald', 'Grant revoked.'));
     }
 
     // Protected Methods
@@ -1516,18 +1568,11 @@ class SettingsController extends Controller
             $isExpired = $exp !== false && $exp < DateTimeHelper::now();
         }
 
-        $createdBy = null;
-        $createdByUserId = $row['createdByUserId'] ?? null;
-        if (is_int($createdByUserId) || (is_string($createdByUserId) && ctype_digit($createdByUserId))) {
-            $user = User::find()->id((int) $createdByUserId)->status(null)->one();
-            if ($user instanceof User) {
-                $createdBy = [
-                    'id' => (int) $user->id,
-                    'label' => $user->getName(),
-                    'cpEditUrl' => $user->getCpEditUrl(),
-                ];
-            }
-        }
+        $createdBy = $this->_resolveRowUser($row['createdByUserId'] ?? null);
+
+        // Subject: the user this grant is for. Null = a global grant that
+        // applies to every caller (rendered distinctly in the table).
+        $subject = $this->_resolveRowUser($row['subjectUserId'] ?? null);
 
         return [
             'id' => (int) ($row['id'] ?? 0),
@@ -1541,8 +1586,93 @@ class SettingsController extends Controller
                 'isExpired' => $isExpired,
             ],
             'createdBy' => $createdBy,
+            'subject' => $subject,
             'dateCreated' => (string) ($row['dateCreated'] ?? ''),
         ];
+    }
+
+    /**
+     * Resolve a raw user-id cell into the `{id, label, cpEditUrl}` shape
+     * the VueAdminTable cells consume, or null when the id is absent or the
+     * user record is missing (deleted). Shared by the `createdBy` (grantor)
+     * and `subject` (grantee) columns of a grant row.
+     *
+     * @return array{id:int,label:string,cpEditUrl:string|null}|null
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _resolveRowUser(mixed $userId): ?array
+    {
+        if (!is_int($userId) && !(is_string($userId) && ctype_digit($userId))) {
+            return null;
+        }
+
+        $user = User::find()->id((int) $userId)->status(null)->one();
+        if (!$user instanceof User) {
+            return null;
+        }
+
+        return [
+            'id' => (int) $user->id,
+            'label' => $user->getName(),
+            'cpEditUrl' => $user->getCpEditUrl(),
+        ];
+    }
+
+    /**
+     * Normalise the posted command scope into a de-duped, order-preserving
+     * list of non-empty fnmatch patterns. Accepts either `patterns` (the
+     * array the guided slideout's grouped command picker posts) or a single
+     * `pattern` string (the legacy field).
+     *
+     * @return string[]
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _postedGrantPatterns(): array
+    {
+        $raw = $this->request->getBodyParam('patterns');
+        if (!is_array($raw)) {
+            $single = $this->request->getBodyParam('pattern');
+            $raw = is_string($single) ? [$single] : [];
+        }
+
+        $patterns = [];
+        foreach ($raw as $value) {
+            if (!is_string($value)) {
+                continue;
+            }
+            $trimmed = trim($value);
+            if ($trimmed !== '' && !in_array($trimmed, $patterns, true)) {
+                $patterns[] = $trimmed;
+            }
+        }
+
+        return $patterns;
+    }
+
+    /**
+     * Write a structured audit line for a grant issue / revoke. The MCP
+     * invocation-audit pipeline covers tool calls, not CP admin actions,
+     * so grant lifecycle events are logged here through Craft's logger
+     * under the `herald` category (the same channel `Invocations` uses as
+     * its secondary trail), capturing the actor, subject, and scope.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _auditGrant(string $action, int $grantId, ?string $pattern, ?int $subjectUserId, ?int $actorId): void
+    {
+        Craft::info(sprintf(
+            'grant %s: id=%d pattern=%s subjectUserId=%s actorUserId=%s',
+            $action,
+            $grantId,
+            $pattern ?? '-',
+            $subjectUserId === null ? 'global' : (string) $subjectUserId,
+            $actorId === null ? '-' : (string) $actorId,
+        ), 'herald');
     }
 
     /**

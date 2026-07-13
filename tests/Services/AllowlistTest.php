@@ -15,6 +15,7 @@
  */
 
 use Carbon\Carbon;
+use craft\elements\User;
 use craftpulse\herald\Herald;
 use craftpulse\herald\records\RuntimeOverride;
 use yii\base\Exception;
@@ -83,6 +84,54 @@ it('getActiveOverrides excludes expired and soft-deleted rows', function() {
 
     expect($patterns)->toContain('_test_/active');
     expect($patterns)->not->toContain('_test_/expired');
+});
+
+// -----------------------------------------------------------------------------
+// Per-user grant subject scoping
+// -----------------------------------------------------------------------------
+
+it('a per-user grant is visible only to its subject', function() {
+    // subjectUserId FKs to users(id), so seed the grant against a real
+    // user. The "other user" is just a query filter value — it need not
+    // exist for the WHERE clause to exclude the grant.
+    $subject = User::find()->status(null)->one();
+    expect($subject)->not->toBeNull();
+    $subjectId = (int) $subject->id;
+    $otherId = $subjectId + 1_000_000;
+
+    $this->service->add('_test_/per-user', subjectUserId: $subjectId);
+
+    // Visible to the subject.
+    $forSubject = array_column($this->service->getActiveOverrides($subjectId), 'pattern');
+    expect($forSubject)->toContain('_test_/per-user');
+
+    // Invisible to a different user.
+    $forOther = array_column($this->service->getActiveOverrides($otherId), 'pattern');
+    expect($forOther)->not->toContain('_test_/per-user');
+
+    // Invisible to the global-only view (userId null).
+    $global = array_column($this->service->getActiveOverrides(), 'pattern');
+    expect($global)->not->toContain('_test_/per-user');
+});
+
+it('a global grant is visible to every subject and the global view', function() {
+    $this->service->add('_test_/global-grant'); // subjectUserId null
+
+    expect(array_column($this->service->getActiveOverrides(), 'pattern'))
+        ->toContain('_test_/global-grant');
+    expect(array_column($this->service->getActiveOverrides(12_345), 'pattern'))
+        ->toContain('_test_/global-grant');
+});
+
+it('getEffective scopes per-user grant patterns to the calling user', function() {
+    $subject = User::find()->status(null)->one();
+    $subjectId = (int) $subject->id;
+
+    $this->service->add('_test_/effective-scoped', subjectUserId: $subjectId);
+
+    expect($this->service->getEffective($subjectId))->toContain('_test_/effective-scoped');
+    expect($this->service->getEffective($subjectId + 1_000_000))->not->toContain('_test_/effective-scoped');
+    expect($this->service->getEffective())->not->toContain('_test_/effective-scoped');
 });
 
 it('getAllOverrides returns expired rows when includeExpired = true', function() {

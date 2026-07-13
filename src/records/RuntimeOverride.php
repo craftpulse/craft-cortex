@@ -21,6 +21,7 @@ use craftpulse\herald\db\Table;
  * @property string|null $note
  * @property string|null $expiresAt
  * @property int|null $createdByUserId
+ * @property int|null $subjectUserId
  * @property string $dateCreated
  * @property string $dateUpdated
  * @property string|null $dateDeleted
