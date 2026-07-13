@@ -1,71 +1,88 @@
 {% extends "herald/_cp/_layout" %}
 
 {# =========================================================================
-   Herald Temporary grants screen — VueAdminTable of admin-issued runtime
-   allowlist grants + Garnish.Slideout for "Issue grant", plus a read-only
-   "Effective allowlist right now" panel.
+   Herald Temporary grants screen.
 
-   "Temporary grants" is the operator-facing label for what the data layer
-   calls runtime allowlist overrides: time-bound additions an admin issues
-   on top of the project-config Settings allowlist that expire
-   automatically. Internal route paths, permission names, controller action
-   names, and the `herald_runtime_overrides` table keep the
-   `allowlist` / `override` wording — this is a label-and-copy rename only.
+   Per-user, time-bound access an operator issues on top of the
+   project-config Settings allowlist: a grant names the user it is FOR, the
+   command scope(s) it covers, and an expiry. The craft_command dispatch
+   gate honours a grant only for its subject.
+
+   Layout:
+     - "Issue grant" opens the guided slideout (user picker, grouped command
+       picker, duration presets, reason).
+     - Active grants render in the main VueAdminTable with a live expiry
+       countdown and a per-row revoke.
+     - Expired grants live in a collapsed "History" section (a second table)
+       until Craft's gc reaps them.
+     - "Effective allowlist right now" is a read-only status panel.
+
+   Internal route paths, permission names, controller action names, and the
+   `herald_runtime_overrides` table keep the `allowlist` / `override`
+   wording. The row shape is locked in
+   `SettingsController::_serializeOverrideRow`:
+   `{id, pattern, note, expiresAt, createdBy, subject, dateCreated}`.
 
    Data path:
-     - Table data : GET  herald/settings/allowlist-table-data → JSON {pagination, data}
+     - Table data : GET  herald/settings/allowlist-table-data?status=active|expired → JSON {pagination, data}
      - Slideout   : GET  herald/settings/allowlist-override-slideout → HTML fragment
-     - Add        : POST herald/settings/add-override  → JSON {model, message}
-     - Remove     : POST herald/settings/remove-override (VueAdminTable
-                                                          deleteAction) → JSON {message}
-
-   The row shape is locked in `SettingsController::_serializeOverrideRow`:
-   `{id, pattern, note, expiresAt, createdBy, dateCreated, isExpired}`.
-
-   The "Effective allowlist right now" panel reads `Allowlist::getEffective()`
-   (the deduplicated union of Settings patterns + active grants the
-   `craft_command` tool actually dispatches against) and
-   `Allowlist::getActiveOverrides()` (so each grant can be annotated with
-   its expiry). Both come pre-resolved from the controller.
+     - Issue      : POST herald/settings/add-override  → JSON {model, models, message}
+     - Revoke     : POST herald/settings/remove-override (VueAdminTable deleteAction) → JSON {message}
    ========================================================================= #}
 
 {% set selectedSubnavItem = 'grants' %}
 
 {% do view.registerTranslations('herald', [
-    'Are you sure you want to remove the grant “{name}”?',
+    'Are you sure you want to revoke this grant?',
+    'Commands',
     'Could not add grant.',
     'Could not open the grant form.',
-    'Created',
-    'Created by',
-    'Expires',
+    'Expired grants',
+    'Expires in',
+    'Global',
     'Grant issued.',
-    'Grant removed.',
+    'Grant revoked.',
     'Issue grant',
+    'Issued',
+    'Issued by',
     'Never',
-    'No grants issued yet.',
-    'Note',
-    'Pattern',
+    'No active grants.',
+    'No expired grants.',
+    'Reason',
     'Search grants',
+    'Subject',
     'expired',
+    'left',
 ]) %}
 
 {% block content %}
     <p class="light">
-        {{ 'Time-bound additions an administrator issues on top of the Settings allowlist. Grants extend the patterns the `craft_command` tool may dispatch, and expire automatically — revoke one early with the trash action.'|t('herald') }}
+        {{ 'Per-user, time-bound access to run additional `craft_command` commands. A grant applies only to its subject user and expires automatically. Revoke one early with the trash action.'|t('herald') }}
     </p>
 
     <div id="herald-allowlist-vue-admin-table"></div>
 
     {# ---------------------------------------------------------------------
+       History — expired grants, still in the DB until Craft's gc reaps them.
+       Collapsed by default; the second table only loads its data when the
+       operator expands it.
+       --------------------------------------------------------------------- #}
+    <details class="herald-grant-history" style="margin-top: 18px;">
+        <summary style="cursor: pointer; font-weight: 600;">
+            {{ 'Expired grants'|t('herald') }}
+        </summary>
+        <div id="herald-allowlist-history-table" style="margin-top: 12px;"></div>
+    </details>
+
+    {# ---------------------------------------------------------------------
        Effective allowlist right now — the combined, deduplicated result the
-       dispatcher sees: base Settings patterns plus every active grant. Grant
-       patterns are annotated with their expiry; base patterns carry no
-       expiry. Read-only — this is a status panel, not an editor.
+       dispatcher sees: base Settings patterns plus every active grant.
+       Read-only status panel.
        --------------------------------------------------------------------- #}
     <div class="pane" style="margin-top: 24px;">
         <h2>{{ 'Effective allowlist right now'|t('herald') }}</h2>
         <p class="light">
-            {{ 'The deduplicated set of patterns the `craft_command` tool may dispatch this moment: the Settings allowlist plus every active grant below.'|t('herald') }}
+            {{ 'The deduplicated set of patterns the `craft_command` tool may dispatch this moment: the Settings allowlist plus every active grant.'|t('herald') }}
         </p>
         <p class="light">
             {{ 'Admin-level patterns only appear here while `allowAdminChanges` is enabled — it is currently {state}.'|t('herald', {
@@ -100,7 +117,7 @@
                             {% if grantExpiry is not null %}
                                 {{ grantExpiry|datetime('short') }}
                             {% else %}
-                                <span class="light">—</span>
+                                <span class="light">{{ 'Never'|t('herald') }}</span>
                             {% endif %}
                         </td>
                     </tr>
@@ -112,55 +129,10 @@
 
 {% js %}
     (function() {
-        var tableContainer = '#herald-allowlist-vue-admin-table';
-
-        function renderPatternCell(value) {
-            // VueAdminTable callbacks receive ONLY the cell value — the
-            // controller serialises `{pattern, isExpired}` composites so
-            // the expired flag travels inside the value.
-            var pattern = Craft.escapeHtml((value && value.pattern) || '');
-            var muted = value && value.isExpired ? ' style="opacity:0.55"' : '';
-            return '<code class="herald-token-prefix"' + muted + '>' + pattern + '</code>';
-        }
-
-        function renderNoteCell(value) {
+        function renderSubjectCell(value) {
+            // Null subject = a global grant that applies to every caller.
             if (!value) {
-                return '<span class="light">—</span>';
-            }
-            return Craft.escapeHtml(value);
-        }
-
-        function renderExpiresCell(value) {
-            // `value` is the `{value, isExpired}` composite from
-            // `_serializeOverrideRow` — null `value.value` means never.
-            if (!value || !value.value) {
-                return '<span class="light">' + Craft.t('herald', 'Never') + '</span>';
-            }
-
-            var expiresAt = new Date(value.value);
-            var formatted = Craft.formatDate(expiresAt, 'short');
-            if (value.isExpired) {
-                return (
-                    '<span style="opacity:0.55">' +
-                    Craft.escapeHtml(formatted) +
-                    ' <span class="light">(' + Craft.t('herald', 'expired') + ')</span>' +
-                    '</span>'
-                );
-            }
-            return Craft.escapeHtml(formatted);
-        }
-
-        function renderDateCreatedCell(value) {
-            if (!value) {
-                return '';
-            }
-            var d = new Date(value);
-            return Craft.escapeHtml(Craft.formatDate(d, 'short'));
-        }
-
-        function renderCreatedByCell(value) {
-            if (!value) {
-                return '<span class="light">—</span>';
+                return '<span class="light">' + Craft.t('herald', 'Global') + '</span>';
             }
             var label = Craft.escapeHtml(value.label || '');
             if (value.cpEditUrl) {
@@ -169,45 +141,69 @@
             return label;
         }
 
-        var columns = [
-            {
-                name: 'pattern',
-                title: Craft.t('herald', 'Pattern'),
-                sortField: 'pattern',
-                callback: renderPatternCell,
-            },
-            {
-                name: 'note',
-                title: Craft.t('herald', 'Note'),
-                callback: renderNoteCell,
-            },
-            {
-                name: 'expiresAt',
-                title: Craft.t('herald', 'Expires'),
-                sortField: 'expiresAt',
-                callback: renderExpiresCell,
-            },
-            {
-                name: 'createdBy',
-                title: Craft.t('herald', 'Created by'),
-                callback: renderCreatedByCell,
-            },
-            {
-                name: 'dateCreated',
-                title: Craft.t('herald', 'Created'),
-                sortField: 'dateCreated',
-                callback: renderDateCreatedCell,
-            },
-        ];
+        function renderPatternCell(value) {
+            var pattern = Craft.escapeHtml((value && value.pattern) || '');
+            var muted = value && value.isExpired ? ' style="opacity:0.55"' : '';
+            return '<code class="herald-token-prefix"' + muted + '>' + pattern + '</code>';
+        }
+
+        function renderNoteCell(value) {
+            if (!value) {
+                return '<span class="light">-</span>';
+            }
+            return Craft.escapeHtml(value);
+        }
+
+        function renderExpiresCell(value) {
+            if (!value || !value.value) {
+                return '<span class="light">' + Craft.t('herald', 'Never') + '</span>';
+            }
+            // Live countdown span — Herald.refreshCountdowns() fills it and
+            // keeps it ticking. data-expires is the naive-UTC stored value.
+            return (
+                '<span class="herald-countdown" data-herald-countdown data-expires="' +
+                Craft.escapeHtml(value.value) +
+                '"></span>'
+            );
+        }
+
+        function renderCreatedByCell(value) {
+            if (!value) {
+                return '<span class="light">-</span>';
+            }
+            var label = Craft.escapeHtml(value.label || '');
+            if (value.cpEditUrl) {
+                return '<a href="' + Craft.escapeHtml(value.cpEditUrl) + '">' + label + '</a>';
+            }
+            return label;
+        }
+
+        function renderDateCreatedCell(value) {
+            if (!value) {
+                return '';
+            }
+            return Craft.escapeHtml(Craft.formatDate(new Date(value), 'short'));
+        }
+
+        function columns() {
+            return [
+                { name: 'subject', title: Craft.t('herald', 'Subject'), callback: renderSubjectCell },
+                { name: 'pattern', title: Craft.t('herald', 'Commands'), sortField: 'pattern', callback: renderPatternCell },
+                { name: 'note', title: Craft.t('herald', 'Reason'), callback: renderNoteCell },
+                { name: 'expiresAt', title: Craft.t('herald', 'Expires in'), sortField: 'expiresAt', callback: renderExpiresCell },
+                { name: 'createdBy', title: Craft.t('herald', 'Issued by'), callback: renderCreatedByCell },
+                { name: 'dateCreated', title: Craft.t('herald', 'Issued'), sortField: 'dateCreated', callback: renderDateCreatedCell },
+            ];
+        }
 
         var adminTable = new Craft.VueAdminTable({
-            container: tableContainer,
-            columns: columns,
-            tableDataEndpoint: 'herald/settings/allowlist-table-data',
+            container: '#herald-allowlist-vue-admin-table',
+            columns: columns(),
+            tableDataEndpoint: 'herald/settings/allowlist-table-data?status=active',
             deleteAction: 'herald/settings/remove-override',
-            deleteConfirmationMessage: Craft.t('herald', 'Are you sure you want to remove the grant “{name}”?'),
-            deleteSuccessMessage: Craft.t('herald', 'Grant removed.'),
-            emptyMessage: Craft.t('herald', 'No grants issued yet.'),
+            deleteConfirmationMessage: Craft.t('herald', 'Are you sure you want to revoke this grant?'),
+            deleteSuccessMessage: Craft.t('herald', 'Grant revoked.'),
+            emptyMessage: Craft.t('herald', 'No active grants.'),
             search: true,
             searchPlaceholder: Craft.t('herald', 'Search grants'),
             buttons: [
@@ -218,12 +214,24 @@
                     enabled: function() { return true; },
                 },
             ],
+            onData: function() { window.Herald.startCountdowns(); },
         });
 
-        // Anchor-based trigger — the `href` attribute set on the
-        // VueAdminTable button renders as `<a href="#...">`. We listen
-        // for clicks on that exact href so the handler is locale-proof
-        // (label-text matching would break under non-English CP).
+        var historyTable = new Craft.VueAdminTable({
+            container: '#herald-allowlist-history-table',
+            columns: columns(),
+            tableDataEndpoint: 'herald/settings/allowlist-table-data?status=expired',
+            deleteAction: 'herald/settings/remove-override',
+            deleteConfirmationMessage: Craft.t('herald', 'Are you sure you want to revoke this grant?'),
+            deleteSuccessMessage: Craft.t('herald', 'Grant revoked.'),
+            emptyMessage: Craft.t('herald', 'No expired grants.'),
+            search: true,
+            searchPlaceholder: Craft.t('herald', 'Search grants'),
+            onData: function() { window.Herald.startCountdowns(); },
+        });
+
+        // Anchor-based trigger for the guided slideout — locale-proof
+        // (the button renders as <a href="#...">).
         document.addEventListener('click', function(event) {
             var target = event.target.closest('a[href="#herald-allowlist-add-override"]');
             if (!target) {
@@ -233,9 +241,8 @@
             window.Herald.openAllowlistOverrideSlideout(adminTable);
         });
 
-        // Expose the table on the window so the slideout can call
-        // .reload() after a successful issuance. Per-tab scope only —
-        // 9.5 (Tokens) gets its own handle on its own tab.
         window.heraldAllowlistTable = adminTable;
+        window.heraldAllowlistHistoryTable = historyTable;
+        window.Herald.startCountdowns();
     })();
 {% endjs %}

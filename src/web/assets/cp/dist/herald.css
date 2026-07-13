@@ -219,6 +219,25 @@
     font-weight: 600;
 }
 
+/* Temporary grants — expiry countdown */
+.herald-countdown--expired {
+    opacity: 0.55;
+}
+
+/* Guided grant slideout — command picker reuses the command-browser group
+   chrome, but its rows are checkbox + route id (left-aligned), and the list
+   is scroll-capped so it never overruns the slideout. */
+.herald-grant-commands .herald-command-groups {
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+.herald-grant-commands .herald-command-action {
+    justify-content: flex-start;
+    gap: 8px;
+    cursor: pointer;
+}
+
 /* Activity detail slideout — redacted payload dump */
 .herald-payload {
     max-height: 320px;

@@ -542,6 +542,24 @@ class SettingsController extends Controller
         // so operators can audit/cull expired entries until gc reaps them.
         $rows = Herald::getInstance()->allowlist->getAllOverrides(includeExpired: true);
 
+        // Active / history split. The Temporary grants screen renders active
+        // grants in the main table and expired grants in a collapsed history
+        // section, each hitting this endpoint with `status=active|expired`.
+        // Default `all` keeps the legacy single-table contract.
+        $status = (string) $this->request->getParam('status', 'all');
+        if ($status === 'active' || $status === 'expired') {
+            $now = DateTimeHelper::now();
+            $rows = array_values(array_filter($rows, static function(array $row) use ($status, $now): bool {
+                $expiresAt = $row['expiresAt'] ?? null;
+                $isExpired = false;
+                if (is_string($expiresAt) && $expiresAt !== '') {
+                    $exp = DateTimeHelper::toDateTime($expiresAt);
+                    $isExpired = $exp !== false && $exp < $now;
+                }
+                return $status === 'expired' ? $isExpired : !$isExpired;
+            }));
+        }
+
         if ($search !== '') {
             $needle = mb_strtolower($search);
             $rows = array_values(array_filter(
@@ -1180,8 +1198,7 @@ class SettingsController extends Controller
 
         $note = $request->getBodyParam('note');
         $note = is_string($note) && $note !== '' ? trim($note) : null;
-        $ttl = $request->getBodyParam('ttlSeconds');
-        $ttlSeconds = is_numeric($ttl) && (int) $ttl > 0 ? (int) $ttl : null;
+        $ttlSeconds = $this->_resolveGrantTtl();
 
         $grantorId = Craft::$app->getUser()->getId();
         $grantorId = is_int($grantorId) ? $grantorId : null;
@@ -1618,6 +1635,43 @@ class SettingsController extends Controller
             'label' => $user->getName(),
             'cpEditUrl' => $user->getCpEditUrl(),
         ];
+    }
+
+    /**
+     * Resolve the grant TTL (seconds) from the posted duration control. A
+     * raw `ttlSeconds` param wins (the API / legacy path and the controller
+     * tests post it directly); otherwise the guided slideout's
+     * `durationPreset` is read as a second-count, or `custom` plus
+     * `customTtlSeconds`. Null falls through to the plugin default in
+     * `Allowlist::add()`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _resolveGrantTtl(): ?int
+    {
+        $request = $this->request;
+
+        // A raw `ttlSeconds` wins when posted (the API / legacy path and the
+        // controller tests use it directly).
+        $direct = $request->getBodyParam('ttlSeconds');
+        if (is_numeric($direct) && (int) $direct > 0) {
+            return (int) $direct;
+        }
+
+        // Otherwise resolve the guided slideout's duration control: a preset
+        // whose value is a second-count, or `custom` + `customTtlSeconds`.
+        $preset = $request->getBodyParam('durationPreset');
+        if ($preset === 'custom') {
+            $custom = $request->getBodyParam('customTtlSeconds');
+            return is_numeric($custom) && (int) $custom > 0 ? (int) $custom : null;
+        }
+        if (is_numeric($preset) && (int) $preset > 0) {
+            return (int) $preset;
+        }
+
+        // Null falls through to the plugin default in `Allowlist::add()`.
+        return null;
     }
 
     /**

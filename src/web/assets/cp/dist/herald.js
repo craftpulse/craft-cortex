@@ -32,6 +32,12 @@
         handle: 'herald',
 
         /**
+         * Interval handle for the grant expiry countdowns, created lazily by
+         * `startCountdowns()` and left running for the life of the page.
+         */
+        _countdownTimer: null,
+
+        /**
          * Open the "+ New override" slideout for the Allowlist tab.
          *
          * Fetches the form HTML from the Herald controller, hands it
@@ -65,6 +71,7 @@
                     });
 
                     Herald._wireAllowlistSlideout(slideout, adminTable);
+                    Herald._wireGrantSlideout(slideout);
                 })
                 .catch(function(error) {
                     Craft.cp.displayError(Craft.t('herald', 'Could not open the grant form.'));
@@ -126,6 +133,162 @@
                         $submit.removeClass('loading').removeAttr('disabled');
                     });
             });
+        },
+
+        /**
+         * Wire the guided grant slideout's command picker: stop the group
+         * checkbox from toggling its <details>, cascade a whole-group check
+         * onto (and disable) the per-action checkboxes, and live-filter the
+         * groups. Native <details> owns expand/collapse, so each group is an
+         * independent disclosure with no shared JS state.
+         *
+         * @private
+         */
+        _wireGrantSlideout: function(slideout) {
+            var container = slideout.$container[0];
+            if (!container) {
+                return;
+            }
+            var root = container.querySelector('[data-herald-grant-commands]');
+            if (!root) {
+                return;
+            }
+
+            var groups = root.querySelectorAll('[data-herald-grant-group]');
+
+            Array.prototype.forEach.call(groups, function(group) {
+                // The group checkbox lives in the <summary>; stop its click
+                // from bubbling to the summary (which would toggle the group).
+                var control = group.querySelector('[data-herald-grant-group-control]');
+                if (control) {
+                    control.addEventListener('click', function(event) {
+                        event.stopPropagation();
+                    });
+                }
+
+                var groupCb = group.querySelector('[data-herald-grant-group-cb]');
+                var actionCbs = group.querySelectorAll('[data-herald-grant-action-cb]');
+                if (groupCb) {
+                    groupCb.addEventListener('change', function() {
+                        Array.prototype.forEach.call(actionCbs, function(cb) {
+                            // A whole-group grant (group/*) already covers the
+                            // exact routes, so disable + clear them to keep the
+                            // posted patterns[] minimal.
+                            cb.checked = false;
+                            cb.disabled = groupCb.checked;
+                        });
+                    });
+                }
+            });
+
+            var filter = root.querySelector('[data-herald-grant-filter]');
+            if (filter) {
+                filter.addEventListener('input', function() {
+                    var needle = (filter.value || '').trim().toLowerCase();
+                    Array.prototype.forEach.call(groups, function(group) {
+                        var handle = (group.getAttribute('data-group-handle') || '').toLowerCase();
+                        var handleMatches = needle === '' || handle.indexOf(needle) !== -1;
+                        var anyActionMatches = false;
+
+                        var actions = group.querySelectorAll('[data-herald-grant-action]');
+                        Array.prototype.forEach.call(actions, function(action) {
+                            var routeId = (action.getAttribute('data-route-id') || '').toLowerCase();
+                            var match = needle === '' || handleMatches || routeId.indexOf(needle) !== -1;
+                            action.hidden = !match;
+                            if (match) {
+                                anyActionMatches = true;
+                            }
+                        });
+
+                        var visible = handleMatches || anyActionMatches;
+                        group.hidden = !visible;
+                        if (needle === '') {
+                            group.open = false;
+                        } else if (visible) {
+                            group.open = true;
+                        }
+                    });
+                });
+            }
+        },
+
+        /**
+         * Start (once) a 30-second interval that refreshes every grant
+         * expiry countdown on the page. Safe to call repeatedly — the timer
+         * is created only on the first call.
+         */
+        startCountdowns: function() {
+            if (Herald._countdownTimer) {
+                Herald.refreshCountdowns();
+                return;
+            }
+            Herald.refreshCountdowns();
+            Herald._countdownTimer = window.setInterval(Herald.refreshCountdowns, 30000);
+        },
+
+        /**
+         * Fill every `[data-herald-countdown]` element with the remaining
+         * time until its `data-expires` timestamp. The stored value is a
+         * naive UTC datetime (Craft's DB convention), so it is normalised to
+         * an explicit UTC instant before the diff — a bare `new Date(...)`
+         * would parse it as local time and skew the countdown by the offset.
+         */
+        refreshCountdowns: function() {
+            var nodes = document.querySelectorAll('[data-herald-countdown]');
+            var now = Date.now();
+            Array.prototype.forEach.call(nodes, function(node) {
+                var iso = node.getAttribute('data-expires');
+                if (!iso) {
+                    node.textContent = '';
+                    return;
+                }
+                var normalised = iso.indexOf('T') === -1 ? iso.replace(' ', 'T') : iso;
+                if (!/([zZ]|[+-]\d\d:?\d\d)$/.test(normalised)) {
+                    normalised += 'Z';
+                }
+                var remaining = new Date(normalised).getTime() - now;
+                if (isNaN(remaining)) {
+                    node.textContent = '';
+                    return;
+                }
+                if (remaining <= 0) {
+                    node.textContent = Craft.t('herald', 'expired');
+                    node.classList.add('herald-countdown--expired');
+                    return;
+                }
+                node.classList.remove('herald-countdown--expired');
+                node.textContent = Herald._humanizeDuration(remaining);
+            });
+        },
+
+        /**
+         * Humanize a millisecond duration into a compact "2d 3h left" /
+         * "5h 12m left" / "<1m left" string.
+         *
+         * @private
+         */
+        _humanizeDuration: function(ms) {
+            var seconds = Math.floor(ms / 1000);
+            var days = Math.floor(seconds / 86400);
+            seconds -= days * 86400;
+            var hours = Math.floor(seconds / 3600);
+            seconds -= hours * 3600;
+            var minutes = Math.floor(seconds / 60);
+
+            var parts = [];
+            if (days) {
+                parts.push(days + 'd');
+            }
+            if (hours) {
+                parts.push(hours + 'h');
+            }
+            if (!days && minutes) {
+                parts.push(minutes + 'm');
+            }
+            if (!days && !hours && !minutes) {
+                parts.push('<1m');
+            }
+            return parts.join(' ') + ' ' + Craft.t('herald', 'left');
         },
 
         /**

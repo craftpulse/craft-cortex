@@ -31,6 +31,7 @@
  */
 
 use craft\db\Query;
+use craft\elements\User;
 use craftpulse\herald\controllers\SettingsController;
 use craftpulse\herald\db\Table;
 use craftpulse\herald\Herald;
@@ -363,6 +364,62 @@ it('actionAddOverride JSON happy path returns the serialised row', function() {
         ->where(['pattern' => 'mailer/test', 'dateDeleted' => null])
         ->count();
     expect((int) $count)->toBe(1);
+});
+
+it('actionAddOverride scopes a grant to the posted subject user', function() {
+    $subject = User::find()->status(null)->one();
+    expect($subject)->not->toBeNull();
+    $subjectId = (int) $subject->id;
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['pattern' => '_test_/subj', 'subjectUserId' => $subjectId]);
+
+    $response = $controller->actionAddOverride();
+
+    expect($response->statusCode)->toBe(200);
+    expect($response->data['model']['subject'])->toBeArray();
+    expect($response->data['model']['subject']['id'])->toBe($subjectId);
+
+    // The stored row carries the subject.
+    $stored = RuntimeOverride::find()->where(['pattern' => '_test_/subj'])->one();
+    expect((int) $stored->subjectUserId)->toBe($subjectId);
+});
+
+it('actionAddOverride accepts multiple command patterns from the picker', function() {
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['patterns' => ['_test_/a', '_test_/b', '_test_/a']]);
+
+    $response = $controller->actionAddOverride();
+
+    expect($response->statusCode)->toBe(200);
+    // De-duped: two distinct patterns, two rows.
+    expect($response->data['models'])->toBeArray()->toHaveCount(2);
+    expect((int) (new Query())->from(Table::RUNTIME_OVERRIDES)->where(['like', 'pattern', '_test_/%', false])->count())->toBe(2);
+});
+
+it('actionAddOverride rejects a crafted (non-existent) subject user with 400', function() {
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['pattern' => '_test_/crafted', 'subjectUserId' => 999999999]);
+
+    $response = $controller->actionAddOverride();
+
+    expect($response->statusCode)->toBe(400);
+    expect($response->data)->toHaveKey('message', 'The selected user could not be found.');
+    // No row was written.
+    expect((new Query())->from(Table::RUNTIME_OVERRIDES)->where(['pattern' => '_test_/crafted'])->exists())->toBeFalse();
+});
+
+it('actionAddOverride resolves a duration preset into the grant expiry', function() {
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['pattern' => '_test_/preset', 'durationPreset' => '3600']);
+
+    $response = $controller->actionAddOverride();
+    expect($response->statusCode)->toBe(200);
+
+    $stored = RuntimeOverride::find()->where(['pattern' => '_test_/preset'])->one();
+    // ~1 hour from now (UTC); allow a small execution-time window.
+    $expires = strtotime((string) $stored->expiresAt . ' UTC');
+    expect($expires)->toBeGreaterThan(time() + 3500)->toBeLessThan(time() + 3700);
 });
 
 it('actionAddOverride empty pattern returns 400 with message', function() {

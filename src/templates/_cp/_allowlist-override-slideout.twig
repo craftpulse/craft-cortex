@@ -1,22 +1,29 @@
 {% import "_includes/forms.twig" as forms %}
 
 {# =========================================================================
-   Temporary-grant issuance slideout body partial.
+   Guided temporary-grant issuance slideout body partial.
 
    Rendered by `actionAllowlistOverrideSlideout` and fetched via
    `Craft.sendActionRequest('GET', 'herald/settings/allowlist-override-slideout')`
    from `Herald.openAllowlistOverrideSlideout()`. The returned HTML is
    passed into `new Craft.Slideout(html, {containerElement: 'form', ...})`
-   — the slideout container provides the `<form>` shell.
+   so the slideout container provides the `<form>` shell.
 
-   No `<html>` / `<body>` chrome — pure fragment. The `data-herald-form`
-   attribute on the body is the JS hook the slideout listener uses to
-   find the submit/cancel handlers; the CSRF token is rendered inline
-   because the slideout's form shell does not auto-inject it.
+   The guided flow (per the grant redesign spec):
+     1. User picker      — the subject the grant is FOR (`subjectUserId`).
+     2. Command picker    — a searchable grouped list; each checkbox posts a
+                            pattern into `patterns[]` (a whole group `group/*`
+                            or an exact route id).
+     3. Duration presets  — 1h / 8h / 24h / 7d / custom (`durationPreset`,
+                            `customTtlSeconds`).
+     4. Reason            — optional free text (`note`).
 
-   Per gate-9 locked decision 6 the only JS framework involved is vanilla
-   `Craft.sendActionRequest` + the Garnish.Slideout subclass — no Vue,
-   no Vite.
+   No `<html>` / `<body>` chrome — pure fragment. `data-herald-form` is the
+   JS hook the slideout listener finds; the CSRF token is rendered inline
+   because the slideout's form shell does not auto-inject it. The command
+   picker uses native `<details>` for independent expand/collapse (no shared
+   JS disclosure state); `Herald._wireGrantSlideout()` adds the live filter
+   and the group/action checkbox cascade.
    ========================================================================= #}
 
 <div class="so-body" data-herald-form>
@@ -26,40 +33,106 @@
 
     <div class="so-content padded">
         <p class="light">
-            {{ 'Grant the {tool} tool a time-bound pattern that layers on top of the project-config defaults.'|t('herald', { tool: '<code>craft_command</code>' })|raw }}
+            {{ 'Grant a user time-bound access to run additional {tool} commands. The grant applies only to the chosen user and expires automatically.'|t('herald', { tool: '<code>craft_command</code>' })|raw }}
         </p>
 
         {{ csrfInput() }}
 
-        {{ forms.textField({
-            label: 'Pattern'|t('herald'),
-            instructions: 'A glob the craft_command tool may dispatch. Uses fnmatch semantics: resave/* matches any resave/<x> route; up matches the literal command.'|t('herald'),
-            id: 'herald-override-pattern',
-            name: 'pattern',
+        {{ forms.elementSelectField({
+            label: 'User'|t('herald'),
+            instructions: 'The user this grant applies to. Only this user gains the granted commands.'|t('herald'),
+            id: 'herald-grant-subject',
+            name: 'subjectUserId',
+            elementType: 'craft\\elements\\User',
+            limit: 1,
             required: true,
-            autofocus: true,
-            placeholder: 'mailer/test',
+        }) }}
+
+        {{ forms.field({
+            label: 'Commands'|t('herald'),
+            instructions: 'Pick one or more command scopes. A group checkbox grants the whole group (group/*); expand a group to grant exact routes. fnmatch semantics apply.'|t('herald'),
+            required: true,
+        }, '') }}
+
+        <div class="herald-grant-commands" data-herald-grant-commands>
+            <div class="herald-command-search">
+                <div class="texticon search icon clearable">
+                    <input
+                        type="text"
+                        class="text fullwidth"
+                        autocomplete="off"
+                        data-herald-grant-filter
+                        placeholder="{{ 'Filter commands'|t('herald') }}"
+                        aria-label="{{ 'Filter commands'|t('herald') }}"
+                    >
+                </div>
+            </div>
+
+            <div class="herald-command-groups">
+                {% for handle, group in commandGroups %}
+                    {% set ids = group.actions|map(a => a.id) %}
+                    {% set groupGlob = (ids|length == 1 and ids[0] == handle) ? handle : handle ~ '/*' %}
+                    <details class="herald-command-group" data-herald-grant-group data-group-handle="{{ handle }}">
+                        <summary class="herald-command-group-header">
+                            <span class="herald-command-group-caret" aria-hidden="true"></span>
+                            <span class="herald-command-group-switch" data-herald-grant-group-control>
+                                <input
+                                    type="checkbox"
+                                    name="patterns[]"
+                                    value="{{ groupGlob }}"
+                                    data-herald-grant-group-cb
+                                    aria-label="{{ 'Grant the whole {group} group'|t('herald', { group: handle }) }}"
+                                >
+                            </span>
+                            <span class="herald-command-group-name">{{ handle }}</span>
+                            <span class="herald-command-group-source light">{{ group.source }}</span>
+                        </summary>
+
+                        <div class="herald-command-actions">
+                            {% for action in group.actions %}
+                                <label class="herald-command-action" data-herald-grant-action data-route-id="{{ action.id }}">
+                                    <input type="checkbox" name="patterns[]" value="{{ action.id }}" data-herald-grant-action-cb>
+                                    <code class="herald-token-prefix">{{ action.id }}</code>
+                                </label>
+                            {% endfor %}
+                        </div>
+                    </details>
+                {% endfor %}
+            </div>
+        </div>
+
+        {{ forms.selectField({
+            label: 'Duration'|t('herald'),
+            instructions: 'How long the grant stays active before it expires automatically.'|t('herald'),
+            id: 'herald-grant-duration',
+            name: 'durationPreset',
+            value: '86400',
+            options: [
+                { label: '1 hour'|t('herald'), value: '3600' },
+                { label: '8 hours'|t('herald'), value: '28800' },
+                { label: '24 hours'|t('herald'), value: '86400' },
+                { label: '7 days'|t('herald'), value: '604800' },
+                { label: 'Custom'|t('herald'), value: 'custom' },
+            ],
         }) }}
 
         {{ forms.textField({
-            label: 'Note'|t('herald'),
-            instructions: 'Optional — surfaces in the audit history alongside the row.'|t('herald'),
-            id: 'herald-override-note',
-            name: 'note',
-            placeholder: 'ticket-1234'|t('herald'),
-        }) }}
-
-        {{ forms.textField({
-            label: 'Expires in (seconds)'|t('herald'),
-            instructions: 'Leave blank to use the plugin default ({default} = {asDays}).'|t('herald', {
-                default: settings.runtimeOverrideTtl,
-                asDays: (settings.runtimeOverrideTtl // 86400) ~ ' days',
-            }),
-            id: 'herald-override-ttl',
-            name: 'ttlSeconds',
+            label: 'Custom duration (seconds)'|t('herald'),
+            instructions: 'Used only when Duration is set to Custom. Minimum 60.'|t('herald'),
+            id: 'herald-grant-custom-ttl',
+            name: 'customTtlSeconds',
             type: 'number',
             min: 60,
             placeholder: settings.runtimeOverrideTtl,
+        }) }}
+
+        {{ forms.textareaField({
+            label: 'Reason'|t('herald'),
+            instructions: 'Optional. Surfaces in the audit history and the grants table.'|t('herald'),
+            id: 'herald-grant-note',
+            name: 'note',
+            rows: 2,
+            placeholder: 'ticket-1234'|t('herald'),
         }) }}
     </div>
 

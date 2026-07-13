@@ -497,14 +497,17 @@ it('resolves the Allowlist data + slideout CP URLs', function() {
     }
 });
 
-it('ships the allowlist-override slideout partial', function() {
+it('ships the guided grant slideout partial', function() {
+    // The guided slideout posts a subject user, one or more command
+    // patterns from the grouped picker, a duration preset, and a reason.
     $path = __DIR__ . '/../../src/templates/_cp/_allowlist-override-slideout.twig';
     expect(file_exists($path))->toBeTrue();
     $contents = file_get_contents($path);
     expect($contents)->not->toBeFalse();
-    expect($contents)->toContain("name: 'pattern'");
+    expect($contents)->toContain("name: 'subjectUserId'");
+    expect($contents)->toContain('name="patterns[]"');
+    expect($contents)->toContain("name: 'durationPreset'");
     expect($contents)->toContain("name: 'note'");
-    expect($contents)->toContain("name: 'ttlSeconds'");
 });
 
 it('allowlist tab template instantiates a Craft.VueAdminTable', function() {
