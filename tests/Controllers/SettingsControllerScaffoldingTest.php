@@ -226,9 +226,12 @@ it('templates never reference an undeclared locale variable in |date filter', fu
 // Architecture invariant — every action body opens with a permission gate
 // -----------------------------------------------------------------------------
 
-it('actionIndex first statement is requireAdmin', function() {
+it('actionIndex first statement is requirePermission(manageSettings)', function() {
+    // Estate settings-permission doctrine: the Settings screen is gated by
+    // a dedicated permission (delegatable to a non-admin group), never by
+    // requireAdmin. allowAdminChanges governs only the save (write axis).
     $body = _herald_controller_method_body('actionIndex');
-    expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
+    expect($body)->toMatch('/^\s*\$this->requirePermission\s*\(\s*self::PERMISSION_MANAGE_SETTINGS\s*\)/m');
 });
 
 it('actionTokens first statement is requireAdmin', function() {
@@ -251,11 +254,14 @@ it('actionConnection first statement is requireAdmin', function() {
     expect($body)->toMatch('/^\s*\$this->requireAdmin\s*\(\s*false\s*\)/m');
 });
 
-it('actionSave first statement is requirePostRequest', function() {
+it('actionSave gates on requirePostRequest, the manage-settings permission, and the write axis', function() {
     $body = _herald_controller_method_body('actionSave');
     expect($body)->toMatch('/^\s*\$this->requirePostRequest\s*\(\s*\)/m');
-    // And the second statement is requireAdmin(requireAdminChanges: true).
-    expect($body)->toMatch('/\$this->requireAdmin\s*\(\s*requireAdminChanges:\s*true\s*\)/');
+    // WHO may save: the manage-settings permission (not requireAdmin).
+    expect($body)->toMatch('/\$this->requirePermission\s*\(\s*self::PERMISSION_MANAGE_SETTINGS\s*\)/');
+    // WHETHER the save may write: fail closed on allowAdminChanges.
+    expect($body)->toMatch('/allowAdminChanges/');
+    expect($body)->toMatch('/ForbiddenHttpException/');
 });
 
 // -----------------------------------------------------------------------------

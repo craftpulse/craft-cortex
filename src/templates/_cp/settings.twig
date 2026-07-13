@@ -47,7 +47,13 @@
    ========================================================================= #}
 
 {% set selectedSubnavItem = 'settings' %}
-{% set fullPageForm = true %}
+
+{# Read-only when the environment forbids admin changes: the save button
+   and form wrapper disappear (fullPageForm), every input is disabled, and
+   the save action fails closed with a 403 regardless. Access to the screen
+   itself is a separate axis, gated by the herald:manageSettings permission
+   in the controller. #}
+{% set fullPageForm = allowAdminChanges %}
 
 {% do view.registerTranslations('herald', [
     '{count}/{total} allowed',
@@ -57,6 +63,14 @@
 {% block content %}
     {{ actionInput('herald/settings/save') }}
     {{ redirectInput('settings/plugins/herald') }}
+
+    {% if not allowAdminChanges %}
+        <div class="readable">
+            <blockquote class="note">
+                {{ 'These settings are read-only because `allowAdminChanges` is disabled in this environment. Change it in `config/general.php` (or the environment) to edit them here.'|t('herald') }}
+            </blockquote>
+        </div>
+    {% endif %}
 
     <h2>{{ 'Defaults'|t('herald') }}</h2>
 
@@ -70,6 +84,7 @@
         id: 'execEnabled',
         name: 'settings[execEnabled]',
         on: settings.execEnabled,
+        disabled: not allowAdminChanges,
     }) }}
 
     {{ forms.lightswitchField({
@@ -78,6 +93,7 @@
         id: 'execDryRunDefault',
         name: 'settings[execDryRunDefault]',
         on: settings.execDryRunDefault,
+        disabled: not allowAdminChanges,
     }) }}
 
     {{ forms.textField({
@@ -88,6 +104,7 @@
         value: settings.runtimeOverrideTtl,
         type: 'number',
         min: 60,
+        disabled: not allowAdminChanges,
     }) }}
 
     <hr>
@@ -105,6 +122,7 @@
         customPatterns: contentCustomPatterns,
         customSetting: 'allowedCommands',
         disabled: allowedCommandsOverridden,
+        readOnly: not allowAdminChanges,
         overriddenMessage: 'The content-commands list is defined in `config/herald.php` and can’t be edited here.'|t('herald'),
     }) }}
 
@@ -129,6 +147,7 @@
         customPatterns: adminCustomPatterns,
         customSetting: 'adminLevelCommands',
         disabled: adminLevelCommandsOverridden,
+        readOnly: not allowAdminChanges,
         overriddenMessage: 'The admin-level commands list is defined in `config/herald.php` and can’t be edited here.'|t('herald'),
     }) }}
 
@@ -148,16 +167,22 @@
        visible here, and an imported macro namespace can't be passed as a
        bare argument. Re-import inside the macro body. #}
     {% import "_includes/forms.twig" as forms %}
-    {% set browserDisabled = cfg.disabled %}
+    {# Two independent axes: `overridden` (locked by config/herald.php, shows
+       the "defined in config" message) and `readOnly` (allowAdminChanges is
+       off). Either disables every input; only `overridden` explains itself
+       with the config message. `aria-disabled` on the root makes
+       `initCommandBrowser` bail, so a read-only browser carries no JS. #}
+    {% set overridden = cfg.disabled %}
+    {% set inputsDisabled = cfg.disabled or (cfg.readOnly ?? false) %}
 
-    {% if browserDisabled %}
+    {% if overridden %}
         <p class="warning">{{ cfg.overriddenMessage }}</p>
     {% endif %}
 
     <div
-        class="herald-command-browser{{ browserDisabled ? ' herald-command-browser--disabled' : '' }}"
+        class="herald-command-browser{{ inputsDisabled ? ' herald-command-browser--disabled' : '' }}"
         data-herald-command-browser
-        {{ browserDisabled ? 'aria-disabled="true"' : '' }}
+        {{ inputsDisabled ? 'aria-disabled="true"' : '' }}
     >
         <div class="herald-command-search">
             <div class="texticon search icon clearable">
@@ -168,7 +193,7 @@
                     data-herald-command-filter
                     placeholder="{{ 'Filter commands'|t('herald') }}"
                     aria-label="{{ 'Filter commands'|t('herald') }}"
-                    {{ browserDisabled ? 'disabled' : '' }}
+                    {{ inputsDisabled ? 'disabled' : '' }}
                 >
             </div>
         </div>
@@ -205,7 +230,7 @@
                                 id: cfg.groupParam ~ '-' ~ handle,
                                 name: cfg.groupParam ~ '[' ~ handle ~ ']',
                                 on: group.fullToggle,
-                                disabled: browserDisabled,
+                                disabled: inputsDisabled,
                                 value: '1',
                             }) }}
                         </span>
@@ -221,7 +246,7 @@
                                     id: cfg.actionParam ~ '-' ~ (action.id|replace({'/': '-'})),
                                     name: cfg.actionParam ~ '[' ~ action.id ~ ']',
                                     on: action.allowed,
-                                    disabled: browserDisabled or group.fullToggle,
+                                    disabled: inputsDisabled or group.fullToggle,
                                     value: '1',
                                     small: true,
                                 }) }}
@@ -257,10 +282,10 @@
             rows: cfg.customPatterns|map(p => { pattern: p }),
             defaultValues: { pattern: '' },
             addRowLabel: 'Add a pattern'|t('herald'),
-            allowAdd: not browserDisabled,
-            allowDelete: not browserDisabled,
-            allowReorder: not browserDisabled,
-            static: browserDisabled,
+            allowAdd: not inputsDisabled,
+            allowDelete: not inputsDisabled,
+            allowReorder: not inputsDisabled,
+            static: inputsDisabled,
         }) }}
     </details>
 {% endmacro %}

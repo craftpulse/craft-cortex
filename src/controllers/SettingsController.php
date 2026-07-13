@@ -35,14 +35,17 @@ use yii\web\Response;
  * filters + redacted-detail slideout). Connection (9.4) is the
  * remaining placeholder.
  *
- * Permission posture per locked decision 7:
- *   - Settings / Tokens / Connection view actions    — `requireAdmin(false)`.
+ * Permission posture:
+ *   - Settings view (`actionIndex`) + save (`actionSave`) — gated by
+ *     `requirePermission(PERMISSION_MANAGE_SETTINGS)`, NOT `requireAdmin`,
+ *     per the estate settings-permission doctrine; the save additionally
+ *     fails closed on `allowAdminChanges` (the write axis, independent of
+ *     who holds the permission).
+ *   - Tokens / Connection view actions                — `requireAdmin(false)`.
  *   - Activity view + table-data + row actions        — `requirePermission(Herald::PERMISSION_VIEW_ACTIVITY)`.
  *     Non-admins are scoped server-side to their own
  *     rows (fail-closed) — see `actionActivityTableData`.
- *   - All mutation actions (`actionSave` + the
- *     pre-existing `actionAddOverride` /
- *     `actionRemoveOverride`)                         — `requirePostRequest`
+ *   - Grant / token / client mutation actions         — `requirePostRequest`
  *                                                       + `requireAdmin(requireAdminChanges: true)`.
  *
  * Edition posture per Gate 9.7: Tokens / Activity / Connection are Pro
@@ -57,6 +60,27 @@ use yii\web\Response;
  */
 class SettingsController extends Controller
 {
+    // Constants
+    // =========================================================================
+
+    /**
+     * Permission that grants access to the Herald Settings screen. Per
+     * Michael's estate settings-permission doctrine the screen is gated by
+     * a dedicated permission, NOT by `requireAdmin`: the permission decides
+     * WHO may be on the screen (delegatable to a non-admin group), while
+     * `allowAdminChanges` decides only WHETHER writes succeed. Admins hold
+     * every permission implicitly, so an admin still reaches the screen.
+     *
+     * Declared here (the enforcing controller) as the single source of
+     * truth and referenced from `beforeAction` / the action gates, the
+     * permission registration in `PluginTrait`, and the CP nav gate in
+     * `Herald::getCpNavItem()` — a bare literal would drift silently and a
+     * typo would pass for admins while denying everyone else.
+     *
+     * @since 5.0.0
+     */
+    public const PERMISSION_MANAGE_SETTINGS = 'herald:manageSettings';
+
     // Public Methods
     // =========================================================================
 
@@ -66,19 +90,21 @@ class SettingsController extends Controller
      * lineage. Runtime allowlist overrides (DB-backed time-bound
      * grants) live on the Allowlist tab — see `actionAllowlist`.
      *
-     * View accessible in read-only mode (`requireAdmin(false)`).
-     * `actionSave` strictly gates write access.
+     * Gated by `PERMISSION_MANAGE_SETTINGS` (not `requireAdmin`) so the
+     * screen can be delegated to a non-admin group; it stays viewable in
+     * read-only mode because `allowAdminChanges` gates only the save, not
+     * the view. `actionSave` re-checks the write axis.
      *
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
      * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
-     * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
+     * @throws \yii\web\ForbiddenHttpException         from `requirePermission`.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
     public function actionIndex(): Response
     {
-        $this->requireAdmin(false);
+        $this->requirePermission(self::PERMISSION_MANAGE_SETTINGS);
 
         $plugin = Herald::getInstance();
         $settings = $plugin->getSettings();
@@ -998,10 +1024,15 @@ class SettingsController extends Controller
      * to a redirect — the Twig form retains posted values via the
      * `$settings` instance held on the plugin.
      *
+     * Gated by `PERMISSION_MANAGE_SETTINGS` (WHO), then an explicit
+     * `allowAdminChanges` fail-closed check (WHETHER the write is allowed
+     * in this environment) — the two axes stay separate per the estate
+     * settings-permission doctrine.
+     *
      * @throws \yii\base\Exception                  on settings-save failure.
      * @throws \yii\base\InvalidConfigException     from `Herald::getInstance()`.
      * @throws \yii\web\BadRequestHttpException     from `requirePostRequest` on non-POST.
-     * @throws \yii\web\ForbiddenHttpException      from `requireAdmin`.
+     * @throws \yii\web\ForbiddenHttpException      from `requirePermission` or the read-only environment guard.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -1009,7 +1040,14 @@ class SettingsController extends Controller
     public function actionSave(): ?Response
     {
         $this->requirePostRequest();
-        $this->requireAdmin(requireAdminChanges: true);
+        $this->requirePermission(self::PERMISSION_MANAGE_SETTINGS);
+
+        // Write axis: settings map to project config, so a save is an
+        // administrative change. Fail closed when the environment forbids
+        // them, independent of who holds the manage-settings permission.
+        if (!Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            throw new ForbiddenHttpException('Administrative changes are disallowed in this environment.');
+        }
 
         $plugin = Herald::getInstance();
         $settings = $plugin->getSettings();

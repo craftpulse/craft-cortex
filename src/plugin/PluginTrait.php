@@ -10,6 +10,7 @@ use craft\services\Elements;
 use craft\services\Gc;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
+use craftpulse\herald\controllers\SettingsController;
 use craftpulse\herald\elements\Skill;
 use craftpulse\herald\events\LogCallEvent;
 use craftpulse\herald\generator\Tool as ToolGenerator;
@@ -182,6 +183,10 @@ trait PluginTrait
      * Registers every Herald permission under a shared Herald
      * heading on the user-permissions screen.
      *
+     *   - `SettingsController::PERMISSION_MANAGE_SETTINGS`
+     *     (`herald:manageSettings`) — gates the Settings screen
+     *     (`actionIndex` / `actionSave`) per the estate settings-permission
+     *     doctrine; `allowAdminChanges` still gates whether a save writes.
      *   - `Skill::PERMISSION_MANAGE` (`manageHeraldSkills`) — global
      *     (no per-instance ACL); the element's `canSave / canDelete /
      *     canView / canDuplicate` overrides consult it directly.
@@ -204,6 +209,13 @@ trait PluginTrait
                 $event->permissions[] = [
                     'heading' => 'Herald',
                     'permissions' => [
+                        SettingsController::PERMISSION_MANAGE_SETTINGS => [
+                            'label' => Craft::t('herald', 'Manage Herald settings'),
+                            'info' => Craft::t(
+                                'herald',
+                                'Allows viewing and editing the Herald Settings screen. Editing still requires allowAdminChanges to be enabled in the environment.',
+                            ),
+                        ],
                         Skill::PERMISSION_MANAGE => [
                             'label' => Craft::t('herald', 'Manage Herald skills'),
                             'info' => Craft::t(

@@ -7,6 +7,7 @@ use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\elements\User;
 use craft\helpers\UrlHelper;
+use craftpulse\herald\controllers\SettingsController;
 use craftpulse\herald\models\Settings;
 use craftpulse\herald\plugin\PluginTrait;
 use craftpulse\herald\plugin\Services as HeraldServices;
@@ -250,7 +251,7 @@ class Herald extends BasePlugin
      * nav never widens access; it only hides what the user can't reach.
      *
      * Subnav map (in display order):
-     *   - Settings          — admin (`requireAdmin(false)`), all editions.
+     *   - Settings          — `herald:manageSettings` permission, all editions.
      *   - Temporary grants   — admin, all editions (the runtime allowlist
      *                          override surface; route handle stays
      *                          `allowlist`).
@@ -285,11 +286,17 @@ class Herald extends BasePlugin
         $isPro = $this->is(self::EDITION_PRO, '>=');
         $subnav = [];
 
-        if ($user->admin) {
+        // Settings is gated by the manage-settings permission (delegatable
+        // to a non-admin group), matching the controller gate. Admins hold
+        // the permission implicitly, so they still see it.
+        if ($user->can(SettingsController::PERMISSION_MANAGE_SETTINGS)) {
             $subnav['settings'] = [
                 'label' => Craft::t('herald', 'Settings'),
                 'url' => 'herald/settings',
             ];
+        }
+
+        if ($user->admin) {
             $subnav['grants'] = [
                 'label' => Craft::t('herald', 'Temporary grants'),
                 'url' => 'herald/allowlist',

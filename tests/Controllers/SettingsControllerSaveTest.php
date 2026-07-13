@@ -47,6 +47,13 @@ class _HeraldSaveHarness extends SettingsController
     {
     }
 
+    public function requirePermission(string $permission): void
+    {
+        // no-op — actionSave now gates on the manage-settings permission;
+        // the harness runs the body against a console-bootstrapped Craft
+        // with no logged-in identity.
+    }
+
     /**
      * Stub the config-file override check so the read-only branch can be
      * exercised without writing a real `config/herald.php` mid-suite.
