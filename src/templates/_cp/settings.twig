@@ -175,22 +175,22 @@
 
         <div class="herald-command-groups">
             {% for handle, group in cfg.groups %}
-                <div
+                {# Native <details> owns the expand/collapse. Each group is an
+                   independent disclosure by construction — no shared JS state,
+                   no duplicate ids, keyboard- and screen-reader-operable for
+                   free. The group lightswitch sits in the <summary> row but
+                   stops its own click from bubbling to the summary (wired in
+                   `initCommandBrowser`) so toggling the switch never opens or
+                   closes the group. #}
+                <details
                     class="herald-command-group"
                     data-herald-command-group
                     data-group-handle="{{ handle }}"
                 >
-                    <div class="herald-command-group-header">
-                        <button
-                            type="button"
-                            class="herald-command-group-toggle"
-                            data-herald-group-expand
-                            aria-expanded="false"
-                        >
-                            <span class="herald-command-group-caret" aria-hidden="true">▸</span>
-                            <span class="herald-command-group-name">{{ handle }}</span>
-                            <span class="herald-command-group-source light">{{ group.source }}</span>
-                        </button>
+                    <summary class="herald-command-group-header">
+                        <span class="herald-command-group-caret" aria-hidden="true"></span>
+                        <span class="herald-command-group-name">{{ handle }}</span>
+                        <span class="herald-command-group-source light">{{ group.source }}</span>
 
                         <span
                             class="herald-command-group-badge light"
@@ -200,16 +200,18 @@
                             {{ '{count}/{total} allowed'|t('herald', { count: group.allowedCount, total: group.totalCount }) }}
                         </span>
 
-                        {{ forms.lightswitch({
-                            id: cfg.groupParam ~ '-' ~ handle,
-                            name: cfg.groupParam ~ '[' ~ handle ~ ']',
-                            on: group.fullToggle,
-                            disabled: browserDisabled,
-                            value: '1',
-                        }) }}
-                    </div>
+                        <span class="herald-command-group-switch" data-herald-group-switch>
+                            {{ forms.lightswitch({
+                                id: cfg.groupParam ~ '-' ~ handle,
+                                name: cfg.groupParam ~ '[' ~ handle ~ ']',
+                                on: group.fullToggle,
+                                disabled: browserDisabled,
+                                value: '1',
+                            }) }}
+                        </span>
+                    </summary>
 
-                    <div class="herald-command-actions" data-herald-command-actions hidden>
+                    <div class="herald-command-actions" data-herald-command-actions>
                         {% for action in group.actions %}
                             <div class="herald-command-action" data-herald-command-action data-route-id="{{ action.id }}">
                                 <label class="herald-command-action-label">
@@ -226,7 +228,7 @@
                             </div>
                         {% endfor %}
                     </div>
-                </div>
+                </details>
             {% endfor %}
         </div>
     </div>

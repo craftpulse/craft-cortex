@@ -356,21 +356,23 @@
          * @private
          */
         _wireCommandGroup: function(group) {
-            var expandBtn = group.querySelector('[data-herald-group-expand]');
-            var actions = group.querySelector('[data-herald-command-actions]');
-            var caret = group.querySelector('.herald-command-group-caret');
-            var groupSwitch = group.querySelector('.herald-command-group-header > .lightswitch');
-
-            if (expandBtn && actions) {
-                expandBtn.addEventListener('click', function() {
-                    var expanded = expandBtn.getAttribute('aria-expanded') === 'true';
-                    expandBtn.setAttribute('aria-expanded', expanded ? 'false' : 'true');
-                    actions.hidden = expanded;
-                    if (caret) {
-                        caret.textContent = expanded ? '▸' : '▾';
-                    }
+            // Expand / collapse is native <details>/<summary> now — the
+            // browser owns the disclosure state, so each group toggles
+            // independently with zero JS and full keyboard / AT support.
+            // The only wiring the summary needs: stop the group lightswitch
+            // (which sits inside the summary) from bubbling its click up to
+            // the summary, otherwise toggling the switch would also open or
+            // close the group. Craft's LightSwitch binds its handler
+            // directly to the switch element, so it still fires; we only
+            // block the summary's disclosure toggle.
+            var switchContainer = group.querySelector('[data-herald-group-switch]');
+            if (switchContainer) {
+                switchContainer.addEventListener('click', function(event) {
+                    event.stopPropagation();
                 });
             }
+
+            var groupSwitch = group.querySelector('[data-herald-group-switch] .lightswitch');
 
             // Craft's `Craft.LightSwitch` is a Garnish.Base widget: it
             // fires `change` via `this.trigger('change')` on the WIDGET
@@ -406,7 +408,7 @@
          * @private
          */
         _applyGroupSwitchState: function(group) {
-            var groupSwitch = group.querySelector('.herald-command-group-header > .lightswitch');
+            var groupSwitch = group.querySelector('[data-herald-group-switch] .lightswitch');
             var on = !!groupSwitch && groupSwitch.classList.contains('on');
             var badge = group.querySelector('[data-herald-group-badge]');
 
@@ -499,7 +501,17 @@
                     }
                 });
 
-                group.hidden = !(handleMatches || anyActionMatches);
+                var visible = handleMatches || anyActionMatches;
+                group.hidden = !visible;
+
+                // With a live filter, auto-open a matching group so its
+                // matched actions are actually on screen; restore the
+                // collapsed state once the filter is cleared.
+                if (needle === '') {
+                    group.open = false;
+                } else if (visible) {
+                    group.open = true;
+                }
             });
         },
 

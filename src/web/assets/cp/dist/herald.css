@@ -132,30 +132,40 @@
     border-top: 1px solid var(--hairline-color, rgba(31, 41, 51, 0.1));
 }
 
+/* The group header is a <summary> — the native disclosure control. */
 .herald-command-group-header {
     display: flex;
     align-items: center;
     gap: 10px;
     padding: 8px 12px;
-}
-
-.herald-command-group-toggle {
-    flex: 1 1 auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0;
-    border: none;
-    background: none;
-    font: inherit;
-    text-align: left;
     cursor: pointer;
-    color: var(--text-color, #1f2933);
+    list-style: none;
+    user-select: none;
 }
 
+/* Suppress the browser's default disclosure triangle; we draw our own caret. */
+.herald-command-group-header::-webkit-details-marker {
+    display: none;
+}
+
+.herald-command-group-header::marker {
+    content: '';
+}
+
+/* CSS caret — a right-pointing triangle that rotates down when the group
+   is open. Purely presentational; the <details> element owns the state. */
 .herald-command-group-caret {
-    width: 1em;
-    color: var(--medium-text-color, #606d7b);
+    flex: 0 0 auto;
+    width: 0;
+    height: 0;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 5px solid var(--medium-text-color, #606d7b);
+    transition: transform 0.12s ease;
+}
+
+.herald-command-group[open] > .herald-command-group-header .herald-command-group-caret {
+    transform: rotate(90deg);
 }
 
 .herald-command-group-name {
@@ -166,9 +176,21 @@
     font-size: 12px;
 }
 
+/* Push the badge + group switch to the right edge of the summary row. */
 .herald-command-group-badge {
+    margin-left: auto;
     font-size: 12px;
     white-space: nowrap;
+}
+
+.herald-command-group-switch {
+    flex: 0 0 auto;
+}
+
+/* When the badge is hidden (group fully toggled on) the switch takes over
+   the right-alignment so it still hugs the edge. */
+.herald-command-group-badge[hidden] + .herald-command-group-switch {
+    margin-left: auto;
 }
 
 .herald-command-actions {
