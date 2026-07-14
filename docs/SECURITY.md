@@ -159,6 +159,16 @@ Any of the three granting permission grants permission. Allowlist mutations thro
 
 If the LLM tries to dispatch a command that isn't on the effective allowlist, `craft_command` returns a structured `ToolException` envelope with `isError: true` — the call never reaches the console runner.
 
+## Write paths — service layer only
+
+Every mutation Herald can perform is authored through Craft's service layer. Nothing in the tool surface emits project-config YAML or raw SQL.
+
+- **Content writes** (the Pro `entry`, `bulk_entries`, `category`, `tag`, `global_set`, `address`, and scaffold tools) go through `Craft::$app->getElements()->saveElement()` with validation enabled. Content is database state — it never touches project config, so these tools work regardless of `allowAdminChanges`.
+- **Schema writes have no dedicated tool and no `schema:write` scope.** Sections, entry types, and fields are mutated only via `craft_command` dispatching core console commands (`sections/create`, `fields/*`, `entrify/*`) or migrations (`make/*` + `migrate/*`) — all of which call `saveSection()` / `saveField()` internally. Craft validates the model and writes the project-config YAML itself; the YAML is the reviewable deploy artifact, committed to Git and propagated with `craft up`.
+- **`allowAdminChanges` is enforced at dispatch.** `craft_command` classifies admin-level routes (schema, project config, plugin state) and refuses them with a structured error naming the flag when `allowAdminChanges = false`. Schema authoring therefore only happens on environments where Craft itself allows it — typically local dev — and reaches production through the normal deploy pipeline, never as an out-of-band write.
+
+This matches the bundled skill corpus (`craft-content-modeling` → infrastructure): author schema through the service layer, treat `project-config/apply` as propagation rather than authoring, and keep content writes on the element API.
+
 ## No shell-execution surface
 
 The architecture test suite (`tests/Architecture/ConventionsTest.php`) enforces that no source file under `src/` calls `eval()`, `shell_exec()`, `proc_open()`, `passthru()`, `popen()`, `exec()`, or uses backtick operators. The check tokenises the source rather than regex-matching, so it's false-positive-proof against docblock / string occurrences.

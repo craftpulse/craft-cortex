@@ -287,6 +287,8 @@ class InitialContext extends AbstractTool implements ContextAwareToolInterface
             'Use `search_skills` to find specific guidance across the bundled corpus without listing every resource.',
             '`craft_exec` is stdio-only and dry-run-by-default — pass `confirm: true` to actually evaluate, plus `dangerous: true` for destructive expressions.',
             '`craft_command` only dispatches commands matching the effective allowlist (see `allowlist` above). Adding patterns requires admin access via the CP settings.',
+            'Schema changes (sections, entry types, fields) have no dedicated write tool: dispatch `sections/create`, `fields/*`, or a migration (`make/migration` then `migrate/up`) via `craft_command` — those routes author through Craft\'s service layer and Craft writes the project-config YAML itself. Never hand-edit `config/project/` YAML. Admin-level routes are refused when `allowAdminChanges` is false; author schema in dev and propagate via commit + `craft up`.',
+            'Content writes (entries, categories, tags, globals) are database state via the element API — they never touch project config and work regardless of `allowAdminChanges`.',
             'Read-only tools (`sections`, `entries`, `system_info`, etc.) are safe to invoke speculatively; mutating tools are stdio-only or Pro-gated.',
         ];
     }
