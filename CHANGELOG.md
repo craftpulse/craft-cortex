@@ -29,6 +29,24 @@ All notable changes to Herald are documented here. Format follows
   registers a fail-closed `allowedDetailKeys` allowlist a recorder enforces.
 - Adds `craftpulse/craft-audit-kit` as a required dependency.
 
+### Fixed - dual-mode workflow tools misclassified as read-only for audit emission
+
+- **`herald.tool.write_invoked` now fires for the Pro write modes of
+  `content_audit`, `drafts_and_revisions`, and `import_export`.** These
+  three tools advertise `readOnlyHint: true` at the class level (accurate
+  for their Free-tier modes), so the class-level hint alone classified
+  every invocation as a read and their `fix_relations` /
+  `prune_unused_assets` / `repair_propagation`, `apply` / `discard`, and
+  `import` write modes never reached a recorder.
+- Each tool now implements a new opt-in `DualModeToolInterface`, declaring
+  a `mode` → write-or-read map derived from its own `FREE_MODES` /
+  `PRO_MODES` constants. `services\Audit` classifies these tools
+  per-invocation from the call's actual `mode` instead of the class
+  attribute; every other tool is unaffected. A mode the map doesn't
+  recognise (missing, malformed, or unresolvable `mode`) is treated as a
+  write, deliberately inverting the unresolvable-tool fail-closed-skip in
+  the audit-safe direction.
+
 ### Added — authentication and authorization (Pro HTTP transport)
 
 - **Capability-grained OAuth scopes.** Replaced the coarse `read` / `write`

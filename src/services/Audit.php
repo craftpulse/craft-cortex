@@ -10,6 +10,7 @@ use craftpulse\auditkit\events\RegisterAuditEventsEvent;
 use craftpulse\auditkit\services\Bus;
 use craftpulse\herald\events\LogCallEvent;
 use craftpulse\herald\Herald;
+use craftpulse\herald\tools\DualModeToolInterface;
 use craftpulse\herald\tools\support\AttributeReader;
 use craftpulse\herald\tools\support\InvocationLogger;
 use Throwable;
@@ -45,11 +46,26 @@ use yii\base\Component;
  *      invocation log already covers them and the volume would swamp a
  *      chain.
  *
- * Write-tool classification rides the tool's own MCP `readOnlyHint`:
- * a tool that advertises `#[IsReadOnly]` is a read tool and is skipped;
- * anything else (a mutating `#[IsDestructive]` tool, or an action tool
- * with no read-only hint) is a write. The classification is resolved
- * from the live registry, so it never drifts from the tool taxonomy.
+ * Write-tool classification rides the tool's own MCP `readOnlyHint` for
+ * most of the registry: a tool that advertises `#[IsReadOnly]` is a
+ * read tool and is skipped; anything else (a mutating
+ * `#[IsDestructive]` tool, or an action tool with no read-only hint)
+ * is a write. The classification is resolved from the live registry,
+ * so it never drifts from the tool taxonomy.
+ *
+ * A handful of dual-mode workflow tools (`content_audit`,
+ * `drafts_and_revisions`, `import_export`) advertise `readOnlyHint:
+ * true` at the class level — accurate for their Free-tier modes — but
+ * carry Pro modes that mutate state under the same tool name. For
+ * those, the class-level hint alone would misclassify every write
+ * invocation as a read and it would never emit. Tools that implement
+ * `craftpulse\herald\tools\DualModeToolInterface` are classified
+ * per-invocation instead, from the `mode` the call actually carried
+ * against the tool's own `getModeWriteMap()`. A mode the map doesn't
+ * recognise (including an unresolvable `mode`) is treated as a write —
+ * inverting the unresolvable-*tool* fail-closed-skip in the other
+ * direction: a missed write is worse than a spurious governance
+ * record.
  *
  * Secret discipline mirrors `SecretRedactor`: token and client *ids*
  * (row ids, the public OAuth `client_id`) travel in `details`; token
@@ -337,6 +353,17 @@ class Audit extends Component
      * invocations, and invocations whose tool cannot be resolved to a
      * registered tool, are skipped fail-closed.
      *
+     * Classification is per-tool for most of the registry (the class-
+     * level MCP `readOnlyHint` decides), but a handful of dual-mode
+     * workflow tools (`content_audit`, `drafts_and_revisions`,
+     * `import_export`) advertise `readOnlyHint: true` at the class
+     * level while carrying Pro modes that mutate state. For those,
+     * `readOnlyHint` alone would misclassify every write invocation as
+     * a read and it would never emit. Tools that implement
+     * `DualModeToolInterface` are classified per-invocation instead,
+     * from the `mode` argument the call actually carried (see
+     * `_isWriteTool()`).
+     *
      * The event fires for every tool call; the write filter is applied
      * here so the DB audit writer and the chain emitter stay independent
      * subscribers on the same seam.
@@ -354,7 +381,7 @@ class Audit extends Component
             return;
         }
 
-        if ($this->_isWriteTool($toolName) !== true) {
+        if ($this->_isWriteTool($toolName, $entry) !== true) {
             return;
         }
 
@@ -451,25 +478,97 @@ class Audit extends Component
     }
 
     /**
-     * Whether the named tool mutates state. Resolves the tool from the
-     * live registry and reads its MCP `readOnlyHint`: a tool that
-     * advertises `#[IsReadOnly]` is a read tool (`false`); anything else
-     * is a write (`true`). Returns null when the name resolves to no
-     * registered tool — the caller treats that as "not a write" and
-     * skips, so a synthetic or unknown name never emits.
+     * Whether the named tool invocation mutates state. Resolves the
+     * tool from the live registry; returns null when the name resolves
+     * to no registered tool — the caller treats that as "not a write"
+     * and skips, so a synthetic or unknown name never emits.
+     *
+     * A tool that implements `DualModeToolInterface` is classified
+     * per-invocation from the call's actual `mode` (`_isWriteMode()`)
+     * — its class-level MCP `readOnlyHint` reflects only the Free
+     * tier and cannot see the Pro write modes. Every other tool is
+     * classified once from that same `readOnlyHint`: a tool advertising
+     * `#[IsReadOnly]` is a read tool (`false`); anything else is a
+     * write (`true`).
+     *
+     * @param array<string,mixed> $entry
      *
      * @author Craftpulse
      * @since  5.1.0
      */
-    private function _isWriteTool(string $toolName): ?bool
+    private function _isWriteTool(string $toolName, array $entry): ?bool
     {
         $tool = Herald::getInstance()->tools->getByName($toolName);
         if ($tool === null) {
             return null;
         }
 
+        if ($tool instanceof DualModeToolInterface) {
+            return $this->_isWriteMode($tool, $entry);
+        }
+
         $annotations = AttributeReader::annotationsFor($tool);
         return ($annotations['readOnlyHint'] ?? false) !== true;
+    }
+
+    /**
+     * Per-invocation write classification for a `DualModeToolInterface`
+     * tool. Reads the `mode` the call actually carried out of the
+     * invocation entry's already-redacted `args` payload — no new
+     * argument logging, just a decode of what `InvocationLogger` had
+     * already captured for the file log / DB audit row.
+     *
+     * A mode absent from the tool's `getModeWriteMap()` (including an
+     * unresolvable `mode` — missing, non-string, or an args payload
+     * that fails to decode) is treated as a write. This deliberately
+     * inverts the unresolvable-*tool* fail-closed-skip above: an
+     * unknown tool name skips (nothing to attribute the write to), but
+     * an unknown *mode* on a known dual-mode tool emits, because a
+     * missed write is worse than a spurious governance record.
+     *
+     * @param array<string,mixed> $entry
+     *
+     * @author Craftpulse
+     * @since  5.1.0
+     */
+    private function _isWriteMode(DualModeToolInterface $tool, array $entry): bool
+    {
+        $mode = $this->_resolveMode($entry);
+        if ($mode === null) {
+            return true;
+        }
+
+        $map = $tool::getModeWriteMap();
+        return $map[$mode] ?? true;
+    }
+
+    /**
+     * Decode the invocation entry's `args` field and pull out the
+     * `mode` argument, or null when the field is missing, not valid
+     * JSON, not an object, or carries no string `mode`. `args` is
+     * already `SecretRedactor`-redacted by `InvocationLogger` — `mode`
+     * is never a secret-shaped key, so it always survives redaction
+     * intact.
+     *
+     * @param array<string,mixed> $entry
+     *
+     * @author Craftpulse
+     * @since  5.1.0
+     */
+    private function _resolveMode(array $entry): ?string
+    {
+        $argsJson = $entry['args'] ?? null;
+        if (!is_string($argsJson) || $argsJson === '') {
+            return null;
+        }
+
+        $decoded = json_decode($argsJson, true);
+        if (!is_array($decoded)) {
+            return null;
+        }
+
+        $mode = $decoded['mode'] ?? null;
+        return is_string($mode) && $mode !== '' ? $mode : null;
     }
 
     /**

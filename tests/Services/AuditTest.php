@@ -16,7 +16,13 @@
  *   - one WRITE-tool invocation emits exactly one
  *     `herald.tool.write_invoked` (across stdio and HTTP),
  *   - a READ-tool invocation emits nothing,
- *   - no token / client secret value ever reaches an event's details.
+ *   - no token / client secret value ever reaches an event's details,
+ *   - the three `DualModeToolInterface` workflow tools (`content_audit`,
+ *     `drafts_and_revisions`, `import_export`) classify per-invocation
+ *     from the call's actual `mode`: each Pro write mode emits exactly
+ *     one correctly-named event, each read mode emits nothing, and an
+ *     unresolvable or unrecognised `mode` on a known dual-mode tool
+ *     emits (the fail-toward-write case).
  *
  * Rows written through the real service seams use the `_test_/` name
  * prefix and are swept in `beforeEach` / `afterEach`.
@@ -325,4 +331,147 @@ it('emits nothing for a read-tool invocation', function() {
     );
 
     expect(_herald_events_named($this->sink, Audit::EVENT_TOOL_WRITE_INVOKED))->toHaveCount(0);
+});
+
+// -----------------------------------------------------------------------------
+// Dual-mode workflow tools — per-invocation `mode` classification
+//
+// `content_audit`, `drafts_and_revisions`, and `import_export` advertise
+// `readOnlyHint: true` at the class level (accurate for their Free-tier
+// modes) but carry Pro modes that mutate state under the same tool name.
+// Each tool implements `DualModeToolInterface`, so `Audit` classifies from
+// the invocation's actual `mode` argument rather than the class attribute.
+// All three tools are Free-registered (`shouldRegister()` is always true),
+// so no `herald_with_pro_registry()` wrapper is needed to resolve them via
+// `Tools::getByName()`.
+// -----------------------------------------------------------------------------
+
+it('emits one write event for a content_audit Pro fix-mode invocation', function() {
+    InvocationLogger::logCall(
+        'content_audit',
+        ['mode' => 'fix_relations'],
+        null,
+        15,
+        new InvocationContext(transport: Server::TRANSPORT_STDIO),
+    );
+
+    $events = _herald_events_named($this->sink, Audit::EVENT_TOOL_WRITE_INVOKED);
+    expect($events)->toHaveCount(1);
+    expect($events[0]->details['tool'])->toBe('content_audit');
+});
+
+it('emits nothing for a content_audit read-mode invocation', function() {
+    InvocationLogger::logCall(
+        'content_audit',
+        ['mode' => 'relations'],
+        null,
+        15,
+        new InvocationContext(transport: Server::TRANSPORT_STDIO),
+    );
+
+    expect(_herald_events_named($this->sink, Audit::EVENT_TOOL_WRITE_INVOKED))->toHaveCount(0);
+});
+
+it('emits one write event for a drafts_and_revisions apply invocation', function() {
+    InvocationLogger::logCall(
+        'drafts_and_revisions',
+        ['mode' => 'apply', 'id' => 1],
+        null,
+        15,
+        new InvocationContext(transport: Server::TRANSPORT_STDIO),
+    );
+
+    $events = _herald_events_named($this->sink, Audit::EVENT_TOOL_WRITE_INVOKED);
+    expect($events)->toHaveCount(1);
+    expect($events[0]->details['tool'])->toBe('drafts_and_revisions');
+});
+
+it('emits one write event for a drafts_and_revisions discard invocation', function() {
+    InvocationLogger::logCall(
+        'drafts_and_revisions',
+        ['mode' => 'discard', 'id' => 1],
+        null,
+        15,
+        new InvocationContext(transport: Server::TRANSPORT_STDIO),
+    );
+
+    expect(_herald_events_named($this->sink, Audit::EVENT_TOOL_WRITE_INVOKED))->toHaveCount(1);
+});
+
+it('emits nothing for a drafts_and_revisions read-mode invocation', function() {
+    InvocationLogger::logCall(
+        'drafts_and_revisions',
+        ['mode' => 'list_drafts'],
+        null,
+        15,
+        new InvocationContext(transport: Server::TRANSPORT_STDIO),
+    );
+
+    expect(_herald_events_named($this->sink, Audit::EVENT_TOOL_WRITE_INVOKED))->toHaveCount(0);
+});
+
+it('emits nothing for a drafts_and_revisions compare invocation', function() {
+    InvocationLogger::logCall(
+        'drafts_and_revisions',
+        ['mode' => 'compare', 'leftId' => 1, 'rightId' => 2],
+        null,
+        15,
+        new InvocationContext(transport: Server::TRANSPORT_STDIO),
+    );
+
+    expect(_herald_events_named($this->sink, Audit::EVENT_TOOL_WRITE_INVOKED))->toHaveCount(0);
+});
+
+it('emits one write event for an import_export import invocation', function() {
+    InvocationLogger::logCall(
+        'import_export',
+        ['mode' => 'import', 'payload' => ['format' => 2, 'entries' => []]],
+        null,
+        15,
+        new InvocationContext(transport: Server::TRANSPORT_STDIO),
+    );
+
+    $events = _herald_events_named($this->sink, Audit::EVENT_TOOL_WRITE_INVOKED);
+    expect($events)->toHaveCount(1);
+    expect($events[0]->details['tool'])->toBe('import_export');
+});
+
+it('emits nothing for an import_export export invocation', function() {
+    InvocationLogger::logCall(
+        'import_export',
+        ['mode' => 'export'],
+        null,
+        15,
+        new InvocationContext(transport: Server::TRANSPORT_STDIO),
+    );
+
+    expect(_herald_events_named($this->sink, Audit::EVENT_TOOL_WRITE_INVOKED))->toHaveCount(0);
+});
+
+it('emits a write event for an unknown mode on a known dual-mode tool (fail toward write)', function() {
+    InvocationLogger::logCall(
+        'content_audit',
+        ['mode' => 'not_a_real_mode'],
+        null,
+        15,
+        new InvocationContext(transport: Server::TRANSPORT_STDIO),
+    );
+
+    $events = _herald_events_named($this->sink, Audit::EVENT_TOOL_WRITE_INVOKED);
+    expect($events)->toHaveCount(1);
+    expect($events[0]->details['tool'])->toBe('content_audit');
+});
+
+it('emits a write event for a dual-mode tool invocation missing the mode argument entirely', function() {
+    InvocationLogger::logCall(
+        'import_export',
+        [],
+        null,
+        15,
+        new InvocationContext(transport: Server::TRANSPORT_STDIO),
+    );
+
+    $events = _herald_events_named($this->sink, Audit::EVENT_TOOL_WRITE_INVOKED);
+    expect($events)->toHaveCount(1);
+    expect($events[0]->details['tool'])->toBe('import_export');
 });

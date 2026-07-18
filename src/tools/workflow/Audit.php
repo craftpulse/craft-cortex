@@ -18,6 +18,7 @@ use craftpulse\herald\attributes\IsIdempotent;
 use craftpulse\herald\attributes\IsReadOnly;
 use craftpulse\herald\Herald;
 use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\DualModeToolInterface;
 use craftpulse\herald\tools\PermissionedToolTrait;
 use craftpulse\herald\tools\StreamableToolInterface;
 use craftpulse\herald\tools\support\InvocationContext;
@@ -83,7 +84,7 @@ use Throwable;
  */
 #[IsReadOnly]
 #[IsIdempotent]
-class Audit extends AbstractTool implements StreamableToolInterface
+class Audit extends AbstractTool implements StreamableToolInterface, DualModeToolInterface
 {
     use PermissionedToolTrait;
 
@@ -170,6 +171,31 @@ class Audit extends AbstractTool implements StreamableToolInterface
             'Pro fix modes: `fix_relations` deletes the broken rows, `prune_unused_assets` hard-deletes ' .
             'unreferenced assets, `repair_propagation` force-resaves entries with missing per-site copies. ' .
             'Pro modes require `saveEntries:{section}` / `deleteAssets:{volume}` per row.';
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Derived from `FREE_MODES` / `PRO_MODES` so there is exactly one
+     * place per tool where a mode is read vs write. Consulted by
+     * `services\Audit::handleToolInvocation()` for per-invocation
+     * `herald.tool.write_invoked` classification — the class-level
+     * `#[IsReadOnly]` MCP hint above is accurate for the Free tier but
+     * cannot express the Pro fix modes, so the audit emitter asks this
+     * method instead of the attribute for tools that implement
+     * `DualModeToolInterface`.
+     *
+     * @return array<string,bool>
+     *
+     * @author Craftpulse
+     * @since  5.1.0
+     */
+    public static function getModeWriteMap(): array
+    {
+        return array_merge(
+            array_fill_keys(self::FREE_MODES, false),
+            array_fill_keys(self::PRO_MODES, true),
+        );
     }
 
     /**
