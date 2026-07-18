@@ -6,6 +6,29 @@ All notable changes to Herald are documented here. Format follows
 
 ## [Unreleased]
 
+### Added - tamper-evident audit trail (Audit Kit emission)
+
+- **Native Audit Kit emission.** Herald now emits native
+  `craftpulse\craft-audit-kit` `AuditEvent`s onto the kit dispatch bus, so
+  every AI write and every OAuth / bearer-token lifecycle action can land
+  in a tamper-evident Ledger chain when Ledger is installed. This is purely
+  additive: the `herald_invocations` DB audit table and the redacted KV
+  file log are unchanged. With no recorder installed the bus is a no-op, so
+  emission is safe on every install.
+- **Events emitted.** OAuth client `registered` / `approved` / `revoked`,
+  `elevation_granted`, bearer-token `issued` / `revoked` (category
+  `system`), and one `herald.tool.write_invoked` per WRITE-tool invocation
+  (category `content`) carrying tool name, kind, transport, outcome, a
+  coarse duration bucket, and the client / token id. Read-tool calls are
+  not emitted (the invocation log already covers them). The write-tool
+  event fires on both transports, so stdio writes reach a recorder too,
+  closing the gap where stdio calls only ever hit the file log.
+- **Privacy contract.** Event details are scalar-only, carry no content
+  bodies and no PII, and never carry secret *values*: token / client ids
+  travel, token plaintext and client secrets never do. Each event type
+  registers a fail-closed `allowedDetailKeys` allowlist a recorder enforces.
+- Adds `craftpulse/craft-audit-kit` as a required dependency.
+
 ### Added — authentication and authorization (Pro HTTP transport)
 
 - **Capability-grained OAuth scopes.** Replaced the coarse `read` / `write`

@@ -10,6 +10,8 @@ use craft\services\Elements;
 use craft\services\Gc;
 use craft\services\UserPermissions;
 use craft\web\UrlManager;
+use craftpulse\auditkit\events\RegisterAuditEventsEvent;
+use craftpulse\auditkit\services\EventTypes;
 use craftpulse\herald\controllers\SettingsController;
 use craftpulse\herald\elements\Skill;
 use craftpulse\herald\events\LogCallEvent;
@@ -64,6 +66,7 @@ trait PluginTrait
         $this->_registerGenerator();
         $this->_registerGcListener();
         $this->_registerAuditLogListener();
+        $this->_registerAuditKitEmission();
         $this->_registerSkillElementType();
         $this->_registerHeraldPermissions();
         $this->_registerSkillProjectConfigHandlers();
@@ -155,6 +158,52 @@ trait PluginTrait
                         Invocations::LOG_CATEGORY,
                     );
                 }
+            },
+        );
+    }
+
+    /**
+     * Wires Herald's Audit Kit emission — additive alongside the
+     * `herald_invocations` DB writer and the KV file log, never a
+     * replacement for either.
+     *
+     * Two listeners:
+     *
+     *   - `EventTypes::EVENT_REGISTER_AUDIT_EVENTS` — contributes
+     *     Herald's `AuditEventType` definitions (fail-closed detail
+     *     allowlists) to the kit's runtime registry so a recorder knows
+     *     which detail keys each event may persist.
+     *   - `InvocationLogger::EVENT_LOG_CALL` — a second subscriber
+     *     alongside `_registerAuditLogListener()`, emitting one
+     *     `herald.tool.write_invoked` per WRITE-tool call across both
+     *     transports (so stdio writes reach a recorder too, closing the
+     *     stdio-not-in-DB gap for writes).
+     *
+     * Both handlers delegate to the `Audit` service; a missing / disabled
+     * Audit Kit resolves to a null bus and every emission is a silent
+     * no-op, so registering the listeners unconditionally is safe.
+     *
+     * The OAuth / bearer-token lifecycle events are emitted from the
+     * `Oauth` and `Tokens` service methods directly, not wired here.
+     *
+     * @author Craftpulse
+     * @since  5.1.0
+     */
+    private function _registerAuditKitEmission(): void
+    {
+        Event::on(
+            EventTypes::class,
+            EventTypes::EVENT_REGISTER_AUDIT_EVENTS,
+            static function(RegisterAuditEventsEvent $event): void {
+                Herald::getInstance()->audit->registerEventTypes($event);
+            },
+        );
+
+        Event::on(
+            InvocationLogger::class,
+            InvocationLogger::EVENT_LOG_CALL,
+            static function(LogCallEvent $event): void {
+                Herald::getInstance()->audit->handleToolInvocation($event);
             },
         );
     }

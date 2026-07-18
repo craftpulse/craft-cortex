@@ -521,6 +521,8 @@ class Oauth extends Component
         }
         $ttl = Herald::getInstance()->getSettings()->getElevationTtl();
         $cache->set($this->elevationCacheKey($userId), true, $ttl);
+
+        Herald::getInstance()->audit->recordElevationGranted($userId);
     }
 
     /**
@@ -621,6 +623,13 @@ class Oauth extends Component
             ));
         }
 
+        Herald::getInstance()->audit->recordClientRegistered(
+            (int) $record->id,
+            $clientId,
+            $isPublic,
+            (bool) $record->approved,
+        );
+
         $response = [
             'client_id' => $clientId,
             'client_name' => $name,
@@ -678,7 +687,11 @@ class Oauth extends Component
             return true;
         }
         $record->approved = true;
-        return $record->save();
+        $saved = $record->save();
+        if ($saved) {
+            Herald::getInstance()->audit->recordClientApproved((int) $record->id, (string) $record->clientId);
+        }
+        return $saved;
     }
 
     /**
@@ -708,6 +721,8 @@ class Oauth extends Component
             ['dateRevoked' => Carbon::now()->toDateTimeString()],
             ['clientId' => $record->clientId, 'dateRevoked' => null],
         );
+
+        Herald::getInstance()->audit->recordClientRevoked((int) $record->id, (string) $record->clientId);
 
         return $saved;
     }

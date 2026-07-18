@@ -113,6 +113,15 @@ Highlights:
 
 Full security reference: **[`docs/SECURITY.md`](docs/SECURITY.md)**.
 
+## Audit trail
+
+Herald keeps two audit surfaces of its own: the `herald_invocations` DB table and a redacted, secret-stripped KV line per tool call in Craft's log. On top of those, Herald emits native [Audit Kit](https://github.com/craftpulse/craft-audit-kit) events onto the shared dispatch bus, so **every AI write lands in your tamper-evident Ledger when Ledger is installed**, alongside a compliance-grade record of who did what.
+
+- **What's emitted.** One event per WRITE-tool invocation (content / schema / dev / workflow) with the tool name, kind, transport, outcome, a coarse duration bucket, and the client / token id; plus the OAuth and bearer-token lifecycle (client registered / approved / revoked, elevation granted, token issued / revoked). Read-tool calls are not emitted (the invocation log already covers them, and the volume would swamp a chain).
+- **Both transports.** The write-tool event fires on stdio and HTTP alike, so agent writes made over the local stdio transport reach the chain too, not just HTTP calls.
+- **Privacy by construction.** Event details are scalar-only, carry no content bodies and no PII, and never carry secret values: token and client *ids* travel, token plaintext and client secrets never do. Each event type declares a fail-closed allowlist of exactly which detail keys a recorder may persist.
+- **Zero-config and safe.** With no recorder installed the bus is a no-op, so emission costs nothing and changes no behaviour. Install Ledger to turn the stream into a verifiable, exportable, SIEM-forwardable chain.
+
 ## Extending
 
 Third-party plugins can register their own tools, prompts, and resources via class-level events. Herald enforces architectural contracts (interface implementation, transport gating, dispatch shape) — third-party authors are responsible for behavioural correctness, the same trust model Craft itself uses for plugin extensibility.

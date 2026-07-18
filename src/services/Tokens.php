@@ -114,6 +114,8 @@ class Tokens extends Component
         // pre-issuance probe.
         $this->_lookupCache = [];
 
+        Herald::getInstance()->audit->recordTokenIssued((int) $record->id, $name, $userId);
+
         return [
             'token' => $plaintext,
             'model' => $this->_hydrate($record),
@@ -206,6 +208,9 @@ class Tokens extends Component
         }
 
         $this->_lookupCache = [];
+
+        Herald::getInstance()->audit->recordTokenRevoked($id);
+
         return true;
     }
 

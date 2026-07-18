@@ -12,6 +12,7 @@ use craftpulse\herald\models\Settings;
 use craftpulse\herald\plugin\PluginTrait;
 use craftpulse\herald\plugin\Services as HeraldServices;
 use craftpulse\herald\services\Allowlist;
+use craftpulse\herald\services\Audit;
 use craftpulse\herald\services\Invocations;
 use craftpulse\herald\services\Oauth;
 use craftpulse\herald\services\Prompts;
@@ -149,6 +150,7 @@ class Herald extends BasePlugin
         return [
             'components' => [
                 'allowlist' => ['class' => Allowlist::class],
+                'audit' => ['class' => Audit::class],
                 'invocations' => ['class' => Invocations::class],
                 'oauth' => ['class' => Oauth::class],
                 'prompts' => ['class' => Prompts::class],

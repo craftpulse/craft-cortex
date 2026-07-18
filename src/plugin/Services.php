@@ -3,6 +3,7 @@
 namespace craftpulse\herald\plugin;
 
 use craftpulse\herald\services\Allowlist;
+use craftpulse\herald\services\Audit;
 use craftpulse\herald\services\Invocations;
 use craftpulse\herald\services\Oauth;
 use craftpulse\herald\services\Prompts;
@@ -45,6 +46,7 @@ use yii\base\InvalidConfigException;
  * =========================================================================
  *
  * @property Allowlist $allowlist the runtime-allowlist override service
+ * @property Audit $audit the Audit Kit native-event emitter
  * @property Invocations $invocations the HTTP-transport audit-log writer
  * @property Oauth $oauth the OAuth 2.1 authorization-server orchestrator
  * @property Prompts $prompts the MCP prompts registry
@@ -76,6 +78,22 @@ trait Services
     {
         $component = $this->get('allowlist');
         assert($component instanceof Allowlist);
+        return $component;
+    }
+
+    /**
+     * Returns the Audit Kit native-event emitter — registers Herald's
+     * `AuditEventType`s and emits `AuditEvent`s onto the kit dispatch bus.
+     *
+     * @throws InvalidConfigException When the component is not registered.
+     *
+     * @author Craftpulse
+     * @since  5.1.0
+     */
+    public function getAudit(): Audit
+    {
+        $component = $this->get('audit');
+        assert($component instanceof Audit);
         return $component;
     }
 
