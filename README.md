@@ -30,6 +30,15 @@ If you develop with [DDEV](https://ddev.com/), run the same commands through the
 
 Herald works on Craft 5.x.
 
+**Not yet on Packagist.** Herald is pre-Plugin-Store-submission. Until it's published, `composer require` needs a VCS repository entry in your project's `composer.json` for both Herald and its `craftpulse/craft-audit-kit` dependency:
+
+```json
+"repositories": [
+    { "type": "vcs", "url": "https://github.com/craftpulse/craft-herald.git" },
+    { "type": "vcs", "url": "https://github.com/craftpulse/craft-audit-kit.git" }
+]
+```
+
 ## Connect your MCP client
 
 Herald ships four console actions for hooking up your MCP client, in increasing order of magic:
