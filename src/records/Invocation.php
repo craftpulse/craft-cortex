@@ -11,7 +11,7 @@ use craftpulse\herald\tools\support\InvocationLogger;
  * Active record for the `herald_invocations` audit-log table.
  *
  * One row per authenticated HTTP-transport `tools/call`. Mirrors the
- * column layout declared in `m260514_120200_herald_invocations` so
+ * column layout declared in `Install::_createInvocationsTable()` so
  * Yii's ActiveRecord can read/write rows without a hand-rolled query.
  *
  * The Record carries DateTime-shaped timestamps via Yii's standard

@@ -56,13 +56,13 @@ class Token extends ActiveRecord
      * @inheritdoc
      *
      * Mirrors the column constraints declared in
-     * `m260514_120000_herald_tokens::safeUp()` at the model layer so
-     * `save()` fails cleanly via validation rather than as a raw DB
-     * exception. The 64-char `tokenHash` constraint catches a caller
-     * passing the plaintext where the hash was expected (or vice
-     * versa) — both happen to be 64 hex chars in herald's scheme,
-     * so the length check is necessary but not sufficient; callers
-     * remain responsible for passing the *hashed* form.
+     * `Install::_createTokensTable()` at the model layer so `save()`
+     * fails cleanly via validation rather than as a raw DB exception.
+     * The 64-char `tokenHash` constraint catches a caller passing the
+     * plaintext where the hash was expected (or vice versa) — both
+     * happen to be 64 hex chars in herald's scheme, so the length check
+     * is necessary but not sufficient; callers remain responsible for
+     * passing the *hashed* form.
      *
      * @author Craftpulse
      * @since  5.0.0
