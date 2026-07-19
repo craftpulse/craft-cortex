@@ -11,7 +11,7 @@
 # `?string` though never null in practice).
 
 includes:
-    - /var/www/html/cms/vendor/craftcms/phpstan/phpstan.neon
+    - vendor/craftcms/phpstan/phpstan.neon
 
 parameters:
     level: 8
