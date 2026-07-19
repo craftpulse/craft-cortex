@@ -41,6 +41,15 @@
         "craftcms/phpstan": "dev-main",
         "pestphp/pest": "^2.36"
     },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../*",
+            "options": {
+                "symlink": true
+            }
+        }
+    ],
     "autoload": {
         "psr-4": {
             "craftpulse\\herald\\": "src/"
