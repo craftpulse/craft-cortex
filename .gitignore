@@ -16,6 +16,7 @@
 # smoke results, anything that's "our knowledge" rather than user-facing
 # documentation. Each developer keeps their own.
 /.internal/
+/docs/plans/
 
 # AI-assisted smoke-run checklists and evidence, local only
 /smoke-testing/
