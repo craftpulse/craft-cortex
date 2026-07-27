@@ -44,7 +44,25 @@ if (!file_exists($craftBase . '/craft')) {
 define('CRAFT_BASE_PATH', $craftBase);
 define('CRAFT_VENDOR_PATH', CRAFT_BASE_PATH . '/vendor');
 
-require_once CRAFT_VENDOR_PATH . '/autoload.php';
+$sharedLoader = require_once CRAFT_VENDOR_PATH . '/autoload.php';
+
+// The shared Craft install's autoloader (just loaded above) registers
+// itself with `prepend: true`, so it jumps ahead of this plugin's own
+// (already-registered) loader in the SPL autoload queue. If another
+// symlinked plugin in the playground still requires an older Pest or
+// PHPUnit, the shared copy now wins for any class not yet resolved —
+// e.g. Pest lazily autoloads PHPUnit's internals mid-run, silently
+// swapping in a stale `PHPUnit\Runner\ErrorHandler` and the like.
+// Re-registering the identical loader object with `prepend: true` is a
+// silent no-op (PHP dedupes autoload callables by identity and leaves
+// the existing position alone), so the fix is to demote it: unregister,
+// then re-register at the back of the queue. This plugin's own vendor
+// keeps priority for anything it ships; the shared loader still serves
+// as a fallback for Craft/Yii and everything else only it has.
+if (is_object($sharedLoader) && method_exists($sharedLoader, 'unregister')) {
+    $sharedLoader->unregister();
+    $sharedLoader->register(false);
+}
 
 // Load the playground's .env (has CRAFT_APP_ID, security key, db creds).
 if (file_exists(CRAFT_BASE_PATH . '/.env')) {
