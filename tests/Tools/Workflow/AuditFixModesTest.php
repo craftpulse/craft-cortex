@@ -66,7 +66,7 @@ afterEach(function() {
         ->status(null)
         ->trashed(null)
         ->site('*')
-        ->title(['like', $this->fixturePrefix . '%'])
+        ->andWhere(['like', 'elements_sites.title', $this->fixturePrefix . '%', false])
         ->all();
     foreach ($entries as $entry) {
         Craft::$app->getElements()->deleteElement($entry, hardDelete: true);
@@ -76,7 +76,7 @@ afterEach(function() {
         ->status(null)
         ->trashed(null)
         ->site('*')
-        ->title(['like', $this->fixturePrefix . '%'])
+        ->andWhere(['like', 'elements_sites.title', $this->fixturePrefix . '%', false])
         ->all();
     foreach ($assets as $asset) {
         Craft::$app->getElements()->deleteElement($asset, hardDelete: true);
