@@ -73,7 +73,7 @@
         "check-cs": "ecs check",
         "fix-cs": "ecs check --fix",
         "phpstan": "phpstan analyse --memory-limit=1G",
-        "test": "@php vendor/bin/pest --configuration=vendor/craftpulse/craft-herald/phpunit.xml.dist"
+        "test": "@php vendor/bin/pest"
     },
     "extra": {
         "name": "Herald MCP",

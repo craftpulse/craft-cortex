@@ -17,7 +17,7 @@ jobs:
           - name: 'PHPStan'
             run: composer phpstan
           - name: 'Coding Standards'
-            run: composer fix-cs
+            run: composer check-cs
     name: ${{ matrix.actions.name }}
     runs-on: ubuntu-latest
     steps:
@@ -40,3 +40,129 @@ jobs:
       - name: Install Composer dependencies
         run: composer install --no-interaction --no-ansi --no-progress
       - run: ${{ matrix.actions.run }}
+
+  # Herald's suite does NOT use markhuot/craft-pest-core, so nothing
+  # self-installs Craft for it. `tests/Bootstrap.php` boots the console
+  # application of a *surrounding* Craft install, located via
+  # `HERALD_TEST_CRAFT_BASE`, and the tools under test introspect that
+  # install's live API surface (sections, fields, volumes, registered
+  # element types). This job therefore has to build a real Craft install
+  # before Pest can run. The harness needs, in order:
+  #
+  #   1. a MySQL 8 service and a database Craft can install into,
+  #   2. a Craft project with the plugin required in from this checkout,
+  #      so `craftcms/plugin-installer` registers it and
+  #      `Herald::getInstance()` resolves,
+  #   3. an installed Craft schema plus one admin user, which the
+  #      permission and CP-controller tests act as (resolved by flag via
+  #      the `herald_admin_user()` helper in `tests/Pest.php`, never by
+  #      username, so no CI-specific account name is baked in),
+  #   4. the plugin's own vendor directory, because the canonical
+  #      invocation is plugin-local: Pest runs from the plugin root with
+  #      its own binary so a conflicting Pest or craft-pest-core in the
+  #      surrounding install's vendor can never hijack the run.
+  #
+  # No content is seeded. That is deliberate, not an omission: the tools
+  # assert on response *shape* rather than on specific records, and the
+  # tests that genuinely need content create and tear down their own
+  # fixtures. Tests that cannot run on a bare install skip themselves
+  # explicitly rather than asserting against ambient data.
+  pest:
+    name: Pest
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: db_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: plugin
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: /tmp/composer-cache
+          key: ${{ runner.os }}-${{ hashFiles('plugin/composer.json') }}
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.3
+          extensions: 'ctype,curl,dom,iconv,imagick,intl,json,mbstring,openssl,pcre,pdo,pdo_mysql,reflection,spl,zip'
+          ini-values: post_max_size=256M, max_execution_time=180, memory_limit=512M
+          tools: composer:v2
+
+      # `--no-scripts` skips the starter project's interactive
+      # `setup/welcome` post-create hook; the environment is written
+      # explicitly in the next step instead.
+      - name: Create the surrounding Craft install
+        run: composer create-project craftcms/craft cms --no-interaction --no-ansi --no-progress --no-scripts
+
+      - name: Write the Craft environment
+        working-directory: cms
+        run: |
+          cat > .env <<'ENV'
+          CRAFT_APP_ID=herald-ci
+          CRAFT_ENVIRONMENT=dev
+          CRAFT_DEV_MODE=true
+          CRAFT_ALLOW_ADMIN_CHANGES=true
+          CRAFT_SECURITY_KEY=ci-only-not-a-secret
+          CRAFT_DB_DRIVER=mysql
+          CRAFT_DB_SERVER=127.0.0.1
+          CRAFT_DB_PORT=3306
+          CRAFT_DB_DATABASE=db_test
+          CRAFT_DB_USER=root
+          CRAFT_DB_PASSWORD=root
+          CRAFT_DB_TABLE_PREFIX=
+          PRIMARY_SITE_URL=http://localhost:8080
+          ENV
+
+      # The path repository resolves the plugin from this checkout, so the
+      # suite always tests the pushed code rather than a published tag.
+      - name: Require the plugin into the Craft install
+        working-directory: cms
+        run: |
+          composer config minimum-stability dev
+          composer config prefer-stable true
+          composer config repositories.craft-audit-kit vcs https://github.com/craftpulse/craft-audit-kit.git
+          composer config repositories.craft-herald path ../plugin
+          composer require craftpulse/craft-herald:@dev --no-interaction --no-ansi --no-progress
+
+      - name: Install Craft
+        working-directory: cms
+        run: |
+          php craft install/craft \
+            --interactive=0 \
+            --username=admin \
+            --email=admin@example.test \
+            --password=Password123! \
+            --siteName=Herald \
+            --siteUrl=http://localhost:8080 \
+            --language=en-US
+
+      - name: Install the Herald plugin
+        working-directory: cms
+        run: php craft plugin/install herald --interactive=0
+
+      - name: Install the plugin's own dependencies
+        working-directory: plugin
+        run: |
+          composer config repositories.craft-audit-kit vcs https://github.com/craftpulse/craft-audit-kit.git
+          composer install --no-interaction --no-ansi --no-progress
+
+      # Run from the plugin's own root, through its own Pest binary. The
+      # bootstrap finds the Craft install through `HERALD_TEST_CRAFT_BASE`
+      # rather than the working directory.
+      - name: Run Pest
+        working-directory: plugin
+        env:
+          HERALD_TEST_CRAFT_BASE: ${{ github.workspace }}/cms
+        run: composer test
