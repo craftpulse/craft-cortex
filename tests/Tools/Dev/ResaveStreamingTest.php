@@ -48,6 +48,14 @@ function _herald_resave_drain(Generator $gen): array
 
 beforeEach(function() {
     $this->tool = Herald::getInstance()->tools->getByName('resave');
+
+    // Every case here resaves the seeded `minorHeroes` entries and
+    // asserts exact progress-frame and terminal counts, so there is
+    // nothing to stream without the seed. Same guard as
+    // `Tools/Content/BulkEntriesTest`.
+    if (Craft::$app->getEntries()->getSectionByHandle('minorHeroes') === null) {
+        $this->markTestSkipped('minorHeroes seed not applied; run `ddev craft migrate/up --track=content`.');
+    }
 });
 
 it('streams progress frames against the minorHeroes seed and returns a structured terminal envelope', function() {

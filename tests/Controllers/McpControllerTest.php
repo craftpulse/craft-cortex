@@ -852,6 +852,21 @@ it('mid-session token swap with a different user terminates the session and retu
         ->status(null)
         ->andWhere(['not', ['users.id' => $this->userId]])
         ->one();
+
+    // A freshly installed Craft has only the one admin account, so fall
+    // back to creating the second identity. Reusing an existing user is
+    // preferred where possible (see above), but this case asserts a 401
+    // security boundary and is worth exercising everywhere rather than
+    // skipping wherever the install happens to be single-user.
+    $createdOtherUser = null;
+    if ($otherUser === null) {
+        $createdOtherUser = new \craft\elements\User();
+        $createdOtherUser->username = '__herald_mcp_swap_' . bin2hex(random_bytes(4));
+        $createdOtherUser->email = $createdOtherUser->username . '@example.test';
+        $createdOtherUser->pending = true;
+        expect(Craft::$app->getElements()->saveElement($createdOtherUser))->toBeTrue();
+        $otherUser = $createdOtherUser;
+    }
     expect($otherUser)->not->toBeNull();
 
     // Initialize the session as user A (our scaffold's admin).
@@ -889,10 +904,16 @@ it('mid-session token swap with a different user terminates the session and retu
     ], $callBody);
     $callResponse = $callController->runIndex();
 
-    expect($callResponse->statusCode)->toBe(401);
-    // The session must have been terminated as part of the
-    // mismatch defense — subsequent get() returns null.
-    expect(Herald::getInstance()->sessions->get($sessionId))->toBeNull();
+    try {
+        expect($callResponse->statusCode)->toBe(401);
+        // The session must have been terminated as part of the
+        // mismatch defense — subsequent get() returns null.
+        expect(Herald::getInstance()->sessions->get($sessionId))->toBeNull();
+    } finally {
+        if ($createdOtherUser !== null) {
+            Craft::$app->getElements()->deleteElement($createdOtherUser, hardDelete: true);
+        }
+    }
 });
 
 // -----------------------------------------------------------------------------

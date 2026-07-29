@@ -62,11 +62,23 @@ jobs:
   #      its own binary so a conflicting Pest or craft-pest-core in the
   #      surrounding install's vendor can never hijack the run.
   #
-  # No content is seeded. That is deliberate, not an omission: the tools
-  # assert on response *shape* rather than on specific records, and the
-  # tests that genuinely need content create and tear down their own
-  # fixtures. Tests that cannot run on a bare install skip themselves
-  # explicitly rather than asserting against ambient data.
+  # KNOWN COVERAGE GAP - no content is seeded here, so the tier of tests
+  # that asserts against seeded content does not execute in CI.
+  #
+  # Most tools assert on response *shape* rather than on specific
+  # records, and the tests that need content create and tear down their
+  # own fixtures, so the large majority runs on a bare install. The
+  # remainder targets named sections (`heroes`, `minorHeroes`) and asset
+  # volumes that exist only in the dev playground, whose content
+  # migrations live in that separate repository rather than in this one.
+  # Those tests skip themselves explicitly, naming the missing seed, so
+  # the shortfall is visible in the run summary as a skip count rather
+  # than hidden behind a filter or an excluded directory. Nothing is
+  # excluded from the invocation: the whole suite is always executed.
+  #
+  # Closing the gap means giving Herald its own content fixtures instead
+  # of borrowing the playground's. That is a harness decision, not a CI
+  # one, and it is deliberately not made here.
   pest:
     name: Pest
     runs-on: ubuntu-latest

@@ -307,7 +307,12 @@ it('stream(prune_unused_assets) yields progress frames and returns a structured 
 
 it('stream(prune_unused_assets) reports cancelled=true when the token flips mid-stream', function() {
     // Seed two assets so the loop has at least two rows to cancel between.
-    _herald_audfxstream_seed_unused_asset($this->fixturePrefix);
+    // The seeder returns null when the install has no volume to write
+    // into, and cancellation cannot be observed on an empty stream, so
+    // the precondition is asserted rather than assumed.
+    if (_herald_audfxstream_seed_unused_asset($this->fixturePrefix) === null) {
+        $this->markTestSkipped('No asset volume on this install; nothing to cancel between.');
+    }
     _herald_audfxstream_seed_unused_asset($this->fixturePrefix . 'b');
 
     herald_with_edition(Herald::EDITION_PRO, function() {

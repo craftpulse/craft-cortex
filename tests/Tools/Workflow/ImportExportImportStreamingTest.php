@@ -37,6 +37,14 @@ beforeEach(function() {
     expect($admin)->not->toBeNull();
     Craft::$app->getUser()->setIdentity($admin);
     $this->admin = $admin;
+
+    // `_herald_impstream_envelope()` degrades to an empty payload when
+    // the seeded `heroes` section is absent, and these cases assert
+    // exact frame and item counts against it. Same guard as
+    // `Tools/Content/BulkEntriesTest`.
+    if (Craft::$app->getEntries()->getSectionByHandle('heroes') === null) {
+        $this->markTestSkipped('heroes seed not applied; run `ddev craft migrate/up --track=content`.');
+    }
 });
 
 afterEach(function() {
