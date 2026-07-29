@@ -12,7 +12,6 @@ use Yii;
 use yii\console\ExitCode;
 
 /**
- * =========================================================================
  * stdio transport for the MCP server.
  *
  * Reads newline-delimited JSON-RPC requests from STDIN, hands each line
@@ -21,13 +20,12 @@ use yii\console\ExitCode;
  * termination signal arrives.
  *
  * Threat model: stdio is a trusted-local transport, but a trusted local
- * *user* is not the same as a trusted client *implementation* — the same
+ * *user* is not the same as a trusted client *implementation*, and the same
  * argument the `craft_exec` docblock makes. The reader therefore bounds
  * each message at `Settings::$stdioMaxMessageBytes` so a hostile or buggy
  * client streaming one unbounded line can't OOM the long-running serve
  * process; oversized lines are drained and rejected with JSON-RPC
  * `-32600` rather than buffered.
- * =========================================================================
  *
  * @author Craftpulse
  * @since  5.0.0

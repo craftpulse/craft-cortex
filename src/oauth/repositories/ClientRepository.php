@@ -125,7 +125,7 @@ class ClientRepository implements ClientRepositoryInterface
             // service inserts always populate, but PHPStan can't
             // infer that from the Record's nullable property
             // declarations. The throw narrows the type for league.
-            throw new \LogicException('Encountered an OauthClient row with an empty clientId — schema invariant violated.');
+            throw new \LogicException('Encountered an OauthClient row with an empty clientId, which violates a schema invariant.');
         }
 
         $entity = new ClientEntity();

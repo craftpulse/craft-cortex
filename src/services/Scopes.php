@@ -365,7 +365,7 @@ class Scopes extends Component
             self::CONTENT_READ => 'Read entries, assets, categories, tags, and globals.',
             self::CONTENT_WRITE => 'Create, update, publish, and delete entries, categories, tags, and globals.',
             self::ASSETS_WRITE => 'Upload and modify assets and address records.',
-            self::SCHEMA_READ => 'Read schema — sections, fields, entry types, volumes, and sites.',
+            self::SCHEMA_READ => 'Read schema: sections, fields, entry types, volumes, and sites.',
             self::SYSTEM_READ => 'Read system configuration, plugins, routes, and diagnostics.',
             self::USERS_READ => 'Read user records (subject to PII gating).',
             self::USERS_WRITE => 'Create, update, and delete users.',

@@ -8,8 +8,7 @@ use yii\console\ExitCode;
 use yii\helpers\Console;
 
 /**
- * =========================================================================
- * Console — print the active Herald edition.
+ * Prints the active Herald edition.
  *
  * Usage:
  *   herald/edition/show
@@ -23,7 +22,6 @@ use yii\helpers\Console;
  * The edition handle lives in project config at
  * `plugins.herald.edition`. The Plugin Store sets it on purchase;
  * Herald does not maintain a separate license table.
- * =========================================================================
  *
  * @author Craftpulse
  * @since  5.0.0
@@ -35,7 +33,7 @@ class EditionController extends Controller
 
     /**
      * Print the active edition handle, the full editions list, and
-     * the `is(EDITION_PRO)` flag. Exit code is always `OK` (0) — the
+     * the `is(EDITION_PRO)` flag. Exit code is always `OK` (0), because the
      * command is read-only and has no failure surface beyond a
      * misconfigured plugin (which would have failed earlier at
      * `Herald::getInstance()`).

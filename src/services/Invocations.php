@@ -122,7 +122,7 @@ class Invocations extends Component
             // trail.
             Craft::error(
                 sprintf(
-                    'Exception while persisting herald_invocations row: %s — %s',
+                    'Exception while persisting herald_invocations row: %s. %s',
                     $e::class,
                     $e->getMessage(),
                 ),

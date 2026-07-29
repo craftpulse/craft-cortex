@@ -28,7 +28,7 @@ This guide walks you through installing Herald into a Craft CMS 5 project and co
   - Zed
   - Windsurf
 
-Other MCP clients that accept the standard `mcpServers` JSON shape (`command` + `args`) will work — you just won't get a one-command auto-config.
+Other MCP clients that accept the standard `mcpServers` JSON shape (`command` + `args`) will work; you just won't get a one-command auto-config.
 
 ## Install the plugin
 
@@ -83,16 +83,16 @@ Herald is DDEV-aware. When you run `ddev craft herald/install` it auto-detects t
 
 ## Connect your MCP client
 
-Once Herald is installed, your MCP client needs to know how to talk to it. Herald provides four console actions for this — listed below in order of decreasing magic:
+Once Herald is installed, your MCP client needs to know how to talk to it. Herald provides four console actions for this, listed below in order of decreasing magic:
 
 | Action | What it does | Where it runs |
 |--------|--------------|---------------|
 | `herald/install/auto` | Scans the host for installed MCP clients, then for each one prompts to apply Herald config. The "I installed Herald, now wire it up everywhere" flow. | **Host only.** Refuses to run from inside a container (DDEV, Docker, Lando, Sail, Podman, LXC, Kubernetes). |
-| `herald/install/detect` | Scans the host and prints a status table of which clients are installed and configured. Read-only — never writes. | **Host only.** Refuses to run from inside a container. |
-| `herald/install/apply --client=<name>` | Writes Herald config to one specific client's config file. Atomic write + timestamped backup. | Anywhere — host or DDEV — but the config path it targets must exist on the running filesystem. |
+| `herald/install/detect` | Scans the host and prints a status table of which clients are installed and configured. Read-only, and it never writes. | **Host only.** Refuses to run from inside a container. |
+| `herald/install/apply --client=<name>` | Writes Herald config to one specific client's config file. Atomic write + timestamped backup. | Anywhere (host or DDEV), but the config path it targets must exist on the running filesystem. |
 | `herald/install` | Prints copy-paste snippets for every supported client (or just one with `--client=<name>`). Read-only. | Anywhere. |
 
-**If you're running Herald inside a container** (DDEV, plain Docker, Lando, Sail, Podman, LXC, Kubernetes), your container can't see your host's `/Applications`, `~/.cursor`, etc. — so `detect` and `auto` refuse to run there to avoid false negatives. Run them from your host's PHP:
+**If you're running Herald inside a container** (DDEV, plain Docker, Lando, Sail, Podman, LXC, Kubernetes), your container can't see your host's `/Applications`, `~/.cursor`, etc., so `detect` and `auto` refuse to run there to avoid false negatives. Run them from your host's PHP:
 
 ```bash
 php /path/to/project/craft herald/install/auto
@@ -102,7 +102,7 @@ Or stick with the manual snippet form (`ddev craft herald/install`), which works
 
 ### Bearer-token authentication for the HTTP transport
 
-Herald also exposes an HTTP transport at `POST /herald/mcp` for clients that don't speak stdio (Claude Desktop's hosted MCP setup, browser-based agents, anything behind a remote agent). The HTTP transport is **disabled by default** — flip `Settings::$httpEnabled = true` in `config/herald.php` to expose it.
+Herald also exposes an HTTP transport at `POST /herald/mcp` for clients that don't speak stdio (Claude Desktop's hosted MCP setup, browser-based agents, anything behind a remote agent). The HTTP transport is **disabled by default**. Flip `Settings::$httpEnabled = true` in `config/herald.php` to expose it.
 
 Once enabled, every request to `/herald/mcp` must carry `Authorization: Bearer <token>`. Issue a token from the console:
 
@@ -110,7 +110,7 @@ Once enabled, every request to `/herald/mcp` must carry `Authorization: Bearer <
 ddev craft herald/token/issue <user> [--name=<name>] [--ttl=<seconds>]
 ```
 
-The plaintext token prints **exactly once** at issuance — copy it then. Herald stores only the SHA-256 hash; if you lose the plaintext, revoke the token and issue a fresh one. By default tokens never expire; pass `--ttl=<seconds>` (e.g. `--ttl=2592000` for 30 days) for shorter rotation, or set `Settings::$tokenTtlDefault` for a global default.
+The plaintext token prints **exactly once** at issuance, so copy it then. Herald stores only the SHA-256 hash; if you lose the plaintext, revoke the token and issue a fresh one. By default tokens never expire; pass `--ttl=<seconds>` (e.g. `--ttl=2592000` for 30 days) for shorter rotation, or set `Settings::$tokenTtlDefault` for a global default.
 
 Configure your MCP client with:
 
@@ -125,13 +125,13 @@ ddev craft herald/token/list [--user=<email-or-username>]
 ddev craft herald/token/revoke <id>
 ```
 
-Revocation is immediate for new requests — in-flight requests on a revoked token complete normally, the next request fails 401.
+Revocation is immediate for new requests. In-flight requests on a revoked token complete normally, the next request fails 401.
 
 ### OAuth 2.1 for the HTTP transport (optional, MCP-spec-compliant)
 
-For clients that auto-discover and self-register against a remote MCP server — Claude Desktop's hosted MCP setup, Anthropic's `/.well-known` flow, IDE plugins that ship with OAuth support — Herald also exposes a full OAuth 2.1 surface: Authorization Code + PKCE (S256), Refresh Token, RFC 7591 Dynamic Client Registration, RFC 7009 token revocation, and RFC 8414 / RFC 9728 discovery metadata.
+For clients that auto-discover and self-register against a remote MCP server (Claude Desktop's hosted MCP setup, Anthropic's `/.well-known` flow, IDE plugins that ship with OAuth support), Herald also exposes a full OAuth 2.1 surface: Authorization Code + PKCE (S256), Refresh Token, RFC 7591 Dynamic Client Registration, RFC 7009 token revocation, and RFC 8414 / RFC 9728 discovery metadata.
 
-The OAuth surface coexists with bearer tokens — both authenticate against the same `herald/mcp` endpoint, OAuth checked first per RFC 8707 audience binding, bearer as fallback for the long-lived admin-issued credentials.
+The OAuth surface coexists with bearer tokens: both authenticate against the same `herald/mcp` endpoint, OAuth checked first per RFC 8707 audience binding, bearer as fallback for the long-lived admin-issued credentials.
 
 **One-time setup:**
 
@@ -148,7 +148,7 @@ GET https://your-site.test/.well-known/oauth-authorization-server   # RFC 8414
 GET https://your-site.test/.well-known/oauth-protected-resource     # RFC 9728
 ```
 
-MCP-spec-aware clients hit these on first contact to discover the authorization server, registration endpoint, supported scopes (`read`, `write`), and PKCE methods (`S256` only — `plain` is rejected).
+MCP-spec-aware clients hit these on first contact to discover the authorization server, registration endpoint, supported scopes (`read`, `write`), and PKCE methods (`S256` only, with `plain` rejected).
 
 **Dynamic Client Registration (RFC 7591):**
 
@@ -162,7 +162,7 @@ curl -X POST https://your-site.test/oauth/register \
   }'
 ```
 
-Returns a fresh `client_id` (and `client_secret` if the method is not `none`). DCR is open-by-default (`Settings::$dcrEnabled = true`) — set it to false to require out-of-band client provisioning.
+Returns a fresh `client_id` (and `client_secret` if the method is not `none`). DCR is open-by-default (`Settings::$dcrEnabled = true`). Set it to false to require out-of-band client provisioning.
 
 **Full PKCE flow:**
 
@@ -199,7 +199,7 @@ Returns a fresh `client_id` (and `client_secret` if the method is not `none`). D
      -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","clientInfo":{"name":"my-client","version":"1.0"}}}'
    ```
 
-**Audience binding (RFC 8707):** The `resource` parameter on `/authorize` and `/token` ends up in the JWT `aud` claim. Herald verifies it matches the canonical `herald/mcp` URL on every request — a token issued for resource A can't be replayed against resource B. Pass `resource=<absolute URL to /herald/mcp>` on both endpoints.
+**Audience binding (RFC 8707):** The `resource` parameter on `/authorize` and `/token` ends up in the JWT `aud` claim. Herald verifies it matches the canonical `herald/mcp` URL on every request, so a token issued for resource A can't be replayed against resource B. Pass `resource=<absolute URL to /herald/mcp>` on both endpoints.
 
 **Token lifetimes** (defaults; configurable via `Settings::$oauthAccessTokenTtl` / `$oauthRefreshTokenTtl`):
 - Access tokens: 1 hour (`PT1H`).
@@ -220,11 +220,11 @@ Revoke (RFC 7009):
 curl -X POST https://your-site.test/oauth/revoke -d 'token=<access or refresh>'
 ```
 
-Per RFC 7009 §2.2 the endpoint returns 200 regardless of whether the token was known — no information leakage.
+Per RFC 7009 §2.2 the endpoint returns 200 regardless of whether the token was known, so there is no information leakage.
 
 ### Streaming Tools (SSE over HTTP)
 
-Herald's HTTP transport supports MCP's Streamable HTTP profile — long-running tools can emit progress frames between the original `tools/call` request and its terminal JSON-RPC response, and clients can cancel an in-flight call without dropping the connection. The Free tier ships no streaming tools; the wire is ready for Gate 8's Pro write tools (eager resave, content audit, batch import/export).
+Herald's HTTP transport supports MCP's Streamable HTTP profile: long-running tools can emit progress frames between the original `tools/call` request and its terminal JSON-RPC response, and clients can cancel an in-flight call without dropping the connection. The Free tier ships no streaming tools; the wire is ready for Gate 8's Pro write tools (eager resave, content audit, batch import/export).
 
 **Client opt-in.** Clients request the SSE response by sending `Accept: text/event-stream` on the `tools/call` POST. MCP-spec-compliant clients (Claude Desktop, Claude Code, Cursor) send the SSE Accept by default. Herald falls back to the JSON response when the header is absent or doesn't mention `text/event-stream`.
 
@@ -255,9 +255,9 @@ event: message
 data: {"jsonrpc":"2.0","id":2,"result":{"content":[...],"isError":false}}
 ```
 
-The terminal frame carries the original request id and the `tools/call` result envelope; intermediate frames are `notifications/progress` envelopes carrying the client's `progressToken` (when supplied in `_meta`) plus `progress` and optional `total` / `message` fields. Each frame's `id:` is a UUIDv4 — currently emitted for forward compatibility with `Last-Event-ID` resumability (deferred to Phase 3); no replay buffer exists today, so reconnects after a dropped connection lose in-flight frames.
+The terminal frame carries the original request id and the `tools/call` result envelope; intermediate frames are `notifications/progress` envelopes carrying the client's `progressToken` (when supplied in `_meta`) plus `progress` and optional `total` / `message` fields. Each frame's `id:` is a UUIDv4, currently emitted for forward compatibility with `Last-Event-ID` resumability (deferred to Phase 3); no replay buffer exists today, so reconnects after a dropped connection lose in-flight frames.
 
-**Cancellation.** Send a JSON-RPC `notifications/cancelled` notification (not a request — no `id` field) referencing the in-flight request id:
+**Cancellation.** Send a JSON-RPC `notifications/cancelled` notification (not a request, so no `id` field) referencing the in-flight request id:
 
 ```
 POST /herald/mcp
@@ -268,11 +268,11 @@ MCP-Protocol-Version: 2025-11-25
 {"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":2,"reason":"user requested"}}
 ```
 
-The server flips a cache-backed cancellation flag the running tool observes between yields. Cooperative tools short-circuit and the server emits a terminal `notifications/cancelled` envelope on the SSE stream. Tools that ignore the flag (pure CPU loops without yield checkpoints) cannot be cancelled — the contract is cooperative, not preemptive. The cancellation slot's TTL is one hour: a delayed `notifications/cancelled` arriving after a network blip still flips a running stream.
+The server flips a cache-backed cancellation flag the running tool observes between yields. Cooperative tools short-circuit and the server emits a terminal `notifications/cancelled` envelope on the SSE stream. Tools that ignore the flag (pure CPU loops without yield checkpoints) cannot be cancelled, because the contract is cooperative, not preemptive. The cancellation slot's TTL is one hour: a delayed `notifications/cancelled` arriving after a network blip still flips a running stream.
 
-**Audit logging.** Streamed invocations write exactly one row to `herald_invocations` per stream completion, not per frame. The `durationMs` column reflects wall-clock from stream start to stream end. Cancellation events surface as `kind=cancelled` rows (distinct from `tool_error`, `internal_error`, and `rate_limited`); `errorClass` / `errorMessage` stay null — cancellation isn't an error.
+**Audit logging.** Streamed invocations write exactly one row to `herald_invocations` per stream completion, not per frame. The `durationMs` column reflects wall-clock from stream start to stream end. Cancellation events surface as `kind=cancelled` rows (distinct from `tool_error`, `internal_error`, and `rate_limited`); `errorClass` / `errorMessage` stay null, since cancellation isn't an error.
 
-**Operator smoke test.** A built-in fixture tool — `_streaming_test` — exists for end-to-end SSE health checks. It's gated behind the `HERALD_STREAMING_FIXTURE=1` env var and never registers in production unless an operator opts in. Flip the env var, restart your PHP-FPM workers, and:
+**Operator smoke test.** A built-in fixture tool, `_streaming_test`, exists for end-to-end SSE health checks. It's gated behind the `HERALD_STREAMING_FIXTURE=1` env var and never registers in production unless an operator opts in. Flip the env var, restart your PHP-FPM workers, and:
 
 ```bash
 curl -N -X POST https://your-site.test/herald/mcp \
@@ -284,7 +284,7 @@ curl -N -X POST https://your-site.test/herald/mcp \
   -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"_streaming_test","arguments":{},"_meta":{"progressToken":"prog-1"}}}'
 ```
 
-Expect: HTTP 200, `Content-Type: text/event-stream`, three progress frames (`progress: 1..3, total: 3`), then a terminal response with `done: true`. If you see anything else — nginx buffering the response into one block, FPM workers not flushing, an SSE-aware proxy rewriting the Content-Type — the fixture's deterministic output makes the misconfiguration easy to spot.
+Expect: HTTP 200, `Content-Type: text/event-stream`, three progress frames (`progress: 1..3, total: 3`), then a terminal response with `done: true`. If you see anything else (nginx buffering the response into one block, FPM workers not flushing, an SSE-aware proxy rewriting the Content-Type), the fixture's deterministic output makes the misconfiguration easy to spot.
 
 ### Auto-detect and apply (fastest)
 
@@ -294,7 +294,7 @@ If you're running Herald from the host (not inside a container), this is one com
 php craft herald/install/auto
 ```
 
-Herald scans your host for installed MCP clients (`/Applications`, `PATH`, `%LOCALAPPDATA%`) and the directories where they store config. For each detected client, you'll see a `[Y/n]` prompt — confirm and Herald writes the config entry the same way `apply` does (atomic write, timestamped backup, idempotent re-runs). Skip with `n` and move to the next.
+Herald scans your host for installed MCP clients (`/Applications`, `PATH`, `%LOCALAPPDATA%`) and the directories where they store config. For each detected client, you'll see a `[Y/n]` prompt. Confirm and Herald writes the config entry the same way `apply` does (atomic write, timestamped backup, idempotent re-runs). Skip with `n` and move to the next.
 
 To preview without writing anything, pair with `--dry-run`:
 
@@ -328,7 +328,7 @@ Herald confirms before writing (`y/N`). It then:
 2. Writes the new contents to a sibling temp file.
 3. Atomically renames the temp into place.
 
-If the parent config directory doesn't exist (e.g. you're trying to configure Claude Desktop on a machine without Claude Desktop installed), Herald refuses with a clear error rather than ghost-creating the directory — that's the canonical "client not installed" signal.
+If the parent config directory doesn't exist (e.g. you're trying to configure Claude Desktop on a machine without Claude Desktop installed), Herald refuses with a clear error rather than ghost-creating the directory, which is the canonical "client not installed" signal.
 
 **Re-runs are idempotent.** If a Herald entry is already in the file, the action refuses unless you pass `--force`. With `--force`, Herald makes a fresh backup, replaces the entry, and leaves every other server in the file untouched.
 
@@ -373,7 +373,7 @@ Format: top-level `mcpServers` JSON object. Reload Claude Desktop after writing 
 
 Config file: project-scoped `.mcp.json` in your project root. Herald writes it next to your `craft` script.
 
-You can also run `claude mcp add --transport stdio herald -- <command>` from your project directory — the snippet printer shows the exact command for your environment. The `--` separator is required: it stops Claude Code from parsing the wrapped `docker exec -i`'s `-i` flag as one of its own.
+You can also run `claude mcp add --transport stdio herald -- <command>` from your project directory. The snippet printer shows the exact command for your environment. The `--` separator is required: it stops Claude Code from parsing the wrapped `docker exec -i`'s `-i` flag as one of its own.
 
 #### Cursor
 
@@ -397,7 +397,7 @@ Config file (per-platform):
 | Windows | `%APPDATA%\Code\User\globalStorage\saoudrizwan.claude-dev\settings\cline_mcp_settings.json` |
 | Linux | `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json` |
 
-Format: top-level `mcpServers` JSON object. **Note:** Cline's MCP support has historically been less stable than other clients — if changes don't apply, restart VS Code.
+Format: top-level `mcpServers` JSON object. **Note:** Cline's MCP support has historically been less stable than other clients, so if changes don't apply, restart VS Code.
 
 #### Zed
 
@@ -437,23 +437,23 @@ In the Inspector UI, point at:
 - **Command:** `docker`
 - **Arguments:** `exec -i ddev-<project>-web php /var/www/html/craft herald/serve`
 
-A successful `initialize` handshake reports `herald 5.0.0` and the negotiated protocol version — `2025-11-25` (the latest Herald advertises) when your client requests it, or `2025-06-18` when an older client does. On a Free install `tools/list` returns 33 entries; `prompts/list` returns 10; `resources/list` returns 98.
+A successful `initialize` handshake reports `herald 5.0.0` and the negotiated protocol version: `2025-11-25` (the latest Herald advertises) when your client requests it, or `2025-06-18` when an older client does. On a Free install `tools/list` returns 33 entries; `prompts/list` returns 10; `resources/list` returns 98.
 
 ## Troubleshooting
 
 ### The `apply` command refuses with "config directory not found"
 
-Herald won't ghost-create config directories — their absence is the canonical "client not installed" signal. Either install the client first, or use the manual snippet form (`herald/install --client=<name>`) and paste into a config file you create yourself.
+Herald won't ghost-create config directories; their absence is the canonical "client not installed" signal. Either install the client first, or use the manual snippet form (`herald/install --client=<name>`) and paste into a config file you create yourself.
 
 ### `apply` refuses inside a container but my client IS installed (on the host)
 
-If you're running `ddev craft herald/install/apply` (or any containerised equivalent) from inside a container, the auto-config writer can only see the container's filesystem — not your host's. Your MCP client lives on the host, so its config directory looks "missing" from the container's perspective.
+If you're running `ddev craft herald/install/apply` (or any containerised equivalent) from inside a container, the auto-config writer can only see the container's filesystem, not your host's. Your MCP client lives on the host, so its config directory looks "missing" from the container's perspective.
 
 Two ways to handle it:
 
 1. **`--dry-run` to preview, then copy-paste.** Inside DDEV, run with `--dry-run`. Herald prints the would-be `AFTER` block including the correct `docker exec` invocation. Copy it into your host MCP client's config file manually.
 
-2. **Use the manual snippet form** — `ddev craft herald/install --client=<name>` — which is designed to be DDEV-friendly and prints the same content with the surrounding context lines.
+2. **Use the manual snippet form**: `ddev craft herald/install --client=<name>`, which is designed to be DDEV-friendly and prints the same content with the surrounding context lines.
 
 ### The `apply` command refuses with "Herald entry already present"
 
@@ -483,11 +483,11 @@ That's by design. `execDryRunDefault` is `true` by default (one of six security 
 
 ### Continue.dev doesn't pick up the standalone YAML
 
-Continue.dev reads standalone block files from `~/.continue/mcpServers/`. Confirm the file exists at `~/.continue/mcpServers/herald.yaml` and contains `schema: v1` at the top. If your Continue install is older, it may not read this directory — fall back to the manual snippet and add the entry under `mcpServers:` in your existing `~/.continue/config.yaml`.
+Continue.dev reads standalone block files from `~/.continue/mcpServers/`. Confirm the file exists at `~/.continue/mcpServers/herald.yaml` and contains `schema: v1` at the top. If your Continue install is older, it may not read this directory. Fall back to the manual snippet and add the entry under `mcpServers:` in your existing `~/.continue/config.yaml`.
 
 ### Anything else
 
-Open an issue at [github.com/craftpulse/craft-herald/issues](https://github.com/craftpulse/craft-herald/issues) — please include:
+Open an issue at [github.com/craftpulse/craft-herald/issues](https://github.com/craftpulse/craft-herald/issues). Please include:
 
 - Your OS and shell
 - The MCP client and its version

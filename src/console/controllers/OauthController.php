@@ -9,22 +9,20 @@ use yii\console\ExitCode;
 use yii\helpers\Console;
 
 /**
- * =========================================================================
- * Console — OAuth key-pair bootstrap.
+ * Bootstraps the OAuth key pair.
  *
  * Usage:
  *   herald/oauth/init-keys [--force]
  *
  * Generates a fresh RSA 2048-bit key pair at
  * `storage/herald/oauth-keys/{private,public}.key` for league/oauth2-
- * server's JWT signing path. Idempotent — refuses to overwrite an
+ * server's JWT signing path. Idempotent: it refuses to overwrite an
  * existing pair unless `--force` is passed. Sets 0600 on the private
  * key, 0644 on the public.
  *
  * Operators run this once per install. The pair stays put across
  * deploys (Git ignores the storage directory); rotating the keys
  * invalidates every in-flight JWT access token.
- * =========================================================================
  *
  * @author Craftpulse
  * @since  5.0.0
@@ -36,9 +34,9 @@ class OauthController extends Controller
 
     /**
      * @var bool When true, overwrites an existing key pair. Defaults
-     *           to false — operators that genuinely want to rotate
-     *           pass `--force` explicitly so accidental overwrites
-     *           don't happen.
+     * to false, so operators that genuinely want to rotate
+     * pass `--force` explicitly so accidental overwrites
+     * don't happen.
      */
     public bool $force = false;
 

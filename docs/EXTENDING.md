@@ -2,7 +2,7 @@
 
 Herald is built around a stable, versioned extension surface. Third-party plugins can register their own tools, prompts, and resources and have them appear alongside the bundled ones in `tools/list`, `prompts/list`, and `resources/list`.
 
-This document covers everything you need to ship an extension. The interfaces, attributes, events, and Schema DSL listed here are part of Herald's locked public surface — once Phase 1 ships, they don't change without a deprecation cycle or a major version bump.
+This document covers everything you need to ship an extension. The interfaces, attributes, events, and Schema DSL listed here are part of Herald's locked public surface: once Phase 1 ships, they don't change without a deprecation cycle or a major version bump.
 
 - [Quick start](#quick-start)
 - [The generator](#the-generator)
@@ -60,11 +60,11 @@ ddev craft make herald-tool
 
 The generator prompts for:
 
-- **Class name** — e.g. `GetWish`
-- **Namespace** — defaults to your plugin's `tools/` directory
-- **MCP tool name** — the `name` field MCP clients see (e.g. `get_wish`)
+- **Class name**: e.g. `GetWish`
+- **Namespace**: defaults to your plugin's `tools/` directory
+- **MCP tool name**: the `name` field MCP clients see (e.g. `get_wish`)
 
-It writes a stub class extending `AbstractTool` with the right attributes (`#[IsReadOnly]`, `#[IsIdempotent]`) and a Schema DSL skeleton, plus a `// TODO` comment block telling you exactly where to add your registration. It does NOT auto-register the tool — that's deliberate, so you keep full control over which event listener owns the registration.
+It writes a stub class extending `AbstractTool` with the right attributes (`#[IsReadOnly]`, `#[IsIdempotent]`) and a Schema DSL skeleton, plus a `// TODO` comment block telling you exactly where to add your registration. It does NOT auto-register the tool. That's deliberate, so you keep full control over which event listener owns the registration.
 
 `craftcms/generator` is a `require-dev` dependency on Herald but ships with `craftcms/cms`, so it's always available in dev environments.
 
@@ -93,7 +93,7 @@ interface ToolInterface
 }
 ```
 
-`AbstractTool` provides defaults for `getInputSchema` (object with no properties), `outputSchema` (`[]` — no schema declared), `shouldRegister` (`true`), `filterFor` (`true` — visible to everyone), and `inputSchemaFor` (delegates to the static `getInputSchema()`). Subclassing it leaves you to implement `getName`, `getDescription`, and `execute`; override the three gating methods only when your tool needs edition or permission gating.
+`AbstractTool` provides defaults for `getInputSchema` (object with no properties), `outputSchema` (`[]`, no schema declared), `shouldRegister` (`true`), `filterFor` (`true`, visible to everyone), and `inputSchemaFor` (delegates to the static `getInputSchema()`). Subclassing it leaves you to implement `getName`, `getDescription`, and `execute`; override the three gating methods only when your tool needs edition or permission gating.
 
 ### The three-method gating contract
 
@@ -101,13 +101,13 @@ interface ToolInterface
 
 | Method | When | Scope | Purpose |
 |--------|------|-------|---------|
-| `shouldRegister(): bool` (static) | Once at boot | Whole install | Edition / license / settings gating. Returns `false` to remove the tool from the registry entirely — no user ever sees it. A Free install returns `false` for Pro tools; `craft_exec` registers but rejects at `execute()` when `execEnabled` is off. |
+| `shouldRegister(): bool` (static) | Once at boot | Whole install | Edition / license / settings gating. Returns `false` to remove the tool from the registry entirely, so no user ever sees it. A Free install returns `false` for Pro tools; `craft_exec` registers but rejects at `execute()` when `execEnabled` is off. |
 | `filterFor(?User $user): bool` | Every `tools/list` and `tools/call` | Per request, per user | Whether this user sees / can resolve the tool. Default `true`. Pro tools override to consult Craft permissions. |
 | `inputSchemaFor(?User $user): array` | Every `tools/list` | Per request, per user | The schema this user sees. Default delegates to `getInputSchema()`. Mode-gated tools override to filter the `mode` enum by permission. |
 
-**stdio vs HTTP.** stdio is a single trusted local process with no per-request identity, so the dispatcher passes `null` to `filterFor()` / `inputSchemaFor()` and the default-true / static-schema path applies — `asListPayloadFor(null)` is identical to `asListPayload()`. The HTTP transport resolves the bearer/OAuth user and passes it through, so per-user filtering and schema rewriting fire.
+**stdio vs HTTP.** stdio is a single trusted local process with no per-request identity, so the dispatcher passes `null` to `filterFor()` / `inputSchemaFor()` and the default-true / static-schema path applies, so `asListPayloadFor(null)` is identical to `asListPayload()`. The HTTP transport resolves the bearer/OAuth user and passes it through, so per-user filtering and schema rewriting fire.
 
-**`execute()` re-checks regardless.** `filterFor()` filtering exists for the LLM's tool-selection UX; it is *not* the security boundary. `execute()` performs its own permission check on every call (defense in depth) — both layers fail closed. A tool that is hidden from a user's `tools/list` and also rejected on direct `tools/call` is the correct, redundant outcome.
+**`execute()` re-checks regardless.** `filterFor()` filtering exists for the LLM's tool-selection UX; it is *not* the security boundary. `execute()` performs its own permission check on every call (defense in depth), and both layers fail closed. A tool that is hidden from a user's `tools/list` and also rejected on direct `tools/call` is the correct, redundant outcome.
 
 Minimal example:
 
@@ -171,7 +171,7 @@ Event::on(
 );
 ```
 
-The event fires once during herald's boot, after the bundled registry is built. Listeners append `ToolInterface` instances to `$event->tools`. **First registration wins** on name collision — bundled herald tools always trump shadowing attempts. Collisions surface a `Craft::warning()` line on the `herald` log channel so a third-party author can spot when their tool is being shadowed.
+The event fires once during herald's boot, after the bundled registry is built. Listeners append `ToolInterface` instances to `$event->tools`. **First registration wins** on name collision, so bundled herald tools always trump shadowing attempts. Collisions surface a `Craft::warning()` line on the `herald` log channel so a third-party author can spot when their tool is being shadowed.
 
 ## Registering a prompt
 
@@ -204,7 +204,7 @@ Event::on(
 );
 ```
 
-Bundled prompts live under the `craftcms_*` namespace. Third-party prompts must use a different prefix to avoid future collisions — see [Naming conventions](#naming-conventions) below.
+Bundled prompts live under the `craftcms_*` namespace. Third-party prompts must use a different prefix to avoid future collisions. See [Naming conventions](#naming-conventions) below.
 
 ## Registering a resource
 
@@ -225,7 +225,7 @@ interface ResourceInterface
 
 Register on `services\Resources::EVENT_REGISTER_RESOURCES`. Same pattern as tools and prompts.
 
-Bundled resources use the `craft-skills://` URI scheme. The `custom-skills://` scheme is reserved for the Pro custom-skills element type (Phase 2). Third-party plugins must use a plugin-specific scheme — `seo://`, `commerce-docs://`, `<vendor>-<topic>://` — to avoid future collisions.
+Bundled resources use the `craft-skills://` URI scheme. The `custom-skills://` scheme is reserved for the Pro custom-skills element type (Phase 2). Third-party plugins must use a plugin-specific scheme (`seo://`, `commerce-docs://`, `<vendor>-<topic>://`) to avoid future collisions.
 
 ## Resource templates (dynamic URIs)
 
@@ -245,7 +245,7 @@ interface ResourceTemplateInterface
 
 URI templates use RFC 6570 Level-1 simple substitution: literal characters plus `{name}` placeholders. Example: `craft-element://entries/{id}`.
 
-Register through the same event as concrete resources — `RegisterResourcesEvent::$resources` accepts both `ResourceInterface` and `ResourceTemplateInterface` instances. The Herald registry routes by `instanceof` at boot.
+Register through the same event as concrete resources: `RegisterResourcesEvent::$resources` accepts both `ResourceInterface` and `ResourceTemplateInterface` instances. The Herald registry routes by `instanceof` at boot.
 
 `matches()` returns the captured-parameter map for a successful match (or null on miss). `read()` is invoked with the same map after the dispatcher confirms a match. Concrete-URI resources are checked first; templates only fire on miss, so a template can't shadow a concrete resource.
 
@@ -253,7 +253,7 @@ Phase 1 ships the interface; no Phase 1 resource implements it. The first concre
 
 ## The Schema DSL
 
-Herald includes a fluent JSON Schema builder for tool input schemas. It generates the same JSON Schema array MCP clients expect — just nicer to author than raw arrays.
+Herald includes a fluent JSON Schema builder for tool input schemas. It generates the same JSON Schema array MCP clients expect, just nicer to author than raw arrays.
 
 Static entry points on `craftpulse\herald\tools\support\Schema`:
 
@@ -266,11 +266,11 @@ Static entry points on `craftpulse\herald\tools\support\Schema`:
 | `Schema::null()` | Null. |
 | `Schema::array(?$items)` | Array. Optional items schema. |
 | `Schema::object($properties = [])` | Object with properties. |
-| `Schema::any()` | Any type — escape hatch. |
+| `Schema::any()` | Any type; the escape hatch. |
 | `Schema::constant($value)` | Literal value. |
-| `Schema::anyOf(...$schemas)` | Union — at least one matches. |
-| `Schema::oneOf(...$schemas)` | Exclusive union — exactly one matches. |
-| `Schema::allOf(...$schemas)` | Intersection — all match. |
+| `Schema::anyOf(...$schemas)` | Union: at least one matches. |
+| `Schema::oneOf(...$schemas)` | Exclusive union: exactly one matches. |
+| `Schema::allOf(...$schemas)` | Intersection: all match. |
 | `Schema::not($schema)` | Negation. |
 
 Fluent setters apply to any schema:
@@ -327,13 +327,13 @@ Herald uses PHP 8 attributes to declare MCP tool annotations at the class level.
 
 Pass `false` to override the default explicitly: `#[IsIdempotent(false)]`. The `Is*` prefix mirrors Laravel MCP's pattern and avoids collision with PHP's `readonly` keyword.
 
-Defaults are `true` because the common case is "this tool IS read-only" / "this tool IS idempotent" — pass `false` only when you mean it.
+Defaults are `true` because the common case is "this tool IS read-only" / "this tool IS idempotent". Pass `false` only when you mean it.
 
 ## Edition gating and conditional registration
 
-`shouldRegister(): bool` is a **static** method that runs once at boot. It gates whole-tool registration on edition / license / settings — *not* on the current user (there is no user at boot). A Pro-only tool returns `false` on Free and never enters the registry; `AbstractTool` returns `true` so the default is "always register".
+`shouldRegister(): bool` is a **static** method that runs once at boot. It gates whole-tool registration on edition / license / settings, *not* on the current user (there is no user at boot). A Pro-only tool returns `false` on Free and never enters the registry; `AbstractTool` returns `true` so the default is "always register".
 
-The bundled Pro tools never hand-write the edition check — they `use ProToolTrait`, which supplies a Pro-gated `shouldRegister()`:
+The bundled Pro tools never hand-write the edition check. They `use ProToolTrait`, which supplies a Pro-gated `shouldRegister()`:
 
 ```php
 trait ProToolTrait
@@ -345,7 +345,7 @@ trait ProToolTrait
 }
 ```
 
-Per-user visibility is a *separate* concern, handled per-request by `filterFor()` (and schema-rewriting by `inputSchemaFor()`) — see [the three-method gating contract](#the-three-method-gating-contract) above. The bundled `PermissionedToolTrait` carries the in-`execute()` permission re-check.
+Per-user visibility is a *separate* concern, handled per-request by `filterFor()` (and schema-rewriting by `inputSchemaFor()`). See [the three-method gating contract](#the-three-method-gating-contract) above. The bundled `PermissionedToolTrait` carries the in-`execute()` permission re-check.
 
 A real Pro tool composes both traits. Abridged from `craftpulse\herald\tools\content\Category`:
 
@@ -358,8 +358,8 @@ use craftpulse\herald\tools\ToolException;
 
 class Category extends AbstractTool
 {
-    use PermissionedToolTrait; // _assertPermission() — in-execute() re-check.
-    use ProToolTrait;          // shouldRegister() — Pro-only registration.
+    use PermissionedToolTrait; // _assertPermission(): in-execute() re-check.
+    use ProToolTrait;          // shouldRegister(): Pro-only registration.
 
     // Per-user visibility: hide the tool from users with no
     // save/delete permission on any category group. stdio (null) and
@@ -393,7 +393,7 @@ class Category extends AbstractTool
 
     public function execute(array $arguments): array
     {
-        // Re-check after resolving the per-resource UID — defense in
+        // Re-check after resolving the per-resource UID: defense in
         // depth, independent of filterFor()'s tools/list filtering.
         $this->_assertPermission($arguments);
         // … resolve, mutate, save.
@@ -405,25 +405,25 @@ class Category extends AbstractTool
 
 Herald distinguishes **protocol errors** from **tool errors**, and they take different wire shapes:
 
-- **Protocol errors** — unknown tool name, missing `name`, malformed params — come back as a JSON-RPC error response. The code is `-32602` (Invalid params) for an unknown / hidden tool, `-32601` for an unknown method, `-32600` for a malformed envelope, `-32603` for an internal error. A tool that `filterFor()` hides is indistinguishable from a missing one: `tools/call` against it returns `-32602`, failing closed.
-- **Tool errors** — a `ToolException` thrown from `execute()` (permission denial, bad arguments, not-found) — come back as a **successful** JSON-RPC response carrying the MCP tool-error envelope:
+- **Protocol errors** (unknown tool name, missing `name`, malformed params) come back as a JSON-RPC error response. The code is `-32602` (Invalid params) for an unknown / hidden tool, `-32601` for an unknown method, `-32600` for a malformed envelope, `-32603` for an internal error. A tool that `filterFor()` hides is indistinguishable from a missing one: `tools/call` against it returns `-32602`, failing closed.
+- **Tool errors**: a `ToolException` thrown from `execute()` (permission denial, bad arguments, not-found) comes back as a **successful** JSON-RPC response carrying the MCP tool-error envelope:
 
   ```json
   {
-    "content": [{ "type": "text", "text": "permission denied — …" }],
+    "content": [{ "type": "text", "text": "permission denied: …" }],
     "isError": true
   }
   ```
 
-  There is **no** `-32002` code anywhere in this path — the locked decision routes every tool-level failure through the `isError: true` envelope so the LLM can read the message and self-correct rather than treating it as a transport fault. Throw `ToolException` for anything the caller could fix; let other exceptions propagate (the dispatcher converts them to a `-32603` internal error and logs the real cause).
+  There is **no** `-32002` code anywhere in this path. The locked decision routes every tool-level failure through the `isError: true` envelope so the LLM can read the message and self-correct rather than treating it as a transport fault. Throw `ToolException` for anything the caller could fix; let other exceptions propagate (the dispatcher converts them to a `-32603` internal error and logs the real cause).
 
 ## Naming conventions
 
 The locked tool/prompt/resource namespaces:
 
-- **Tool names** — bundled tools follow a deliberate pattern. Listing tools use plural nouns (`sections`, `entries`); multi-mode introspection tools use the most descriptive name (`system_diagnostics`, `content_audit`); workflow tools use combined direction (`drafts_and_revisions`, `import_export`). Action verbs for write tools (`resave`, `clear_caches`). Third-party tools should choose a vendor-prefixed handle (`<vendor>_<purpose>`) to avoid future collisions, especially for additions Herald itself might make.
-- **Prompt names** — bundled prompts use the `craftcms_*` prefix (`craftcms_extending`, `craftcms_templates`, …). The `custom_*` prefix is reserved for the Pro custom-skills feature. Third-party plugins should use a plugin-specific prefix (`<vendor>_<purpose>`).
-- **Resource URI schemes** — `craft-skills://` is bundled; `custom-skills://` is reserved. Third-party plugins should use a plugin-specific scheme.
+- **Tool names**: bundled tools follow a deliberate pattern. Listing tools use plural nouns (`sections`, `entries`); multi-mode introspection tools use the most descriptive name (`system_diagnostics`, `content_audit`); workflow tools use combined direction (`drafts_and_revisions`, `import_export`). Action verbs for write tools (`resave`, `clear_caches`). Third-party tools should choose a vendor-prefixed handle (`<vendor>_<purpose>`) to avoid future collisions, especially for additions Herald itself might make.
+- **Prompt names**: bundled prompts use the `craftcms_*` prefix (`craftcms_extending`, `craftcms_templates`, …). The `custom_*` prefix is reserved for the Pro custom-skills feature. Third-party plugins should use a plugin-specific prefix (`<vendor>_<purpose>`).
+- **Resource URI schemes**: `craft-skills://` is bundled; `custom-skills://` is reserved. Third-party plugins should use a plugin-specific scheme.
 
 ## Collision behaviour
 
@@ -432,10 +432,10 @@ When a name / URI collides between two registrations, **first registration wins*
 Collisions are not silent. The registry logs `Craft::warning()` on the `herald` channel:
 
 ```
-Tool name collision on "sections" — first registration (craftpulse\herald\tools\schema\Sections) wins; ignoring mywishingwell\plugin\tools\Sections.
+Tool name collision on "sections": first registration (craftpulse\herald\tools\schema\Sections) wins; ignoring mywishingwell\plugin\tools\Sections.
 ```
 
-If you see this in your logs while developing, rename your tool. Suppressing the collision (e.g. running before bundled tools register) is unsupported — bundled herald registrations are load-bearing for the tool catalogue.
+If you see this in your logs while developing, rename your tool. Suppressing the collision (e.g. running before bundled tools register) is unsupported, because bundled herald registrations are load-bearing for the tool catalogue.
 
 ## Testing your extension
 
@@ -468,4 +468,4 @@ it('appears in the registry with the right annotations', function () {
 });
 ```
 
-If you're testing `craft_command`-allowlist-aware tools or anything stdio-vs-HTTP, the full set of `mcp/Server` test helpers (transport-aware dispatch, error envelopes, etc.) lives in the herald test suite — your plugin can mimic the patterns there.
+If you're testing `craft_command`-allowlist-aware tools or anything stdio-vs-HTTP, the full set of `mcp/Server` test helpers (transport-aware dispatch, error envelopes, etc.) lives in the herald test suite, and your plugin can mimic the patterns there.

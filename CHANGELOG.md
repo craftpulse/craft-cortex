@@ -76,10 +76,10 @@ All notable changes to Herald are documented here. Format follows
   write, deliberately inverting the unresolvable-tool fail-closed-skip in
   the audit-safe direction.
 
-### Added — authentication and authorization (Pro HTTP transport)
+### Added: authentication and authorization (Pro HTTP transport)
 
 - **Capability-grained OAuth scopes.** Replaced the coarse `read` / `write`
-  scope pair with a capability vocabulary — `content:read`,
+  scope pair with a capability vocabulary: `content:read`,
   `content:write`, `content:publish`, `content:delete`, `assets:write`,
   `schema:read`, `system:read`, `users:read`, `users:write`. Every tool
   maps to the scope it requires; over the HTTP transport a tool is visible
@@ -107,12 +107,12 @@ All notable changes to Herald are documented here. Format follows
   screen. A new setting auto-approves clients for trusted or development
   installs.
 
-### Added — control panel
+### Added: control panel
 
 - **Clients screen.** A new admin-only screen listing every registered
   OAuth client, with inline approve / revoke actions.
 
-### Changed — control panel
+### Changed: control panel
 
 - The Herald CP screens now live under a standard sidebar section with a
   Settings / Temporary grants / Tokens / Activity / Connection subnav
@@ -122,7 +122,7 @@ All notable changes to Herald are documented here. Format follows
   browser: every available console command (core plus installed plugins)
   is listed by group with on/off switches and a live filter, instead of a
   raw glob-pattern table. Content-level and admin-level commands are shown
-  in separate sections — admin-level commands (project config, migrations,
+  in separate sections. Admin-level commands (project config, migrations,
   scaffolding, schema, fixtures) are clearly marked and only dispatch when
   `allowAdminChanges` is enabled. Hand-written glob patterns are preserved
   in a per-section "Custom patterns" table.
@@ -130,15 +130,15 @@ All notable changes to Herald are documented here. Format follows
   "Effective allowlist" panel showing the combined result of the
   configured defaults plus active grants.
 
-### Added — Gate 7.7 (Pro tier, SSE streaming infrastructure)
+### Added: Gate 7.7 (Pro tier, SSE streaming infrastructure)
 
-- `StreamableToolInterface` — opt-in contract for tools that stream
+- `StreamableToolInterface`: opt-in contract for tools that stream
   progress. `stream(array, InvocationContext): Generator` yields
   `{progress, total?, message?}` frames and returns the terminal
   payload. Non-streamable tools (the existing 33 Free tools) are
-  unaffected — the dispatcher's degrade-gracefully path collapses
+  unaffected, because the dispatcher's degrade-gracefully path collapses
   them to a single one-frame SSE response.
-- `Server::dispatchStreaming()` — generator-driven counterpart to
+- `Server::dispatchStreaming()`: generator-driven counterpart to
   `dispatch()`. Yields one `notifications/progress` JSON-RPC envelope
   per progress frame, plus one terminal `tools/call` response. Pulls
   `_meta.progressToken` from the original `tools/call` and threads it
@@ -149,7 +149,7 @@ All notable changes to Herald are documented here. Format follows
   `CancellationToken` poll-callback observes between yields. On flip
   the tool short-circuits with a `notifications/cancelled` terminal
   envelope and an audit row with `kind=cancelled`.
-- `SseEmitter` — wire framing for `text/event-stream` responses. Sets
+- `SseEmitter`: wire framing for `text/event-stream` responses. Sets
   the canonical headers (Content-Type, Cache-Control, X-Accel-
   Buffering, Connection), disables PHP output buffering, writes
   `id`/`event`/`data` framed lines with UUIDv4 frame ids
@@ -168,7 +168,7 @@ All notable changes to Herald are documented here. Format follows
   `src/tools/dev/StreamingFixtureTool.php`. Opt-in via
   `HERALD_STREAMING_FIXTURE=1` env var; production installs never see
   it. Yields three deterministic progress frames + a terminal
-  payload, with cooperative cancellation between yields — drive it
+  payload, with cooperative cancellation between yields. Drive it
   with `curl -H 'Accept: text/event-stream'` to verify end-to-end
   SSE health on a new install.
 - 8 new Pest tests across `tests/Mcp/StreamingTest.php` and
@@ -183,19 +183,19 @@ All notable changes to Herald are documented here. Format follows
 
 - `Last-Event-ID` SSE resumability (locked decision 14). Frame ids
   are already emitted on every frame, so the wire is forward-
-  compatible — Phase 3 adds a per-stream replay buffer keyed off the
+  compatible. Phase 3 adds a per-stream replay buffer keyed off the
   emitted ids and a `GET /herald/mcp?Last-Event-ID=…` resume path
   without changing the wire shape.
 
-### Added — Gate 7.6 (Pro tier, rate limit + burst-quota observability)
+### Added: Gate 7.6 (Pro tier, rate limit + burst-quota observability)
 
-- `RateLimiter` service — token-bucket per authenticated HTTP user.
+- `RateLimiter` service: token-bucket per authenticated HTTP user.
   Default burst 60 / refill 5 per second; configurable via
   `rateLimitBurst` and `rateLimitPerSecond` in `config/herald.php`.
   Bucket state is stored in Craft's cache so the limiter survives
   process restarts without losing accumulated debt.
 - `RateLimitStatus` value object returned by `RateLimiter::consume()`
-  carries `allowed`, `remaining`, `resetAt`, and `retryAfter` — the
+  carries `allowed`, `remaining`, `resetAt`, and `retryAfter`, the
   controller reads these without knowing how the limit is implemented.
 - `McpController::beforeAction()` checks the limiter after successful
   auth. Exhausted callers receive `429 Too Many Requests` with a
@@ -212,15 +212,15 @@ All notable changes to Herald are documented here. Format follows
   exhausted does not throttle user B), and `kind=rate_limited` audit
   row written on 429.
 
-### Added — Gate 7.5 (Pro tier, audit log DB table)
+### Added: Gate 7.5 (Pro tier, audit log DB table)
 
-- `herald_invocations` table — one row per authenticated HTTP
+- `herald_invocations` table: one row per authenticated HTTP
   `tools/call`. Columns: `userId`, `clientId`, `toolName`,
   `arguments` (post-redaction JSON excerpt), `responseExcerpt`
   (capped at `auditResponseExcerptBytes`, default 2048),
   `durationMs`, `kind` (`success`, `tool_error`, `internal_error`,
   `rate_limited`, `cancelled`), `rateLimitRemaining`, `dateCreated`.
-- `Invocations` service — `log(InvocationRecord): void` is the
+- `Invocations` service: `log(InvocationRecord): void` is the
   soft-write contract: failures are logged at `warning` level and
   suppressed so a DB hiccup never interrupts an MCP response. A
   configurable `auditRetentionDays` (default `null` = forever)
@@ -228,7 +228,7 @@ All notable changes to Herald are documented here. Format follows
 - `EVENT_LOG_CALL` fires after each row is persisted, carrying the
   hydrated `InvocationRecord`. Operators and third-party plugins can
   forward rows to Elasticsearch, Datadog, etc. without touching core.
-- `InvocationQuery` — fluent query builder over `herald_invocations`.
+- `InvocationQuery`: fluent query builder over `herald_invocations`.
   Supports `byUser()`, `byTool()`, `byKind()`, `since()`, `until()`,
   `limit()`, and `latest()`. Intended as the read surface for a
   future CP audit dashboard.
@@ -239,14 +239,14 @@ All notable changes to Herald are documented here. Format follows
   prune removes old rows only, `InvocationQuery` filters, and
   `EVENT_LOG_CALL` fires with the correct record.
 
-### Added — Gate 7.4 (Pro tier, per-user tool filtering)
+### Added: Gate 7.4 (Pro tier, per-user tool filtering)
 
 - Three-method gating contract added to `ToolInterface`:
-  `shouldRegister(): bool` — static, runs once at boot, removes
+  `shouldRegister(): bool` is static, runs once at boot, and removes
   tools nobody on the install can use (e.g. `craft_exec` when
-  `execEnabled = false`); `filterFor(?User $user): bool` — per-
+  `execEnabled = false`); `filterFor(?User $user): bool` is per-
   request per-user gating, default `true`, Pro tools override to
-  check Craft permissions; `inputSchemaFor(?User $user): array` —
+  check Craft permissions; `inputSchemaFor(?User $user): array` is
   per-request schema rewrite, default delegates to static
   `getInputSchema()`, mode-gated tools filter their `mode` enum.
 - `Tools::asListPayloadFor(?User)` and `Tools::getByNameFor(string,
@@ -254,9 +254,9 @@ All notable changes to Herald are documented here. Format follows
   existing `asListPayload()` and `getByName()` stay for stdio (`null`
   user is the default-true path).
 - `shouldRegister()` promoted from instance to static per the Craft
-  contract idiom — the service calls it once at registry build time
+  contract idiom, so the service calls it once at registry build time
   without instantiating the tool.
-- No concrete tool overrides ship in Gate 7.4 — all existing Free
+- No concrete tool overrides ship in Gate 7.4. All existing Free
   tools default to `filterFor() = true` and `inputSchemaFor() =
   getInputSchema()`. The Pro override layer (entry-save gate,
   user-edit gate, etc.) lands with the first Pro write-tool in a
@@ -267,13 +267,13 @@ All notable changes to Herald are documented here. Format follows
   returns null for filtered tools, and `inputSchemaFor` override
   narrows the schema for the requesting user.
 
-### Added — Gate 7.3 (Pro tier, OAuth 2.1 + DCR + discovery metadata)
+### Added: Gate 7.3 (Pro tier, OAuth 2.1 + DCR + discovery metadata)
 
 - `league/oauth2-server` dependency. Authorization Code + PKCE (S256
-  only — `plain` rejected) + Refresh Token grants. RSA 2048-bit JWT
+  only, with `plain` rejected) + Refresh Token grants. RSA 2048-bit JWT
   signing keys generated by `herald/oauth/init-keys` (0600 on the
   private key) and stored under `storage/herald/oauth-keys/`.
-- Three new tables — `herald_oauth_clients`, `herald_oauth_codes`,
+- Three new tables: `herald_oauth_clients`, `herald_oauth_codes`,
   `herald_oauth_tokens`. Hashed-at-rest secrets; codes are one-shot;
   access tokens carry the RFC 8707 audience indicator in `aud`.
 - `Oauth` service orchestrates league's `AuthorizationServer` and
@@ -283,25 +283,25 @@ All notable changes to Herald are documented here. Format follows
   `src/oauth/entities/`. AccessTokenEntity overrides `convertToJWT`
   to bake the resource indicator into `aud` (audience binding) with
   the client id in a custom `cid` claim.
-- Four new web endpoints — `oauth/authorize`, `oauth/token`,
-  `oauth/register`, `oauth/revoke` — plus the two RFC 8414 / 9728
+- Four new web endpoints (`oauth/authorize`, `oauth/token`,
+  `oauth/register`, `oauth/revoke`), plus the two RFC 8414 / 9728
   discovery endpoints at site root `.well-known/oauth-authorization-server`
   and `.well-known/oauth-protected-resource`. Twig consent screen at
   `src/templates/oauth/authorize.twig`.
 - `McpController::beforeAction()` bearer lookup: OAuth-first per the
   locked precedence in `docs/plans/gate-7.md` decision 17, bearer
   fallback on miss. Audience binding rejects tokens whose `aud`
-  doesn't match the canonical `herald/mcp` URL — RFC 8707 confused-
+  doesn't match the canonical `herald/mcp` URL (RFC 8707 confused-
   deputy defense. 401 challenge now carries `resource_metadata=<URL>`
   per RFC 9728.
 - New settings: `$dcrEnabled = true` (open registration by default),
   `$oauthAccessTokenTtl = 'PT1H'`, `$oauthRefreshTokenTtl = 'P30D'`.
 - 51 new Pest tests across service, controllers, well-known, and
-  console — including a full PKCE flow E2E (register → authorize →
+  console, including a full PKCE flow E2E (register → authorize →
   token → MCP call), code-reuse rejection, S256 verifier mismatch,
   audience binding, token revocation, and init-keys idempotency.
 
-### Added — Gate 7.2 (Pro tier, bearer token auth)
+### Added: Gate 7.2 (Pro tier, bearer token auth)
 
 - `herald_tokens` table + `Tokens` service. SHA-256-hashed-at-rest;
   the plaintext is surfaced ONCE at issuance and never returned by
@@ -321,11 +321,11 @@ All notable changes to Herald are documented here. Format follows
   complete normally. Per PLANNING.md §4.9 and the locked decision
   in `docs/plans/gate-7.md`.
 
-### Added — Gate 7.1 (Pro tier, HTTP transport scaffolding)
+### Added: Gate 7.1 (Pro tier, HTTP transport scaffolding)
 
 - HTTP transport skeleton at `POST/GET/DELETE /herald/mcp`. Behind
   `Settings::$httpEnabled = false` by default; flip to true to expose.
-  Spec target MCP 2025-06-18 — `MCP-Protocol-Version` header validated,
+  Spec target MCP 2025-06-18, with the `MCP-Protocol-Version` header validated,
   `Origin` header validated against `Settings::$allowedOrigins`,
   `Mcp-Session-Id` header drives stateful session lookup, single
   JSON-RPC message per POST.
@@ -335,7 +335,7 @@ All notable changes to Herald are documented here. Format follows
   `docs/plans/gate-7.md`). Wire implementation in 7.7; contract here
   locks the shape so streaming tools can opt in cooperatively without
   a later interface break.
-- No auth on the endpoint in 7.1 — auth lands in 7.2 (bearer tokens).
+- No auth on the endpoint in 7.1; auth lands in 7.2 (bearer tokens).
 
 ## [5.0.0] - 2026-05-14
 

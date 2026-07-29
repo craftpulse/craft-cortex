@@ -130,7 +130,7 @@
     <h2>{{ 'Admin-level commands'|t('herald') }}</h2>
 
     <p class="light">
-        {{ 'Console commands that mutate admin-only state — project config, migrations, scaffolding, section/field schema, fixtures. These dispatch ONLY when `allowAdminChanges` is enabled in `config/general.php`; with it off, a matching `craft_command` call is rejected regardless of what is toggled here.'|t('herald') }}
+        {{ 'Console commands that mutate admin-only state: project config, migrations, scaffolding, section/field schema, fixtures. These dispatch ONLY when `allowAdminChanges` is enabled in `config/general.php`; with it off, a matching `craft_command` call is rejected regardless of what is toggled here.'|t('herald') }}
     </p>
 
     {% if not allowAdminChanges %}
@@ -265,7 +265,7 @@
         <summary>{{ 'Custom patterns'|t('herald') }} ({{ cfg.customPatterns|length }})</summary>
 
         <p class="light">
-            {{ 'Glob patterns that don’t map to a listed command — custom wildcards, or commands for plugins that aren’t installed here. Edited as raw `fnmatch` patterns and merged with the toggles above on save.'|t('herald') }}
+            {{ 'Glob patterns that don’t map to a listed command: custom wildcards, or commands for plugins that aren’t installed here. Edited as raw `fnmatch` patterns and merged with the toggles above on save.'|t('herald') }}
         </p>
 
         {{ forms.editableTable({

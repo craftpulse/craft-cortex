@@ -7,14 +7,15 @@ use yii\console\ExitCode;
 use yii\helpers\Console;
 
 /**
- * =========================================================================
- * Herald install commands — print copy-paste MCP client config snippets
- * (`herald/install`), write them directly to the client's config file
- * (`herald/install/apply`), and auto-detect installed clients on the
- * host filesystem (`herald/install/detect` and `herald/install/auto`).
+ * Wires MCP clients up to herald.
+ *
+ * Prints copy-paste MCP client config snippets (`herald/install`), writes them
+ * directly to the client's config file (`herald/install/apply`), and auto-detects
+ * installed clients on the host filesystem (`herald/install/detect` and
+ * `herald/install/auto`).
  *
  * The default action prints snippets for the user to copy into their MCP
- * client's config manually (read-only — never writes). The `apply`
+ * client's config manually (read-only, and it never writes). The `apply`
  * action resolves the client's per-platform config path, merges a herald
  * entry into it, and writes the result atomically with a timestamped
  * backup. The snippet form is the documented manual fallback whenever
@@ -23,11 +24,11 @@ use yii\helpers\Console;
  *
  * The `detect` action scans the host for installed MCP clients and prints
  * a status table. The `auto` action runs detection plus per-client
- * confirm-and-apply in one pass — the Boost-style "I installed herald,
+ * confirm-and-apply in one pass: the "I installed herald,
  * now wire it up everywhere" flow. **Both refuse to run from inside any
  * container** (DDEV, plain Docker, Lando, Sail, Podman, LXC, Kubernetes)
  * because the container can't see the host's `/Applications`, `~/.cursor`,
- * etc. — false negatives are worse than no detection. The manual
+ * etc., and false negatives are worse than no detection. The manual
  * `herald/install` snippet flow works from inside DDEV and stays the
  * documented fallback.
  *
@@ -50,7 +51,6 @@ use yii\helpers\Console;
  * Use `--ddev` to emit the docker-exec invocation form (herald running
  * inside DDEV, MCP client on host). Auto-detected from `DDEV_PROJECT` /
  * `IS_DDEV_PROJECT` when present.
- * =========================================================================
  *
  * @author Craftpulse
  * @since  5.0.0
@@ -129,34 +129,34 @@ class InstallController extends Controller
 
     /**
      * @var string|null Restrict output to a single client (handle from
-     *                  the CLIENTS map above). Default: print all (index
-     *                  action) / required (apply action).
+     * the CLIENTS map above). Default: print all (index
+     * action) / required (apply action).
      */
     public ?string $client = null;
 
     /**
      * @var bool Whether to use the DDEV `docker exec` form. Auto-true if
-     *          the running process detects DDEV, false otherwise.
+     * the running process detects DDEV, false otherwise.
      */
     public bool $ddev = false;
 
     /**
      * @var string|null Override the DDEV project name (used in the
-     *                  `docker exec -i ddev-<name>-web ...` form). Auto-
-     *                  detected from `DDEV_PROJECT` if available.
+     * `docker exec -i ddev-<name>-web ...` form). Auto-
+     * detected from `DDEV_PROJECT` if available.
      */
     public ?string $ddevProject = null;
 
     /**
-     * @var bool Apply-action only — overwrite an existing herald entry
-     *          when one is already registered in the target file. Default
-     *          refuses (idempotent — re-running apply is a no-op).
+     * @var bool Apply-action only. Overwrite an existing herald entry
+     * when one is already registered in the target file. Default
+     * refuses (idempotent, so re-running apply is a no-op).
      */
     public bool $force = false;
 
     /**
-     * @var bool Apply-action only — print the target path and would-be
-     *          before / after contents without writing or backing up.
+     * @var bool Apply-action only. Print the target path and would-be
+     * before / after contents without writing or backing up.
      */
     public bool $dryRun = false;
 
@@ -209,13 +209,13 @@ class InstallController extends Controller
         $command = $this->_buildCommand($isDdev, $project);
 
         $this->stdout("\n");
-        $this->stdout("Herald — MCP client configuration\n", \yii\helpers\Console::FG_PURPLE);
+        $this->stdout("Herald: MCP client configuration\n", \yii\helpers\Console::FG_PURPLE);
         $this->stdout(str_repeat('=', 70) . "\n\n");
 
         if ($isDdev) {
-            $this->stdout("Detected DDEV environment — using `docker exec` invocation form.\n", \yii\helpers\Console::FG_GREY);
+            $this->stdout("Detected DDEV environment, using the `docker exec` invocation form.\n", \yii\helpers\Console::FG_GREY);
         } else {
-            $this->stdout("Running in a non-DDEV PHP context — using the direct `php` form.\n", \yii\helpers\Console::FG_GREY);
+            $this->stdout("Running in a non-DDEV PHP context, using the direct `php` form.\n", \yii\helpers\Console::FG_GREY);
             $this->stdout("If your MCP client lives on the host but Craft runs in DDEV, re-run\n", \yii\helpers\Console::FG_GREY);
             $this->stdout("with --ddev (or set DDEV_PROJECT) to emit the docker-exec form.\n", \yii\helpers\Console::FG_GREY);
         }
@@ -252,7 +252,7 @@ class InstallController extends Controller
      *   - `--dry-run` prints the target path and a before / after diff
      *     without writing anything. Skips the confirm prompt.
      *   - Without `--force`, an existing herald entry causes the action
-     *     to refuse — re-runs are idempotent.
+     *     to refuse, because re-runs are idempotent.
      *   - With `--force`, the existing herald entry is replaced. Other
      *     servers in the file are preserved untouched.
      *   - All writes prompt for `y/N` confirmation. `--interactive=0`
@@ -284,11 +284,11 @@ class InstallController extends Controller
     /**
      * Scan the host filesystem for installed MCP clients and print a
      * status table. **Refuses to run from inside any container** (DDEV,
-     * plain Docker, Lando, Sail, Podman, LXC, Kubernetes) — the container
+     * plain Docker, Lando, Sail, Podman, LXC, Kubernetes), because the container
      * can't see the host's `/Applications`, `~/.cursor`, etc. and any
      * detection result would be a false negative.
      *
-     * Read-only — never writes. Pair with `herald/install/auto` to detect
+     * Read-only, and it never writes. Pair with `herald/install/auto` to detect
      * and apply in one pass.
      *
      * @author Craftpulse
@@ -335,7 +335,7 @@ class InstallController extends Controller
     }
 
     /**
-     * Detect installed clients and walk them interactively — for each
+     * Detect installed clients and walk them interactively: for each
      * detected client, prompt to apply herald config and run the same
      * write pipeline `actionApply()` uses. **Refuses to run from inside
      * any container** (DDEV, plain Docker, Lando, Sail, Podman, LXC,
@@ -642,7 +642,7 @@ class InstallController extends Controller
         $this->stderr("\n");
         $this->stderr("herald/install/{$action} cannot run from inside a container.\n", Console::FG_RED);
         $this->stderr("\n");
-        $this->stderr("The herald process can only see the container's filesystem —\n", Console::FG_GREY);
+        $this->stderr("The herald process can only see the container's filesystem,\n", Console::FG_GREY);
         $this->stderr("not your host's /Applications, ~/.cursor, etc. Detection from\n", Console::FG_GREY);
         $this->stderr("inside the container would produce false negatives.\n", Console::FG_GREY);
         $this->stderr("\n");
@@ -718,7 +718,7 @@ class InstallController extends Controller
             ), Console::FG_GREY);
             $this->stderr(sprintf(
                 "If you're running this inside a container (e.g. DDEV) and your MCP\n" .
-                "client lives on the host, the manual snippet form is the right path —\n" .
+                "client lives on the host, the manual snippet form is the right path:\n" .
                 "the auto-config writer can only see the container's filesystem.\n",
             ), Console::FG_GREY);
             return ExitCode::CONFIG;
@@ -741,7 +741,7 @@ class InstallController extends Controller
         [$newContents, $action] = $result;
 
         if ($this->dryRun) {
-            $this->stdout("Dry run — no changes written.\n\n", Console::FG_PURPLE);
+            $this->stdout("Dry run, no changes written.\n\n", Console::FG_PURPLE);
             $this->stdout("Target: ", Console::FG_GREY);
             $this->stdout("{$path}\n");
             $this->stdout("Action: ", Console::FG_GREY);
@@ -751,7 +751,7 @@ class InstallController extends Controller
                 $this->stdout("Note: parent directory ", Console::FG_YELLOW);
                 $this->stdout("{$parent}", Console::FG_YELLOW);
                 $this->stdout(" does not exist on this filesystem.\n", Console::FG_YELLOW);
-                $this->stdout("A real write would refuse — this dry-run is a preview only.\n", Console::FG_YELLOW);
+                $this->stdout("A real write would refuse; this dry-run is a preview only.\n", Console::FG_YELLOW);
                 if ($this->_detectContainer()) {
                     $this->stdout("(You're running inside a container. The container's filesystem isn't your host's; copy the\n", Console::FG_GREY);
                     $this->stdout("AFTER block below into your host MCP client config manually.)\n\n", Console::FG_GREY);

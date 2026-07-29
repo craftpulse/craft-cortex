@@ -9,8 +9,7 @@ use yii\console\ExitCode;
 use yii\helpers\Console;
 
 /**
- * =========================================================================
- * Console — issue, revoke, and list bearer tokens used by the HTTP
+ * Issues, revokes, and lists the bearer tokens used by the HTTP
  * transport (`POST /herald/mcp`). Admin-issued only; Gate 7.3 lands
  * OAuth 2.1 for delegated / self-service flows.
  *
@@ -21,13 +20,12 @@ use yii\helpers\Console;
  *
  * `<user>` accepts an email address or a username; resolved through
  * `Users::getUserByUsernameOrEmail()`. The plaintext token is printed
- * exactly once at issuance — operators that lose the token re-issue
+ * exactly once at issuance, so operators that lose the token re-issue
  * a fresh one and revoke the old.
  *
  * Plaintext is never persisted, never logged, and never returned by
  * any service method beyond `issue()`. The console output is the only
  * surface it ever appears on.
- * =========================================================================
  *
  * @author Craftpulse
  * @since  5.0.0
@@ -39,22 +37,22 @@ class TokenController extends Controller
 
     /**
      * @var string|null Human-readable identifier for the issued token.
-     *                  Defaults to `cli-<unix-timestamp>` when omitted
-     *                  so every row has something to grep on in the
-     *                  CP listing.
+     * Defaults to `cli-<unix-timestamp>` when omitted
+     * so every row has something to grep on in the
+     * CP listing.
      */
     public ?string $name = null;
 
     /**
      * @var int|null TTL in seconds for the issued token. Null (the
-     *               default) inherits from `Settings::$tokenTtlDefault`
-     *               which itself defaults to null = no expiry.
+     * default) inherits from `Settings::$tokenTtlDefault`
+     * which itself defaults to null = no expiry.
      */
     public ?int $ttl = null;
 
     /**
-     * @var string|null List action only — restrict output to one
-     *                  user (email or username).
+     * @var string|null List action only. Restrict output to one
+     * user (email or username).
      */
     public ?string $user = null;
 
@@ -122,7 +120,7 @@ class TokenController extends Controller
         $this->stdout("  expiresAt: ", Console::FG_GREY);
         $this->stdout(($model->expiresAt ?? 'never') . "\n");
         $this->stdout("\n");
-        $this->stdout("  token (save this — it will not be shown again):\n", Console::FG_YELLOW);
+        $this->stdout("  token (save this, it will not be shown again):\n", Console::FG_YELLOW);
         $this->stdout("    {$token}\n\n", Console::FG_CYAN);
         $this->stdout("Configure your MCP client with:\n", Console::FG_GREY);
         $this->stdout("  Authorization: Bearer {$token}\n\n", Console::FG_GREY);
@@ -131,7 +129,7 @@ class TokenController extends Controller
     }
 
     /**
-     * Revoke a token by its primary-key id. Soft-delete — the row
+     * Revoke a token by its primary-key id. A soft delete, so the row
      * stays in the table with `dateDeleted` set so audit history
      * survives. Subsequent lookups against the plaintext return null.
      *
@@ -166,7 +164,7 @@ class TokenController extends Controller
     }
 
     /**
-     * List bearer tokens — all live tokens by default, or restricted
+     * List bearer tokens: all live tokens by default, or restricted
      * to one user via `--user=<email-or-username>`. Plaintext is
      * never shown; only the 8-char prefix lets operators correlate
      * a row back to a client.

@@ -9,9 +9,8 @@ use yii\console\ExitCode;
 use yii\helpers\Console;
 
 /**
- * =========================================================================
- * Console — generate human-readable Markdown for herald's tool, prompt,
- * and resource registries.
+ * Generates human-readable Markdown for herald's tool, prompt, and resource
+ * registries.
  *
  * Each action walks the runtime registry and writes a versioned snapshot
  * to `docs/<TYPE>.md` at the repo root. Run after registry changes to
@@ -27,7 +26,6 @@ use yii\helpers\Console;
  * `--out=<dir>` overrides the output directory (default: `docs/`
  * relative to the herald package root). Tests use this to write into
  * a tmp directory and assert the output shape.
- * =========================================================================
  *
  * @author Craftpulse
  * @since  5.0.0
@@ -39,7 +37,7 @@ class DocsController extends Controller
 
     /**
      * @var string|null Override the output directory. Defaults to the
-     *                  `docs/` folder inside the herald package root.
+     * `docs/` folder inside the herald package root.
      */
     public ?string $out = null;
 

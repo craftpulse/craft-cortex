@@ -265,7 +265,7 @@ class Oauth extends Component
 
         Craft::warning(
             sprintf(
-                'herald OAuth refresh-token theft detected — revoked %d token(s) in family %s. Reason: %s',
+                'herald OAuth refresh-token theft detected. Revoked %d token(s) in family %s. Reason: %s',
                 $count,
                 $familyId,
                 $reason,

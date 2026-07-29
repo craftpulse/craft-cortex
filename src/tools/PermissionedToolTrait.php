@@ -98,7 +98,7 @@ trait PermissionedToolTrait
         foreach ($permissions as $permission) {
             if (str_ends_with($permission, ':*')) {
                 throw new ToolException(sprintf(
-                    'permission check failed — wildcard sentinel `%s` reached execute(); ' .
+                    'permission check failed: wildcard sentinel `%s` reached execute(); ' .
                         'tool failed to resolve per-resource UID before calling _assertPermission().',
                     $permission,
                 ));
@@ -124,6 +124,6 @@ trait PermissionedToolTrait
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
     {
-        return sprintf('permission denied — requires `%s`.', $missingPermission);
+        return sprintf('permission denied: requires `%s`.', $missingPermission);
     }
 }
