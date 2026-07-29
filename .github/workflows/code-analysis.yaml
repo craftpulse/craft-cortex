@@ -148,9 +148,25 @@ jobs:
             --siteUrl=http://localhost:8080 \
             --language=en-US
 
+      # Craft installs as Solo, which permits exactly one user account.
+      # The permission, OAuth, and CP-controller suites all create extra
+      # user fixtures, and on Solo `saveElement()` fails, leaving a null
+      # id that surfaces as a foreign-key violation rather than an
+      # edition error. Pro is the edition the suite is written against.
+      - name: Set the Craft edition to Pro
+        working-directory: cms
+        run: php craft exec 'Craft::$app->setEdition(\craft\enums\CmsEdition::Pro)'
+
       - name: Install the Herald plugin
         working-directory: cms
         run: php craft plugin/install herald --interactive=0
+
+      # Herald's own documented setup step. The OAuth service throws
+      # `InvalidConfigException` naming this command when the keypair is
+      # absent, so the HTTP-transport and token suites need it to exist.
+      - name: Generate the OAuth signing keypair
+        working-directory: cms
+        run: php craft herald/oauth/init-keys
 
       - name: Install the plugin's own dependencies
         working-directory: plugin
