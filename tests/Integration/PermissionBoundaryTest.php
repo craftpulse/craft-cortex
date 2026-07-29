@@ -211,7 +211,7 @@ it('Entry denies a non-permitted user with ToolException + tool_error audit row'
 
         expect($result['exception'])->toBeInstanceOf(ToolException::class);
         expect($result['exception']->getMessage())
-            ->toStartWith('permission denied — mode `create` on section `' . $section->uid . '`');
+            ->toStartWith('permission denied: mode `create` on section `' . $section->uid . '`');
 
         expect($result['auditRow'])->not->toBeNull();
         expect($result['auditRow']->toolName)->toBe('entry');
@@ -247,7 +247,7 @@ it('Category denies a non-permitted user with ToolException + tool_error audit r
 
         expect($result['exception'])->toBeInstanceOf(ToolException::class);
         expect($result['exception']->getMessage())
-            ->toStartWith('permission denied — mode `update` on group `' . $group->uid . '`');
+            ->toStartWith('permission denied: mode `update` on group `' . $group->uid . '`');
 
         expect($result['auditRow'])->not->toBeNull();
         expect($result['auditRow']->kind)->toBe('tool_error');
@@ -276,7 +276,7 @@ it('GlobalSet denies a non-permitted user with ToolException + tool_error audit 
 
         expect($result['exception'])->toBeInstanceOf(ToolException::class);
         expect($result['exception']->getMessage())
-            ->toStartWith('permission denied — global_set update on set `' . $set->uid . '`');
+            ->toStartWith('permission denied: global_set update on set `' . $set->uid . '`');
 
         expect($result['auditRow'])->not->toBeNull();
         expect($result['auditRow']->kind)->toBe('tool_error');
@@ -300,7 +300,7 @@ it('Address denies a non-permitted user with ToolException + tool_error audit ro
 
         expect($result['exception'])->toBeInstanceOf(ToolException::class);
         expect($result['exception']->getMessage())
-            ->toStartWith('permission denied — mode `create` requires `editUsers`');
+            ->toStartWith('permission denied: mode `create` requires `editUsers`');
 
         expect($result['auditRow'])->not->toBeNull();
         expect($result['auditRow']->kind)->toBe('tool_error');
@@ -325,7 +325,7 @@ it('Users denies a non-permitted user with ToolException + tool_error audit row'
 
         expect($result['exception'])->toBeInstanceOf(ToolException::class);
         expect($result['exception']->getMessage())
-            ->toStartWith('permission denied — mode `update` requires `');
+            ->toStartWith('permission denied: mode `update` requires `');
 
         expect($result['auditRow'])->not->toBeNull();
         expect($result['auditRow']->kind)->toBe('tool_error');
@@ -351,7 +351,7 @@ it('Skill denies a non-permitted user with ToolException + tool_error audit row'
 
         expect($result['exception'])->toBeInstanceOf(ToolException::class);
         expect($result['exception']->getMessage())
-            ->toStartWith('permission denied — mode `create` requires `herald:manage-skills`');
+            ->toStartWith('permission denied: mode `create` requires `herald:manage-skills`');
 
         expect($result['auditRow'])->not->toBeNull();
         expect($result['auditRow']->kind)->toBe('tool_error');
@@ -387,7 +387,7 @@ it('ScaffoldEntries denies a non-permitted user with ToolException + tool_error 
 
         expect($result['exception'])->toBeInstanceOf(ToolException::class);
         expect($result['exception']->getMessage())
-            ->toStartWith('permission denied — scaffold_entries requires `saveEntries:' . $section->uid);
+            ->toStartWith('permission denied: scaffold_entries requires `saveEntries:' . $section->uid);
 
         expect($result['auditRow'])->not->toBeNull();
         expect($result['auditRow']->kind)->toBe('tool_error');
@@ -421,7 +421,7 @@ it('BulkEntries (streaming) denies a non-permitted user with ToolException + too
 
         expect($result['exception'])->toBeInstanceOf(ToolException::class);
         expect($result['exception']->getMessage())
-            ->toStartWith('permission denied — mode `set_status` requires `saveEntries:' . $section->uid . '`');
+            ->toStartWith('permission denied: mode `set_status` requires `saveEntries:' . $section->uid . '`');
 
         expect($result['auditRow'])->not->toBeNull();
         expect($result['auditRow']->kind)->toBe('tool_error');
@@ -439,7 +439,7 @@ it('stdio (null user) does not raise the permission-denial path for any Pro tool
     // `_assertPermission()` returns early without throwing. The
     // boundary check is the absence of the denial path — the tool
     // may still throw for other reasons (no section, validation, etc.)
-    // but NOT with the `permission denied — ` prefix.
+    // but NOT with the `permission denied: ` prefix.
     herald_with_edition(Herald::EDITION_PRO, function() {
         Craft::$app->getUser()->setIdentity(null);
 
@@ -464,7 +464,7 @@ it('stdio (null user) does not raise the permission-denial path for any Pro tool
             } catch (ToolException $e) {
                 // Non-permission ToolException is OK; what we don't
                 // want to see is the denial prefix.
-                expect($e->getMessage())->not->toStartWith('permission denied — ');
+                expect($e->getMessage())->not->toStartWith('permission denied: ');
             }
         }
     });
@@ -548,7 +548,7 @@ it('Server::dispatch() wraps Pro tool permission denial in the locked {content, 
             ->toHaveKey('type', 'text')
             ->toHaveKey('text');
         expect($result['content'][0]['text'])
-            ->toStartWith('permission denied — mode `create` on section `' . $target->uid . '`');
+            ->toStartWith('permission denied: mode `create` on section `' . $target->uid . '`');
 
         // Audit row written by the dispatcher's catch block, NOT by
         // any manual `logCall()` — proves the EVENT_LOG_CALL listener

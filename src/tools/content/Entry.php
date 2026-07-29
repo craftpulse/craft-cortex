@@ -690,7 +690,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
         try {
             $applied = Craft::$app->getDrafts()->applyDraft($draft);
         } catch (Throwable $e) {
-            throw new ToolException("entry: apply_draft failed — {$e->getMessage()}");
+            throw new ToolException("entry: apply_draft failed: {$e->getMessage()}");
         }
 
         if (!$applied instanceof EntryElement) {
@@ -719,7 +719,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
         $sectionUid = $this->_resolveSectionUid($arguments) ?? '?';
 
         return sprintf(
-            'permission denied — mode `%s` on section `%s` requires `%s`.',
+            'permission denied: mode `%s` on section `%s` requires `%s`.',
             $mode,
             $sectionUid,
             $missingPermission,

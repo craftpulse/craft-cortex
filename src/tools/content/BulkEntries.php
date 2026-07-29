@@ -467,7 +467,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
     {
         $mode = $this->_mode($arguments) ?? '?';
         return sprintf(
-            'permission denied — mode `%s` requires `%s`.',
+            'permission denied: mode `%s` requires `%s`.',
             $mode,
             $missingPermission,
         );

@@ -248,7 +248,7 @@ class Tag extends AbstractTool
         }
 
         throw new ToolException(
-            'permission denied — tag operations require admin status. Craft 5 has no ' .
+            'permission denied: tag operations require admin status. Craft 5 has no ' .
                 'per-tag-group permission, so non-admin tag management is not supported.'
         );
     }

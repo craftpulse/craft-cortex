@@ -269,7 +269,7 @@ class Diagnostics extends AbstractTool
         $type = is_string($arguments['type'] ?? null) ? $arguments['type'] : '?';
 
         return sprintf(
-            'permission denied — type `%s` requires `%s`.',
+            'permission denied: type `%s` requires `%s`.',
             $type,
             $missingPermission,
         );
@@ -432,8 +432,8 @@ class Diagnostics extends AbstractTool
         $queue = Craft::$app->getQueue();
         if (!$queue instanceof Queue) {
             throw new ToolException(
-                'system_diagnostics: the active queue driver does not support manage_queue ' .
-                    '— Craft\'s `craft\\queue\\Queue` is required.',
+                'system_diagnostics: the active queue driver does not support manage_queue. ' .
+                    'Craft\'s `craft\\queue\\Queue` is required.',
             );
         }
 
@@ -456,7 +456,7 @@ class Diagnostics extends AbstractTool
                 'release_all' => $queue->releaseAll(),
             };
         } catch (Throwable $e) {
-            throw new ToolException("system_diagnostics: manage_queue {$action} failed — {$e->getMessage()}");
+            throw new ToolException("system_diagnostics: manage_queue {$action} failed: {$e->getMessage()}");
         }
 
         $after = $this->_queueTotals($queue);

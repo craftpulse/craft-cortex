@@ -401,7 +401,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
         $sectionUid = is_string($arguments['sectionUid'] ?? null) ? $arguments['sectionUid'] : '?';
 
         return sprintf(
-            'permission denied — mode `import` on section `%s` requires `%s`.',
+            'permission denied: mode `import` on section `%s` requires `%s`.',
             $sectionUid,
             $missingPermission,
         );
@@ -570,7 +570,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
         $format = $payload['format'] ?? null;
         if ($format !== self::FORMAT_VERSION) {
             throw new ToolException(sprintf(
-                'import_export: payload `format` mismatch — expected %d, got %s.',
+                'import_export: payload `format` mismatch: expected %d, got %s.',
                 self::FORMAT_VERSION,
                 var_export($format, true),
             ));

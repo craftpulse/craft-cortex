@@ -495,7 +495,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
         }
 
         return sprintf(
-            'permission denied — mode `%s` on %s `%s` requires `%s`.',
+            'permission denied: mode `%s` on %s `%s` requires `%s`.',
             $mode,
             $resourceType,
             $resourceUid,

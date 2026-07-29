@@ -272,7 +272,7 @@ class Resave extends AbstractTool implements StreamableToolInterface
 
         if (!empty($arguments['queue'])) {
             throw new ToolException(
-                'resave: `queue: true` is not supported — the tool runs synchronously ' .
+                'resave: `queue: true` is not supported. The tool runs synchronously ' .
                 'and streams progress back to the caller. Drop the option, or dispatch ' .
                 'the queue job through `craft_command` if a background run is needed.',
             );

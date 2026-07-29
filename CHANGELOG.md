@@ -6,6 +6,26 @@ All notable changes to Herald are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed - tool error messages no longer use em-dashes
+
+- **Every tool error message MCP clients receive is reworded** to use a
+  colon or a sentence break instead of an em-dash, matching the house
+  copy convention already used by the default permission-denied message
+  (`permission denied: requires ...`). This changes wire text, so any
+  client, prompt, or downstream test matching on the old strings needs
+  updating.
+
+  | Old | New |
+  | --- | --- |
+  | ``permission denied — mode `create` on section `<uid>` requires `<perm>`.`` | ``permission denied: mode `create` on section `<uid>` requires `<perm>`.`` |
+  | `address: create denied — caller cannot save addresses for the resolved owner.` | `address: create denied. Caller cannot save addresses for the resolved owner.` |
+  | `entry: apply_draft failed — <reason>` | `entry: apply_draft failed: <reason>` |
+  | ``import_export: payload `format` mismatch — expected 1, got 2.`` | ``import_export: payload `format` mismatch: expected 1, got 2.`` |
+
+- Tool, prompt, and resource **descriptions are unchanged** - they are
+  protocol payload the model reads, not operator-facing copy, and are
+  deliberately out of scope here.
+
 ### Changed - permission handles are kebab-case
 
 - **Every Herald permission handle is now `herald:<kebab-case-action>`**,

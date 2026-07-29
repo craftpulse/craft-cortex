@@ -11,7 +11,7 @@
  *     `release_all`) against fixture jobs pushed via Craft's queue.
  *   - The required-`jobId` guard on `retry` / `release`.
  *   - The permission-denied error-message contract — the locked rich
- *     format `permission denied — type `manage_queue` requires
+ *     format `permission denied: type `manage_queue` requires
  *     `utility:queue-manager`.` keyed on by the 8.10 invariant test.
  *   - The cross-edition guard.
  *
@@ -384,7 +384,7 @@ it('manage_queue throws permission-denied with the locked rich-format message fo
 
             expect($caught)->not->toBeNull();
             expect($caught->getMessage())->toMatch(
-                "/^permission denied — type `manage_queue` requires `utility:queue-manager`\\.\$/",
+                "/^permission denied: type `manage_queue` requires `utility:queue-manager`\\.\$/",
             );
         });
     } finally {

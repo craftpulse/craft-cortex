@@ -297,7 +297,7 @@ class Skill extends AbstractTool
         $mode = $this->_mode($arguments) ?? '?';
 
         return sprintf(
-            'permission denied — mode `%s` requires `%s`.',
+            'permission denied: mode `%s` requires `%s`.',
             $mode,
             $missingPermission,
         );
@@ -453,7 +453,7 @@ class Skill extends AbstractTool
 
         $caller = Craft::$app->getUser()->getIdentity();
         if ($caller !== null && !Craft::$app->getElements()->canSave($element, $caller)) {
-            throw new ToolException('skill: create denied — caller cannot save Herald skills.');
+            throw new ToolException('skill: create denied. Caller cannot save Herald skills.');
         }
 
         if (!Craft::$app->getElements()->saveElement($element, runValidation: true)) {
@@ -501,7 +501,7 @@ class Skill extends AbstractTool
 
         $caller = Craft::$app->getUser()->getIdentity();
         if ($caller !== null && !Craft::$app->getElements()->canSave($element, $caller)) {
-            throw new ToolException('skill: update denied — caller cannot save this skill.');
+            throw new ToolException('skill: update denied. Caller cannot save this skill.');
         }
 
         if (array_key_exists('title', $arguments) && is_string($arguments['title'])) {
@@ -542,7 +542,7 @@ class Skill extends AbstractTool
 
         $caller = Craft::$app->getUser()->getIdentity();
         if ($caller !== null && !Craft::$app->getElements()->canDelete($element, $caller)) {
-            throw new ToolException('skill: delete denied — caller cannot delete this skill.');
+            throw new ToolException('skill: delete denied. Caller cannot delete this skill.');
         }
 
         $hardDelete = (bool) ($arguments['hardDelete'] ?? false);
@@ -751,7 +751,7 @@ class Skill extends AbstractTool
             'errors' => [
                 'handle' => [
                     'Skill handle cannot be changed once the element is created. '
-                        . 'Handle is the natural key — delete the skill and create a new one.',
+                        . 'Handle is the natural key: delete the skill and create a new one.',
                 ],
             ],
         ];

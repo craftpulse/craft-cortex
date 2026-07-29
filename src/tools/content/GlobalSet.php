@@ -228,7 +228,7 @@ class GlobalSet extends AbstractTool
         $globalSetUid = $this->_resolveGlobalSetUid($arguments) ?? '?';
 
         return sprintf(
-            'permission denied — global_set update on set `%s` requires `%s`.',
+            'permission denied: global_set update on set `%s` requires `%s`.',
             $globalSetUid,
             $missingPermission,
         );

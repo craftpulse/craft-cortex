@@ -274,7 +274,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
     {
         return sprintf(
-            'permission denied — scaffold_entries requires `%s`.',
+            'permission denied: scaffold_entries requires `%s`.',
             $missingPermission,
         );
     }

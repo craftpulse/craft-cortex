@@ -44,7 +44,7 @@ use Craft;
  *     whole-tool admin gate via `_assertAdmin()` instead.
  *   - Entry, Category, GlobalSet, Address: each overrides
  *     `_buildPermissionDeniedMessage()` to emit the rich format
- *     existing tests assert on (e.g. `"permission denied — mode `update`
+ *     existing tests assert on (e.g. `"permission denied: mode `update`
  *     on section `posts` requires `saveEntries:{uid}`"`).
  * =========================================================================
  *
@@ -114,7 +114,7 @@ trait PermissionedToolTrait
      * Build the user-facing permission-denied error message. The
      * default implementation emits the bare permission string —
      * consuming tools override to surface the tool-specific rich
-     * format (e.g. `"permission denied — mode `update` on section
+     * format (e.g. `"permission denied: mode `update` on section
      * `posts` requires `saveEntries:{uid}`"`).
      *
      * @param array<string,mixed> $arguments

@@ -339,7 +339,7 @@ class Category extends AbstractTool
         $groupUid = $this->_resolveGroupUid($arguments) ?? '?';
 
         return sprintf(
-            'permission denied — mode `%s` on group `%s` requires `%s`.',
+            'permission denied: mode `%s` on group `%s` requires `%s`.',
             $mode,
             $groupUid,
             $missingPermission,

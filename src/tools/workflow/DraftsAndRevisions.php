@@ -303,7 +303,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
         $sectionUid = is_string($arguments['sectionUid'] ?? null) ? $arguments['sectionUid'] : '?';
 
         return sprintf(
-            'permission denied — mode `%s` on section `%s` requires `%s`.',
+            'permission denied: mode `%s` on section `%s` requires `%s`.',
             $mode,
             $sectionUid,
             $missingPermission,
@@ -530,7 +530,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
         try {
             $applied = Craft::$app->getDrafts()->applyDraft($draft);
         } catch (Throwable $e) {
-            throw new ToolException("drafts_and_revisions: apply failed — {$e->getMessage()}");
+            throw new ToolException("drafts_and_revisions: apply failed: {$e->getMessage()}");
         }
 
         if (!$applied instanceof Entry) {
@@ -589,7 +589,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
         try {
             $deleted = Craft::$app->getElements()->deleteElement($draft, true);
         } catch (Throwable $e) {
-            throw new ToolException("drafts_and_revisions: discard failed — {$e->getMessage()}");
+            throw new ToolException("drafts_and_revisions: discard failed: {$e->getMessage()}");
         }
 
         if (!$deleted) {

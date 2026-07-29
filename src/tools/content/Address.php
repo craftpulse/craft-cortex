@@ -335,7 +335,7 @@ class Address extends AbstractTool
         $mode = $this->_mode($arguments) ?? '?';
 
         return sprintf(
-            'permission denied — mode `%s` requires `%s`.',
+            'permission denied: mode `%s` requires `%s`.',
             $mode,
             $missingPermission,
         );
@@ -457,7 +457,7 @@ class Address extends AbstractTool
         $caller = Craft::$app->getUser()->getIdentity();
         if ($caller !== null && !Craft::$app->getElements()->canSave($element, $caller)) {
             throw new ToolException(
-                'address: create denied — caller cannot save addresses for the resolved owner.'
+                'address: create denied. Caller cannot save addresses for the resolved owner.'
             );
         }
 
@@ -518,7 +518,7 @@ class Address extends AbstractTool
         $caller = Craft::$app->getUser()->getIdentity();
         if ($caller !== null && !Craft::$app->getElements()->canSave($element, $caller)) {
             throw new ToolException(
-                'address: update denied — caller cannot save this address.'
+                'address: update denied. Caller cannot save this address.'
             );
         }
 
@@ -560,7 +560,7 @@ class Address extends AbstractTool
         $caller = Craft::$app->getUser()->getIdentity();
         if ($caller !== null && !Craft::$app->getElements()->canDelete($element, $caller)) {
             throw new ToolException(
-                'address: delete denied — caller cannot delete this address.'
+                'address: delete denied. Caller cannot delete this address.'
             );
         }
 
@@ -725,7 +725,7 @@ class Address extends AbstractTool
 
         if (!Craft::$app->getElements()->canView($address, $user)) {
             throw new ToolException(
-                'address: view denied — caller cannot view this address.'
+                'address: view denied. Caller cannot view this address.'
             );
         }
     }

@@ -478,7 +478,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
         $mode = $this->_mode($arguments) ?? '?';
 
         return sprintf(
-            'permission denied — mode `%s` requires `%s`.',
+            'permission denied: mode `%s` requires `%s`.',
             $mode,
             $missingPermission,
         );
@@ -662,7 +662,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
         $adminRequested = ($arguments['admin'] ?? null) === true;
         if ($adminRequested && ($caller === null || !$caller->admin)) {
             throw new ToolException(
-                'users: create denied — `admin: true` requires the caller is an admin. ' .
+                'users: create denied. `admin: true` requires the caller is an admin. ' .
                     'Non-admin callers cannot promote a new user to admin.'
             );
         }
@@ -671,7 +671,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
         // `registerUsers` + Craft's edition / count check together.
         if ($caller !== null && !$caller->admin && !$caller->canRegisterUsers()) {
             throw new ToolException(
-                'users: create denied — caller lacks `registerUsers` permission ' .
+                'users: create denied. Caller lacks `registerUsers` permission ' .
                     '(or the install cannot accept additional users).'
             );
         }
@@ -737,7 +737,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
         // Per-target canSave (covers register / editUsers / self).
         if ($caller !== null && !Craft::$app->getElements()->canSave($element, $caller)) {
             throw new ToolException(
-                'users: update denied — caller cannot save this user.'
+                'users: update denied. Caller cannot save this user.'
             );
         }
 
@@ -750,7 +750,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
         $isSelf = $caller !== null && $caller->id === $element->id;
         if ($element->admin && $caller !== null && !$caller->admin && !$isSelf) {
             throw new ToolException(
-                'users: update denied — non-admin callers cannot edit an admin user. ' .
+                'users: update denied. Non-admin callers cannot edit an admin user. ' .
                     'Even with `administrateUsers`, only an admin may edit another admin ' .
                     '(matches UsersController::actionDeactivateUser line 2194).'
             );
@@ -764,7 +764,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
             $newAdmin = $arguments['admin'];
             if ($newAdmin !== $element->admin && ($caller === null || !$caller->admin)) {
                 throw new ToolException(
-                    'users: update denied — changing the `admin` field requires the ' .
+                    'users: update denied. Changing the `admin` field requires the ' .
                         'caller is an admin. ' .
                         (
                             $newAdmin
@@ -835,7 +835,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
 
         if ($caller !== null && !Craft::$app->getElements()->canDelete($element, $caller)) {
             throw new ToolException(
-                'users: delete denied — caller cannot delete this user. ' .
+                'users: delete denied. Caller cannot delete this user. ' .
                     'Non-admin callers cannot delete admin users even with `deleteUsers`.'
             );
         }
@@ -986,7 +986,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
 
         if (!Craft::$app->getElements()->canView($user, $caller)) {
             throw new ToolException(
-                'users: view denied — caller cannot view this user.'
+                'users: view denied. Caller cannot view this user.'
             );
         }
     }
@@ -1176,7 +1176,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
 
             if (!$canAdministrate) {
                 throw new ToolException(sprintf(
-                    'users: update denied — `%s` is a sensitive field requiring `administrateUsers`. ' .
+                    'users: update denied. `%s` is a sensitive field requiring `administrateUsers`. ' .
                         'Omit the field to leave it unchanged.',
                     $field,
                 ));
@@ -1230,7 +1230,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
                 }
                 if (!$caller->can("assignUserGroup:{$group->uid}")) {
                     throw new ToolException(sprintf(
-                        'users: group assignment denied — caller cannot assign group ' .
+                        'users: group assignment denied. Caller cannot assign group ' .
                             '`%s` (requires `assignUserGroup:%s`).',
                         $group->name,
                         $group->uid,

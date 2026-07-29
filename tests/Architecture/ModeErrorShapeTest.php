@@ -21,7 +21,7 @@
  *     `system_diagnostics: type `<type>` is unavailable on this edition.`
  *
  *   Template B — permission denial (Pro tools + Pro-mode Free tools).
- *   All shapes start with the literal 9-char prefix `permission denied — `,
+ *   All shapes start with the literal 9-char prefix `permission denied: `,
  *   then a tool-specific enrichment, then ` requires `<perm>`.` (with a
  *   trailing period). Three accepted enrichments:
  *     - mode-on-resource: ``mode `<mode>` on <resource> `<uid>` requires `<perm>`.``
@@ -31,9 +31,9 @@
  * Two locked deviations (per locked decision 3 of the gate-8.10 plan):
  *
  *   - `tag` — whole-tool admin gate (no mode-keyed message):
- *     ``permission denied — tag operations require admin status. ...``
+ *     ``permission denied: tag operations require admin status. ...``
  *   - `global_set` — fixed `update` mode (one mode only):
- *     ``permission denied — global_set update on set `<uid>` requires `<perm>`.``
+ *     ``permission denied: global_set update on set `<uid>` requires `<perm>`.``
  *
  * **Invocation strategy** — reflection over the protected
  * `_buildPermissionDeniedMessage()` method on each tool. The Pest test
@@ -94,7 +94,7 @@ function _herald_invoke_permission_denied_message(
 // Permission-denial shape — Template B (per locked decision 3 of the plan)
 // -----------------------------------------------------------------------------
 
-it('entry permission-denied message matches `permission denied — mode `<mode>` on section `<uid>` requires `<perm>`.`', function() {
+it('entry permission-denied message matches `permission denied: mode `<mode>` on section `<uid>` requires `<perm>`.`', function() {
     herald_with_edition(Herald::EDITION_PRO, function() {
         $message = _herald_invoke_permission_denied_message(
             new Entry(),
@@ -104,12 +104,12 @@ it('entry permission-denied message matches `permission denied — mode `<mode>`
         // sectionUid resolution returns null for a fabricated UID
         // (no matching Section) — `?` placeholder is the contract.
         expect($message)->toBe(
-            'permission denied — mode `create` on section `?` requires `saveEntries:xxxx-yyyy-zzzz`.',
+            'permission denied: mode `create` on section `?` requires `saveEntries:xxxx-yyyy-zzzz`.',
         );
     });
 });
 
-it('category permission-denied message matches `permission denied — mode `<mode>` on group `<uid>` requires `<perm>`.`', function() {
+it('category permission-denied message matches `permission denied: mode `<mode>` on group `<uid>` requires `<perm>`.`', function() {
     herald_with_edition(Herald::EDITION_PRO, function() {
         $message = _herald_invoke_permission_denied_message(
             new Category(),
@@ -117,12 +117,12 @@ it('category permission-denied message matches `permission denied — mode `<mod
             ['mode' => 'update', 'groupUid' => 'xxxx-yyyy-zzzz'],
         );
         expect($message)->toBe(
-            'permission denied — mode `update` on group `?` requires `saveCategories:xxxx-yyyy-zzzz`.',
+            'permission denied: mode `update` on group `?` requires `saveCategories:xxxx-yyyy-zzzz`.',
         );
     });
 });
 
-it('global_set permission-denied message matches `permission denied — global_set update on set `<uid>` requires `<perm>`.`', function() {
+it('global_set permission-denied message matches `permission denied: global_set update on set `<uid>` requires `<perm>`.`', function() {
     herald_with_edition(Herald::EDITION_PRO, function() {
         $message = _herald_invoke_permission_denied_message(
             new GlobalSet(),
@@ -130,45 +130,45 @@ it('global_set permission-denied message matches `permission denied — global_s
             ['globalSetUid' => 'xxxx-yyyy-zzzz'],
         );
         expect($message)->toBe(
-            'permission denied — global_set update on set `?` requires `editGlobalSet:xxxx-yyyy-zzzz`.',
+            'permission denied: global_set update on set `?` requires `editGlobalSet:xxxx-yyyy-zzzz`.',
         );
     });
 });
 
-it('address permission-denied message matches `permission denied — mode `<mode>` requires `<perm>`.`', function() {
+it('address permission-denied message matches `permission denied: mode `<mode>` requires `<perm>`.`', function() {
     herald_with_edition(Herald::EDITION_PRO, function() {
         $message = _herald_invoke_permission_denied_message(
             new Address(),
             'editUsers',
             ['mode' => 'update'],
         );
-        expect($message)->toBe('permission denied — mode `update` requires `editUsers`.');
+        expect($message)->toBe('permission denied: mode `update` requires `editUsers`.');
     });
 });
 
-it('users permission-denied message matches `permission denied — mode `<mode>` requires `<perm>`.`', function() {
+it('users permission-denied message matches `permission denied: mode `<mode>` requires `<perm>`.`', function() {
     herald_with_edition(Herald::EDITION_PRO, function() {
         $message = _herald_invoke_permission_denied_message(
             new Users(),
             'editUsers',
             ['mode' => 'update'],
         );
-        expect($message)->toBe('permission denied — mode `update` requires `editUsers`.');
+        expect($message)->toBe('permission denied: mode `update` requires `editUsers`.');
     });
 });
 
-it('skill permission-denied message matches `permission denied — mode `<mode>` requires `<perm>`.`', function() {
+it('skill permission-denied message matches `permission denied: mode `<mode>` requires `<perm>`.`', function() {
     herald_with_edition(Herald::EDITION_PRO, function() {
         $message = _herald_invoke_permission_denied_message(
             new Skill(),
             'herald:manage-skills',
             ['mode' => 'create'],
         );
-        expect($message)->toBe('permission denied — mode `create` requires `herald:manage-skills`.');
+        expect($message)->toBe('permission denied: mode `create` requires `herald:manage-skills`.');
     });
 });
 
-it('bulk_entries permission-denied message matches `permission denied — mode `<mode>` requires `<perm>`.`', function() {
+it('bulk_entries permission-denied message matches `permission denied: mode `<mode>` requires `<perm>`.`', function() {
     herald_with_edition(Herald::EDITION_PRO, function() {
         $message = _herald_invoke_permission_denied_message(
             new BulkEntries(),
@@ -176,41 +176,41 @@ it('bulk_entries permission-denied message matches `permission denied — mode `
             ['mode' => 'set_status'],
         );
         expect($message)->toBe(
-            'permission denied — mode `set_status` requires `saveEntries:xxxx-yyyy-zzzz`.',
+            'permission denied: mode `set_status` requires `saveEntries:xxxx-yyyy-zzzz`.',
         );
     });
 });
 
-it('scaffold_entries permission-denied message matches `permission denied — scaffold_entries requires `<perm>`.`', function() {
+it('scaffold_entries permission-denied message matches `permission denied: scaffold_entries requires `<perm>`.`', function() {
     herald_with_edition(Herald::EDITION_PRO, function() {
         $message = _herald_invoke_permission_denied_message(
             new ScaffoldEntries(),
             'utility:project-config',
             [],
         );
-        expect($message)->toBe('permission denied — scaffold_entries requires `utility:project-config`.');
+        expect($message)->toBe('permission denied: scaffold_entries requires `utility:project-config`.');
     });
 });
 
-it('drafts_and_revisions permission-denied message matches `permission denied — mode `<mode>` on section `<uid>` requires `<perm>`.`', function() {
+it('drafts_and_revisions permission-denied message matches `permission denied: mode `<mode>` on section `<uid>` requires `<perm>`.`', function() {
     $message = _herald_invoke_permission_denied_message(
         new DraftsAndRevisions(),
         'saveEntries:xxxx-yyyy-zzzz',
         ['mode' => 'apply', 'sectionUid' => 'xxxx-yyyy-zzzz'],
     );
     expect($message)->toBe(
-        'permission denied — mode `apply` on section `xxxx-yyyy-zzzz` requires `saveEntries:xxxx-yyyy-zzzz`.',
+        'permission denied: mode `apply` on section `xxxx-yyyy-zzzz` requires `saveEntries:xxxx-yyyy-zzzz`.',
     );
 });
 
-it('content_audit (section) permission-denied message matches `permission denied — mode `<mode>` on section `<uid>` requires `<perm>`.`', function() {
+it('content_audit (section) permission-denied message matches `permission denied: mode `<mode>` on section `<uid>` requires `<perm>`.`', function() {
     $message = _herald_invoke_permission_denied_message(
         new Audit(),
         'saveEntries:xxxx-yyyy-zzzz',
         ['mode' => 'fix_relations', 'sectionUid' => 'xxxx-yyyy-zzzz'],
     );
     expect($message)->toBe(
-        'permission denied — mode `fix_relations` on section `xxxx-yyyy-zzzz` requires `saveEntries:xxxx-yyyy-zzzz`.',
+        'permission denied: mode `fix_relations` on section `xxxx-yyyy-zzzz` requires `saveEntries:xxxx-yyyy-zzzz`.',
     );
 });
 
@@ -221,7 +221,7 @@ it('content_audit (volume) permission-denied message uses the `volume` resource 
         ['mode' => 'prune_unused_assets', 'volumeUid' => 'xxxx-yyyy-zzzz'],
     );
     expect($message)->toBe(
-        'permission denied — mode `prune_unused_assets` on volume `xxxx-yyyy-zzzz` requires `saveAssets:xxxx-yyyy-zzzz`.',
+        'permission denied: mode `prune_unused_assets` on volume `xxxx-yyyy-zzzz` requires `saveAssets:xxxx-yyyy-zzzz`.',
     );
 });
 
@@ -232,29 +232,29 @@ it('content_audit (group) permission-denied message uses the `group` resource ty
         ['mode' => 'fix_relations', 'groupUid' => 'xxxx-yyyy-zzzz'],
     );
     expect($message)->toBe(
-        'permission denied — mode `fix_relations` on group `xxxx-yyyy-zzzz` requires `saveCategories:xxxx-yyyy-zzzz`.',
+        'permission denied: mode `fix_relations` on group `xxxx-yyyy-zzzz` requires `saveCategories:xxxx-yyyy-zzzz`.',
     );
 });
 
-it('import_export permission-denied message matches `permission denied — mode `import` on section `<uid>` requires `<perm>`.`', function() {
+it('import_export permission-denied message matches `permission denied: mode `import` on section `<uid>` requires `<perm>`.`', function() {
     $message = _herald_invoke_permission_denied_message(
         new ImportExport(),
         'saveEntries:xxxx-yyyy-zzzz',
         ['mode' => 'import', 'sectionUid' => 'xxxx-yyyy-zzzz'],
     );
     expect($message)->toBe(
-        'permission denied — mode `import` on section `xxxx-yyyy-zzzz` requires `saveEntries:xxxx-yyyy-zzzz`.',
+        'permission denied: mode `import` on section `xxxx-yyyy-zzzz` requires `saveEntries:xxxx-yyyy-zzzz`.',
     );
 });
 
-it('system_diagnostics permission-denied message matches `permission denied — type `<type>` requires `<perm>`.`', function() {
+it('system_diagnostics permission-denied message matches `permission denied: type `<type>` requires `<perm>`.`', function() {
     $message = _herald_invoke_permission_denied_message(
         new Diagnostics(),
         'utility:queue-manager',
         ['type' => 'manage_queue'],
     );
     expect($message)->toBe(
-        'permission denied — type `manage_queue` requires `utility:queue-manager`.',
+        'permission denied: type `manage_queue` requires `utility:queue-manager`.',
     );
 });
 
@@ -287,7 +287,7 @@ it('tag admin gate emits the whole-tool admin-status message', function() {
         });
 
         expect($caught)->toBeInstanceOf(ToolException::class);
-        expect($caught->getMessage())->toStartWith('permission denied — tag operations require admin status.');
+        expect($caught->getMessage())->toStartWith('permission denied: tag operations require admin status.');
     } finally {
         Craft::$app->getUser()->setIdentity(null);
         Craft::$app->getElements()->deleteElement($caller, hardDelete: true);

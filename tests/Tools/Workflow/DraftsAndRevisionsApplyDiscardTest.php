@@ -11,7 +11,7 @@
  *   - The `discard` happy path verifying the draft row is hard-deleted
  *     and the canonical is untouched.
  *   - The permission-denied error-message contract — the locked rich
- *     format `permission denied — mode `X` on section `Y` requires `Z`.`
+ *     format `permission denied: mode `X` on section `Y` requires `Z`.`
  *     keyed on by the 8.10 invariant test.
  *   - The cross-edition guard: dispatching `apply` / `discard` on a
  *     Free install throws `ToolException`.
@@ -306,7 +306,7 @@ it('apply mode throws permission-denied with the locked rich-format message for 
 
             expect($caught)->not->toBeNull();
             expect($caught->getMessage())->toMatch(
-                "/^permission denied — mode `apply` on section `{$section->uid}` requires `saveEntries:{$section->uid}`\\.\$/",
+                "/^permission denied: mode `apply` on section `{$section->uid}` requires `saveEntries:{$section->uid}`\\.\$/",
             );
         });
     } finally {
@@ -428,7 +428,7 @@ it('discard mode throws permission-denied with the locked rich-format message', 
 
             expect($caught)->not->toBeNull();
             expect($caught->getMessage())->toMatch(
-                "/^permission denied — mode `discard` on section `{$section->uid}` requires `saveEntries:{$section->uid}`\\.\$/",
+                "/^permission denied: mode `discard` on section `{$section->uid}` requires `saveEntries:{$section->uid}`\\.\$/",
             );
         });
     } finally {

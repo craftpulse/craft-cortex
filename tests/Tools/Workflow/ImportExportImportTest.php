@@ -342,7 +342,7 @@ it('import skips items where the caller lacks saveEntries on the target section'
             expect($row['kind'])->toBe('skipped');
             expect($row['reason'])->toBe('permission_denied');
             expect($row['requiredPermission'])->toBe("saveEntries:{$section->uid}");
-            expect($row['message'])->toMatch("/^permission denied — mode `import` on section `{$section->uid}` requires `saveEntries:{$section->uid}`\\.\$/");
+            expect($row['message'])->toMatch("/^permission denied: mode `import` on section `{$section->uid}` requires `saveEntries:{$section->uid}`\\.\$/");
         });
     } finally {
         Craft::$app->getUser()->setIdentity($this->admin);
