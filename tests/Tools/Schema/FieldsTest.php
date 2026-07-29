@@ -6,6 +6,7 @@
  */
 
 use Craft;
+use craft\base\FieldInterface;
 use craftpulse\herald\Herald;
 use craftpulse\herald\tools\ToolException;
 
@@ -24,8 +25,31 @@ it('lists fields with type, handle, instructions', function() {
             'id', 'uid', 'name', 'handle', 'type', 'typeDisplayName',
             'instructions', 'searchable', 'translationMethod', 'isRelational',
         ]);
-        expect($field['type'])->toBeString()->toStartWith('craft\\');
+
+        // The tool must report a real field class for every field,
+        // regardless of which plugin registered it. Asserting a `craft\`
+        // namespace prefix here would fail the moment any third-party
+        // field type is installed in the playground (e.g.
+        // percipiolondon/colourswatches, craftpulse/timeloop) — that's a
+        // fact about the playground's plugin roster, not about Herald's
+        // field handling.
+        expect($field['type'])->toBeString();
+        expect(class_exists($field['type']))->toBeTrue();
+        expect(is_subclass_of($field['type'], FieldInterface::class))->toBeTrue();
     }
+});
+
+it('includes a core field type among the reported classes', function() {
+    $result = $this->tool->execute([]);
+
+    if ($result['fields'] === []) {
+        $this->markTestSkipped('No fields in playground.');
+    }
+
+    $types = array_column($result['fields'], 'type');
+    $coreTypes = array_filter($types, fn(string $type): bool => str_starts_with($type, 'craft\\fields\\'));
+
+    expect($coreTypes)->not->toBeEmpty();
 });
 
 it('returns full field detail (with settings) when handle is passed', function() {
