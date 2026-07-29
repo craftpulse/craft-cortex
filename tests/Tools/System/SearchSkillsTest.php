@@ -84,7 +84,7 @@ it('every topics row carries a `source` field', function() {
     }
 });
 
-it('respects the kind filter — agent-only search returns only agents', function() {
+it('respects the kind filter: agent-only search returns only agents', function() {
     $result = $this->tool->execute([
         'mode' => 'search',
         'query' => 'craft',
@@ -99,7 +99,7 @@ it('respects the kind filter — agent-only search returns only agents', functio
     }
 });
 
-it('respects the kind filter — skill-only search returns only routers', function() {
+it('respects the kind filter: skill-only search returns only routers', function() {
     $result = $this->tool->execute([
         'mode' => 'search',
         'query' => 'craft',

@@ -205,7 +205,7 @@ it('declares the Tokens endpoints', function() {
     }
 });
 
-it('every Tokens action is Pro-gated — 403 on Free (Gate 9.7)', function(string $method, array $params) {
+it('every Tokens action is Pro-gated: 403 on Free (Gate 9.7)', function(string $method, array $params) {
     Herald::getInstance()->edition = Herald::EDITION_FREE;
 
     $controller = new _HeraldTokensHarness('settings', Herald::getInstance());

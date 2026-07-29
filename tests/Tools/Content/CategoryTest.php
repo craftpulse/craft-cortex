@@ -121,7 +121,7 @@ it('throws ToolException on unknown mode', function() {
 // filterFor — per-user visibility
 // -----------------------------------------------------------------------------
 
-it('filterFor(null) returns true — stdio is trusted', function() {
+it('filterFor(null) returns true: stdio is trusted', function() {
     herald_with_edition(Herald::EDITION_PRO, function() {
         expect(_herald_category_tool()->filterFor(null))->toBeTrue();
     });

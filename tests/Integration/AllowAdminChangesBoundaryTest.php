@@ -158,7 +158,7 @@ it('no registered tool exposes an admin-bleed enum value under allowAdminChanges
     });
 });
 
-it('the enum walk is non-trivial — system_diagnostics.type carries the expected Free values', function() {
+it('the enum walk is non-trivial: system_diagnostics.type carries the expected Free values', function() {
     // Sanity check that the walk actually traverses the schema. If
     // every tool's `getInputSchema()` suddenly returned no enums, the
     // primary invariant would pass vacuously. This crosses

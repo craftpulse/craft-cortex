@@ -163,7 +163,7 @@ it('lookup() touches lastUsedAt on a hit', function() {
     expect($record->lastUsedAt)->not->toBeNull();
 });
 
-it('lookup() memoizes per-request — second lookup of the same plaintext does not re-query the DB', function() {
+it('lookup() memoizes per-request: second lookup of the same plaintext does not re-query the DB', function() {
     $issued = $this->service->issue($this->userId, '_test_/lookup-memo');
 
     // Fresh service so we own the cache state for the assertion.

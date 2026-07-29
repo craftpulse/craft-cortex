@@ -614,7 +614,7 @@ it('DELETE without Mcp-Session-Id returns 400', function() {
 // GET — reserved for SSE in 7.7, 405 today
 // -----------------------------------------------------------------------------
 
-it('GET returns 405 in sub-gates 7.1–7.2', function() {
+it('GET returns 405 in sub-gates 7.1-7.2', function() {
     $controller = _herald_mcp_harness('GET', [
         Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
         'Authorization' => $this->bearerHeader,
@@ -1228,7 +1228,7 @@ it('a failing tool over HTTP writes a tool_error row with the error class/messag
     Herald::getInstance()->sessions->terminate($sessionId);
 });
 
-it('a revoked bearer 401s before dispatch — no audit row written', function() {
+it('a revoked bearer 401s before dispatch: no audit row written', function() {
     // Establish the baseline row count for the test's bearer.
     $before = (int) \craftpulse\herald\records\Invocation::find()
         ->where(['userId' => $this->userId])
@@ -1438,7 +1438,7 @@ it('a throttled call writes one herald_invocations row with kind=rate_limited an
     Herald::getInstance()->sessions->terminate($firstSessionId);
 });
 
-it('a throttled call does NOT dispatch — no tool-execution audit row, only the throttle row', function() {
+it('a throttled call does NOT dispatch: no tool-execution audit row, only the throttle row', function() {
     Herald::getInstance()->getSettings()->rateLimitBurst = 1;
     Herald::getInstance()->getSettings()->rateLimitPerSecond = 1;
     Herald::getInstance()->rateLimiter->clear($this->userId);

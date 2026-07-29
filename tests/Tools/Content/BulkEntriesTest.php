@@ -167,7 +167,7 @@ it('implements StreamableToolInterface', function() {
 // filterFor
 // -----------------------------------------------------------------------------
 
-it('filterFor(null) returns true — stdio is trusted', function() {
+it('filterFor(null) returns true: stdio is trusted', function() {
     herald_with_edition(Herald::EDITION_PRO, function() {
         expect(_herald_bulk_tool()->filterFor(null))->toBeTrue();
     });

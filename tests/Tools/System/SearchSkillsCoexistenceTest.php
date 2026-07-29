@@ -100,7 +100,7 @@ function _herald_coex_save(string $handle, string $title, ?string $description =
 // Baseline: bundled-only corpus
 // -----------------------------------------------------------------------------
 
-it('bundled-only baseline — rows carry source: bundled', function() {
+it('bundled-only baseline: rows carry source: bundled', function() {
     $result = $this->tool->execute(['mode' => 'topics']);
     expect($result['count'])->toBeGreaterThan(0);
     foreach ($result['topics'] as $row) {

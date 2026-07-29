@@ -120,7 +120,7 @@ it('record() persists tool_error rows with the error class/message', function() 
 // record() — stdio filter (decision 11)
 // -----------------------------------------------------------------------------
 
-it('record() is a no-op for stdio transport — no DB row written', function() {
+it('record() is a no-op for stdio transport: no DB row written', function() {
     $entry = [
         'tool' => '_test_/stdio-filter',
         'kind' => 'success',
@@ -138,7 +138,7 @@ it('record() is a no-op for stdio transport — no DB row written', function() {
     expect((int) $count)->toBe(0);
 });
 
-it('record() is a no-op for unknown transport — no DB row written', function() {
+it('record() is a no-op for unknown transport: no DB row written', function() {
     $entry = [
         'tool' => '_test_/unknown-filter',
         'kind' => 'success',
@@ -291,7 +291,7 @@ it('prune() does not delete rows newer than the retention window', function() {
 // Round-trip parity (locked decision 5)
 // -----------------------------------------------------------------------------
 
-it('record() round-trip parity — DB row reconstitutes byte-equal KV line', function() {
+it('record() round-trip parity: DB row reconstitutes byte-equal KV line', function() {
     // Build a canonical entry, format the KV line, persist via the
     // service, read the row back, reformat from the row, assert
     // equality. Drift between the wire format and the DB column set
@@ -371,7 +371,7 @@ it('find() returns an InvocationQuery bound to the herald_invocations table', fu
     expect($query->from)->toBe([\craftpulse\herald\db\Table::INVOCATIONS]);
 });
 
-it('find() filters compose — toolName + kind + userId resolve to the right rows', function() {
+it('find() filters compose: toolName + kind + userId resolve to the right rows', function() {
     // Seed three rows: two matching, one off on toolName.
     foreach (['_test_/q-a', '_test_/q-a', '_test_/q-b'] as $i => $tool) {
         $this->service->record([

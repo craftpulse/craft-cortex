@@ -220,7 +220,7 @@ it('accepts a valid lowercase-slug handle', function(string $handle) {
     'short' => 'ddev',
 ]);
 
-it('rejects recreating a soft-deleted handle with a clean validation error — no IntegrityException, no orphaned element row', function() {
+it('rejects recreating a soft-deleted handle with a clean validation error: no IntegrityException, no orphaned element row', function() {
     // BLOCKER (Gate 9 hardening): the DB UNIQUE index on
     // herald_skills.handle holds the trashed row, so a default
     // (trashed=false) uniqueness probe used to pass, saveElement()

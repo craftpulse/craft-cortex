@@ -59,7 +59,7 @@ it('throws on get_sdl when schema name is unknown', function() {
     $this->tool->execute(['mode' => 'get_sdl', 'name' => '__definitely_not_a_schema__']);
 })->throws(ToolException::class, "No GraphQL schema found with name '__definitely_not_a_schema__'");
 
-it('lists tokens with metadata only — never the access-token value', function() {
+it('lists tokens with metadata only: never the access-token value', function() {
     $result = $this->tool->execute(['mode' => 'list_tokens']);
 
     expect($result)->toHaveKey('mode', 'list_tokens');

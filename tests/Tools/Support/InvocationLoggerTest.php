@@ -257,7 +257,7 @@ it('fires EVENT_LOG_CALL once per logCall() with the structured entry + formatte
     expect($payload['entry']['duration_ms'])->toBe(12);
 });
 
-it('fires EVENT_LOG_CALL even for stdio invocations — listener filters by transport', function() {
+it('fires EVENT_LOG_CALL even for stdio invocations: listener filters by transport', function() {
     // Decision 11: stdio gets the KV log line, no DB row. The event
     // fires regardless so subscribers can route stdio differently
     // (e.g. mirror to a separate sink); the audit-log listener in

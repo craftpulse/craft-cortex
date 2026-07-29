@@ -207,7 +207,7 @@ it('declares the Activity endpoints', function() {
     }
 });
 
-it('every Activity action is Pro-gated — 403 on Free (Gate 9.7)', function(string $method, array $params) {
+it('every Activity action is Pro-gated: 403 on Free (Gate 9.7)', function(string $method, array $params) {
     Herald::getInstance()->edition = Herald::EDITION_FREE;
 
     $controller = new _HeraldActivityHarness('settings', Herald::getInstance());
@@ -223,7 +223,7 @@ it('every Activity action is Pro-gated — 403 on Free (Gate 9.7)', function(str
     'row detail' => ['actionActivityRow', ['id' => 1]],
 ]);
 
-it('actionConnection is Pro-gated — 403 on Free (Gate 9.7)', function() {
+it('actionConnection is Pro-gated: 403 on Free (Gate 9.7)', function() {
     Herald::getInstance()->edition = Herald::EDITION_FREE;
 
     $controller = new _HeraldActivityHarness('settings', Herald::getInstance());

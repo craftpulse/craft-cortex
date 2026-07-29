@@ -55,21 +55,21 @@
 
         function renderNameCell(value) {
             if (!value) {
-                return '<span class="light">—</span>';
+                return '<span class="light">-</span>';
             }
             return Craft.escapeHtml(value);
         }
 
         function renderTokenPrefixCell(value) {
             if (!value) {
-                return '<span class="light">—</span>';
+                return '<span class="light">-</span>';
             }
             return '<code class="herald-token-prefix">' + Craft.escapeHtml(value) + '…</code>';
         }
 
         function renderUserCell(value) {
             if (!value) {
-                return '<span class="light">—</span>';
+                return '<span class="light">-</span>';
             }
             var label = Craft.escapeHtml(value.label || '');
             if (value.cpEditUrl) {

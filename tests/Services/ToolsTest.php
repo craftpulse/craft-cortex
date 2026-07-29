@@ -81,7 +81,7 @@ function _herald_restore_tools(Tools $original, \Closure $listener): void
 // Invariant: asListPayloadFor(null) === asListPayload()
 // -----------------------------------------------------------------------------
 
-it('asListPayloadFor(null) equals asListPayload() — stdio invariant', function() {
+it('asListPayloadFor(null) equals asListPayload(): stdio invariant', function() {
     $service = Herald::getInstance()->tools;
 
     $stdio = $service->asListPayload();

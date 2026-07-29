@@ -99,7 +99,7 @@ it('60 consecutive consume() calls succeed, the 61st throws RateLimitExceededExc
 // Refill
 // -----------------------------------------------------------------------------
 
-it('after 1 second of simulated time the bucket refills 5 tokens — 5 more consumes succeed before another throw', function() {
+it('after 1 second of simulated time the bucket refills 5 tokens: 5 more consumes succeed before another throw', function() {
     // Drain to empty.
     for ($i = 0; $i < 60; $i++) {
         $this->service->consume($this->userId);

@@ -56,21 +56,21 @@
 
         function renderNameCell(value) {
             if (!value) {
-                return '<span class="light">—</span>';
+                return '<span class="light">-</span>';
             }
             return Craft.escapeHtml(value);
         }
 
         function renderClientIdCell(value) {
             if (!value) {
-                return '<span class="light">—</span>';
+                return '<span class="light">-</span>';
             }
             return '<code>' + Craft.escapeHtml(value) + '</code>';
         }
 
         function renderTypeCell(value) {
             if (!value) {
-                return '<span class="light">—</span>';
+                return '<span class="light">-</span>';
             }
             return Craft.escapeHtml(Craft.t('herald', value));
         }
@@ -84,7 +84,7 @@
 
         function renderRedirectCell(value) {
             if (!value || !value.length) {
-                return '<span class="light">—</span>';
+                return '<span class="light">-</span>';
             }
             return value.map(function(uri) {
                 return '<code>' + Craft.escapeHtml(uri) + '</code>';

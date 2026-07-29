@@ -176,7 +176,7 @@ it('declares the Clients endpoints', function() {
     }
 });
 
-it('every Clients action is Pro-gated — 403 on Free', function(string $method, array $params) {
+it('every Clients action is Pro-gated: 403 on Free', function(string $method, array $params) {
     Herald::getInstance()->edition = Herald::EDITION_FREE;
 
     $controller = new _HeraldClientsHarness('settings', Herald::getInstance());

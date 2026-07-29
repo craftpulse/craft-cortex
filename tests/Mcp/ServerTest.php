@@ -355,7 +355,7 @@ it('returns JSON-RPC -32601 for an unknown method', function() {
 // setUserId() — request-scoped, no static state leak between instances
 // -----------------------------------------------------------------------------
 
-it('setUserId() is request-scoped — separate Server instances do not share user state', function() {
+it('setUserId() is request-scoped: separate Server instances do not share user state', function() {
     $a = new Server(Server::TRANSPORT_HTTP);
     $a->setUserId(101);
 

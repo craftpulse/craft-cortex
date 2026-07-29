@@ -33,7 +33,7 @@ it('throws when expression is missing', function() {
 // Dry-run default
 // -----------------------------------------------------------------------------
 
-it('returns dry-run analysis without confirm — does NOT evaluate', function() {
+it('returns dry-run analysis without confirm: does NOT evaluate', function() {
     $result = $this->tool->execute([
         'expression' => '1 + 1',
     ]);

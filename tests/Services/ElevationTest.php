@@ -31,7 +31,7 @@ it('mints an elevation marker bound to a Craft user id', function() {
     Craft::$app->getCache()->delete($oauth->elevationCacheKey($userId));
 });
 
-it('elevation is bound per-user — a different user id is not elevated', function() {
+it('elevation is bound per-user: a different user id is not elevated', function() {
     $userA = random_int(1_000_000, 4_000_000);
     $userB = random_int(5_000_000, 9_000_000);
     $oauth = Herald::getInstance()->oauth;

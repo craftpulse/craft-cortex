@@ -88,7 +88,7 @@ it('maps content read and write tools to distinct scopes', function() {
         ->and($scopes->scopeForTool('sections'))->toBe(Scopes::SCHEMA_READ);
 });
 
-it('fails closed for an unmapped tool — returns the ungrantable NONE scope', function() {
+it('fails closed for an unmapped tool: returns the ungrantable NONE scope', function() {
     // MAJOR 6: an unmapped tool must NOT default to a read scope. It maps
     // to the NONE sentinel, which is ungrantable (isKnown() rejects it),
     // so no token can ever cover it and grantsTool() denies it over HTTP.

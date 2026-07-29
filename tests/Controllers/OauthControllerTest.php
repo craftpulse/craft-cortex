@@ -866,7 +866,7 @@ it('elevate POST still requires the password when elevatedSessionDuration is 0 (
     }
 });
 
-it('elevation does not cross users — a token bound to a different user is not elevated', function() {
+it('elevation does not cross users: a token bound to a different user is not elevated', function() {
     // MAJOR 4e in the user-keyed model: user A elevates, but the MCP
     // dispatcher gates on the userId the access token is bound to. A token
     // bound to user B therefore sees no elevation from A's grant.
@@ -897,7 +897,7 @@ it('elevation does not cross users — a token bound to a different user is not 
     }
 });
 
-it('elevate has no token query param path (Blocker 2 — no token in URL)', function() {
+it('elevate has no token query param path (Blocker 2: no token in URL)', function() {
     // A token supplied as `?token=` must be irrelevant: elevation is
     // keyed by the logged-in user, and the action never reads a token
     // param. With no password, it must not mint even with a token in the

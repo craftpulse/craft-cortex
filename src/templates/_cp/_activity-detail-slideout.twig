@@ -41,7 +41,7 @@
         <div class="herald-meta-grid">
             <dl>
                 <dt>{{ 'Tool'|t('herald') }}</dt>
-                <dd><code>{{ row.toolName ?? '—' }}</code></dd>
+                <dd><code>{{ row.toolName ?? '-' }}</code></dd>
 
                 {% if mode %}
                     <dt>{{ 'Mode'|t('herald') }}</dt>
@@ -64,10 +64,10 @@
                 <dd>{{ row.durationMs ?? 0 }}ms</dd>
 
                 <dt>{{ 'Transport'|t('herald') }}</dt>
-                <dd>{{ row.transport ?? '—' }}</dd>
+                <dd>{{ row.transport ?? '-' }}</dd>
 
                 <dt>{{ 'Client'|t('herald') }}</dt>
-                <dd>{{ row.clientName ?? '—' }}</dd>
+                <dd>{{ row.clientName ?? '-' }}</dd>
 
                 {% if row.sessionId is defined and row.sessionId %}
                     <dt>{{ 'Session'|t('herald') }}</dt>
@@ -85,7 +85,7 @@
                 {% endif %}
 
                 <dt>{{ 'When'|t('herald') }}</dt>
-                <dd>{{ row.dateCreated ? row.dateCreated|datetime('short') : '—' }}</dd>
+                <dd>{{ row.dateCreated ? row.dateCreated|datetime('short') : '-' }}</dd>
             </dl>
         </div>
 
