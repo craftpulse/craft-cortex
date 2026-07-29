@@ -72,7 +72,7 @@ class _HeraldAllowlistHarness extends SettingsController
 
     public function requirePermission(string $permission): void
     {
-        // no-op — grant actions gate on herald:manageGrants; the harness
+        // no-op — grant actions gate on herald:manage-grants; the harness
         // runs the body without a logged-in identity.
     }
 

@@ -15,7 +15,7 @@
  *     elements.
  *   - Idempotency cache hit on `create`.
  *   - Handle-change refusal on `update` (natural-key invariant).
- *   - Permission denial for users without `manageHeraldSkills`.
+ *   - Permission denial for users without `herald:manage-skills`.
  *   - Trashed resolution emits the restore-hint message.
  *   - Override behaviour: creating a skill with a bundled handle
  *     succeeds; deleting the override re-surfaces the bundled row.
@@ -138,7 +138,7 @@ it('filterFor returns true for admin users', function() {
     });
 });
 
-it('filterFor returns false for users without manageHeraldSkills', function() {
+it('filterFor returns false for users without herald:manage-skills', function() {
     $user = new User();
     $user->username = $this->fixturePrefix . 'no_perms';
     $user->email = $user->username . '@example.test';
@@ -535,7 +535,7 @@ it('the same idempotencyKey returns the cached envelope without re-saving', func
 // Permission gating
 // -----------------------------------------------------------------------------
 
-it('create mode throws ToolException for users without manageHeraldSkills', function() {
+it('create mode throws ToolException for users without herald:manage-skills', function() {
     herald_with_edition(Herald::EDITION_PRO, function() {
         $unprivileged = new User();
         $unprivileged->username = $this->fixturePrefix . 'denied';

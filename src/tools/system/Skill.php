@@ -45,7 +45,7 @@ use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
  *   - `delete` — soft-delete by default; `hardDelete: true` removes the
  *                row entirely (FK CASCADE wipes `herald_skills`).
  *
- * Permission contract — `manageHeraldSkills` (global, no per-instance
+ * Permission contract — `herald:manage-skills` (global, no per-instance
  * ACL). Admins always pass; non-admins pass when granted the
  * permission. The element's `canSave / canDelete / canView /
  * canDuplicate` overrides resolve to the same permission; the mode
@@ -142,7 +142,7 @@ class Skill extends AbstractTool
             'source=bundled / element / all (default all). create requires handle + title; ' .
             'update accepts id / uid / handle but rejects handle changes (natural-key ' .
             'invariant). delete soft-deletes by default; hardDelete=true removes the row ' .
-            'entirely and cascades the herald_skills FK. Permission: manageHeraldSkills ' .
+            'entirely and cascades the herald_skills FK. Permission: herald:manage-skills ' .
             '(global, no per-instance ACL). idempotencyKey caches the result for 24h.';
     }
 
@@ -199,7 +199,7 @@ class Skill extends AbstractTool
      * @inheritdoc
      *
      * stdio is trusted; admins always pass; non-admins need
-     * `manageHeraldSkills`. Mirrors `Address::filterFor()` shape.
+     * `herald:manage-skills`. Mirrors `Address::filterFor()` shape.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -263,7 +263,7 @@ class Skill extends AbstractTool
 
     /**
      * Permission gate — every mutating mode requires
-     * `manageHeraldSkills`. Read modes (`list` / `get`) skip the
+     * `herald:manage-skills`. Read modes (`list` / `get`) skip the
      * mutation gate but still consult `filterFor()` for whole-tool
      * visibility upstream.
      *

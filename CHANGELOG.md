@@ -6,6 +6,35 @@ All notable changes to Herald are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed - permission handles are kebab-case
+
+- **Every Herald permission handle is now `herald:<kebab-case-action>`**,
+  matching the estate-wide convention. Craft lowercases permission names
+  on both write and check, so camelCase handles lost their word
+  boundaries in the database (`herald:managesettings`); kebab-case keeps
+  them readable in the `userpermissions` table, in project config, and in
+  exports.
+
+  | Old | New |
+  | --- | --- |
+  | `herald:manageSettings` | `herald:manage-settings` |
+  | `herald:manageGrants` | `herald:manage-grants` |
+  | `herald:viewActivity` | `herald:view-activity` |
+  | `manageHeraldSkills` | `herald:manage-skills` |
+
+- **The skills handle is now namespaced.** It was the one Herald handle
+  registered without the `herald:` prefix, so it is both prefixed and
+  kebab-cased in this change.
+- **A migration carries existing grants over automatically.** User
+  grants, group grants, and the project-config group permission lists are
+  all repointed at the new handles and the old permission rows are
+  removed, so no grantee loses access and no dead handle is left behind.
+  Nothing to do on upgrade beyond `craft up`.
+- Craft's own permissions (`accessCp`, `editUsers`, `utility:queue-manager`
+  and the rest) are untouched, as are Herald's colon-suffixed cache keys
+  (`herald:session:`, `herald:cancel:`, `herald:elevation:` and friends),
+  which were never permissions.
+
 ### Added - tamper-evident audit trail (Audit Kit emission)
 
 - **Native Audit Kit emission.** Herald now emits native

@@ -188,7 +188,7 @@ Issue, list, and revoke long-lived HTTP-transport bearer tokens. Each token is b
 
 ### Activity
 
-Browse the `herald_invocations` audit log — one row per tool invocation, with tool name, transport, user, duration, outcome, and a redacted argument / response excerpt. Gated on the `herald:viewActivity` permission (`Herald::PERMISSION_VIEW_ACTIVITY`) rather than admin, so you can grant audit visibility without granting settings access.
+Browse the `herald_invocations` audit log — one row per tool invocation, with tool name, transport, user, duration, outcome, and a redacted argument / response excerpt. Gated on the `herald:view-activity` permission (`Herald::PERMISSION_VIEW_ACTIVITY`) rather than admin, so you can grant audit visibility without granting settings access.
 
 ### Connection
 

@@ -161,10 +161,10 @@ it('skill permission-denied message matches `permission denied — mode `<mode>`
     herald_with_edition(Herald::EDITION_PRO, function() {
         $message = _herald_invoke_permission_denied_message(
             new Skill(),
-            'herald:editSkills',
+            'herald:manage-skills',
             ['mode' => 'create'],
         );
-        expect($message)->toBe('permission denied — mode `create` requires `herald:editSkills`.');
+        expect($message)->toBe('permission denied — mode `create` requires `herald:manage-skills`.');
     });
 });
 

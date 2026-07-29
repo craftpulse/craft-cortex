@@ -51,7 +51,7 @@
 {# Read-only when the environment forbids admin changes: the save button
    and form wrapper disappear (fullPageForm), every input is disabled, and
    the save action fails closed with a 403 regardless. Access to the screen
-   itself is a separate axis, gated by the herald:manageSettings permission
+   itself is a separate axis, gated by the herald:manage-settings permission
    in the controller. #}
 {% set fullPageForm = allowAdminChanges %}
 

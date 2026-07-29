@@ -302,7 +302,7 @@ it('non-admin without permission is denied across the can-suite', function() {
 // Permission registration
 // -----------------------------------------------------------------------------
 
-it('registers `manageHeraldSkills` under a `Herald` heading', function() {
+it('registers `herald:manage-skills` under a `Herald` heading', function() {
     $permissions = Craft::$app->getUserPermissions()->getAllPermissions();
     $heraldBlock = null;
     foreach ($permissions as $block) {

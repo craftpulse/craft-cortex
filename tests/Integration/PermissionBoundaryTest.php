@@ -351,7 +351,7 @@ it('Skill denies a non-permitted user with ToolException + tool_error audit row'
 
         expect($result['exception'])->toBeInstanceOf(ToolException::class);
         expect($result['exception']->getMessage())
-            ->toStartWith('permission denied — mode `create` requires `manageHeraldSkills`');
+            ->toStartWith('permission denied — mode `create` requires `herald:manage-skills`');
 
         expect($result['auditRow'])->not->toBeNull();
         expect($result['auditRow']->kind)->toBe('tool_error');

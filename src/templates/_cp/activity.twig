@@ -6,7 +6,7 @@
    audit log + filter bar + row-click Garnish.Slideout detail.
 
    The log records one row per authenticated Streamable-HTTP `tools/call`.
-   Admins audit every row; non-admins granted `herald:viewActivity` see
+   Admins audit every row; non-admins granted `herald:view-activity` see
    ONLY their own rows — the scope is enforced server-side in
    `SettingsController::actionActivityTableData` and cannot be widened by
    the `filters[userId]` param (fail-closed, decision 7).

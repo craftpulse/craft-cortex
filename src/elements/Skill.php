@@ -38,7 +38,7 @@ use yii\base\InvalidConfigException;
  *     field; the field layout is editable through the field-layout
  *     designer when Gate 9 ships the CP UI.
  *
- * Permission contract: `manageHeraldSkills` is a single global
+ * Permission contract: `herald:manage-skills` is a single global
  * permission registered via Herald's `EVENT_REGISTER_PERMISSIONS`
  * listener. Admins always pass; non-admins pass when granted the
  * permission. There is no per-instance ACL.
@@ -64,7 +64,7 @@ class Skill extends Element
      *
      * @since 5.0.0
      */
-    public const PERMISSION_MANAGE = 'manageHeraldSkills';
+    public const PERMISSION_MANAGE = 'herald:manage-skills';
 
     /**
      * Slug-format constraint on the handle (the skill's natural key).
@@ -536,7 +536,7 @@ class Skill extends Element
     /**
      * Resolve whether the given user can manage Herald skills. Admins
      * always pass; non-admins pass when granted the
-     * `manageHeraldSkills` permission. Centralised here so
+     * `herald:manage-skills` permission. Centralised here so
      * `canView/canSave/canDelete/canDuplicate` all share a single
      * implementation.
      *

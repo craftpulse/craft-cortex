@@ -68,7 +68,7 @@ it('shows all items to an admin on Pro', function() {
 });
 
 it('shows only Activity to a non-admin with viewActivity on Pro', function() {
-    // A non-admin user granted only `herald:viewActivity`. The playground
+    // A non-admin user granted only `herald:view-activity`. The playground
     // may not seed one; skip rather than fail the suite if absent.
     $nonAdmin = User::find()
         ->admin(false)
@@ -77,7 +77,7 @@ it('shows only Activity to a non-admin with viewActivity on Pro', function() {
         ->first(fn(User $u): bool => $u->can(Herald::PERMISSION_VIEW_ACTIVITY));
 
     if (!$nonAdmin instanceof User) {
-        $this->markTestSkipped('No non-admin user with herald:viewActivity in the playground.');
+        $this->markTestSkipped('No non-admin user with herald:view-activity in the playground.');
     }
 
     Craft::$app->getUser()->setIdentity($nonAdmin);

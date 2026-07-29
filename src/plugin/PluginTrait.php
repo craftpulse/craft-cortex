@@ -233,17 +233,17 @@ trait PluginTrait
      * heading on the user-permissions screen.
      *
      *   - `SettingsController::PERMISSION_MANAGE_SETTINGS`
-     *     (`herald:manageSettings`) — gates the Settings screen
+     *     (`herald:manage-settings`) — gates the Settings screen
      *     (`actionIndex` / `actionSave`) per the estate settings-permission
      *     doctrine; `allowAdminChanges` still gates whether a save writes.
      *   - `SettingsController::PERMISSION_MANAGE_GRANTS`
-     *     (`herald:manageGrants`) — gates the Temporary grants screen and
+     *     (`herald:manage-grants`) — gates the Temporary grants screen and
      *     its issue / revoke actions. Its own permission because issuing a
      *     grant widens the `craft_command` allowlist for a user.
-     *   - `Skill::PERMISSION_MANAGE` (`manageHeraldSkills`) — global
+     *   - `Skill::PERMISSION_MANAGE` (`herald:manage-skills`) — global
      *     (no per-instance ACL); the element's `canSave / canDelete /
      *     canView / canDuplicate` overrides consult it directly.
-     *   - `Herald::PERMISSION_VIEW_ACTIVITY` (`herald:viewActivity`) —
+     *   - `Herald::PERMISSION_VIEW_ACTIVITY` (`herald:view-activity`) —
      *     gates the Activity tab (Gate 9.3); the controller scopes
      *     queries to the caller's own rows when the user is non-admin.
      *

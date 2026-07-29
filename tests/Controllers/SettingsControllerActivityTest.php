@@ -11,7 +11,7 @@
  *   - `actionActivityRow`        — redacted-detail slideout payload.
  *
  * The headline invariant is the fail-closed permission scope: an admin
- * sees every row; a non-admin granted `herald:viewActivity` sees ONLY
+ * sees every row; a non-admin granted `herald:view-activity` sees ONLY
  * their own rows, and cannot widen the result by posting a foreign
  * `filters[userId]`. The harness no-ops the permission gate, so scoping
  * is asserted against the controller's own identity-driven logic — the

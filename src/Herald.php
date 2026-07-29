@@ -96,7 +96,7 @@ class Herald extends BasePlugin
      *
      * @since 5.0.0
      */
-    public const PERMISSION_VIEW_ACTIVITY = 'herald:viewActivity';
+    public const PERMISSION_VIEW_ACTIVITY = 'herald:view-activity';
 
     // Public Properties
     // =========================================================================
@@ -104,7 +104,7 @@ class Herald extends BasePlugin
     /**
      * @inheritdoc
      */
-    public string $schemaVersion = '1.1.0';
+    public string $schemaVersion = '1.2.0';
 
     /**
      * @inheritdoc
@@ -253,13 +253,13 @@ class Herald extends BasePlugin
      * nav never widens access; it only hides what the user can't reach.
      *
      * Subnav map (in display order):
-     *   - Settings          — `herald:manageSettings` permission, all editions.
-     *   - Temporary grants   — `herald:manageGrants` permission, all
+     *   - Settings          — `herald:manage-settings` permission, all editions.
+     *   - Temporary grants   — `herald:manage-grants` permission, all
      *                          editions (the per-user runtime grant surface;
      *                          route handle stays `allowlist`).
      *   - Tokens            — admin + Pro.
      *   - Clients           — admin + Pro (OAuth client approval gate).
-     *   - Activity          — `herald:viewActivity` + Pro (admins pass
+     *   - Activity          — `herald:view-activity` + Pro (admins pass
      *                          implicitly via `can()`).
      *   - Connection        — admin + Pro.
      *

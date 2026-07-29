@@ -79,7 +79,7 @@ class SettingsController extends Controller
      *
      * @since 5.0.0
      */
-    public const PERMISSION_MANAGE_SETTINGS = 'herald:manageSettings';
+    public const PERMISSION_MANAGE_SETTINGS = 'herald:manage-settings';
 
     /**
      * Permission that grants access to the Temporary grants screen and the
@@ -97,7 +97,7 @@ class SettingsController extends Controller
      *
      * @since 5.0.0
      */
-    public const PERMISSION_MANAGE_GRANTS = 'herald:manageGrants';
+    public const PERMISSION_MANAGE_GRANTS = 'herald:manage-grants';
 
     // Public Methods
     // =========================================================================
@@ -681,7 +681,7 @@ class SettingsController extends Controller
      * `filters[from]`, `filters[to]` (a `dateCreated` bracket).
      *
      * **Permission scoping — fail closed.** An admin sees every row; a
-     * non-admin (granted `herald:viewActivity` but not admin) sees ONLY
+     * non-admin (granted `herald:view-activity` but not admin) sees ONLY
      * rows whose `userId` equals their own. The scope is applied
      * unconditionally on the query before any caller-supplied filter, so
      * a non-admin cannot widen it by posting `filters[userId]=<other>` —
