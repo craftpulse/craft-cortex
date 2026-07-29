@@ -38,8 +38,7 @@ beforeEach(function() {
     // Real user + token ids so the FK constraints on
     // `herald_invocations.userId` / `.tokenId` don't trip the
     // happy-path tests.
-    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    $admin = herald_admin_user();
     expect($admin)->not->toBeNull();
     $this->userId = (int) $admin->id;
 

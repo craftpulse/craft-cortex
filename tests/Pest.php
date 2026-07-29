@@ -16,6 +16,7 @@
  * @since  5.0.0
  */
 
+use craft\elements\User;
 use craftpulse\herald\Herald;
 use PHPUnit\Framework\TestCase;
 
@@ -64,6 +65,36 @@ expect()->extend('toBeMcpErrorEnvelope', function() {
 // -----------------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------------
+
+/**
+ * Resolve an admin user to act as for tests that need an authenticated,
+ * fully-privileged identity.
+ *
+ * Tests must never name a specific account: the suite runs against the
+ * surrounding Craft install (see `tests/Bootstrap.php`), so a hardcoded
+ * username couples every permission test to one developer's playground
+ * and returns null everywhere else, including on a clean CI runner. The
+ * identity itself is incidental to what these tests assert; only the
+ * admin flag matters, so the query resolves the lowest-id admin and is
+ * stable across runs.
+ *
+ * Returns null only on an install with no admin at all. Callers keep
+ * their `expect(...)->not->toBeNull()` guard so that case fails loudly
+ * rather than silently acting as an anonymous user.
+ *
+ * @author Craftpulse
+ * @since  5.0.0
+ */
+function herald_admin_user(): ?User
+{
+    /** @var ?User $admin */
+    $admin = User::find()
+        ->admin()
+        ->orderBy(['elements.id' => SORT_ASC])
+        ->one();
+
+    return $admin;
+}
 
 /**
  * Decode the JSON payload out of a tools/call success envelope so tests

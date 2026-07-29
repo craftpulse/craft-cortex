@@ -33,8 +33,7 @@ beforeEach(function() {
     // Resolve a playground admin user once — used as the "permitted"
     // caller in filterFor stubs. Same lookup as TokensTest /
     // OauthTest so test envs stay aligned.
-    $this->admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    $this->admin = herald_admin_user();
     expect($this->admin)->not->toBeNull();
 });
 

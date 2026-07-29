@@ -68,8 +68,7 @@ use craftpulse\herald\tools\ToolInterface;
 // -----------------------------------------------------------------------------
 
 beforeEach(function() {
-    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    $admin = herald_admin_user();
     expect($admin)->not->toBeNull();
     Craft::$app->getUser()->setIdentity($admin);
     $this->admin = $admin;

@@ -28,9 +28,9 @@ use craft\elements\User;
 use craftpulse\herald\Herald;
 
 beforeEach(function() {
-    $this->admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio');
+    $this->admin = herald_admin_user();
     if (!$this->admin instanceof User) {
-        $this->markTestSkipped('No admin user `michtio` in the playground.');
+        $this->markTestSkipped('No admin user on the surrounding Craft install.');
     }
 });
 

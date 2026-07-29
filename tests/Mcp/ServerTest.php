@@ -829,6 +829,15 @@ it('matchTemplate returns null when no template matches', function() {
 // -----------------------------------------------------------------------------
 
 it('tools/list over HTTP omits a tool whose filterFor returns false for the resolved user', function() {
+    // Resolve the identity BEFORE registering the listener and swapping
+    // the registry. Anything that can fail has to run outside the
+    // try/finally window: a throw between the swap and the `try` leaks
+    // the stub tool into the process-wide registry, and every later
+    // test that counts registered tools or maps them to OAuth scopes
+    // then fails on state this test created.
+    $admin = herald_admin_user();
+    expect($admin)->not->toBeNull();
+
     // Register a stub tool that only the null-user (stdio) caller sees.
     // The HTTP path resolves the bound userId to a real User and the
     // stub returns false for it, so the tool drops out of tools/list.
@@ -866,8 +875,7 @@ it('tools/list over HTTP omits a tool whose filterFor returns false for the reso
     $freshTools->init();
     Herald::getInstance()->set('tools', $freshTools);
 
-    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    $admin = herald_admin_user();
     expect($admin)->not->toBeNull();
 
     try {
@@ -901,6 +909,11 @@ it('tools/list over HTTP omits a tool whose filterFor returns false for the reso
 });
 
 it('tools/call over HTTP rejects a tool whose filterFor returns false as Unknown tool', function() {
+    // Resolve the identity before the registry swap, for the same
+    // leak reason documented on the tools/list filter test above.
+    $admin = herald_admin_user();
+    expect($admin)->not->toBeNull();
+
     // A non-admin user (null-user-only stub) tries to call the tool
     // through the HTTP path. The dispatcher must fail closed —
     // indistinguishable from "tool not registered" on the wire.
@@ -937,10 +950,6 @@ it('tools/call over HTTP rejects a tool whose filterFor returns false as Unknown
     $freshTools = new \craftpulse\herald\services\Tools();
     $freshTools->init();
     Herald::getInstance()->set('tools', $freshTools);
-
-    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
-    expect($admin)->not->toBeNull();
 
     try {
         $http = new Server(Server::TRANSPORT_HTTP);

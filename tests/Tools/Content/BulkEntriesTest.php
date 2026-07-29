@@ -38,8 +38,7 @@ use craftpulse\herald\tools\ToolException;
 beforeEach(function() {
     $this->fixturePrefix = '__herald_bulktest_' . bin2hex(random_bytes(4)) . '_';
 
-    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    $admin = herald_admin_user();
     expect($admin)->not->toBeNull();
     Craft::$app->getUser()->setIdentity($admin);
     $this->admin = $admin;

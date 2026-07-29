@@ -45,8 +45,7 @@ beforeEach(function() {
     // (lowercase letters, digits, single hyphens).
     $this->fixturePrefix = 'herald-skilltest-' . bin2hex(random_bytes(4)) . '-';
 
-    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    $admin = herald_admin_user();
     expect($admin)->not->toBeNull();
     Craft::$app->getUser()->setIdentity($admin);
     $this->admin = $admin;

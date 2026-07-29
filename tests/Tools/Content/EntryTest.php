@@ -49,8 +49,7 @@ beforeEach(function() {
     // Bind the admin user as the dispatch identity. Per-mode permission
     // tests later switch to a non-admin or a User-with-permissions to
     // exercise the boundary.
-    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    $admin = herald_admin_user();
     expect($admin)->not->toBeNull();
     Craft::$app->getUser()->setIdentity($admin);
     $this->admin = $admin;

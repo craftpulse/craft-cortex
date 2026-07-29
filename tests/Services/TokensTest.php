@@ -28,8 +28,7 @@ beforeEach(function() {
     // The playground always has at least one admin user; we use it as
     // the userId binding for issued tokens. Resolving via the lookup
     // catches CI envs where the seeded user has shifted.
-    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    $admin = herald_admin_user();
     expect($admin)->not->toBeNull();
     $this->userId = (int) $admin->id;
 });

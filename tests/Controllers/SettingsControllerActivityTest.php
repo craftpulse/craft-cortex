@@ -126,8 +126,7 @@ class _HeraldActivityRequest
  */
 function _heraldActivityAdmin(): User
 {
-    $user = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    $user = herald_admin_user();
     expect($user)->not->toBeNull();
     return $user;
 }

@@ -86,9 +86,7 @@ beforeEach(function() {
     $bus->setSinks([$this->sink]);
     Herald::getInstance()->audit->setBus($bus);
 
-    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com')
-        ?? \craft\elements\User::find()->admin()->one();
+    $admin = herald_admin_user();
     $this->userId = $admin !== null ? (int) $admin->id : 1;
 });
 

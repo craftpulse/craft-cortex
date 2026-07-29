@@ -312,8 +312,7 @@ it('actionAllowlistTableData pagination respects per_page', function() {
 });
 
 it('actionAllowlistTableData serialises createdBy from the user record', function() {
-    $user = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    $user = herald_admin_user();
     expect($user)->not->toBeNull();
 
     Herald::getInstance()->allowlist->add(pattern: 'audit/*', userId: (int) $user->id, note: 'attributed', ttlSeconds: 3600);

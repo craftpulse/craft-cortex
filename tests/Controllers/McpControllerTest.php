@@ -228,8 +228,7 @@ beforeEach(function() {
     // Auth scaffolding — issue a fresh bearer token bound to the
     // playground's admin user for the majority of tests. Tests that
     // exercise the no-auth / bad-auth paths swap the header out.
-    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    $admin = herald_admin_user();
     expect($admin)->not->toBeNull();
     $this->userId = (int) $admin->id;
 

@@ -66,8 +66,7 @@ function _herald_token_harness(array $options = []): _HeraldTokenControllerHarne
 }
 
 beforeEach(function() {
-    $admin = Craft::$app->getUsers()->getUserByUsernameOrEmail('michtio')
-        ?? Craft::$app->getUsers()->getUserByUsernameOrEmail('development@craftpulse.com');
+    $admin = herald_admin_user();
     expect($admin)->not->toBeNull();
     $this->userId = (int) $admin->id;
     $this->userHandle = (string) ($admin->username ?? $admin->email);
