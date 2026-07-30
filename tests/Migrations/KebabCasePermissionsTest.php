@@ -20,10 +20,21 @@
  * alone.
  *
  * Fixture strategy: permission names are fixed handles and cannot be
- * prefixed, so `afterEach` deletes exactly the Herald handle set (old,
- * new, and per-entity forms) along with the throwaway users and groups.
- * The playground carries no Herald grants at baseline, so that scope is
- * surgical.
+ * prefixed, so cleanup targets exactly the Herald handle set (old, new,
+ * and per-entity forms) along with the throwaway users and groups. The
+ * content fixtures pre-seed a real `herald:view-activity` grant on a
+ * non-admin user, and that grant must survive this suite.
+ *
+ * A row-id snapshot is not enough: `m260729_160000_kebab_case_permissions`
+ * merges onto an already-existing target row by deleting BOTH the old and
+ * the new permission rows and reinserting the new name under a fresh id
+ * (`_moveGrants()`), so a permission id captured before a migration run is
+ * not the id the surviving grant lives on afterward. `afterEach` therefore
+ * cleans up by orphan status instead of by id: it removes this test's own
+ * throwaway users and groups FIRST (their join rows cascade away with
+ * them), then deletes only the Herald-handle-set permission rows left with
+ * no grantee at all. A row a real, pre-existing grantee still holds is
+ * never a candidate, regardless of which id it ends up on.
  *
  * **SEQUENTIAL ONLY** — one test writes to
  * `users.groups.<uid>.permissions` in project config. Concurrent readers
@@ -54,10 +65,6 @@ beforeEach(function() {
 });
 
 afterEach(function() {
-    Craft::$app->getDb()->createCommand()
-        ->delete(CraftTable::USERPERMISSIONS, _herald_permission_cleanup_condition())
-        ->execute();
-
     foreach ($this->fixtureGroupIds as $groupId) {
         UserGroupRecord::deleteAll(['id' => $groupId]);
     }
@@ -72,6 +79,13 @@ afterEach(function() {
     foreach ($users as $user) {
         Craft::$app->getElements()->deleteElement($user, hardDelete: true);
     }
+
+    // The throwaway grantees are gone (and their join rows with them, via
+    // FK CASCADE), so any Herald-handle-set row with no grantee left is
+    // safe to remove. A row a real, pre-existing grantee still holds is
+    // not a candidate here regardless of which id the migration left it
+    // on.
+    _herald_delete_orphaned_permissions();
 
     Craft::$app->getUserPermissions()->reset();
 });
@@ -159,6 +173,50 @@ function _herald_permission_id(string $name): ?int
         ->scalar(Craft::$app->getDb());
 
     return ($id === false || $id === null) ? null : (int) $id;
+}
+
+/**
+ * Deletes every Herald-handle-set permission row that no longer has any
+ * grantee, in either grant table. Called after this test's own throwaway
+ * users and groups are already gone, so a row a real grantee (for
+ * example, the content fixtures' non-admin `herald:view-activity` holder)
+ * still holds is never a candidate, no matter which id the rename
+ * migration left the row on.
+ */
+function _herald_delete_orphaned_permissions(): void
+{
+    $candidateIds = (new Query())
+        ->select(['id'])
+        ->from([CraftTable::USERPERMISSIONS])
+        ->where(_herald_permission_cleanup_condition())
+        ->column();
+
+    if ($candidateIds === []) {
+        return;
+    }
+
+    $grantedIds = array_unique(array_merge(
+        (new Query())
+            ->select(['permissionId'])
+            ->from([CraftTable::USERPERMISSIONS_USERS])
+            ->where(['permissionId' => $candidateIds])
+            ->column(),
+        (new Query())
+            ->select(['permissionId'])
+            ->from([CraftTable::USERPERMISSIONS_USERGROUPS])
+            ->where(['permissionId' => $candidateIds])
+            ->column(),
+    ));
+
+    $orphanIds = array_diff($candidateIds, $grantedIds);
+
+    if ($orphanIds === []) {
+        return;
+    }
+
+    Craft::$app->getDb()->createCommand()
+        ->delete(CraftTable::USERPERMISSIONS, ['id' => array_values($orphanIds)])
+        ->execute();
 }
 
 /**
