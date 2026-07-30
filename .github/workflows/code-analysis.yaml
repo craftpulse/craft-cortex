@@ -60,25 +60,38 @@ jobs:
   #   4. the plugin's own vendor directory, because the canonical
   #      invocation is plugin-local: Pest runs from the plugin root with
   #      its own binary so a conflicting Pest or craft-pest-core in the
-  #      surrounding install's vendor can never hijack the run.
+  #      surrounding install's vendor can never hijack the run,
+  #   5. the content fixtures, because a tier of tests asserts against
+  #      named content rather than response shape.
   #
-  # KNOWN COVERAGE GAP - no content is seeded here, so the tier of tests
-  # that asserts against seeded content does not execute in CI.
+  # The fixture step installs the contract documented in
+  # `tests/fixtures/FixtureInstaller.php`: the `heroes` / `minorHeroes` /
+  # `teams` / `about` sections, 13 fields, the `images` volume, the
+  # `factions` category group, the `infinityStones` tag group, the
+  # `shieldDirective` global set, 150 `Minor Hero %04d` entries, two
+  # referenced assets, and the `nfury` and activity-viewer users. It
+  # mirrors the dev playground's Marvel seed handle for handle, so both
+  # runners satisfy the same assertions. It must run after the edition is
+  # set to Pro (Solo permits exactly one user) and it never creates a
+  # site: `AuditFixModesTest` asserts `repair_propagation` finds zero
+  # propagation gaps, which only holds on a single-site install.
   #
-  # Most tools assert on response *shape* rather than on specific
-  # records, and the tests that need content create and tear down their
-  # own fixtures, so the large majority runs on a bare install. The
-  # remainder targets named sections (`heroes`, `minorHeroes`) and asset
-  # volumes that exist only in the dev playground, whose content
-  # migrations live in that separate repository rather than in this one.
-  # Those tests skip themselves explicitly, naming the missing seed, so
-  # the shortfall is visible in the run summary as a skip count rather
-  # than hidden behind a filter or an excluded directory. Nothing is
-  # excluded from the invocation: the whole suite is always executed.
+  # `composer test:ci` then runs Pest with `--fail-on-skipped`, so the
+  # zero-skip contract is enforced rather than merely reported. A skip in
+  # this job means the fixtures no longer satisfy something the suite
+  # needs, and the fixture step's own report (printed above the Pest
+  # output) names the missing invariant. If `--fail-on-skipped` ever
+  # stops being honoured through Pest, the fallback is
+  # `pest --log-junit junit.xml` plus a grep asserting the file contains
+  # no `<skipped` elements.
   #
-  # Closing the gap means giving Herald its own content fixtures instead
-  # of borrowing the playground's. That is a harness decision, not a CI
-  # one, and it is deliberately not made here.
+  # One caveat, deliberately not worked around here: the suite consumes
+  # the activity-viewer's permission grant, because
+  # `KebabCasePermissionsTest`'s cleanup deletes the
+  # `herald:view-activity` row from `userpermissions`, which cascades the
+  # grant away. That is invisible in CI, where the fixture step always
+  # runs immediately before Pest, but it means a second local run needs
+  # `composer test:fixtures` again to reach zero skips.
   pest:
     name: Pest
     runs-on: ubuntu-latest
@@ -186,11 +199,21 @@ jobs:
           composer config repositories.craft-audit-kit vcs https://github.com/craftpulse/craft-audit-kit.git
           composer install --no-interaction --no-ansi --no-progress
 
+      # Same contract as the Pest step below: run from the plugin root,
+      # locate the Craft install through `HERALD_TEST_CRAFT_BASE`.
+      - name: Install the Herald content fixtures
+        working-directory: plugin
+        env:
+          HERALD_TEST_CRAFT_BASE: ${{ github.workspace }}/cms
+        run: composer test:fixtures
+
       # Run from the plugin's own root, through its own Pest binary. The
       # bootstrap finds the Craft install through `HERALD_TEST_CRAFT_BASE`
-      # rather than the working directory.
+      # rather than the working directory. `test:ci` adds
+      # `--fail-on-skipped`; `composer test` stays graceful for local runs
+      # against an unfixtured install.
       - name: Run Pest
         working-directory: plugin
         env:
           HERALD_TEST_CRAFT_BASE: ${{ github.workspace }}/cms
-        run: composer test
+        run: composer test:ci
