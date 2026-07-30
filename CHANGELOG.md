@@ -26,6 +26,18 @@ All notable changes to Herald are documented here. Format follows
   protocol payload the model reads, not operator-facing copy, and are
   deliberately out of scope here.
 
+- **Four progress/log strings missed by the initial sweep are reworded**
+  the same way: the `bulk_entries` and `scaffold_entries` idempotency-hit
+  progress frame, the `content_audit` propagation `hint` payload (both
+  branches), and the registry-collision `Craft::warning()` line.
+
+  | Old | New |
+  | --- | --- |
+  | `Idempotency cache hit — returning cached envelope.` | `Idempotency cache hit: returning cached envelope.` |
+  | `` `totalCount` counts gaps found within the scanned subset only — `` | `` `totalCount` counts gaps found within the scanned subset only: `` |
+  | `... was reached — additional sections were not scanned.` | `... was reached. Additional sections were not scanned.` |
+  | ``%s %s collision on "%s" — first registration (%s) wins; ignoring %s.`` | ``%s %s collision on "%s": first registration (%s) wins; ignoring %s.`` |
+
 ### Changed - permission handles are kebab-case
 
 - **Every Herald permission handle is now `herald:<kebab-case-action>`**,

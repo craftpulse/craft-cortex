@@ -706,7 +706,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
             $payload['truncatedSections'] = $truncatedSections;
             $payload['truncationCap'] = self::PROPAGATION_SECTION_ROW_CAP;
             $payload['hint'] = 'One or more sections exceeded the per-section row cap. ' .
-                '`totalCount` counts gaps found within the scanned subset only — ' .
+                '`totalCount` counts gaps found within the scanned subset only: ' .
                 'sections that hit the cap may have additional un-scanned gaps. ' .
                 'Narrow with the `section` filter for an exhaustive scan of a single section.';
         }
@@ -718,7 +718,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
                 : '';
             $payload['hint'] .= 'The global gap cap of '
                 . self::PROPAGATION_GLOBAL_GAP_CAP
-                . ' was reached — additional sections were not scanned. '
+                . ' was reached. Additional sections were not scanned. '
                 . 'Narrow with the `section` filter to inspect specific sections.';
         }
 

@@ -227,7 +227,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
     {
         $cacheHit = $this->_idempotencyCacheHit($arguments);
         if ($cacheHit !== null) {
-            yield ['progress' => 1, 'total' => 1, 'message' => 'Idempotency cache hit — returning cached envelope.'];
+            yield ['progress' => 1, 'total' => 1, 'message' => 'Idempotency cache hit: returning cached envelope.'];
             return $cacheHit;
         }
 

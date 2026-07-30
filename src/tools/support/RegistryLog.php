@@ -43,7 +43,7 @@ final class RegistryLog
     ): void {
         Craft::warning(
             sprintf(
-                '%s %s collision on "%s" — first registration (%s) wins; ignoring %s.',
+                '%s %s collision on "%s": first registration (%s) wins; ignoring %s.',
                 $kind,
                 $field,
                 $key,

@@ -384,7 +384,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
             // frames, but emitting one keeps the wire-level contract
             // monotonically progress-aware). Then return the cached
             // envelope as the terminal payload.
-            yield ['progress' => 1, 'total' => 1, 'message' => 'Idempotency cache hit — returning cached envelope.'];
+            yield ['progress' => 1, 'total' => 1, 'message' => 'Idempotency cache hit: returning cached envelope.'];
             return $cacheHit;
         }
 
