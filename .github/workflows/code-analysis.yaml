@@ -81,24 +81,18 @@ jobs:
   # ones that are not. A fixture regression therefore fails as a fixture
   # failure rather than as a wall of skipped tests.
   #
-  # ZERO-SKIP GATE - NOT YET ARMED. `composer test:ci` runs Pest with
-  # `--fail-on-skipped`, and the fixtures take the skip count from 168 to
-  # 1. The remaining skip is not a fixture gap: it is cross-test
-  # contamination. `tests/Migrations/KebabCasePermissionsTest`'s cleanup
-  # deletes the `herald:view-activity` row from `userpermissions`
-  # wholesale, which cascades away any grant on it, and
-  # `tests/Plugin/CpNavItemTest` runs after that file in the default
-  # order and needs a non-admin holding exactly that permission. No
-  # fixture can survive it: the cascade takes user grants and group
-  # grants alike. That test file's own docblock states the assumption it
-  # relies on, "the playground carries no Herald grants at baseline",
-  # which the fixtures necessarily invalidate.
-  #
-  # Arming this is a one-line change (`composer test` ->
-  # `composer test:ci`) once that cleanup is scoped to the permission ids
-  # it created, which is the pattern the same file already uses for its
-  # own `$createdIds`. Until then the gate stays available but unarmed,
-  # because a permanently red required check trains people to ignore it.
+  # ZERO-SKIP GATE - ARMED. `composer test:ci` runs Pest with
+  # `--fail-on-skipped`. It used to be blocked by cross-test contamination:
+  # `tests/Migrations/KebabCasePermissionsTest`'s cleanup deleted the
+  # `herald:view-activity` row from `userpermissions` wholesale, which
+  # cascaded away any grant on it, and `tests/Plugin/CpNavItemTest` (which
+  # runs after that file in the default order) needs a non-admin holding
+  # exactly that permission. That cleanup is now scoped by orphan status
+  # instead of by row id: it removes the test's own throwaway users and
+  # groups first, then deletes only Herald-handle-set permission rows left
+  # with no grantee at all, so a pre-existing grant (the fixtures' non-admin
+  # `herald:view-activity` holder) survives regardless of which row id the
+  # rename migration leaves it on.
   #
   # If `--fail-on-skipped` ever stops being honoured through Pest, the
   # fallback is `pest --log-junit junit.xml` plus a grep asserting the
@@ -223,10 +217,10 @@ jobs:
 
       # Run from the plugin's own root, through its own Pest binary. The
       # bootstrap finds the Craft install through `HERALD_TEST_CRAFT_BASE`
-      # rather than the working directory. Swap `test` for `test:ci` to arm
-      # the zero-skip gate; see the note above the job for what blocks it.
+      # rather than the working directory. `test:ci` arms the zero-skip
+      # gate; see the note above the job.
       - name: Run Pest
         working-directory: plugin
         env:
           HERALD_TEST_CRAFT_BASE: ${{ github.workspace }}/cms
-        run: composer test
+        run: composer test:ci
