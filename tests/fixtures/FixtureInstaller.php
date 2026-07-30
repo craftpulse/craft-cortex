@@ -982,6 +982,60 @@ class FixtureInstaller
     }
 
     /**
+     * Ensure the `localImages` filesystem, and the directory it points at.
+     *
+     * CI's starter project has no `web/uploads`, and `Local::getFileList()`
+     * throws on a missing root, so the directory is created too.
+     *
+     * @throws \RuntimeException if Craft rejects the save.
+     * @throws \yii\base\Exception if the uploads directory can't be created.
+     *
+     * @author Craftpulse
+     */
+    private function _ensureFilesystem(): Local
+    {
+        $uploads = Craft::getAlias('@webroot/uploads');
+
+        if (is_string($uploads) && !is_dir($uploads)) {
+            FileHelper::createDirectory($uploads);
+            $this->_say("created $uploads");
+        }
+
+        $service = Craft::$app->getFs();
+        $existing = $service->getFilesystemByHandle(self::FS_HANDLE);
+
+        if ($existing instanceof Local) {
+            return $existing;
+        }
+
+        if ($existing !== null) {
+            throw new \RuntimeException(sprintf(
+                'Filesystem `%s` exists but is a %s, not a local filesystem.',
+                self::FS_HANDLE,
+                $existing::class,
+            ));
+        }
+
+        $fs = new Local([
+            'name' => 'Local images',
+            'handle' => self::FS_HANDLE,
+            'hasUrls' => true,
+            'url' => '@web/uploads',
+            'path' => '@webroot/uploads',
+        ]);
+
+        if (!$service->saveFilesystem($fs)) {
+            throw new \RuntimeException(
+                'Failed to save filesystem `' . self::FS_HANDLE . '`: ' . json_encode($fs->getErrors()),
+            );
+        }
+
+        $this->_say('created filesystem `' . self::FS_HANDLE . '`');
+
+        return $fs;
+    }
+
+    /**
      * Ensure the `nfury` user and one address on him.
      *
      * Saved with search indexing left on: the `users` tool's `search` mode
@@ -1043,57 +1097,54 @@ class FixtureInstaller
     }
 
     /**
-     * Ensure the `localImages` filesystem, and the directory it points at.
+     * Ensure the `shieldDirective` global set (schema only).
      *
-     * CI's starter project has no `web/uploads`, and `Local::getFileList()`
-     * throws on a missing root, so the directory is created too.
+     * `saveSet()` writes the schema to project config; the element row's
+     * field values are a separate `saveElement()` in `_ensureGlobalValues()`.
+     *
+     * @param array<string, FieldInterface> $fields
      *
      * @throws \RuntimeException if Craft rejects the save.
-     * @throws \yii\base\Exception if the uploads directory can't be created.
      *
      * @author Craftpulse
      */
-    private function _ensureFilesystem(): Local
+    private function _ensureGlobalSet(array $fields): GlobalSet
     {
-        $uploads = Craft::getAlias('@webroot/uploads');
+        $service = Craft::$app->getGlobals();
+        $existing = $service->getSetByHandle(self::GLOBAL_SET);
 
-        if (is_string($uploads) && !is_dir($uploads)) {
-            FileHelper::createDirectory($uploads);
-            $this->_say("created $uploads");
-        }
-
-        $service = Craft::$app->getFs();
-        $existing = $service->getFilesystemByHandle(self::FS_HANDLE);
-
-        if ($existing instanceof Local) {
+        if ($existing !== null) {
             return $existing;
         }
 
-        if ($existing !== null) {
-            throw new \RuntimeException(sprintf(
-                'Filesystem `%s` exists but is a %s, not a local filesystem.',
-                self::FS_HANDLE,
-                $existing::class,
-            ));
-        }
+        $set = new GlobalSet();
+        $set->name = 'S.H.I.E.L.D. Directive';
+        $set->handle = self::GLOBAL_SET;
 
-        $fs = new Local([
-            'name' => 'Local images',
-            'handle' => self::FS_HANDLE,
-            'hasUrls' => true,
-            'url' => '@web/uploads',
-            'path' => '@webroot/uploads',
+        $layout = new FieldLayout(['type' => GlobalSet::class]);
+        $tab = new FieldLayoutTab(['name' => 'Directive', 'layout' => $layout]);
+        $tab->setElements([
+            new CustomField($fields['directorName'], ['width' => 50]),
+            new CustomField($fields['threatLevel'], ['width' => 50]),
+            new CustomField($fields['currentDirective'], ['width' => 100]),
         ]);
+        $layout->setTabs([$tab]);
+        $set->setFieldLayout($layout);
 
-        if (!$service->saveFilesystem($fs)) {
+        if (!$service->saveSet($set)) {
             throw new \RuntimeException(
-                'Failed to save filesystem `' . self::FS_HANDLE . '`: ' . json_encode($fs->getErrors()),
+                'Failed to save global set `' . self::GLOBAL_SET . '`: ' . json_encode($set->getErrors()),
             );
         }
 
-        $this->_say('created filesystem `' . self::FS_HANDLE . '`');
+        $this->_say('created global set `' . self::GLOBAL_SET . '`');
 
-        return $fs;
+        // Re-read rather than returning the instance we just handed to
+        // `saveSet()`. That call persists the SCHEMA through project config,
+        // and the element row it creates on the way is a different object:
+        // setting field values on ours would save happily and land nowhere,
+        // which is invisible until a later process reads the set back.
+        return $service->getSetByHandle(self::GLOBAL_SET) ?? $set;
     }
 
     /**
@@ -1224,57 +1275,6 @@ class FixtureInstaller
     }
 
     /**
-     * Ensure the `shieldDirective` global set (schema only).
-     *
-     * `saveSet()` writes the schema to project config; the element row's
-     * field values are a separate `saveElement()` in `_ensureGlobalValues()`.
-     *
-     * @param array<string, FieldInterface> $fields
-     *
-     * @throws \RuntimeException if Craft rejects the save.
-     *
-     * @author Craftpulse
-     */
-    private function _ensureGlobalSet(array $fields): GlobalSet
-    {
-        $service = Craft::$app->getGlobals();
-        $existing = $service->getSetByHandle(self::GLOBAL_SET);
-
-        if ($existing !== null) {
-            return $existing;
-        }
-
-        $set = new GlobalSet();
-        $set->name = 'S.H.I.E.L.D. Directive';
-        $set->handle = self::GLOBAL_SET;
-
-        $layout = new FieldLayout(['type' => GlobalSet::class]);
-        $tab = new FieldLayoutTab(['name' => 'Directive', 'layout' => $layout]);
-        $tab->setElements([
-            new CustomField($fields['directorName'], ['width' => 50]),
-            new CustomField($fields['threatLevel'], ['width' => 50]),
-            new CustomField($fields['currentDirective'], ['width' => 100]),
-        ]);
-        $layout->setTabs([$tab]);
-        $set->setFieldLayout($layout);
-
-        if (!$service->saveSet($set)) {
-            throw new \RuntimeException(
-                'Failed to save global set `' . self::GLOBAL_SET . '`: ' . json_encode($set->getErrors()),
-            );
-        }
-
-        $this->_say('created global set `' . self::GLOBAL_SET . '`');
-
-        // Re-read rather than returning the instance we just handed to
-        // `saveSet()`. That call persists the SCHEMA through project config,
-        // and the element row it creates on the way is a different object:
-        // setting field values on ours would save happily and land nowhere,
-        // which is invisible until a later process reads the set back.
-        return $service->getSetByHandle(self::GLOBAL_SET) ?? $set;
-    }
-
-    /**
      * Ensure the four sections, returning them keyed by handle.
      *
      * No site is ever created: `AuditFixModesTest` asserts
@@ -1332,6 +1332,39 @@ class FixtureInstaller
         }
 
         return $out;
+    }
+
+    /**
+     * Ensure the `infinityStones` tag group.
+     *
+     * @throws \RuntimeException if Craft rejects the save.
+     *
+     * @author Craftpulse
+     */
+    private function _ensureTagGroup(): TagGroup
+    {
+        $service = Craft::$app->getTags();
+        $existing = $service->getTagGroupByHandle(self::TAG_GROUP);
+
+        if ($existing !== null) {
+            return $existing;
+        }
+
+        $group = new TagGroup([
+            'name' => 'Infinity Stones',
+            'handle' => self::TAG_GROUP,
+            'fieldLayout' => new FieldLayout(['type' => Tag::class]),
+        ]);
+
+        if (!$service->saveTagGroup($group)) {
+            throw new \RuntimeException(
+                'Failed to save tag group `' . self::TAG_GROUP . '`: ' . json_encode($group->getErrors()),
+            );
+        }
+
+        $this->_say('created tag group `' . self::TAG_GROUP . '`');
+
+        return $group;
     }
 
     /**
@@ -1426,39 +1459,6 @@ class FixtureInstaller
     }
 
     /**
-     * Ensure the `infinityStones` tag group.
-     *
-     * @throws \RuntimeException if Craft rejects the save.
-     *
-     * @author Craftpulse
-     */
-    private function _ensureTagGroup(): TagGroup
-    {
-        $service = Craft::$app->getTags();
-        $existing = $service->getTagGroupByHandle(self::TAG_GROUP);
-
-        if ($existing !== null) {
-            return $existing;
-        }
-
-        $group = new TagGroup([
-            'name' => 'Infinity Stones',
-            'handle' => self::TAG_GROUP,
-            'fieldLayout' => new FieldLayout(['type' => Tag::class]),
-        ]);
-
-        if (!$service->saveTagGroup($group)) {
-            throw new \RuntimeException(
-                'Failed to save tag group `' . self::TAG_GROUP . '`: ' . json_encode($group->getErrors()),
-            );
-        }
-
-        $this->_say('created tag group `' . self::TAG_GROUP . '`');
-
-        return $group;
-    }
-
-    /**
      * Ensure the `images` volume. Several tests reach for
      * `getAllVolumes()[0]`, so any volume satisfies them, but the fixtures
      * own this one so the asset step knows where to index into.
@@ -1500,6 +1500,22 @@ class FixtureInstaller
     }
 
     /**
+     * Count entries in a section, tolerating a section that doesn't exist.
+     *
+     * @author Craftpulse
+     */
+    private function _entryCount(string $sectionHandle): int
+    {
+        $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
+
+        if ($section === null) {
+            return 0;
+        }
+
+        return (int) Entry::find()->sectionId($section->id)->status(null)->count();
+    }
+
+    /**
      * Slugs already present in a section, as a lookup set. One query rather
      * than 150.
      *
@@ -1518,22 +1534,6 @@ class FixtureInstaller
         }
 
         return $slugs;
-    }
-
-    /**
-     * Count entries in a section, tolerating a section that doesn't exist.
-     *
-     * @author Craftpulse
-     */
-    private function _entryCount(string $sectionHandle): int
-    {
-        $section = Craft::$app->getEntries()->getSectionByHandle($sectionHandle);
-
-        if ($section === null) {
-            return 0;
-        }
-
-        return (int) Entry::find()->sectionId($section->id)->status(null)->count();
     }
 
     /**
