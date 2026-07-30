@@ -17,8 +17,13 @@ parameters:
     level: 8
     paths:
         - src
+        # The content-fixtures installer is the most schema-write-heavy code
+        # in the repo, so it gets the same level 8 treatment as `src`. The
+        # rest of `tests/` is deliberately not analysed.
+        - tests/fixtures
     excludePaths:
         - tests/Bootstrap.php
+        - tests/boot-craft.php
     treatPhpDocTypesAsCertain: false
     ignoreErrors:
         # Tools take MCP-shaped `array<string,mixed>` arguments. Annotating

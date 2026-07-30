@@ -73,7 +73,9 @@
         "check-cs": "ecs check",
         "fix-cs": "ecs check --fix",
         "phpstan": "phpstan analyse --memory-limit=1G",
-        "test": "@php vendor/bin/pest"
+        "test": "@php vendor/bin/pest",
+        "test:ci": "@php vendor/bin/pest --fail-on-skipped",
+        "test:fixtures": "@php tests/fixtures/install.php"
     },
     "extra": {
         "name": "Herald MCP",
