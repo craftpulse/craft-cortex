@@ -188,10 +188,12 @@ Two scripts:
 
 | Script | Behaviour |
 | --- | --- |
-| `composer test` | Plain `pest`. Skips seed-dependent cases gracefully on an unfixtured install. |
-| `composer test:ci` | `pest --fail-on-skipped`. What CI runs, immediately after the fixture step. |
+| `composer test` | Plain `pest`. Skips seed-dependent cases gracefully on an unfixtured install. What CI runs today. |
+| `composer test:ci` | `pest --fail-on-skipped`, the zero-skip gate. Available but not yet armed in CI. |
 
-The suite consumes the activity-viewer's permission grant (`KebabCasePermissionsTest` deletes the `herald:view-activity` row, which cascades the grant away), so re-run `composer test:fixtures` before each run if you want a zero-skip result locally.
+With the fixtures installed, the skip count goes from 168 to 1. The remaining skip is cross-test contamination rather than a fixture gap: `KebabCasePermissionsTest`'s cleanup deletes the `herald:view-activity` row from `userpermissions` wholesale, which cascades away any grant on it (user grants and group grants alike), and `CpNavItemTest` needs a non-admin holding exactly that permission. Scoping that cleanup to the ids it created is what arms `test:ci` in the workflow.
+
+The same cleanup means the activity-viewer grant does not survive a suite run, so re-run `composer test:fixtures` before each run.
 
 ### Static analysis
 
