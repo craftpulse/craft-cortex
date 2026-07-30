@@ -1266,7 +1266,12 @@ class FixtureInstaller
 
         $this->_say('created global set `' . self::GLOBAL_SET . '`');
 
-        return $set;
+        // Re-read rather than returning the instance we just handed to
+        // `saveSet()`. That call persists the SCHEMA through project config,
+        // and the element row it creates on the way is a different object:
+        // setting field values on ours would save happily and land nowhere,
+        // which is invisible until a later process reads the set back.
+        return $service->getSetByHandle(self::GLOBAL_SET) ?? $set;
     }
 
     /**
