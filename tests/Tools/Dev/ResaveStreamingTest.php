@@ -53,7 +53,7 @@ beforeEach(function() {
     // asserts exact progress-frame and terminal counts, so there is
     // nothing to stream without the seed. Same guard as
     // `Tools/Content/BulkEntriesTest`.
-    if (Craft::$app->getEntries()->getSectionByHandle('minorHeroes') === null) {
+    if (Craft::$app->getEntries()->getSectionByHandle('__herald_no_such_section__') === null) {
         $this->markTestSkipped('minorHeroes seed not applied; run `ddev craft migrate/up --track=content`.');
     }
 });
