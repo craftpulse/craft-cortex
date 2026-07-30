@@ -170,6 +170,29 @@ ddev exec --dir=/var/www/html/cms vendor/bin/pest \
 
 Pest covers the registry, every tool, every prompt, every resource, the JSON-RPC dispatcher, the extension events, and seven architectural conventions (no `eval` / shell-exec family / `declare(strict_types=1)`, every tool implements `ToolInterface`, every class has a section header + `@author Craftpulse` + `@since`, every private method/property uses the underscore prefix, no tool's `execute()` declares `mixed`).
 
+#### Content fixtures
+
+Most tests assert on response shape, but a tier of them needs named content: a `heroes` section, 150 `minorHeroes` entries, a `heroImage` field, a `factions` category group, a user called `nfury`. On a bare install those tests skip themselves. Install the fixtures first:
+
+```bash
+# from the plugin root, pointed at the Craft install to fixture
+HERALD_TEST_CRAFT_BASE=/var/www/html/cms composer test:fixtures
+
+# read-only: print the invariant table, exit 1 if anything is missing
+HERALD_TEST_CRAFT_BASE=/var/www/html/cms php tests/fixtures/install.php --report
+```
+
+The installer never re-saves, modifies or deletes an entity that already exists, and never creates a site. Running it against an install that already carries equivalent content (the dev playground's Marvel seed) leaves `config/project/` byte-identical and every row untouched. The full contract lives in the class docblock of `tests/fixtures/FixtureInstaller.php`.
+
+Two scripts:
+
+| Script | Behaviour |
+| --- | --- |
+| `composer test` | Plain `pest`. Skips seed-dependent cases gracefully on an unfixtured install. |
+| `composer test:ci` | `pest --fail-on-skipped`. What CI runs, immediately after the fixture step. |
+
+The suite consumes the activity-viewer's permission grant (`KebabCasePermissionsTest` deletes the `herald:view-activity` row, which cascades the grant away), so re-run `composer test:fixtures` before each run if you want a zero-skip result locally.
+
 ### Static analysis
 
 ```bash
