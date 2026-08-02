@@ -47,15 +47,6 @@ Craft pulls the package via Composer, runs the install migration, and registers 
 
 ### Composer (CLI)
 
-**Not yet on Packagist.** Herald is pre-Plugin-Store-submission, so `composer require` needs a VCS repository entry in your project's `composer.json` for both Herald and its `craftpulse/craft-audit-kit` dependency:
-
-```json
-"repositories": [
-    { "type": "vcs", "url": "https://github.com/craftpulse/craft-herald.git" },
-    { "type": "vcs", "url": "https://github.com/craftpulse/craft-audit-kit.git" }
-]
-```
-
 1. Open your terminal and go to your Craft project root:
 
         cd /path/to/project
