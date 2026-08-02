@@ -30,7 +30,7 @@
     "require": {
         "php": ">=8.2",
         "craftcms/cms": "^5.0",
-        "craftpulse/craft-audit-kit": "^1.0.0-beta.2",
+        "craftpulse/craft-audit-kit": "~1.0.0",
         "lcobucci/clock": "^3.0",
         "league/oauth2-server": "^9.0",
         "nyholm/psr7": "^1.8",
