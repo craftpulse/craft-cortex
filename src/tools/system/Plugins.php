@@ -22,7 +22,7 @@ use craftpulse\herald\tools\support\Schema;
  * No parameters.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -35,7 +35,7 @@ class Plugins extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -46,7 +46,7 @@ class Plugins extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -64,7 +64,7 @@ class Plugins extends AbstractTool
      * Craft cannot resolve come back as `null`, hence the optional
      * (non-required) annotation on most fields.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function outputSchema(): array
@@ -97,7 +97,7 @@ class Plugins extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array

@@ -20,7 +20,7 @@
  *     success level, per SEP-1303, and the tool never runs.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

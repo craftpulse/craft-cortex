@@ -7,7 +7,7 @@
  * assertions here also act as a guardrail against schema drift.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

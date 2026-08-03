@@ -1,20 +1,19 @@
 /* =========================================================================
    Herald CP styles.
 
-   Status-pill colour per invocation `kind` (locked decision 6, gate-9 plan):
+   Status-pill colour per invocation `kind` (locked):
      - success         — green
      - tool_error      — red
      - internal_error  — red
      - rate_limited    — amber
      - cancelled       — grey
 
-   Per docs/plans/gate-9.md sub-gate 9.1 the only cosmetic surface 9.1
-   needs is the status-pill colour palette + a monospace token-prefix
-   font + minor table-column-width tuning. Slideout-specific styles land
-   in 9.2 / 9.3 alongside their respective interaction surfaces.
+   The CP surface leans on Craft's own control-panel styles. The only
+   cosmetic surface this file owns is the status-pill colour palette, a
+   monospace token-prefix font, and minor table-column-width tuning.
    ========================================================================= */
 
-/* Status pills (Activity tab, lands in 9.3) */
+/* Status pills (Activity tab) */
 .herald-status {
     display: inline-block;
     padding: 1px 8px;

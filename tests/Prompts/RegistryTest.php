@@ -5,7 +5,7 @@
  * Registry-level invariants for the Prompts service.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

@@ -26,7 +26,7 @@ use craftpulse\herald\tools\ToolException;
  * the Pro tier.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -39,7 +39,7 @@ class Globals extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -50,7 +50,7 @@ class Globals extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -63,7 +63,7 @@ class Globals extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -80,7 +80,7 @@ class Globals extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -127,7 +127,7 @@ class Globals extends AbstractTool
     /**
      * @param string[] $eagerHandles
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _loadSet(string $handle, int $siteId, array $eagerHandles): ?GlobalSet
@@ -148,7 +148,7 @@ class Globals extends AbstractTool
      * @param string[] $eagerHandles
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeSet(GlobalSet $set, array $eagerHandles, ElementSerializer $serializer): array
@@ -166,7 +166,7 @@ class Globals extends AbstractTool
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveSiteIdForGlobals(array $arguments): int

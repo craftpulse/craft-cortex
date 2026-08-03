@@ -23,7 +23,7 @@ use yii\helpers\Console;
  * `plugins.herald.edition`. The Plugin Store sets it on purchase;
  * Herald does not maintain a separate license table.
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class EditionController extends Controller
@@ -38,7 +38,7 @@ class EditionController extends Controller
      * misconfigured plugin (which would have failed earlier at
      * `Herald::getInstance()`).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionShow(): int

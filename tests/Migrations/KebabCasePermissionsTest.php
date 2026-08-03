@@ -41,7 +41,7 @@
  * of the same PC surface would race this test's set/remove window.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

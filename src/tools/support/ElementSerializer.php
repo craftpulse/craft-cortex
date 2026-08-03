@@ -30,7 +30,7 @@ use DateTimeInterface;
  *      cause N+1 by serialising it.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class ElementSerializer
@@ -46,7 +46,7 @@ class ElementSerializer
      *                               fields are stubbed, not queried.
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function serializeElement(ElementInterface $element, array $eagerHandles = []): array
@@ -64,7 +64,7 @@ class ElementSerializer
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function summarizeElement(ElementInterface $element): array
@@ -84,7 +84,7 @@ class ElementSerializer
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _identity(ElementInterface $element): array
@@ -114,7 +114,7 @@ class ElementSerializer
      * @param string[] $eagerHandles
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeFieldValues(ElementInterface $element, array $eagerHandles): array
@@ -143,7 +143,7 @@ class ElementSerializer
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeFieldValue(mixed $value, bool $isEager): mixed

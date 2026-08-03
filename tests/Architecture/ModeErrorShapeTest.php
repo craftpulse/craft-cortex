@@ -12,8 +12,7 @@
  * `_toolErrorEnvelope()`), so the invariant we lock is the *text*
  * prefix the message-builder emits, not a JSON-RPC error code.
  *
- * Two canonical templates per `docs/plans/gate-8.10.md` locked
- * decision 2:
+ * Two canonical templates, locked:
  *
  *   Template A — edition denial (Free tools with Pro modes):
  *     `<tool>: mode `<mode>` is unavailable on this edition.`
@@ -46,7 +45,7 @@
  * `ToolException::getMessage()` against the edition-denial template.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

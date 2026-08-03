@@ -22,7 +22,7 @@ use craft\elements\User;
  * once, in `Tokens::issue()`'s return value.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Token extends Model
@@ -120,7 +120,7 @@ class Token extends Model
      * migration means a deleted user takes its tokens with it, so
      * this is defensive against pre-FK rows or out-of-band deletes.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getUser(): ?User
@@ -139,7 +139,7 @@ class Token extends Model
      *
      * @return array<int,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function defineRules(): array

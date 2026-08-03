@@ -11,7 +11,7 @@
  * the unit layer, not via a flaky resave integration test.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

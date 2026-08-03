@@ -23,7 +23,7 @@
  * and are gone by next test.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

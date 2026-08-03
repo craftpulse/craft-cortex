@@ -5,7 +5,7 @@
  * Registry-level invariants for the Resources service.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

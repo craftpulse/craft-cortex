@@ -39,7 +39,7 @@ use Throwable;
  *   - `delete` — soft-delete by default; `hardDelete: true` removes the
  *     row entirely. Permission via `Elements::canDelete` on the owner.
  *
- * Permission contract (locked decision 4 of `docs/plans/gate-8.md`):
+ * Permission contract (locked):
  *   - `_requiredPermissions()` returns `['editUsers']` — coarse gate for
  *     `filterFor()` whole-tool visibility plus the trait's wildcard
  *     sentinel rejection.
@@ -65,11 +65,11 @@ use Throwable;
  * Skipped on stdio.
  *
  * Cancellation: single-mutation tool, not streaming. The Gate 7.4
- * InvocationContext is irrelevant here per locked decision 8 of
- * `docs/plans/gate-8.md`.
+ * InvocationContext is irrelevant here: the operation either
+ * completes or doesn't.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsDestructive]
@@ -119,7 +119,7 @@ class Address extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -130,7 +130,7 @@ class Address extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -154,7 +154,7 @@ class Address extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -228,7 +228,7 @@ class Address extends AbstractTool
      * `Elements::canSave / canView / canDelete` for the precise
      * owner-delegation semantics.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterFor(?User $user = null): bool
@@ -255,7 +255,7 @@ class Address extends AbstractTool
      * happen in `execute()` via `Elements::canSave / canView /
      * canDelete`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function inputSchemaFor(?User $user = null): array
@@ -270,7 +270,7 @@ class Address extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -310,7 +310,7 @@ class Address extends AbstractTool
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -327,7 +327,7 @@ class Address extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
@@ -352,7 +352,7 @@ class Address extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _list(array $arguments): array
@@ -401,7 +401,7 @@ class Address extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _get(array $arguments): array
@@ -427,7 +427,7 @@ class Address extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _create(array $arguments): array
@@ -485,7 +485,7 @@ class Address extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _update(array $arguments): array
@@ -548,7 +548,7 @@ class Address extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _delete(array $arguments): array
@@ -590,7 +590,7 @@ class Address extends AbstractTool
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveAddress(array $arguments): AddressElement
@@ -638,7 +638,7 @@ class Address extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveOwner(int $ownerId): User
@@ -658,7 +658,7 @@ class Address extends AbstractTool
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _requireOwnerId(array $arguments): int
@@ -675,7 +675,7 @@ class Address extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _ownerType(array $arguments): string
@@ -691,7 +691,7 @@ class Address extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _assertOwnerType(string $ownerType): void
@@ -713,7 +713,7 @@ class Address extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _assertCanView(AddressElement $address): void
@@ -739,7 +739,7 @@ class Address extends AbstractTool
      *
      * @return array<string,mixed>|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _validateCountryCode(AddressElement $element, string $mode): ?array
@@ -778,7 +778,7 @@ class Address extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyAddressAttributes(AddressElement $element, array $arguments): void
@@ -837,7 +837,7 @@ class Address extends AbstractTool
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _successEnvelope(AddressElement $element, string $mode): array
@@ -856,7 +856,7 @@ class Address extends AbstractTool
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _ownershipChangeEnvelope(AddressElement $element, string $mode): array
@@ -882,7 +882,7 @@ class Address extends AbstractTool
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeAddress(AddressElement $address): array

@@ -11,7 +11,7 @@
  * the teardown can match by name without touching real registrations.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

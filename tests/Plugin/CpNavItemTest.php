@@ -20,7 +20,7 @@
  * cleared in `afterEach`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

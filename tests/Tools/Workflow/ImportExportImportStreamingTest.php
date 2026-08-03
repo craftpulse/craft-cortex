@@ -15,7 +15,7 @@
  *   - `stream()` rejects `export` and edition-gated calls.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

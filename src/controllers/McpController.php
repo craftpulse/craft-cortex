@@ -38,7 +38,7 @@ use yii\web\Response;
  * Bearer lookup happens once per request in `beforeAction()`. In-flight
  * requests on a revoked token complete normally — revocation only
  * blocks the *next* request — per the locked decision in
- * `docs/plans/gate-7.md` item 16. The `CancellationToken` mechanism
+ * the locked transport decision. The `CancellationToken` mechanism
  * on `InvocationContext` is reserved for the explicit
  * `notifications/cancelled` MCP message in sub-gate 7.7, not for
  * server-side token revocation.
@@ -67,7 +67,7 @@ use yii\web\Response;
  * bearer token.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class McpController extends Controller
@@ -182,7 +182,7 @@ class McpController extends Controller
      * Returns true to continue with `actionIndex()`; false (with the
      * response populated) to short-circuit.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function beforeAction($action): bool
@@ -390,7 +390,7 @@ class McpController extends Controller
      * carried at HTTP 200 — that's the spec-shaped client expectation
      * and the dispatcher already produces it.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionIndex(): Response
@@ -419,7 +419,7 @@ class McpController extends Controller
      * production path returns a default-constructed emitter that
      * writes to PHP's output stream via `echo` + `flush()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildSseEmitter(): SseEmitter
@@ -445,7 +445,7 @@ class McpController extends Controller
      *
      * @param string[] $allowedOrigins
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _passesOrigin(array $allowedOrigins): bool
@@ -520,7 +520,7 @@ class McpController extends Controller
      * genuinely needs a JSON-RPC-shaped rejection here, it has to land
      * together with real `2026-07-28` support, not before it.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _passesProtocolVersion(): bool
@@ -557,7 +557,7 @@ class McpController extends Controller
      * login-attempt counter, not a status, so relying on the status
      * alone would let a locked account straight through.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _isUsableAccount(User $user): bool
@@ -581,7 +581,7 @@ class McpController extends Controller
      * The plaintext returned here is never logged. Callers hash it
      * before any persistent surface.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _extractBearer(): ?string
@@ -608,7 +608,7 @@ class McpController extends Controller
      * termination; herald does allow it, so we treat DELETE as a
      * first-class operation.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _handleDelete(): Response
@@ -633,7 +633,7 @@ class McpController extends Controller
      * Handle a POST — parse the body, validate session affinity,
      * dispatch, surface the response.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _handlePost(): Response
@@ -776,7 +776,7 @@ class McpController extends Controller
      * require q-value parsing for this binary "client supports SSE"
      * decision.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _acceptsEventStream(): bool
@@ -825,7 +825,7 @@ class McpController extends Controller
      *
      * @param array<string,mixed> $request
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _streamPost(Server $server, array $request, bool $isInitialize, string $sessionId): Response
@@ -909,7 +909,7 @@ class McpController extends Controller
      *
      * @param array<string,mixed>|mixed $params
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _clientNameFromInitialize(mixed $params): ?string
@@ -936,7 +936,7 @@ class McpController extends Controller
      * unauthenticated clients can discover the authorization server
      * without prior configuration.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _unauthorized(string $message): Response
@@ -987,7 +987,7 @@ class McpController extends Controller
      *
      * @return array{userId:?int, tokenId:?int, scopes:array<int,string>, jti:?string}|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveBearer(string $bearer): ?array
@@ -1039,7 +1039,7 @@ class McpController extends Controller
      *
      * @return array<int,string>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _parseScopes(mixed $raw): array
@@ -1057,7 +1057,7 @@ class McpController extends Controller
      * on how the client built them; we normalize both before
      * comparing.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _audienceMatches(string $a, string $b): bool
@@ -1071,7 +1071,7 @@ class McpController extends Controller
      * RPC-shaped errors (parse error, dispatcher rejections) see
      * `_jsonRpcResponse()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _status(int $code, string $message): Response
@@ -1090,7 +1090,7 @@ class McpController extends Controller
      *
      * @param array<string,mixed> $envelope
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _jsonRpcResponse(array $envelope): Response
@@ -1111,7 +1111,7 @@ class McpController extends Controller
      * second count the caller should wait — stamped onto the header
      * directly so well-behaved clients self-throttle.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _rateLimited(RateLimitStatus $status): Response
@@ -1140,7 +1140,7 @@ class McpController extends Controller
      * `herald.audit` category and surface to operators tailing
      * the file log.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _writeRateLimitedAuditRow(RateLimitStatus $status): void

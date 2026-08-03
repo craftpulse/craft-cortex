@@ -15,7 +15,7 @@
  * Client names are prefixed `_test_/` so the teardown matches by name.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

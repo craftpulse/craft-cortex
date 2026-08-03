@@ -27,7 +27,7 @@
  * path and skips the check, exactly as `PermissionedToolTrait` does.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

@@ -50,7 +50,7 @@ namespace craftpulse\herald\mcp\transport;
  * call multiple times.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class SseEmitter
@@ -124,7 +124,7 @@ final class SseEmitter
      *                                              cleanly under an
      *                                              outer `ob_start`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(?callable $writer = null)
@@ -139,7 +139,7 @@ final class SseEmitter
      *
      * Idempotent — calling twice is a no-op past the first.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function start(): void
@@ -177,7 +177,7 @@ final class SseEmitter
      * when there are no buffers to flush; the loop guard is the
      * authority, not the notice.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function disableBuffering(): void
@@ -203,7 +203,7 @@ final class SseEmitter
      * @param array<int|string,mixed>      $data  Pre-shaped JSON-RPC envelope to emit as the `data:` payload.
      * @param string|null                  $id    Optional frame id. When null, a fresh UUIDv4 is generated.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function emit(string $event, array $data, ?string $id = null): void
@@ -239,7 +239,7 @@ final class SseEmitter
      * Pushes one final flush through so any buffered tail bytes hit
      * the wire before the caller returns control to Yii.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function end(): void
@@ -264,7 +264,7 @@ final class SseEmitter
      * implementation can use these ids as cursor keys without
      * changing the wire shape.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _generateFrameId(): string

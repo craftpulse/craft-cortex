@@ -11,7 +11,7 @@
     },
     "authors": [
         {
-            "name": "Craftpulse",
+            "name": "CraftPulse",
             "homepage": "https://craftpulse.com"
         }
     ],
@@ -71,7 +71,7 @@
     "extra": {
         "name": "Herald MCP",
         "handle": "herald",
-        "developer": "Craftpulse",
+        "developer": "CraftPulse",
         "developerUrl": "https://craftpulse.com",
         "documentationUrl": "https://github.com/craftpulse/craft-herald",
         "changelogUrl": "https://raw.githubusercontent.com/craftpulse/craft-herald/develop-v5/CHANGELOG.md",

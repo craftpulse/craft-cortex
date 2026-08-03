@@ -21,7 +21,7 @@ use craftpulse\herald\tools\support\Schema;
  * No parameters. The information is small and read together.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -34,7 +34,7 @@ class SystemInfo extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -45,7 +45,7 @@ class SystemInfo extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -63,7 +63,7 @@ class SystemInfo extends AbstractTool
      * read the response from `structuredContent` and validate it. Older
      * clients still read the JSON-serialised text block.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function outputSchema(): array
@@ -108,7 +108,7 @@ class SystemInfo extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -157,7 +157,7 @@ class SystemInfo extends AbstractTool
     // =========================================================================
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _editionName(CmsEdition $edition): string

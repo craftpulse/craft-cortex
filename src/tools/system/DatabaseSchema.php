@@ -27,7 +27,7 @@ use yii\db\TableSchema;
  *     summary view; useful before requesting full structure).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -40,7 +40,7 @@ class DatabaseSchema extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -51,7 +51,7 @@ class DatabaseSchema extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -65,7 +65,7 @@ class DatabaseSchema extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -82,7 +82,7 @@ class DatabaseSchema extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -139,7 +139,7 @@ class DatabaseSchema extends AbstractTool
      * @param array<int|string,mixed> $filter
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyFilter(array $allNames, array $filter, string $prefix): array
@@ -166,7 +166,7 @@ class DatabaseSchema extends AbstractTool
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeTable(TableSchema $table): array

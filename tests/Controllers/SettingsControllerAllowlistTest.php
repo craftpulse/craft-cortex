@@ -26,7 +26,7 @@
  * Real CP smoke lives in the gate-9.2 manual verification step.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

@@ -9,7 +9,7 @@
  * HTTP transport that don't touch the controller / dispatcher.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

@@ -15,7 +15,7 @@ namespace craftpulse\herald\tools\support;
  *
  * The class is intentionally small: a boolean flag, an optional
  * cancellation reason, and three read methods. Locking the shape from
- * sub-gate 7.1 (per `docs/plans/gate-7.md`) means streaming tools in
+ * sub-gate 7.1 means streaming tools in
  * later gates can opt in cooperatively without an interface break here.
  *
  * Concurrency: PHP requests are single-threaded inside a worker, so a
@@ -24,7 +24,7 @@ namespace craftpulse\herald\tools\support;
  * no shared-memory hazard.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class CancellationToken
@@ -80,7 +80,7 @@ final class CancellationToken
      *                                              token flips
      *                                              permanently.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(?callable $pollCallback = null)
@@ -102,7 +102,7 @@ final class CancellationToken
      * generator without the dispatcher needing to subclass this
      * final class.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function isCancelled(): bool
@@ -139,7 +139,7 @@ final class CancellationToken
      *                            future `notifications/cancelled` body
      *                            carrying `params.reason`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function cancel(?string $reason = null): void
@@ -161,7 +161,7 @@ final class CancellationToken
      * accessor opens the door to richer payloads without a contract
      * bump.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getReason(): ?string

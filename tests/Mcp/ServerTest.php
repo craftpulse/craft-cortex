@@ -7,7 +7,7 @@
  * tools happen to be registered.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

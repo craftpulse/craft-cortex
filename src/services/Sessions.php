@@ -59,7 +59,7 @@ use yii\caching\CacheInterface;
  * timestamps; it's a service.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Sessions extends Component
@@ -94,7 +94,7 @@ class Sessions extends Component
      * a freshly-generated opaque id which the caller surfaces back to
      * the client in the `Mcp-Session-Id` response header.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function create(string $protocolVersion, ?string $clientName, ?int $userId = null): Session
@@ -117,7 +117,7 @@ class Sessions extends Component
      * Fetch a session by id, or null if it's not in the cache (never
      * created, expired, or terminated).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function get(string $id): ?Session
@@ -144,7 +144,7 @@ class Sessions extends Component
      * lookup on this request. When the stored session's `userId`
      * doesn't match the current request's bearer token, the session
      * is terminated and null is returned — that's the mid-session
-     * token-swap defense locked in `docs/plans/gate-7.md` item 16.
+     * locked token-swap defense.
      * Sessions stored with `userId === null` (created before auth
      * resolved) pre-bind on the first matching touch.
      *
@@ -152,7 +152,7 @@ class Sessions extends Component
      * controller maps it to a 401, which the client handles the
      * same way as any other unknown session.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function touch(string $id, ?int $currentUserId = null): ?Session
@@ -194,7 +194,7 @@ class Sessions extends Component
      * time, after which they MUST respond to requests containing that
      * session ID with HTTP 404 Not Found").
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function terminate(string $id): void
@@ -213,7 +213,7 @@ class Sessions extends Component
      * `random_bytes()` → 32 lowercase hex chars. Uses the CSPRNG; no
      * shell, no userspace PRNG.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _generateId(): string
@@ -224,7 +224,7 @@ class Sessions extends Component
     /**
      * Write the session to cache with the configured sliding TTL.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _persist(Session $session): void
@@ -249,7 +249,7 @@ class Sessions extends Component
      * @throws \RuntimeException When Craft is misconfigured to the
      *                           point of having no cache component.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _cache(): CacheInterface

@@ -33,7 +33,7 @@ use yii\base\Event;
  * older clients — see `SUPPORTED_PROTOCOL_VERSIONS`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Server
@@ -277,7 +277,7 @@ class Server
      *                          the HTTP adapter is
      *                          `controllers/McpController`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(string $transport = self::TRANSPORT_STDIO)
@@ -302,7 +302,7 @@ class Server
      * stdio leaves this null and the dispatcher never calls this
      * setter.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setUserId(?int $userId): void
@@ -320,7 +320,7 @@ class Server
      *
      * @param string[]|null $scopes
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setGrantedScopes(?array $scopes): void
@@ -335,7 +335,7 @@ class Server
      * so high-stakes tools can gate. stdio never calls this — the
      * constructor leaves stdio implicitly elevated.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setElevated(bool $elevated): void
@@ -351,7 +351,7 @@ class Server
      * this null — OAuth correlation flows through the (userId,
      * clientName, dateCreated) tuple on the audit row instead.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setTokenId(?int $tokenId): void
@@ -372,7 +372,7 @@ class Server
      * the controller's pre-dispatch hint is the fall-through for
      * non-initialize calls.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setClientName(?string $clientName): void
@@ -387,7 +387,7 @@ class Server
      * extracted from the request headers. Null for stdio and for
      * `initialize` (the session id is minted in the response).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setSessionId(?string $sessionId): void
@@ -403,7 +403,7 @@ class Server
      * `RateLimitStatus`. Threaded onto every invocation context so
      * the Gate 7.6 audit log carries throttle pressure per row.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setRateLimitRemaining(?int $value): void
@@ -420,7 +420,7 @@ class Server
      * source of truth across `_initializeResult()` and the session
      * write.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getClientName(): ?string
@@ -443,7 +443,7 @@ class Server
      * populates the slot, and only for the lifetime of its yield
      * loop.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getInFlightCancellationToken(): ?CancellationToken
@@ -458,7 +458,7 @@ class Server
      * @param array<string,mixed> $request
      * @return array<string,mixed>|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function dispatch(array $request): ?array
@@ -541,7 +541,7 @@ class Server
      * @param array<string,mixed> $request
      * @return Generator<int,array<string,mixed>,mixed,void>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function dispatchStreaming(array $request): Generator
@@ -631,7 +631,7 @@ class Server
      *                                    clientInfo: {name, version}}`.
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _initializeResult(array $params): array
@@ -676,7 +676,7 @@ class Server
      * error, matching the lenient posture the rest of the dispatcher
      * takes toward client input.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _negotiateProtocolVersion(mixed $requested): string
@@ -705,7 +705,7 @@ class Server
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _toolsList(): array
@@ -731,7 +731,7 @@ class Server
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _promptsList(): array
@@ -744,7 +744,7 @@ class Server
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resourcesList(): array
@@ -765,7 +765,7 @@ class Server
      * @param array<string,mixed> $params
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _handlePromptsGet(int|string|null $id, array $params): array
@@ -804,7 +804,7 @@ class Server
      * @param array<string,mixed> $params
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _handleResourcesRead(int|string|null $id, array $params): array
@@ -853,7 +853,7 @@ class Server
      * @param array<string,mixed> $params
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _handleToolsCall(int|string|null $id, array $params): array
@@ -945,7 +945,7 @@ class Server
      * @param array<string,mixed> $params
      * @return array{error: array<string,mixed>|null, tool: ToolInterface|null, name: string, arguments: array<string,mixed>}
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _validateToolCall(int|string|null $id, array $params): array
@@ -1031,7 +1031,7 @@ class Server
      * @param array<string,mixed> $callParams Original `tools/call` params (carries `_meta.progressToken`).
      * @return Generator<int,array<string,mixed>,mixed,void>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _streamToolCall(
@@ -1144,7 +1144,7 @@ class Server
      * construction, only when the streaming loop checks the flag
      * between yields.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _invocationContextWithCancellation(string|int|null $requestId): InvocationContext
@@ -1183,7 +1183,7 @@ class Server
      *
      * @param array<string,mixed>|mixed $params
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _recordCancellation(mixed $params): void
@@ -1238,7 +1238,7 @@ class Server
      * @param array<string,mixed> $frame
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _progressEnvelope(string|int|null $progressToken, array $frame): array
@@ -1271,7 +1271,7 @@ class Server
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _cancelledEnvelope(int|string|null $id, string|int|null $progressToken): array
@@ -1296,7 +1296,7 @@ class Server
      *
      * @param array<string,mixed> $callParams
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _progressToken(array $callParams): string|int|null
@@ -1322,7 +1322,7 @@ class Server
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _logCancelled(string $name, array $arguments, InvocationContext $context, int $durationMs): void
@@ -1359,7 +1359,7 @@ class Server
      * lookup resolves, so the context here carries the authenticated
      * user id forward into the audit log.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _invocationContext(string|int|null $requestId): InvocationContext
@@ -1388,7 +1388,7 @@ class Server
      * "resolved to null" — a missing/disabled user id should not
      * trigger a fresh lookup on every dispatched method.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveUser(): ?User
@@ -1413,7 +1413,7 @@ class Server
      * division loses sub-millisecond resolution which is fine for the
      * invocation-log granularity.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _elapsedMs(int $startNs): int
@@ -1441,7 +1441,7 @@ class Server
      * @param Generator<int,mixed,mixed,array<int|string,mixed>> $gen
      * @return array<int|string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _consumeGenerator(Generator $gen): array
@@ -1480,7 +1480,7 @@ class Server
      * @param array<int|string,mixed> $result
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _toolResultEnvelope(ToolInterface $tool, array $result): array
@@ -1508,7 +1508,7 @@ class Server
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _toolErrorEnvelope(string $message): array
@@ -1526,7 +1526,7 @@ class Server
      * @param array<string,mixed>|object $result
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _successResponse(int|string|null $id, array|object $result): array
@@ -1542,7 +1542,7 @@ class Server
      * @param int|string|null $id
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _errorResponse(int|string|null $id, int $code, string $message): array
@@ -1566,7 +1566,7 @@ class Server
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _internalError(int|string|null $id, Throwable $e, string $message): array

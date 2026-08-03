@@ -24,7 +24,7 @@ use craftpulse\herald\tools\support\Schema;
  * and where would I add a new one?". No parameters.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -37,7 +37,7 @@ class Routes extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -48,7 +48,7 @@ class Routes extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -67,7 +67,7 @@ class Routes extends AbstractTool
      * read `structuredContent`; older clients still see the same JSON in
      * the text block.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function outputSchema(): array
@@ -106,7 +106,7 @@ class Routes extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -175,7 +175,7 @@ class Routes extends AbstractTool
      * @param array<string,mixed> $routes
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _normalizeRoutes(array $routes): array
@@ -192,7 +192,7 @@ class Routes extends AbstractTool
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _siteHandle(int $siteId): ?string

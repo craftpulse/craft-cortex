@@ -45,7 +45,7 @@ use yii\base\Event;
  * (`config`, `editions`, settings) and the trait composition.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 trait PluginTrait
@@ -58,7 +58,7 @@ trait PluginTrait
      * plugin needs at boot. Idempotent at the call site — Herald
      * only invokes this from its own `init()` after `parent::init()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function onPluginInit(): void
@@ -83,7 +83,7 @@ trait PluginTrait
      * dependency). Class-exists guard keeps the plugin bootable
      * on installs without `craftcms/generator`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _registerGenerator(): void
@@ -112,7 +112,7 @@ trait PluginTrait
      * revoked tokens — fail-closed-safe per `Oauth::pruneExpired()`,
      * and never severs an active refresh-rotation chain.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _registerGcListener(): void
@@ -137,7 +137,7 @@ trait PluginTrait
      * internal try/catch. The KV file log line is the secondary
      * audit trail when the DB write fails.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _registerAuditLogListener(): void
@@ -186,7 +186,7 @@ trait PluginTrait
      * The OAuth / bearer-token lifecycle events are emitted from the
      * `Oauth` and `Tokens` service methods directly, not wired here.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     private function _registerAuditKitEmission(): void
@@ -214,7 +214,7 @@ trait PluginTrait
      * `ElementTypes` tool discovery and so Craft's
      * element-condition / GraphQL surfaces pick it up.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _registerSkillElementType(): void
@@ -256,7 +256,7 @@ trait PluginTrait
      * Shape verified against
      * `vendor/craftcms/cms/src/services/UserPermissions.php:85-96`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _registerHeraldPermissions(): void
@@ -317,7 +317,7 @@ trait PluginTrait
      * update / remove so the field layout stays in sync between
      * PC and the live `Fields` service across environments.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _registerSkillProjectConfigHandlers(): void
@@ -366,7 +366,7 @@ trait PluginTrait
      * (token issue/revoke, activity rows) land in 9.2 / 9.3 alongside
      * their respective controller actions.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _registerUrlRules(): void

@@ -21,7 +21,7 @@ use Throwable;
  * backticks — this is the only way commands run.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class ConsoleRunner
@@ -53,7 +53,7 @@ class ConsoleRunner
      *                          single-flight, so a nested run would clear
      *                          the outer dispatch's buffer mid-capture.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function run(string $route, array $params = []): array
@@ -110,7 +110,7 @@ class ConsoleRunner
     /**
      * Register the user-stream filter once per process. Idempotent.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _register(): void
@@ -128,7 +128,7 @@ class ConsoleRunner
      * and Yii write coloured progress; the LLM only sees the bytes, so
      * we drop the escape codes for cleaner rendering.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _stripAnsi(string $output): string

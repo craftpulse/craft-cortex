@@ -30,7 +30,7 @@ use ReflectionClass;
  * at server boot (~30 attribute reads, once per process).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class AttributeReader
@@ -61,7 +61,7 @@ final class AttributeReader
      * @param ToolInterface|class-string<ToolInterface> $toolOrClass
      * @return array<string,bool|string>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function annotationsFor(ToolInterface|string $toolOrClass): array
@@ -104,7 +104,7 @@ final class AttributeReader
      *
      * @param ToolInterface|class-string<ToolInterface> $toolOrClass
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function isStdioOnly(ToolInterface|string $toolOrClass): bool

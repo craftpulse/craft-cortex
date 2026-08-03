@@ -6,7 +6,7 @@
  * `resources/read` blocks and that text matches the bundled skills.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

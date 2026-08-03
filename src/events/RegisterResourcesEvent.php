@@ -48,7 +48,7 @@ use yii\base\Event;
  * ```
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class RegisterResourcesEvent extends Event
@@ -61,7 +61,7 @@ class RegisterResourcesEvent extends Event
      *
      * @var array<int, ResourceInterface|ResourceTemplateInterface>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public array $resources = [];

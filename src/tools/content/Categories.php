@@ -20,7 +20,7 @@ use craftpulse\herald\tools\ToolException;
  * search, with, orderBy, limit/offset, site, count.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -68,7 +68,7 @@ class Categories extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -79,7 +79,7 @@ class Categories extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -92,7 +92,7 @@ class Categories extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -132,7 +132,7 @@ class Categories extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -186,7 +186,7 @@ class Categories extends AbstractTool
      * @param string[] $eagerHandles
      * @throws ToolException from `_orderBy()` when the sort expression is not allowlisted.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildQuery(array $arguments, array $eagerHandles): CategoryQuery

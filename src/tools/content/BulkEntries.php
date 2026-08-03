@@ -97,7 +97,7 @@ use Throwable;
  * `results[]` array is the recovery surface for the caller.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsDestructive]
@@ -181,7 +181,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -192,7 +192,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -218,7 +218,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -301,7 +301,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * `saveEntries:{sectionUid}` passes. stdio and admin always pass.
      * Per-row enforcement happens inside the each-loop.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterFor(?User $user = null): bool
@@ -333,7 +333,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -359,7 +359,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function stream(array $arguments, InvocationContext $ctx): Generator
@@ -400,7 +400,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -429,7 +429,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _assertCoarsePermission(array $arguments): void
@@ -460,7 +460,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
@@ -484,7 +484,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _dispatch(string $mode, array $arguments, InvocationContext $ctx): Generator
@@ -517,7 +517,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _setStatus(array $arguments, InvocationContext $ctx): Generator
@@ -561,7 +561,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _updateFields(array $arguments, InvocationContext $ctx): Generator
@@ -608,7 +608,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _relate(array $arguments, InvocationContext $ctx): Generator
@@ -705,7 +705,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _migrate(array $arguments, InvocationContext $ctx): Generator
@@ -827,7 +827,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _runLoop(
@@ -960,7 +960,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildQuery(array $arguments): EntryQuery
@@ -1045,7 +1045,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @param array<string,mixed> $range
      * @return array<int,string>|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _parseDateRange(array $range): ?array
@@ -1076,7 +1076,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * aggregate query; no element hydration. Result feeds every
      * progress frame's `total` field.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _preflightCount(EntryQuery $query): int
@@ -1092,7 +1092,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      *
      * @param array<string,mixed> $rawQuery
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveSectionUidFromQuery(array $rawQuery): ?string
@@ -1113,7 +1113,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _assertCap(int $total, array $arguments): void
@@ -1142,7 +1142,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * and operators that want those must drive the dates explicitly
      * via `update_fields`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyStatus(EntryElement $entry, string $status): void
@@ -1161,7 +1161,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      *
      * @return list<int>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _currentRelationIds(EntryElement $entry, string $fieldHandle): array
@@ -1187,7 +1187,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
     /**
      * Whether the given section is assigned the given entry type.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _sectionAllowsEntryType(Section $section, EntryType $entryType): bool
@@ -1206,7 +1206,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _assertTargetPermission(Section $section): void
@@ -1234,7 +1234,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _isDryRun(array $arguments): bool
@@ -1258,7 +1258,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @param array<string,mixed>            $extras
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _terminalEnvelope(
@@ -1303,7 +1303,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @param array<string,mixed>  $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _terminalErrorEnvelope(string $mode, array $errors, array $arguments): array
@@ -1333,7 +1333,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _failureOutcome(EntryElement $entry, string $reason): array
@@ -1353,7 +1353,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _progressFrame(int $progress, int $total, string $message): array
@@ -1374,7 +1374,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _progressInterval(array $arguments): int
@@ -1388,7 +1388,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _onPermissionDenied(array $arguments): string
@@ -1405,7 +1405,7 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _idempotencyArguments(array $arguments, string $mode): array

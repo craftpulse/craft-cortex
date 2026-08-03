@@ -15,7 +15,7 @@
  *     etc. Keeps assertions readable in tests.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 
@@ -85,7 +85,7 @@ expect()->extend('toBeMcpErrorEnvelope', function() {
  * their `expect(...)->not->toBeNull()` guard so that case fails loudly
  * rather than silently acting as an anonymous user.
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 function herald_admin_user(): ?User

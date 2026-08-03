@@ -85,7 +85,7 @@ use yii\base\Event;
  *     surfaces it onward).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class FiberProgressBridge
@@ -138,7 +138,7 @@ final class FiberProgressBridge
      * @param Closure(): mixed                             $blockingCall    The blocking callable that fires events.
      * @param Throwable                                    $cancelException Exception to throw into the Fiber on cancellation. MUST be catchable by the wrapped service for clean exit.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(
@@ -176,7 +176,7 @@ final class FiberProgressBridge
      * @return Generator<int,array<string,mixed>,mixed,mixed>
      * @throws Throwable Any uncaught throwable from the blocking call.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function run(Closure $shouldCancel): Generator

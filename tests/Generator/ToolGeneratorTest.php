@@ -12,7 +12,7 @@
  * `ddev craft make herald-tool` covers the actual code-output path.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

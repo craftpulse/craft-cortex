@@ -21,7 +21,7 @@
  * doesn't pollute the production registry.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

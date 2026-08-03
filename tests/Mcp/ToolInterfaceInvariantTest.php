@@ -10,8 +10,7 @@
  * these methods without preserving the contract for `null` users
  * trips the assertion here before it ships.
  *
- * Locked contract — see `.claude/rules/architecture.md` "Per-user
- * tool visibility" and `docs/plans/gate-7.md` locked decision 3.
+ * Locked contract: per-user tool visibility.
  *
  *   - `filterFor(null)` must return `true` for every Free tool.
  *     Stdio passes `null`; the stdio registry must surface every
@@ -21,7 +20,7 @@
  *     only fire for non-null users.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

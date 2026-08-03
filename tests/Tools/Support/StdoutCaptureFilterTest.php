@@ -13,7 +13,7 @@
  * corrupt the outer capture — the guard fails loud instead.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

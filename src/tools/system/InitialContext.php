@@ -43,7 +43,7 @@ use craftpulse\herald\tools\support\Schema;
  * and spec-aware clients read structuredContent directly.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[Title('Get Initial Context')]
@@ -72,7 +72,7 @@ class InitialContext extends AbstractTool implements ContextAwareToolInterface
      * Store the per-invocation context the dispatcher injects before
      * `execute()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setInvocationContext(InvocationContext $ctx): void
@@ -83,7 +83,7 @@ class InitialContext extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -94,7 +94,7 @@ class InitialContext extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -110,7 +110,7 @@ class InitialContext extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function outputSchema(): array
@@ -163,7 +163,7 @@ class InitialContext extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -228,7 +228,7 @@ class InitialContext extends AbstractTool implements ContextAwareToolInterface
      *
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _elementTypes(): array
@@ -254,7 +254,7 @@ class InitialContext extends AbstractTool implements ContextAwareToolInterface
      *
      * @return array<int,array<string,string>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _skillPrompts(): array
@@ -276,7 +276,7 @@ class InitialContext extends AbstractTool implements ContextAwareToolInterface
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _hints(): array
@@ -294,7 +294,7 @@ class InitialContext extends AbstractTool implements ContextAwareToolInterface
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _editionName(CmsEdition $edition): string

@@ -4,8 +4,8 @@
  * =========================================================================
  * Tools service tests — per-user filtering surface (Gate 7.4).
  *
- * Asserts the locked architectural contract from
- * `.claude/rules/architecture.md` "Per-user tool visibility":
+ * Asserts the locked architectural contract for per-user tool
+ * visibility:
  *
  *   - `asListPayloadFor(null) === asListPayload()` — stdio invariant.
  *   - `asListPayloadFor($user)` omits tools where `filterFor()` is false.
@@ -19,7 +19,7 @@
  * extension contract is the test fixture.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

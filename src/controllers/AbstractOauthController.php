@@ -45,7 +45,7 @@ use yii\web\Response;
  * cheap static reads stay unthrottled.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 abstract class AbstractOauthController extends Controller
@@ -65,7 +65,7 @@ abstract class AbstractOauthController extends Controller
      *
      * @throws \yii\web\BadRequestHttpException From `parent::beforeAction()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function beforeAction($action): bool
@@ -98,7 +98,7 @@ abstract class AbstractOauthController extends Controller
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _throttledActionIds(): array
@@ -117,7 +117,7 @@ abstract class AbstractOauthController extends Controller
      * list, and requests without a resolvable IP, pass through
      * untouched.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _passesIpThrottle(Action $action): bool
@@ -145,7 +145,7 @@ abstract class AbstractOauthController extends Controller
      * Populate a 429 response with the canonical `Retry-After: <seconds>`
      * header and a JSON body. Mirrors `McpController::_rateLimited()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _rateLimited(RateLimitStatus $status): Response
@@ -164,7 +164,7 @@ abstract class AbstractOauthController extends Controller
      * disabled. Same shape as `McpController`'s kill-switch reject — a
      * JSON `{"error": "…"}` body naming the `httpEnabled` flag.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _httpDisabled(): Response
@@ -183,7 +183,7 @@ abstract class AbstractOauthController extends Controller
      * because the edition is a durable licensing state, not a config
      * switch. Mirrors `McpController::beforeAction()`'s Gate 2.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _proRequired(): Response

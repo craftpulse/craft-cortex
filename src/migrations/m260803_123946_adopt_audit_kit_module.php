@@ -45,7 +45,7 @@ use craftpulse\auditkit\helpers\PluginAdoption;
  * deferred write.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class m260803_123946_adopt_audit_kit_module extends Migration
@@ -59,7 +59,7 @@ class m260803_123946_adopt_audit_kit_module extends Migration
      * @throws \Throwable from `PluginAdoption::adopt()` if one of its
      *         database writes fails.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function safeUp(): bool
@@ -76,7 +76,7 @@ class m260803_123946_adopt_audit_kit_module extends Migration
      * registration for a package that is no longer a plugin, which is
      * not a state worth being able to return to.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function safeDown(): bool

@@ -6,7 +6,7 @@
  * `prompts/get` and that the text is the SKILL.md content verbatim.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

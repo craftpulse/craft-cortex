@@ -16,7 +16,7 @@ use Exception;
  * error envelope.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class ToolException extends Exception

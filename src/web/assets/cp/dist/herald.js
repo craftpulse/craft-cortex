@@ -1,13 +1,12 @@
 /* =========================================================================
    Herald CP JavaScript.
 
-   Single global `Herald` namespace on `window`. 9.2 ships the
-   Allowlist-tab slideout wiring; 9.3 / 9.5 extend with Activity-detail
-   and Tokens-issuance slideouts respectively.
+   Single global `Herald` namespace on `window`, carrying the
+   Allowlist, Activity-detail and Tokens-issuance slideout wiring.
 
-   Per docs/plans/gate-9.md locked decision 6 + 16: pure vanilla JS,
-   no Vue components authored, no TypeScript, no bundler. The file
-   ships verbatim through Craft's asset manager.
+   Locked decision: pure vanilla JS, no Vue components authored, no
+   TypeScript, no bundler. The file ships verbatim through Craft's
+   asset manager.
    ========================================================================= */
 (function(window) {
     'use strict';
@@ -19,10 +18,10 @@
     /**
      * Herald CP JavaScript namespace.
      *
-     * Populated incrementally across Gate 9 sub-gates:
-     *   - 9.2 — openAllowlistOverrideSlideout
-     *   - 9.3 — openActivityDetailSlideout
-     *   - 9.5 — openTokenIssuanceSlideout, copyToClipboard
+     * Public surface:
+     *   - openAllowlistOverrideSlideout
+     *   - openActivityDetailSlideout
+     *   - openTokenIssuanceSlideout, copyToClipboard
      */
     var Herald = {
         /**

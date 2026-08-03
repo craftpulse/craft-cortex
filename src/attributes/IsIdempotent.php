@@ -15,14 +15,14 @@ use Attribute;
  * keys (cf. the `entry` tool's `idempotencyKey` parameter in Pro).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[Attribute(Attribute::TARGET_CLASS)]
 final class IsIdempotent
 {
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(

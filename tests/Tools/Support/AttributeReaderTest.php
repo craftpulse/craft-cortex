@@ -6,7 +6,7 @@
  * matches the MCP `ToolAnnotations` payload shape.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

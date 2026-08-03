@@ -25,7 +25,7 @@ namespace craftpulse\herald\resources;
  * the requested URI and passes the captured parameters to `read()`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 interface ResourceTemplateInterface
@@ -36,7 +36,7 @@ interface ResourceTemplateInterface
      * non-slash, non-empty segment. Example:
      * `craft-element://entries/{id}`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getUriTemplate(): string;
@@ -45,7 +45,7 @@ interface ResourceTemplateInterface
      * Display label shown in `resources/list`. Surfaced once — clients
      * see the template, not the matched form.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getName(): string;
@@ -53,7 +53,7 @@ interface ResourceTemplateInterface
     /**
      * Human-readable description shown in `resources/list`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getDescription(): string;
@@ -63,7 +63,7 @@ interface ResourceTemplateInterface
      * URI (i.e. assumed uniform across all matched URIs). Resources
      * with variable MIME types should override at the protocol layer.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getMimeType(): string;
@@ -76,7 +76,7 @@ interface ResourceTemplateInterface
      *
      * @return array<string,string>|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function matches(string $uri): ?array;
@@ -91,7 +91,7 @@ interface ResourceTemplateInterface
      * @param array<string,string> $captures Captured parameters from `matches()`.
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function read(string $uri, array $captures): array;

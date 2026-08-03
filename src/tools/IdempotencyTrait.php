@@ -38,7 +38,7 @@ use craft\elements\User;
  *     `use` — PHP traits can't `extends`).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 trait IdempotencyTrait
@@ -77,7 +77,7 @@ trait IdempotencyTrait
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _idempotencyCacheHit(array $arguments): ?array
@@ -108,7 +108,7 @@ trait IdempotencyTrait
      * @param array<string,mixed> $arguments
      * @param array<string,mixed> $envelope
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _cacheIdempotencyEnvelope(array $arguments, array $envelope): void
@@ -139,7 +139,7 @@ trait IdempotencyTrait
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _idempotencyCacheKey(array $arguments): ?string

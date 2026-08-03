@@ -17,7 +17,7 @@
  * Full CP round-trip lives in the manual gate-9.2 verification step.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

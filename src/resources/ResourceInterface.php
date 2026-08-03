@@ -17,7 +17,7 @@ namespace craftpulse\herald\resources;
  * reference (`craft-skills://<skill>/<reference>`).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 interface ResourceInterface
@@ -27,7 +27,7 @@ interface ResourceInterface
      * lookup key for `resources/read` and as the `uri` field in the
      * `resources/list` payload.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getUri(): string;
@@ -36,7 +36,7 @@ interface ResourceInterface
      * Display label shown in `resources/list`. Free-form, intended for
      * humans browsing a resource picker.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getName(): string;
@@ -45,7 +45,7 @@ interface ResourceInterface
      * Human-readable description shown in `resources/list`. Should
      * answer "what would I find inside?" in one or two sentences.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getDescription(): string;
@@ -54,7 +54,7 @@ interface ResourceInterface
      * MIME type of the resource content. Skills are always Markdown
      * so this is `text/markdown` for every bundled resource.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getMimeType(): string;
@@ -66,7 +66,7 @@ interface ResourceInterface
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function read(): array;

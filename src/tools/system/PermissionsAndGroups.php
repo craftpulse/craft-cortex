@@ -26,7 +26,7 @@ use craftpulse\herald\tools\support\Schema;
  * No parameters. Permissions and groups are small and read together.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -39,7 +39,7 @@ class PermissionsAndGroups extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -50,7 +50,7 @@ class PermissionsAndGroups extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -70,7 +70,7 @@ class PermissionsAndGroups extends AbstractTool
      * with `additionalProperties: true` — the LLM still gets the flat
      * `permissionNames` list and `permissionCount` for ergonomic lookup.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function outputSchema(): array
@@ -97,7 +97,7 @@ class PermissionsAndGroups extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -142,7 +142,7 @@ class PermissionsAndGroups extends AbstractTool
      * @param array<int|string,mixed> $tree
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _flatten(array $tree): array

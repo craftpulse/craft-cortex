@@ -9,7 +9,7 @@
  * shape-only assertions still pass with `count: 0`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

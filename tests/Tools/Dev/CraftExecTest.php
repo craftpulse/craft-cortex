@@ -14,7 +14,7 @@
  * Plus the settings toggle (`execEnabled`) and a few sanity cases.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

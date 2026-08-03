@@ -27,7 +27,7 @@ use yii\web\Response;
  * is disabled, so a default install exposes no discovery surface.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class WellKnownController extends AbstractOauthController
@@ -68,7 +68,7 @@ class WellKnownController extends AbstractOauthController
      *     what the metadata advertises, but listing S256-only
      *     advertises the policy clearly.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionAuthorizationServer(): Response
@@ -109,7 +109,7 @@ class WellKnownController extends AbstractOauthController
      * `resource_metadata=<this URL>` so unauthenticated clients can
      * follow the trail to discovery without prior knowledge.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionProtectedResource(): Response

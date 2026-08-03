@@ -58,7 +58,7 @@ use yii\base\InvalidConfigException;
  * @property Tokens $tokens the bearer-token issuance / lookup / revoke service
  * @property Tools $tools the MCP tool registry
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 trait Services
@@ -71,7 +71,7 @@ trait Services
      *
      * @throws InvalidConfigException When the component is not registered.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getAllowlist(): Allowlist
@@ -87,7 +87,7 @@ trait Services
      *
      * @throws InvalidConfigException When the component is not registered.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public function getAudit(): Audit
@@ -102,7 +102,7 @@ trait Services
      *
      * @throws InvalidConfigException When the component is not registered.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getInvocations(): Invocations
@@ -118,7 +118,7 @@ trait Services
      *
      * @throws InvalidConfigException When the component is not registered.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getOauth(): Oauth
@@ -134,7 +134,7 @@ trait Services
      *
      * @throws InvalidConfigException When the component is not registered.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getPrompts(): Prompts
@@ -149,7 +149,7 @@ trait Services
      *
      * @throws InvalidConfigException When the component is not registered.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getRateLimiter(): RateLimiter
@@ -165,7 +165,7 @@ trait Services
      *
      * @throws InvalidConfigException When the component is not registered.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getResources(): Resources
@@ -181,7 +181,7 @@ trait Services
      *
      * @throws InvalidConfigException When the component is not registered.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getScopes(): Scopes
@@ -197,7 +197,7 @@ trait Services
      *
      * @throws InvalidConfigException When the component is not registered.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getSessions(): Sessions
@@ -213,7 +213,7 @@ trait Services
      *
      * @throws InvalidConfigException When the component is not registered.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getSkills(): Skills
@@ -229,7 +229,7 @@ trait Services
      *
      * @throws InvalidConfigException When the component is not registered.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getTokens(): Tokens
@@ -245,7 +245,7 @@ trait Services
      *
      * @throws InvalidConfigException When the component is not registered.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getTools(): Tools

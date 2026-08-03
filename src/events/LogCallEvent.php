@@ -35,7 +35,7 @@ use yii\base\Event;
  * they don't recognise); renaming or removing one is a contract bump.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class LogCallEvent extends Event
@@ -50,7 +50,7 @@ class LogCallEvent extends Event
      *                          Subscribers read individual fields here
      *                          rather than parsing the formatted line.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public array $entry = [];
@@ -61,7 +61,7 @@ class LogCallEvent extends Event
      *             so SIEM forwarders that pin against the wire format
      *             have a copy without re-running the formatter.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public string $line = '';

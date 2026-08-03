@@ -17,7 +17,7 @@ namespace craftpulse\herald\prompts;
  * playbooks) can declare them without an ABI change.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 interface PromptInterface
@@ -27,7 +27,7 @@ interface PromptInterface
      * key in the registry and as the `name` field in `prompts/list` /
      * `prompts/get`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getName(): string;
@@ -36,7 +36,7 @@ interface PromptInterface
      * Human-readable description shown to the LLM in `prompts/list`.
      * One to three sentences answering "when would I invoke this?".
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getDescription(): string;
@@ -48,7 +48,7 @@ interface PromptInterface
      *
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getArguments(): array;
@@ -61,7 +61,7 @@ interface PromptInterface
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function render(array $arguments): array;

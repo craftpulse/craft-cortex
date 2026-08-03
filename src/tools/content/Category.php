@@ -32,7 +32,7 @@ use craftpulse\herald\tools\ToolException;
  *   - `delete` — soft-delete by default; `hardDelete: true` removes the
  *     row entirely. Requires `deleteCategories:{groupUid}`.
  *
- * Permission contract (locked decision 4 of `docs/plans/gate-8.md`):
+ * Permission contract (locked):
  *   - `_requiredPermissions(array $arguments): array` returns the
  *     Craft permission strings the arguments imply. The same method
  *     drives both `filterFor()` (whole-tool visibility, sentinel
@@ -61,7 +61,7 @@ use craftpulse\herald\tools\ToolException;
  * TTL 24h. Skipped on stdio (no per-request identity).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsDestructive]
@@ -90,7 +90,7 @@ class Category extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -101,7 +101,7 @@ class Category extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -121,7 +121,7 @@ class Category extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -177,7 +177,7 @@ class Category extends AbstractTool
      * permission. `execute()` performs its own per-group re-check
      * regardless.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterFor(?User $user = null): bool
@@ -211,7 +211,7 @@ class Category extends AbstractTool
      * and a user without `saveCategories:*` doesn't see `create` /
      * `update`. stdio (`null`) always sees the full enum.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function inputSchemaFor(?User $user = null): array
@@ -269,7 +269,7 @@ class Category extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -301,7 +301,7 @@ class Category extends AbstractTool
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -330,7 +330,7 @@ class Category extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
@@ -359,7 +359,7 @@ class Category extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _create(array $arguments): array
@@ -418,7 +418,7 @@ class Category extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _update(array $arguments): array
@@ -468,7 +468,7 @@ class Category extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _delete(array $arguments): array
@@ -505,7 +505,7 @@ class Category extends AbstractTool
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveGroup(array $arguments): ?CategoryGroup
@@ -549,7 +549,7 @@ class Category extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveGroupUid(array $arguments): ?string
@@ -575,7 +575,7 @@ class Category extends AbstractTool
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveCategory(array $arguments): CategoryElement
@@ -623,7 +623,7 @@ class Category extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyAttributes(CategoryElement $element, array $arguments, bool $isCreate): void
@@ -661,7 +661,7 @@ class Category extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _assertParentInGroup(CategoryElement $element, array $arguments): bool
@@ -701,7 +701,7 @@ class Category extends AbstractTool
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _successEnvelope(CategoryElement $element, string $mode): array

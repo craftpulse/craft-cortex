@@ -23,7 +23,7 @@ use yii\base\Component;
  * does NOT catch.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class FiberEmitterFixture extends Component
@@ -55,7 +55,7 @@ final class FiberEmitterFixture extends Component
      * try/catch around the loop, with `QueryAbortedException` causing
      * a "fail silently" early return.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function run(int $iterations, bool $cancellable = true): string
@@ -85,7 +85,7 @@ final class FiberEmitterFixture extends Component
      * scenario that, under a break-on-cancel bridge, would leave the
      * Fiber suspended and leak the class-level listener.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function runThenEmitOnCancel(int $iterations): string
@@ -119,7 +119,7 @@ final class FiberEmitterFixture extends Component
      *
      * @throws RuntimeException Always, after the second emitted row.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function failAfter(int $rowsBeforeFailure): never

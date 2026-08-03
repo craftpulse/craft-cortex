@@ -41,7 +41,7 @@ use yii\base\Component;
  *      handler all call `resetMemo()` so the next `getMergedCorpus()`
  *      rebuilds against the new state.
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  * =========================================================================
  */
@@ -84,7 +84,7 @@ class Skills extends Component
      *
      * @var MemoizableArray<array<string,mixed>>|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private ?MemoizableArray $_merged = null;
@@ -97,7 +97,7 @@ class Skills extends Component
      *
      * @var array<string,Skill>|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private ?array $_elementByHandle = null;
@@ -115,7 +115,7 @@ class Skills extends Component
      * Mirrors `Addresses::getFieldLayout()`
      * (`vendor/craftcms/cms/src/services/Addresses.php:387-404`).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getFieldLayout(): FieldLayout
@@ -154,7 +154,7 @@ class Skills extends Component
      * @param FieldLayout $layout
      * @param bool $runValidation Whether the layout should be validated.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function saveFieldLayout(FieldLayout $layout, bool $runValidation = true): bool
@@ -179,7 +179,7 @@ class Skills extends Component
      * `Addresses::handleChangedAddressFieldLayout`
      * (`vendor/craftcms/cms/src/services/Addresses.php:432-455`).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function handleChangedFieldLayout(ConfigEvent $event): void
@@ -231,7 +231,7 @@ class Skills extends Component
      *
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getMergedCorpus(?string $kindFilter = null): array
@@ -258,7 +258,7 @@ class Skills extends Component
      * handles return null — consumers fall through to the
      * filesystem-backed `BundledSkills::content()` path.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getByHandle(string $handle): ?Skill
@@ -278,7 +278,7 @@ class Skills extends Component
      *
      * @return list<string>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function allHandles(): array
@@ -301,7 +301,7 @@ class Skills extends Component
      * Public so `SkillResource::read()` and `SkillPrompt::render()`
      * share the exact same synthesis path.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function synthesizeContent(Skill $skill): string
@@ -326,7 +326,7 @@ class Skills extends Component
      * from `handleChangedFieldLayout` so the next read rebuilds
      * against the new state.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function resetMemo(): void
@@ -358,7 +358,7 @@ class Skills extends Component
      *   4. Iterate bundled agent names and emit them (no element-
      *      stored agents in 8.6).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildMerged(): void
@@ -442,7 +442,7 @@ class Skills extends Component
      * downstream consumers handle that case as "skill metadata only,
      * no inline content yet".
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _readBodyField(Skill $skill): string
@@ -462,7 +462,7 @@ class Skills extends Component
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _elementRow(Skill $skill): array

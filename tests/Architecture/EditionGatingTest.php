@@ -5,7 +5,7 @@
  * Edition-gating invariants — Gate 8 architecture test sweep.
  *
  * Walks the list of Pro tool classes and asserts each one uses
- * `ProToolTrait` (locked decision 2 of `docs/plans/gate-8.md`). The
+ * `ProToolTrait` (locked decision). The
  * list grows as Gate 8 sub-gates land — 8.2 ships `Entry`; 8.3 adds
  * `Category`, `Tag`, `GlobalSet`; 8.4 adds `Address`; 8.5 adds
  * `Users`; 8.6 adds `BulkEntries`. Each builder appends to the list
@@ -20,7 +20,7 @@
  *     this).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

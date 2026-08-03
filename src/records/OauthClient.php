@@ -36,7 +36,7 @@ use craftpulse\herald\db\Table;
  * @property string $dateUpdated
  * @property string $uid
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class OauthClient extends ActiveRecord
@@ -47,7 +47,7 @@ class OauthClient extends ActiveRecord
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function tableName(): string
@@ -64,7 +64,7 @@ class OauthClient extends ActiveRecord
      * the column; the value is a 32-char hex string from
      * `bin2hex(random_bytes(16))`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function rules(): array

@@ -23,7 +23,7 @@ use League\OAuth2\Server\Entities\Traits\ScopeTrait;
  * code changes.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class ScopeEntity implements ScopeEntityInterface

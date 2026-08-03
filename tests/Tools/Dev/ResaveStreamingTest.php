@@ -13,7 +13,7 @@
  * `ResaveTest.php` — this file is the streaming-only surface.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

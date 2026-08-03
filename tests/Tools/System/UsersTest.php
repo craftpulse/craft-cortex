@@ -35,7 +35,7 @@
  * concurrent reads of the same PC surface.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

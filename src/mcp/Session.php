@@ -37,7 +37,7 @@ use DateTimeInterface;
  * cache, no PSR-16-backend gotchas around `__sleep` / `__wakeup`).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class Session
@@ -65,7 +65,7 @@ final class Session
      *                                            gate 7.2). Always null
      *                                            in 7.1.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(
@@ -83,7 +83,7 @@ final class Session
      *
      * @param array<string,mixed> $row
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function fromArray(array $row): self
@@ -107,7 +107,7 @@ final class Session
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function toArray(): array

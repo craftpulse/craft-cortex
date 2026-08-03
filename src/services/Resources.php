@@ -25,7 +25,7 @@ use yii\base\Component;
  * service init and never mutated. Same shape as `Tools` and `Prompts`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Resources extends Component
@@ -72,7 +72,7 @@ class Resources extends Component
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function init(): void
@@ -121,7 +121,7 @@ class Resources extends Component
      *
      * @return array{0: ResourceTemplateInterface, 1: array<string,string>}|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function matchTemplate(string $uri): ?array
@@ -142,7 +142,7 @@ class Resources extends Component
      *
      * @return ResourceTemplateInterface[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getTemplates(): array
@@ -155,7 +155,7 @@ class Resources extends Component
      *
      * @return ResourceInterface[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getAll(): array
@@ -168,7 +168,7 @@ class Resources extends Component
      * URI is registered — the dispatcher converts that to JSON-RPC
      * error -32602 (Invalid params).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getByUri(string $uri): ?ResourceInterface
@@ -179,7 +179,7 @@ class Resources extends Component
     /**
      * Number of registered resources.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getCount(): int
@@ -193,7 +193,7 @@ class Resources extends Component
      *
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function asListPayload(): array
@@ -220,7 +220,7 @@ class Resources extends Component
      *
      * @return ResourceInterface[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildRegistry(): array

@@ -77,7 +77,7 @@ use Throwable;
  * for the raw controller surface.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[Title('Resave Elements')]
@@ -155,7 +155,7 @@ class Resave extends AbstractTool implements StreamableToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -166,7 +166,7 @@ class Resave extends AbstractTool implements StreamableToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -189,7 +189,7 @@ class Resave extends AbstractTool implements StreamableToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -222,7 +222,7 @@ class Resave extends AbstractTool implements StreamableToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -257,7 +257,7 @@ class Resave extends AbstractTool implements StreamableToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function stream(array $arguments, InvocationContext $ctx): Generator
@@ -453,7 +453,7 @@ class Resave extends AbstractTool implements StreamableToolInterface
      *
      * @param array<string,mixed> $params Validated parameter map from `_buildParams()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _streamingResolve(string $type, array $params): ElementQueryInterface
@@ -512,7 +512,7 @@ class Resave extends AbstractTool implements StreamableToolInterface
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _emitProgress(MultiElementActionEvent $event, int $total): array
@@ -554,7 +554,7 @@ class Resave extends AbstractTool implements StreamableToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildParams(string $type, array $arguments): array

@@ -23,7 +23,7 @@ use League\OAuth2\Server\Entities\Traits\EntityTrait;
  * at the token endpoint.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class ClientEntity implements ClientEntityInterface
@@ -38,7 +38,7 @@ class ClientEntity implements ClientEntityInterface
      * Mark the client confidential or public. Public clients have no
      * `clientSecretHash` and authenticate via PKCE only.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setIsConfidential(bool $isConfidential): void
@@ -49,7 +49,7 @@ class ClientEntity implements ClientEntityInterface
     /**
      * Set the client name (rendered on the consent screen).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setName(string $name): void
@@ -64,7 +64,7 @@ class ClientEntity implements ClientEntityInterface
      *
      * @param string|string[] $redirectUri
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setRedirectUri(string|array $redirectUri): void

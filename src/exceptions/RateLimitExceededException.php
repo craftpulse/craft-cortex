@@ -23,7 +23,7 @@ use RuntimeException;
  * try/catch around `consume()` in the controller is the only call site.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class RateLimitExceededException extends RuntimeException
@@ -37,7 +37,7 @@ class RateLimitExceededException extends RuntimeException
      *                                for the HTTP header and writes the
      *                                full shape onto the audit row.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(

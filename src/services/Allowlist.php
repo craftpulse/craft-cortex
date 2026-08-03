@@ -36,7 +36,7 @@ use yii\helpers\Inflector;
  * the same class is forbidden.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Allowlist extends Component
@@ -140,7 +140,7 @@ class Allowlist extends Component
      * is `true`, plus active runtime overrides, deduplicated.
      *
      * The admin-level merge mirrors the `allowAdminChanges` policy
-     * from `docs/plans/gate-8.md` locked decision 14: when the host
+     * from the locked `allowAdminChanges` policy: when the host
      * Craft install forbids admin-level changes, no tool — including
      * `craft_command` — may dispatch a route that mutates project
      * config, schema, or scaffolding. `getEffective()` is the single
@@ -157,7 +157,7 @@ class Allowlist extends Component
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getEffective(?int $userId = null): array
@@ -211,7 +211,7 @@ class Allowlist extends Component
      *
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getActiveOverrides(?int $userId = null): array
@@ -245,7 +245,7 @@ class Allowlist extends Component
      *
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getAllOverrides(bool $includeExpired = true): array
@@ -308,7 +308,7 @@ class Allowlist extends Component
      *
      * @return array<string,array{group:string,source:string,adminLevel:bool,actions:array<int,array{id:string,action:string,adminLevel:bool}>}>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getCommandGroups(): array
@@ -364,7 +364,7 @@ class Allowlist extends Component
      * @param string[] $adminPatterns   The saved `Settings::$adminLevelCommands`.
      * @return array{groups:array<string,array{group:string,source:string,adminLevel:bool,fullToggle:bool,allowedCount:int,totalCount:int,actions:array<int,array{id:string,action:string,adminLevel:bool,allowed:bool}>}>,contentCustomPatterns:string[],adminCustomPatterns:string[]}
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function mapPatternsToToggleState(array $contentPatterns, array $adminPatterns): array
@@ -444,7 +444,7 @@ class Allowlist extends Component
      * @param string[]            $customPatterns Verbatim power-user globs.
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function patternsFromToggleState(array $fullGroups, array $actionIds, array $customPatterns, bool $adminLevel): array
@@ -504,7 +504,7 @@ class Allowlist extends Component
      * @param array<string,array{group:string,source:string,adminLevel:bool,actions:array<int,array{id:string,action:string,adminLevel:bool}>}> $groups
      * @return array{groupGlobs:array<string,string>,actionIds:array<string,string>}
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _indexKnownPatterns(array $groups, bool $adminLevel): array
@@ -536,7 +536,7 @@ class Allowlist extends Component
      * @param array{groupGlobs:array<string,string>,actionIds:array<string,string>} $index
      * @return array{fullGroups:array<string,bool>,actionIds:array<string,bool>,customPatterns:string[]}
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveBucket(array $patterns, array $index): array
@@ -576,7 +576,7 @@ class Allowlist extends Component
      *
      * @param array{group:string,actions:array<int,array{id:string,action:string,adminLevel:bool}>} $group
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _groupGlobFor(array $group): string
@@ -607,7 +607,7 @@ class Allowlist extends Component
      *
      * @throws Exception when the underlying record fails validation or save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function add(
@@ -636,7 +636,7 @@ class Allowlist extends Component
      *
      * @throws Exception when the underlying record fails to save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function remove(int $id): bool
@@ -661,7 +661,7 @@ class Allowlist extends Component
      * subsequent gc cycles pick up the rest. Without the cap a single
      * gc pass could lock the table for seconds on large installs.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function pruneExpired(): int
@@ -701,7 +701,7 @@ class Allowlist extends Component
      *
      * @return array<string,array{group:string,source:string,adminLevel:bool,actions:array<int,array{id:string,action:string,adminLevel:bool}>}>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _enumerateCommandGroups(): array
@@ -800,7 +800,7 @@ class Allowlist extends Component
      * silently re-class a `migrate/*` route as content-level and slip it
      * into the always-admitted bucket.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function isAdminLevelRoute(string $routeId): bool
@@ -829,7 +829,7 @@ class Allowlist extends Component
      *
      * @param array<string,array{source:string,actions:array<string,array{id:string,action:string}>}> $groups
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _collectControllers(
@@ -885,7 +885,7 @@ class Allowlist extends Component
      *
      * @return array<string,class-string>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _coreCommandAliases(): array
@@ -904,7 +904,7 @@ class Allowlist extends Component
      * @param class-string $class
      * @param array<string,array{source:string,actions:array<string,array{id:string,action:string}>}> $groups
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _collectActionsForRoute(string $id, string $class, string $source, array &$groups): void
@@ -939,7 +939,7 @@ class Allowlist extends Component
      * @param string[]                                      $actions
      * @param array<string,array{id:string,action:string}> $accumulator
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _foldActions(string $controllerId, array $actions, string $defaultAction, array &$accumulator): void
@@ -975,7 +975,7 @@ class Allowlist extends Component
      * `gc/run`. Returns `index` when the class can't be reflected — the
      * conservative default that registers no extra bare alias.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _defaultActionId(string $class): string
@@ -1002,7 +1002,7 @@ class Allowlist extends Component
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _reflectActions(string $class): array
@@ -1040,7 +1040,7 @@ class Allowlist extends Component
      * forward (`mapPatternsToToggleState`) and inverse
      * (`patternsFromToggleState`) mappings agree on the rule.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _groupHandleFromRouteId(string $routeId): string
@@ -1055,7 +1055,7 @@ class Allowlist extends Component
      * `ClearCachesController` → `clear-caches`. Mirrors
      * `HelpController::getModuleCommands()`'s `camel2id(...)` call.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _controllerIdFromClass(string $basename): string
@@ -1069,7 +1069,7 @@ class Allowlist extends Component
      * `craftpulse\herald\Herald` returns `craftpulse\herald`. Returns null
      * when the class is not namespaced (defensive — every Craft plugin is).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _baseNamespace(string $class): ?string
@@ -1090,7 +1090,7 @@ class Allowlist extends Component
      *
      * @param class-string $pluginClass
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _pluginConsoleDirectory(string $pluginClass): ?string
@@ -1112,7 +1112,7 @@ class Allowlist extends Component
      *
      * @throws Exception
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _saveOrThrow(RuntimeOverride $override, string $action, string $context): void

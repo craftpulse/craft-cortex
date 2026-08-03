@@ -14,7 +14,7 @@
  * prefix; `afterEach()` hard-deletes everything under the prefix.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

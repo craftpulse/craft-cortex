@@ -4,7 +4,7 @@
  * =========================================================================
  * craft_command × allowAdminChanges boundary tests — Gate 8.1.
  *
- * Locks `docs/plans/gate-8.md` locked decision 14:
+ * Locks the `allowAdminChanges` policy:
  *
  *   - Content-level patterns (`Settings::$allowedCommands` ∪ runtime
  *     overrides) are always admitted by the dispatch gate.
@@ -29,7 +29,7 @@
  * about the gate, not the runner.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

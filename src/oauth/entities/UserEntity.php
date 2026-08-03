@@ -16,7 +16,7 @@ use League\OAuth2\Server\Entities\UserEntityInterface;
  * `Oauth::lookupAccessToken()` reads back to resolve the Craft user.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class UserEntity implements UserEntityInterface

@@ -37,7 +37,7 @@
  * manage_queue) and confirms no admin-level value.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

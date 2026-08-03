@@ -44,9 +44,8 @@ use Throwable;
  *     `admin: true`.
  *   - `update` — load by id/uid, mutate, save. Per-target `canSave`
  *     plus an explicit "non-admin caller editing an admin target"
- *     refusal (the headline correction in `docs/plans/gate-8.5.md`
- *     locked decision 10 — `User::canSave` does NOT enforce admin-
- *     protection natively, it lives in `canDelete` and ad-hoc in
+ *     refusal (`User::canSave` does NOT enforce admin-protection
+ *     natively, it lives in `canDelete` and ad-hoc in
  *     `UsersController`). Sensitive-field gate
  *     (`email / username on non-self / active / suspended / pending /
  *     locked / newPassword on non-self`) requires `administrateUsers`.
@@ -66,8 +65,7 @@ use Throwable;
  *   - Sensitive-field / admin / group-assignment gates layered on top
  *     of the per-target check inside each mode body.
  *
- * PII gating contract (locked decision 4 of `docs/plans/gate-8.md`,
- * fieldmap in `docs/plans/gate-8.5.md` §"PII gating spec"):
+ * PII gating contract (locked):
  *   - `_serializeUser($target, ?$caller)` is the PII-aware serialiser.
  *   - `email`, `unverifiedEmail`, lockout fields require `editUsers`.
  *   - `passwordResetRequired` requires `administrateUsers`.
@@ -132,7 +130,7 @@ use Throwable;
  *     the successor lands.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsDestructive]
@@ -246,7 +244,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setInvocationContext(InvocationContext $ctx): void
@@ -257,7 +255,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -268,7 +266,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -298,7 +296,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -374,7 +372,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * `Elements::canSave / canView / canDelete` plus the tool-layer
      * admin-protection gate.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterFor(?UserElement $user = null): bool
@@ -403,7 +401,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * `drafts_and_revisions`/`content_audit`/`import_export` which
      * gate modes on permissions.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function inputSchemaFor(?UserElement $user = null): array
@@ -416,7 +414,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -454,7 +452,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -470,7 +468,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
@@ -515,7 +513,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * @throws ToolException When a guarded field is present and the
      *                       request is not elevated.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _assertTransportAllowsCredentialMutations(array $arguments): void
@@ -551,7 +549,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _list(array $arguments): array
@@ -609,7 +607,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _get(array $arguments): array
@@ -638,7 +636,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _create(array $arguments): array
@@ -680,9 +678,8 @@ class Users extends AbstractTool implements ContextAwareToolInterface
 
         // Apply attributes, respecting the administrateUsers gate for
         // active/suspended/pending — silently ignore when missing
-        // (per locked decision 19 in docs/plans/gate-8.5.md). Default
-        // pending=true matches UsersController::actionSaveUser line
-        // 1733.
+        // (locked). Default pending=true matches
+        // UsersController::actionSaveUser line 1733.
         $this->_applyCreateAttributes($element, $arguments, $caller);
         $this->_applyFields($element, $arguments);
 
@@ -717,7 +714,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _update(array $arguments): array
@@ -741,11 +738,10 @@ class Users extends AbstractTool implements ContextAwareToolInterface
             );
         }
 
-        // **Admin-protection gate** — the headline correction from
-        // docs/plans/gate-8.5.md locked decision 10. `User::canSave`
-        // does NOT enforce "non-admin cannot edit an admin"
-        // natively; that protection lives in `canDelete` and ad-hoc
-        // in `UsersController` (`requireAdmin(false)` at line 2194).
+        // **Admin-protection gate.** `User::canSave` does NOT enforce
+        // "non-admin cannot edit an admin" natively; that protection
+        // lives in `canDelete` and ad-hoc in `UsersController`
+        // (`requireAdmin(false)` at line 2194).
         // We add the gate here to match Craft's CP posture.
         $isSelf = $caller !== null && $caller->id === $element->id;
         if ($element->admin && $caller !== null && !$caller->admin && !$isSelf) {
@@ -823,7 +819,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _delete(array $arguments): array
@@ -891,7 +887,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveUser(array $arguments): UserElement
@@ -945,7 +941,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * @param array<string,mixed> $probeFilter
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _throwResolutionMiss(string $field, string $value, array $probeFilter): never
@@ -974,7 +970,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _assertCanView(UserElement $user): void
@@ -1001,7 +997,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * @param UserQuery<array-key,UserElement> $query
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyListFilters(UserQuery $query, array $arguments): void
@@ -1050,7 +1046,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyCreateAttributes(UserElement $element, array $arguments, ?UserElement $caller): void
@@ -1103,7 +1099,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyUpdateAttributes(UserElement $element, array $arguments, ?UserElement $caller, bool $isSelf): void
@@ -1142,7 +1138,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _assertSensitiveFields(UserElement $element, array $arguments, ?UserElement $caller, bool $isSelf): void
@@ -1193,7 +1189,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * @param string[] $existingGroupUids
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyGroupAssignment(UserElement $element, mixed $groupUidsArg, ?UserElement $caller, array $existingGroupUids): void
@@ -1252,7 +1248,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _successEnvelope(UserElement $element, string $mode, ?UserElement $caller): array
@@ -1283,7 +1279,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeUser(UserElement $target, ?UserElement $caller): array
@@ -1347,7 +1343,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      *
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeAddressReferences(UserElement $target): array
@@ -1390,7 +1386,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeAllowlistedFields(UserElement $target): array
@@ -1424,7 +1420,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * defaults to "show me something" rather than the conservative
      * relation stub `ElementSerializer` emits.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeScalarish(mixed $value): mixed

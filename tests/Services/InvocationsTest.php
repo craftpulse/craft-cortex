@@ -20,7 +20,7 @@
  * stays in the shape it started in.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

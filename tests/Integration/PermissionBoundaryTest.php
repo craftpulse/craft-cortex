@@ -8,15 +8,14 @@
  * `_assertPermission()` denies a non-admin caller, every Pro tool
  *
  *   1. Raises `ToolException` with a message matching the canonical
- *      prefix locked in `docs/plans/gate-8.10.md` decision 3.
+ *      locked canonical prefix.
  *      `ModeErrorShapeTest` locks the precise full-message shape via
  *      reflection over the protected message builder; this test
  *      locks the end-to-end **dispatch-style** path: the exception
  *      class, the audit-row shape, the kind sentinel.
  *
  *   2. Stdio (`null` user identity) is trusted local and the
- *      permission check skips entirely (locked decision 3 of
- *      `gate-7.md`).
+ *      permission check skips entirely (locked decision).
  *
  * Test boundaries — what this test does and does NOT cover:
  *
@@ -43,7 +42,7 @@
  * pre-yield throw path (locked decision 10).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

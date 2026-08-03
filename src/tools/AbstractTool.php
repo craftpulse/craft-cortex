@@ -16,7 +16,7 @@ use craft\elements\User;
  * `getName`, `getDescription`, `getInputSchema`, and `execute`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 abstract class AbstractTool implements ToolInterface
@@ -30,7 +30,7 @@ abstract class AbstractTool implements ToolInterface
      * Default schema: object with no required properties. Override per
      * tool to expose `handle`, `count`, `mode`, etc.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -58,7 +58,7 @@ abstract class AbstractTool implements ToolInterface
      * text block (`Server::_toolResultEnvelope`); when it's empty the
      * envelope carries the text block only.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function outputSchema(): array
@@ -73,7 +73,7 @@ abstract class AbstractTool implements ToolInterface
      * settings gating override (e.g. `craft_exec` checks
      * `Settings::$execEnabled`; future Pro tools check the edition).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function shouldRegister(): bool
@@ -89,7 +89,7 @@ abstract class AbstractTool implements ToolInterface
      * for the resolved user. See `ToolInterface::filterFor()` for the
      * locked contract.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterFor(?User $user = null): bool
@@ -107,7 +107,7 @@ abstract class AbstractTool implements ToolInterface
      * behaviour: `inputSchemaFor(null)` returns the static schema
      * verbatim, preserving the stdio path.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function inputSchemaFor(?User $user = null): array
@@ -125,7 +125,7 @@ abstract class AbstractTool implements ToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _handle(array $arguments): ?string
@@ -139,7 +139,7 @@ abstract class AbstractTool implements ToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _isCount(array $arguments): bool
@@ -154,7 +154,7 @@ abstract class AbstractTool implements ToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _mode(array $arguments): ?string
@@ -171,7 +171,7 @@ abstract class AbstractTool implements ToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _limit(array $arguments, int $default, int $max): int
@@ -186,7 +186,7 @@ abstract class AbstractTool implements ToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _offset(array $arguments): int
@@ -226,7 +226,7 @@ abstract class AbstractTool implements ToolInterface
      * @return array<string,int>|null
      * @throws ToolException when the value is not a string, is empty, or names an alias outside `$sortable`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _orderBy(array $arguments, array $sortable): ?array
@@ -285,7 +285,7 @@ abstract class AbstractTool implements ToolInterface
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _eagerHandles(array $arguments): array
@@ -312,7 +312,7 @@ abstract class AbstractTool implements ToolInterface
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _resolveSiteId(array $arguments): int
@@ -336,7 +336,7 @@ abstract class AbstractTool implements ToolInterface
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _resolveOptionalSiteId(array $arguments): ?int
@@ -375,7 +375,7 @@ abstract class AbstractTool implements ToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _applyFields(Element $element, array $arguments): void
@@ -399,7 +399,7 @@ abstract class AbstractTool implements ToolInterface
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _validationEnvelope(Element $element, string $mode): array

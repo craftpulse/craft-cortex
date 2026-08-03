@@ -31,7 +31,7 @@ use League\OAuth2\Server\Repositories\ScopeRepositoryInterface;
  * scopes from the moment it's minted.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class ScopeRepository implements ScopeRepositoryInterface
@@ -67,7 +67,7 @@ class ScopeRepository implements ScopeRepositoryInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getScopeEntityByIdentifier(string $identifier): ?ScopeEntityInterface
@@ -88,7 +88,7 @@ class ScopeRepository implements ScopeRepositoryInterface
      * the issued token carries fine-grained scopes. Capability scopes
      * pass through unchanged.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function finalizeScopes(

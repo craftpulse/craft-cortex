@@ -18,13 +18,13 @@
  *   - Every tool implements `ToolInterface`.
  *
  *   - Every class file under `src/` opens with a section-header comment
- *     and includes `@author Craftpulse`.
+ *     and includes `@author CraftPulse`.
  *
  * Implemented as Pest tests (not arch() expectations) because the file-
  * content checks aren't expressible through Pest's class-graph DSL.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 
@@ -175,10 +175,10 @@ it('does not declare strict_types in src/', function() {
 });
 
 // -----------------------------------------------------------------------------
-// Section header + @author Craftpulse
+// Section header + @author CraftPulse
 // -----------------------------------------------------------------------------
 
-it('every PHP class file in src/ has a section header and @author Craftpulse', function() {
+it('every PHP class file in src/ has a section header and @author CraftPulse', function() {
     $violations = [];
     $sectionMarker = '====';
 
@@ -203,8 +203,8 @@ it('every PHP class file in src/ has a section header and @author Craftpulse', f
             $violations[] = sprintf('%s missing section header', $file);
         }
 
-        if (!str_contains($contents, '@author Craftpulse')) {
-            $violations[] = sprintf('%s missing @author Craftpulse', $file);
+        if (!str_contains($contents, '@author CraftPulse')) {
+            $violations[] = sprintf('%s missing @author CraftPulse', $file);
         }
     }
 
@@ -258,7 +258,7 @@ it('every concrete class under src/tools/{schema,content,system,graphql,dev,work
 // -----------------------------------------------------------------------------
 
 it('every PHP class file in src/ has at least one @since tag', function() {
-    // Mirrors the @author Craftpulse check above. @since lives on classes
+    // Mirrors the @author CraftPulse check above. @since lives on classes
     // and on individual methods; we only assert that each class file has
     // the tag *somewhere* — a missing class-level @since is the regression
     // we're catching, not per-method drift (PHPStan + reviewer catches

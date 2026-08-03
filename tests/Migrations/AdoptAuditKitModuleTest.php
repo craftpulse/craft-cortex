@@ -25,7 +25,7 @@
  * — which is exactly why it is safe to run inside the suite.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

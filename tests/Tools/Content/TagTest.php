@@ -19,7 +19,7 @@
  * skip when no tag group exists.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

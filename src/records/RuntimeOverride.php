@@ -27,7 +27,7 @@ use craftpulse\herald\db\Table;
  * @property string|null $dateDeleted
  * @property string $uid
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class RuntimeOverride extends ActiveRecord
@@ -38,7 +38,7 @@ class RuntimeOverride extends ActiveRecord
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function tableName(): string
@@ -54,7 +54,7 @@ class RuntimeOverride extends ActiveRecord
      * than as a raw DB exception when callers try to insert an empty
      * or oversized pattern.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function rules(): array

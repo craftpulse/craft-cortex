@@ -18,7 +18,7 @@
  * model (no project-config write), and reset in `afterEach()`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

@@ -79,7 +79,7 @@ use craftpulse\herald\Herald;
  * carries an old name.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class m260729_160000_kebab_case_permissions extends Migration
@@ -97,7 +97,7 @@ class m260729_160000_kebab_case_permissions extends Migration
      * @throws \yii\db\Exception
      * @throws \yii\web\ServerErrorHttpException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function safeUp(): bool
@@ -120,7 +120,7 @@ class m260729_160000_kebab_case_permissions extends Migration
      * @throws \yii\db\Exception
      * @throws \yii\web\ServerErrorHttpException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function safeDown(): bool
@@ -140,7 +140,7 @@ class m260729_160000_kebab_case_permissions extends Migration
      *
      * @return array<string, string>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _map(): array
@@ -175,7 +175,7 @@ class m260729_160000_kebab_case_permissions extends Migration
      * @throws \yii\db\Exception
      * @throws \yii\web\ServerErrorHttpException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _renamePermissions(array $map): void
@@ -197,7 +197,7 @@ class m260729_160000_kebab_case_permissions extends Migration
      * @param string $storedName The permission name as stored (lowercased by Craft).
      * @param array<string, string> $map Old permission name to new permission name, both lowercased.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _renamedName(string $storedName, array $map): ?string
@@ -227,7 +227,7 @@ class m260729_160000_kebab_case_permissions extends Migration
      *
      * @throws \yii\db\Exception
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _renameGrants(array $map): void
@@ -260,7 +260,7 @@ class m260729_160000_kebab_case_permissions extends Migration
      * @param array<string, string> $map Old permission name to new permission name, both lowercased.
      * @return array<int, mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _scanCondition(array $map): array
@@ -282,7 +282,7 @@ class m260729_160000_kebab_case_permissions extends Migration
      *
      * @throws \yii\db\Exception
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _moveGrants(int $oldPermissionId, string $newPermissionName): void
@@ -335,7 +335,7 @@ class m260729_160000_kebab_case_permissions extends Migration
      * @param array<int, int> $permissionIds
      * @return array<int, int>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _grantees(string $table, string $column, array $permissionIds): array
@@ -362,7 +362,7 @@ class m260729_160000_kebab_case_permissions extends Migration
      * @throws \yii\base\NotSupportedException
      * @throws \yii\web\ServerErrorHttpException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _rewriteProjectConfig(array $map): void

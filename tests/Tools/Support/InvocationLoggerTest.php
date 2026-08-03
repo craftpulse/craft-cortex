@@ -12,7 +12,7 @@
  * shape (transport, request id, user, client).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

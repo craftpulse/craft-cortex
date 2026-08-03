@@ -55,7 +55,7 @@ use yii\web\Response;
  * but these gates are the enforcement; the tabs are UX.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class SettingsController extends Controller
@@ -117,7 +117,7 @@ class SettingsController extends Controller
      * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requirePermission`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionIndex(): Response
@@ -169,7 +169,7 @@ class SettingsController extends Controller
      * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionTokens(): Response
@@ -214,7 +214,7 @@ class SettingsController extends Controller
      * @throws \yii\web\BadRequestHttpException        from `requireAcceptsJson` on non-JSON callers.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionTokensTableData(): Response
@@ -295,7 +295,7 @@ class SettingsController extends Controller
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      * @throws \Throwable                              from template rendering.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionTokenIssueSlideout(): Response
@@ -342,7 +342,7 @@ class SettingsController extends Controller
      * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionIssueToken(): ?Response
@@ -419,7 +419,7 @@ class SettingsController extends Controller
      * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionRevokeToken(): ?Response
@@ -461,7 +461,7 @@ class SettingsController extends Controller
      * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionAllowlist(): Response
@@ -534,7 +534,7 @@ class SettingsController extends Controller
      * @throws \yii\web\BadRequestHttpException            from `requireAcceptsJson` on non-JSON callers.
      * @throws \yii\web\ForbiddenHttpException             from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionAllowlistTableData(): Response
@@ -625,7 +625,7 @@ class SettingsController extends Controller
      * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionAllowlistOverrideSlideout(): Response
@@ -655,7 +655,7 @@ class SettingsController extends Controller
      * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requirePermission`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionActivity(): Response
@@ -710,7 +710,7 @@ class SettingsController extends Controller
      * @throws \yii\web\BadRequestHttpException        from `requireAcceptsJson` on non-JSON callers.
      * @throws \yii\web\ForbiddenHttpException         from `requirePermission`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionActivityTableData(): Response
@@ -832,7 +832,7 @@ class SettingsController extends Controller
      * @throws \yii\web\ForbiddenHttpException         from `requirePermission`.
      * @throws NotFoundHttpException                   when the row is missing or out of the caller's scope.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionActivityRow(): Response
@@ -903,7 +903,7 @@ class SettingsController extends Controller
      * @throws \yii\base\InvalidConfigException        from `Herald::getInstance()`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionClients(): Response
@@ -933,7 +933,7 @@ class SettingsController extends Controller
      * @throws \yii\web\BadRequestHttpException        from `requireAcceptsJson`.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionClientsTableData(): Response
@@ -983,7 +983,7 @@ class SettingsController extends Controller
      * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionApproveClient(): ?Response
@@ -1015,7 +1015,7 @@ class SettingsController extends Controller
      * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionRevokeClient(): ?Response
@@ -1044,7 +1044,7 @@ class SettingsController extends Controller
      * @throws \craft\errors\MissingComponentException if the view component is unavailable.
      * @throws \yii\web\ForbiddenHttpException         from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionConnection(): Response
@@ -1081,7 +1081,7 @@ class SettingsController extends Controller
      * @throws \yii\web\BadRequestHttpException     from `requirePostRequest` on non-POST.
      * @throws \yii\web\ForbiddenHttpException      from `requirePermission` or the read-only environment guard.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionSave(): ?Response
@@ -1171,7 +1171,7 @@ class SettingsController extends Controller
      * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionAddOverride(): ?Response
@@ -1253,7 +1253,7 @@ class SettingsController extends Controller
      * @throws \yii\web\BadRequestHttpException  from `requirePostRequest` / `requireAcceptsJson` / `getRequiredBodyParam`.
      * @throws \yii\web\ForbiddenHttpException   from `requireAdmin`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionRemoveOverride(): ?Response
@@ -1301,7 +1301,7 @@ class SettingsController extends Controller
      *
      * @throws \yii\base\InvalidConfigException from `Craft::$app->getConfig()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function isSettingOverridden(string $attribute): bool
@@ -1326,7 +1326,7 @@ class SettingsController extends Controller
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _postedToggleMap(string $param): array
@@ -1353,7 +1353,7 @@ class SettingsController extends Controller
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _postedCustomPatterns(string $setting): array
@@ -1377,7 +1377,7 @@ class SettingsController extends Controller
      * Whether the current CP user is an admin. Centralised so the
      * Activity scoping logic reads the identity in exactly one place.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _callerIsAdmin(): bool
@@ -1397,7 +1397,7 @@ class SettingsController extends Controller
      * The pin is an `andWhere` so it composes with (and cannot be widened
      * by) any caller-supplied `filters[userId]`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _scopeActivityQueryToUser(InvocationQuery $query): void
@@ -1418,7 +1418,7 @@ class SettingsController extends Controller
      *
      * @param array<string,mixed> $filters
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _filterValue(array $filters, string $key): ?string
@@ -1454,7 +1454,7 @@ class SettingsController extends Controller
      * @param array<string,mixed> $row The raw DB row from `InvocationQuery::all`.
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeActivityRow(array $row): array
@@ -1492,7 +1492,7 @@ class SettingsController extends Controller
      * no `mode`. The args are already redacted in the DB — this only reads
      * the (non-sensitive) routing discriminator most Herald tools carry.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _extractMode(mixed $argsRedacted): ?string
@@ -1521,7 +1521,7 @@ class SettingsController extends Controller
      *
      * @throws ForbiddenHttpException on Free installs.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _requirePro(): void
@@ -1545,7 +1545,7 @@ class SettingsController extends Controller
      * @return array<int,array{label:string,value:string}>
      * @throws \yii\base\InvalidConfigException from `Herald::getInstance()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _scopeOptions(): array
@@ -1568,7 +1568,7 @@ class SettingsController extends Controller
      * back to the raw text instead of letting `Json::decode` throw (a
      * truncated excerpt 500'd the slideout; gate-9 browser smoke).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _prettyRedactedColumn(mixed $raw): ?string
@@ -1613,7 +1613,7 @@ class SettingsController extends Controller
      *                                 or `RuntimeOverride::toArray()`.
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeOverrideRow(array $row): array
@@ -1656,7 +1656,7 @@ class SettingsController extends Controller
      *
      * @return array{id:int,label:string,cpEditUrl:string|null}|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveRowUser(mixed $userId): ?array
@@ -1685,7 +1685,7 @@ class SettingsController extends Controller
      * `customTtlSeconds`. Null falls through to the plugin default in
      * `Allowlist::add()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveGrantTtl(): ?int
@@ -1722,7 +1722,7 @@ class SettingsController extends Controller
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _postedGrantPatterns(): array
@@ -1754,7 +1754,7 @@ class SettingsController extends Controller
      * under the `herald` category (the same channel `Invocations` uses as
      * its secondary trail), capturing the actor, subject, and scope.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _auditGrant(string $action, int $grantId, ?string $pattern, ?int $subjectUserId, ?int $actorId): void
@@ -1787,7 +1787,7 @@ class SettingsController extends Controller
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeClientRow(OauthClientRecord $client): array
@@ -1838,7 +1838,7 @@ class SettingsController extends Controller
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeTokenRow(Token $token): array

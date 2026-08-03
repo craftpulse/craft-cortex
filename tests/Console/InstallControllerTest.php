@@ -14,7 +14,7 @@
  * Yii console output capture entirely.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

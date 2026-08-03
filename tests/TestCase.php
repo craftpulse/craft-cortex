@@ -48,7 +48,7 @@ use PHPUnit\Framework\TestCase as PhpUnitTestCase;
  *     the database. Tests that need that guarantee have to reset the service
  *     themselves.
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class TestCase extends PhpUnitTestCase
@@ -70,7 +70,7 @@ class TestCase extends PhpUnitTestCase
      *
      * @return void
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function setUp(): void
@@ -95,7 +95,7 @@ class TestCase extends PhpUnitTestCase
      *
      * @return void
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function tearDown(): void

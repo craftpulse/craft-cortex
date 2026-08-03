@@ -27,7 +27,7 @@
  * broken flow green, which is exactly how the body/query split shipped.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

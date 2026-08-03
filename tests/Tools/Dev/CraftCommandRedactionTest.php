@@ -21,7 +21,7 @@
  * Both layers are exercised so a regression in either surfaces.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

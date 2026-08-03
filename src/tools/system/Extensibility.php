@@ -36,7 +36,7 @@ use yii\base\Event;
  *   - `mode: "events" | "twig" | "utilities" | "commands"`: just one.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -49,7 +49,7 @@ class Extensibility extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -60,7 +60,7 @@ class Extensibility extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -74,7 +74,7 @@ class Extensibility extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -91,7 +91,7 @@ class Extensibility extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -126,7 +126,7 @@ class Extensibility extends AbstractTool
      *
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _events(): array
@@ -168,7 +168,7 @@ class Extensibility extends AbstractTool
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _twig(): array
@@ -223,7 +223,7 @@ class Extensibility extends AbstractTool
     /**
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _utilities(): array
@@ -247,7 +247,7 @@ class Extensibility extends AbstractTool
     /**
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _commands(): array
@@ -294,7 +294,7 @@ class Extensibility extends AbstractTool
     /**
      * Render an event-handler callable into a stable string for output.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _describeHandler(mixed $handler): string

@@ -24,7 +24,7 @@ use Throwable;
  * time, driven by the CP settings UI.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Settings extends Model
@@ -44,10 +44,8 @@ class Settings extends Model
      *               Pre-Gate-8.1 this array also carried the admin-
      *               level patterns (`migrate/*`, `make/*`, etc.).
      *               They moved to `$adminLevelCommands` per the
-     *               `allowAdminChanges` policy locked in
-     *               `docs/plans/gate-8.md` locked decision 14.
-     *               Pre-ship, so the shape change ships without
-     *               back-compat.
+     *               locked `allowAdminChanges` policy. Pre-ship, so
+     *               the shape change ships without back-compat.
      */
     public array $allowedCommands = [
         'resave/*',
@@ -332,7 +330,7 @@ class Settings extends Model
     /**
      * Resolved default TTL (seconds) for a new runtime grant.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getRuntimeOverrideTtl(): int
@@ -343,7 +341,7 @@ class Settings extends Model
     /**
      * Resolved sliding TTL (seconds) for HTTP-transport sessions.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getSessionTtl(): int
@@ -355,7 +353,7 @@ class Settings extends Model
      * Resolved TTL (seconds) of an elevated marker minted by
      * `/oauth/elevate`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getElevationTtl(): int
@@ -367,7 +365,7 @@ class Settings extends Model
      * Resolved bytes of the redacted tool response persisted to the audit
      * log's `responseExcerpt` column.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getAuditResponseExcerptBytes(): int
@@ -379,7 +377,7 @@ class Settings extends Model
      * Resolved maximum size (bytes) of a single newline-delimited JSON-RPC
      * message the stdio transport will buffer.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getStdioMaxMessageBytes(): int
@@ -390,7 +388,7 @@ class Settings extends Model
     /**
      * Resolved burst capacity for the per-user HTTP rate limiter.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getRateLimitBurst(): int
@@ -402,7 +400,7 @@ class Settings extends Model
      * Resolved sustained refill rate (tokens per second) for the per-user
      * HTTP rate limiter.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getRateLimitPerSecond(): int
@@ -415,7 +413,7 @@ class Settings extends Model
      * (the default). A blank / null value, or an env var that resolves to
      * one, means tokens live until revoked.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getTokenTtlDefault(): ?int
@@ -427,7 +425,7 @@ class Settings extends Model
      * Resolved audit-log retention window (days), or null for "forever"
      * (the default).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getAuditRetentionDays(): ?int
@@ -446,7 +444,7 @@ class Settings extends Model
      * @param string $attribute the attribute under validation
      * @param array<string,int>|null $params the `min` / `max` bounds for the resolved value
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function validateResolvedInt(string $attribute, ?array $params = null): void
@@ -472,7 +470,7 @@ class Settings extends Model
      * @param string $attribute the attribute under validation
      * @param array<string,int>|null $params the `min` / `max` bounds for the resolved value
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function validateNullableResolvedInt(string $attribute, ?array $params = null): void
@@ -502,7 +500,7 @@ class Settings extends Model
      *
      * @return array<int,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function defineRules(): array
@@ -530,7 +528,7 @@ class Settings extends Model
      * opaque 500 on every `/oauth/token` and `/oauth/authorize` call
      * instead of a clean settings-validation error.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function validateDateInterval(string $attribute): void
@@ -558,7 +556,7 @@ class Settings extends Model
      * Resolve a numeric tunable's raw value (a literal or an env-var
      * reference) to a concrete integer via `App::parseEnv`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveInt(int|string $value): int
@@ -572,7 +570,7 @@ class Settings extends Model
      * integer. A value that resolves to something non-numeric collapses to
      * null (validation reports the malformed input separately).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveNullableInt(int|string|null $value): ?int
@@ -595,7 +593,7 @@ class Settings extends Model
      *
      * @param array<string,int>|null $params
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _checkResolvedBounds(string $attribute, int $value, ?array $params): void

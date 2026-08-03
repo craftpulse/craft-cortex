@@ -26,7 +26,7 @@ use php_user_filter;
  * consistency and isolation.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class StdoutCaptureFilter extends php_user_filter
@@ -62,7 +62,7 @@ class StdoutCaptureFilter extends php_user_filter
      * @param resource $out
      * @param int $consumed
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filter($in, $out, &$consumed, $closing): int

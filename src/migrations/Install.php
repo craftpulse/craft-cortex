@@ -66,7 +66,7 @@ use craftpulse\herald\db\Table;
  * check.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Install extends Migration
@@ -94,7 +94,7 @@ class Install extends Migration
      * @throws \craft\errors\MigrationException from
      *         `MigrationManager::up()` when a kit migration fails.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function safeUp(): bool
@@ -120,7 +120,7 @@ class Install extends Migration
      * module shared by every installed consumer, so tearing its state
      * down on one plugin's uninstall would break the others.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function safeDown(): bool
@@ -148,7 +148,7 @@ class Install extends Migration
      *
      * @return void
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _createRuntimeOverridesTable(): void
@@ -203,7 +203,7 @@ class Install extends Migration
      *
      * @return void
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _createSkillsTable(): void
@@ -248,7 +248,7 @@ class Install extends Migration
      *
      * @return void
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _createTokensTable(): void
@@ -303,7 +303,7 @@ class Install extends Migration
      *
      * @return void
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _createOauthClientsTable(): void
@@ -340,7 +340,7 @@ class Install extends Migration
      *
      * @return void
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _createOauthCodesTable(): void
@@ -412,7 +412,7 @@ class Install extends Migration
      *
      * @return void
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _createOauthTokensTable(): void
@@ -486,7 +486,7 @@ class Install extends Migration
      *
      * @return void
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _createInvocationsTable(): void

@@ -29,7 +29,7 @@ use Throwable;
  * for cross-environment content sync, gated behind
  * `saveEntries:{section}` permissions and dry-run-by-default. The Pro
  * unlock follows the Gate 8.8 mode-unlock composition contract (locked
- * decision 6 of `docs/plans/gate-8.md`): the tool stays
+ * decision): the tool stays
  * Free-registered, the mode enum is edition-aware, HTTP callers see
  * `import` only when they hold `saveEntries:{section}` on at least
  * one section, and `execute()` re-checks edition + permission for
@@ -95,7 +95,7 @@ use Throwable;
  * not expected in the wild.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -146,7 +146,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -157,7 +157,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -184,7 +184,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      *
      * @return array<string,bool>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public static function getModeWriteMap(): array
@@ -206,7 +206,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      * runtime gate in `execute()`. HTTP callers on Pro are further
      * filtered down per Craft permissions in `inputSchemaFor($user)`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -248,7 +248,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      * re-validates the resolved mode for security AND blocks Pro modes
      * on Free installs.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function inputSchemaFor(?User $user = null): array
@@ -285,7 +285,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -324,14 +324,14 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      * Streaming entry point. Only `import` is streamable — `export`
      * returns a single materialised envelope in one shot via `execute()`.
      *
-     * Per `docs/plans/gate-8.9.md` locked decision 1: yields one
+     * Locked progress contract: yields one
      * `{progress, total, message}` frame every `progressInterval` items
      * processed; `message` is `"Importing item index={index} uid={uid}"`.
      * Cancellation polls between items; in-flight items always complete.
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function stream(array $arguments, InvocationContext $ctx): Generator
@@ -369,7 +369,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -393,7 +393,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
@@ -414,7 +414,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _export(array $arguments): array
@@ -464,7 +464,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeEntry(Entry $entry): array
@@ -503,7 +503,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _authorIds(Entry $entry): array
@@ -526,7 +526,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      * can re-link the hierarchy without depending on auto-incrementing
      * primary keys.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _parentUid(Entry $entry): ?string
@@ -557,7 +557,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _import(array $arguments, InvocationContext $ctx): Generator
@@ -661,7 +661,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _progressInterval(array $arguments): int
@@ -684,7 +684,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      * @param array<string,mixed> $item
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _importOneEntry(array $item, int $index, bool $dryRun): array
@@ -838,7 +838,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      *
      * @param array<string,mixed> $item
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyImportAttributes(Entry $entry, array $item): void
@@ -876,7 +876,7 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
      *
      * @param array<string,mixed> $item
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyImportFields(Entry $entry, array $item): void

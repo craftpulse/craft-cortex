@@ -34,7 +34,7 @@ use craftpulse\herald\db\Table;
  * @property string|null $dateDeleted
  * @property string $uid
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Token extends ActiveRecord
@@ -45,7 +45,7 @@ class Token extends ActiveRecord
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function tableName(): string
@@ -65,7 +65,7 @@ class Token extends ActiveRecord
      * is necessary but not sufficient; callers remain responsible for
      * passing the *hashed* form.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function rules(): array

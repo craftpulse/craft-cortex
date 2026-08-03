@@ -33,7 +33,7 @@
  * validation (item 1.1) cannot close this on its own.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

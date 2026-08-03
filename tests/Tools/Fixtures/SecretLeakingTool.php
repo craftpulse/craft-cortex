@@ -17,7 +17,7 @@ use craftpulse\herald\tools\AbstractTool;
  * tools in the audit log.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class SecretLeakingTool extends AbstractTool
@@ -28,7 +28,7 @@ final class SecretLeakingTool extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -39,7 +39,7 @@ final class SecretLeakingTool extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -53,7 +53,7 @@ final class SecretLeakingTool extends AbstractTool
      * @param array<string,mixed> $arguments
      * @return array<int|string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array

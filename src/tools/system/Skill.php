@@ -67,7 +67,7 @@ use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
  * gate — out of scope for Gate 8.6 (mention in the tool description).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsDestructive]
@@ -118,7 +118,7 @@ class Skill extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -129,7 +129,7 @@ class Skill extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -149,7 +149,7 @@ class Skill extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -201,7 +201,7 @@ class Skill extends AbstractTool
      * stdio is trusted; admins always pass; non-admins need
      * `herald:manage-skills`. Mirrors `Address::filterFor()` shape.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterFor(?User $user = null): bool
@@ -223,7 +223,7 @@ class Skill extends AbstractTool
      * `execute()` via the trait's `_assertPermission()` plus per-
      * element re-checks.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function inputSchemaFor(?User $user = null): array
@@ -236,7 +236,7 @@ class Skill extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -270,7 +270,7 @@ class Skill extends AbstractTool
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -289,7 +289,7 @@ class Skill extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
@@ -316,7 +316,7 @@ class Skill extends AbstractTool
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _list(array $arguments): array
@@ -374,7 +374,7 @@ class Skill extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _get(array $arguments): array
@@ -418,7 +418,7 @@ class Skill extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _create(array $arguments): array
@@ -475,7 +475,7 @@ class Skill extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _update(array $arguments): array
@@ -531,7 +531,7 @@ class Skill extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _delete(array $arguments): array
@@ -570,7 +570,7 @@ class Skill extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyBody(SkillElement $element, array $arguments): void
@@ -597,7 +597,7 @@ class Skill extends AbstractTool
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveSkillElement(array $arguments): SkillElement
@@ -653,7 +653,7 @@ class Skill extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _tryResolveElement(array $arguments): ?SkillElement
@@ -686,7 +686,7 @@ class Skill extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _handleArg(array $arguments): ?string
@@ -700,7 +700,7 @@ class Skill extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _source(array $arguments): string
@@ -719,7 +719,7 @@ class Skill extends AbstractTool
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _successEnvelope(SkillElement $element, string $mode): array
@@ -737,7 +737,7 @@ class Skill extends AbstractTool
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _handleChangeEnvelope(SkillElement $element, string $mode): array
@@ -762,7 +762,7 @@ class Skill extends AbstractTool
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeElement(SkillElement $element): array
@@ -791,7 +791,7 @@ class Skill extends AbstractTool
      * @param array<string,mixed> $row
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeRow(array $row): array
@@ -828,7 +828,7 @@ class Skill extends AbstractTool
      * from a bundled SKILL.md bytestream. Returns null when no heading
      * is present — the bundled row's title falls back to the handle.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _extractBundledTitle(string $content): ?string

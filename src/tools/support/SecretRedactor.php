@@ -25,7 +25,7 @@ namespace craftpulse\herald\tools\support;
  * `API_SECRET`, `private-key` all match.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class SecretRedactor
@@ -51,7 +51,7 @@ class SecretRedactor
      * Whether a key (lookup name, env var, config field) contains a
      * secret needle. Match is substring on the normalised form.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function isSecretKey(string $key): bool
@@ -73,7 +73,7 @@ class SecretRedactor
      * @param array<int|string,mixed> $data
      * @return array<int|string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function redactArray(array $data): array
@@ -98,7 +98,7 @@ class SecretRedactor
      * the assignment operator so we don't false-redact prose that
      * happens to mention "password".
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function redactString(string $output): string

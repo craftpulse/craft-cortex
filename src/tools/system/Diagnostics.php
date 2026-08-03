@@ -35,7 +35,7 @@ use Throwable;
  *   - `project_config_diff` — `areChangesPending()` summary.
  *
  * Pro type (Gate 8.8a — mode-unlock composition contract, locked
- * decision 6 of `docs/plans/gate-8.md`):
+ * decision):
  *   - `manage_queue` — retry / release single jobs, or bulk
  *     retry_all / release_all the whole channel. Permission gate is
  *     Craft's native `utility:queue-manager` (`QueueManager::id()`).
@@ -49,7 +49,7 @@ use Throwable;
  * Default `limit` is 50 items per mode; hard-cap 500.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -95,7 +95,7 @@ class Diagnostics extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -106,7 +106,7 @@ class Diagnostics extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -128,7 +128,7 @@ class Diagnostics extends AbstractTool
      * runtime gate in `execute()`. HTTP callers on Pro are further
      * filtered down per Craft permissions in `inputSchemaFor($user)`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -169,7 +169,7 @@ class Diagnostics extends AbstractTool
      * `execute()` still re-validates the resolved type for security
      * AND blocks Pro types on Free installs.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function inputSchemaFor(?User $user = null): array
@@ -200,7 +200,7 @@ class Diagnostics extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -240,7 +240,7 @@ class Diagnostics extends AbstractTool
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -261,7 +261,7 @@ class Diagnostics extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
@@ -283,7 +283,7 @@ class Diagnostics extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _logs(array $arguments, int $limit): array
@@ -319,7 +319,7 @@ class Diagnostics extends AbstractTool
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _lastError(array $arguments): array
@@ -352,7 +352,7 @@ class Diagnostics extends AbstractTool
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _deprecations(int $limit): array
@@ -382,7 +382,7 @@ class Diagnostics extends AbstractTool
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _queue(int $limit): array
@@ -414,7 +414,7 @@ class Diagnostics extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _manageQueue(array $arguments): array
@@ -489,7 +489,7 @@ class Diagnostics extends AbstractTool
      *
      * @return array{waiting:int,delayed:int,reserved:int,failed:int,total:int}
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _queueTotals(Queue $queue): array
@@ -508,7 +508,7 @@ class Diagnostics extends AbstractTool
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _projectConfigDiff(): array
@@ -528,7 +528,7 @@ class Diagnostics extends AbstractTool
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _tail(string $path, int $n): array
@@ -570,7 +570,7 @@ class Diagnostics extends AbstractTool
      * @param string[] $lines
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _parseLogLines(array $lines, string $minLevel): array
@@ -611,7 +611,7 @@ class Diagnostics extends AbstractTool
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _channel(array $arguments): string
@@ -621,7 +621,7 @@ class Diagnostics extends AbstractTool
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _minLevel(array $arguments): string
@@ -635,7 +635,7 @@ class Diagnostics extends AbstractTool
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _logPath(string $channel): string

@@ -25,7 +25,7 @@
  * test-run prefix, defense in depth.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

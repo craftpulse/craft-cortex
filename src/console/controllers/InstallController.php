@@ -52,7 +52,7 @@ use yii\helpers\Console;
  * inside DDEV, MCP client on host). Auto-detected from `DDEV_PROJECT` /
  * `IS_DDEV_PROJECT` when present.
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class InstallController extends Controller
@@ -166,7 +166,7 @@ class InstallController extends Controller
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function options($actionID): array
@@ -184,7 +184,7 @@ class InstallController extends Controller
      *
      * @return array<string,string>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function optionAliases(): array
@@ -199,7 +199,7 @@ class InstallController extends Controller
     /**
      * Print MCP client config snippets for herald.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionIndex(): int
@@ -258,7 +258,7 @@ class InstallController extends Controller
      *   - All writes prompt for `y/N` confirmation. `--interactive=0`
      *     auto-rejects (safe default for CI).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionApply(): int
@@ -291,7 +291,7 @@ class InstallController extends Controller
      * Read-only, and it never writes. Pair with `herald/install/auto` to detect
      * and apply in one pass.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionDetect(): int
@@ -350,7 +350,7 @@ class InstallController extends Controller
      * Exit code: OK when at least one client was applied or skipped
      * cleanly; CONFIG when running inside a container.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionAuto(): int
@@ -425,7 +425,7 @@ class InstallController extends Controller
      * @internal Public for test access only.
      * @return array{app: bool, configured: bool, configPath: ?string}
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function detect(string $client): array
@@ -486,7 +486,7 @@ class InstallController extends Controller
      *     `%APPDATA%\Zed\settings.json` per zed.dev/docs/configuring-zed.
      *   - windsurf: ~/.codeium/windsurf/mcp_config.json across platforms.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function resolveConfigPath(string $client): ?string
@@ -538,7 +538,7 @@ class InstallController extends Controller
      * @return array{0: string, 1: string}|null
      * @throws \RuntimeException When the existing file is malformed.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function buildMergedConfig(string $client, ?string $existing, string $command): ?array
@@ -553,7 +553,7 @@ class InstallController extends Controller
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _detectDdev(): bool
@@ -595,7 +595,7 @@ class InstallController extends Controller
      * convention. For plain Docker or other runtimes we don't, so `_buildCommand()`
      * is intentionally left untouched.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _detectContainer(): bool
@@ -630,7 +630,7 @@ class InstallController extends Controller
      * (and emits the message) when the action should bail; false (silent)
      * when it should proceed.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _refuseInContainer(string $action): bool
@@ -671,7 +671,7 @@ class InstallController extends Controller
      * Pre-conditions enforced by callers (not re-checked here):
      *   - `$client` is a known handle in `self::CLIENTS`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyOne(string $client, bool $skipConfirm): int
@@ -799,7 +799,7 @@ class InstallController extends Controller
      * `actionDetect()` to keep the table compact while staying readable
      * in monochrome terminals.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _renderSignal(string $kind, bool $detected): void
@@ -818,7 +818,7 @@ class InstallController extends Controller
      * convenient case". Honours `PATHEXT` on Windows for extension-less
      * lookups (`cursor` → `cursor.exe`).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _binaryInPath(string $name): bool
@@ -863,7 +863,7 @@ class InstallController extends Controller
      * the call in `docker exec -i`; otherwise we fall back to a `php`
      * direct call against the project's `craft` script.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildCommand(bool $isDdev, string $project): string
@@ -879,7 +879,7 @@ class InstallController extends Controller
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _printClientBlock(string $handle, string $label, string $command): void
@@ -898,7 +898,7 @@ class InstallController extends Controller
      * action through Yii's console output. Returns an empty string for
      * unknown clients.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function buildSnippet(string $handle, string $command): string
@@ -916,7 +916,7 @@ class InstallController extends Controller
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _claudeDesktop(string $command): string
@@ -941,7 +941,7 @@ TXT;
      * parsing the wrapped command's flags (e.g. `-i` on `docker exec`) as
      * its own. Verified against https://code.claude.com/docs/en/mcp.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _claudeCode(string $command): string
@@ -960,7 +960,7 @@ TXT;
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _cursor(string $command): string
@@ -982,7 +982,7 @@ TXT;
      * `experimental.modelContextProtocolServers` is deprecated. Verified
      * against https://docs.continue.dev/customize/deep-dives/mcp.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _continue(string $command): string
@@ -1001,7 +1001,7 @@ TXT;
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _cline(string $command): string
@@ -1025,7 +1025,7 @@ TXT;
      * legacy `assistant.mcp_servers` key is not the current shape.
      * Verified against https://zed.dev/docs/ai/mcp.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _zed(string $command): string
@@ -1042,7 +1042,7 @@ TXT;
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _windsurf(string $command): string
@@ -1062,7 +1062,7 @@ TXT;
      * Build the canonical JSON snippet for the `mcpServers` shape used
      * by most clients. Clients that diverge get a custom rendering above.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _jsonSnippet(string $command): string
@@ -1084,7 +1084,7 @@ JSON;
      * by Continue.dev. Indentation is two-space per the YAML 1.2 spec
      * conventions Continue's config follows.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _yamlSnippet(string $command): string
@@ -1112,7 +1112,7 @@ JSON;
      * need escaping (whitespace, leading dash, special chars). Keeps
      * the snippet copy-paste safe without overquoting plain identifiers.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _yamlScalar(string $value): string
@@ -1129,7 +1129,7 @@ JSON;
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _splitCommand(string $command): array
@@ -1143,7 +1143,7 @@ JSON;
      * first (set on POSIX and on Git Bash / WSL on Windows), then falls
      * back to `%USERPROFILE%` on Windows.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _homeDir(): string
@@ -1168,7 +1168,7 @@ JSON;
      * Claude Desktop, Cline, Zed). Returns null on non-Windows platforms
      * or when the env var is missing.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _appData(): ?string
@@ -1188,7 +1188,7 @@ JSON;
      * @return array{0: string, 1: string}|null
      * @throws \RuntimeException When the existing file is not valid JSON.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _mergeJsonMcpServers(?string $existing, string $command): ?array
@@ -1204,7 +1204,7 @@ JSON;
      * @return array{0: string, 1: string}|null
      * @throws \RuntimeException When the existing file is not valid JSON.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _mergeJsonContextServers(?string $existing, string $command): ?array
@@ -1226,7 +1226,7 @@ JSON;
      * @return array{0: string, 1: string}|null
      * @throws \RuntimeException When the existing file is not valid JSON.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _mergeJsonObjectKey(?string $existing, string $command, string $serversKey): ?array
@@ -1280,7 +1280,7 @@ JSON;
      *
      * @return array{0: string, 1: string}|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildContinueStandalone(?string $existing, string $command): ?array
@@ -1312,7 +1312,7 @@ JSON;
      * from docs.continue.dev/reference: top-level `name` / `version` /
      * `schema` + `mcpServers:` list with one entry.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _renderContinueYaml(string $command): string
@@ -1345,7 +1345,7 @@ JSON;
      *
      * @throws \RuntimeException On any I/O failure during the write path.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _writeAtomic(string $path, string $contents, ?string $existing): void
@@ -1413,7 +1413,7 @@ JSON;
      * client-config directory unboundedly. Best-effort: a failed unlink
      * is ignored — pruning stale backups must never break a write.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _pruneBackups(string $path): void

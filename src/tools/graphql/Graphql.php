@@ -30,7 +30,7 @@ use Throwable;
  * arbitrary GraphQL against the bound schema. Treat them like passwords.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -43,7 +43,7 @@ class Graphql extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -54,7 +54,7 @@ class Graphql extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -68,7 +68,7 @@ class Graphql extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -88,7 +88,7 @@ class Graphql extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -112,7 +112,7 @@ class Graphql extends AbstractTool
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _listSchemas(): array
@@ -147,7 +147,7 @@ class Graphql extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _getSdl(array $arguments): array
@@ -193,7 +193,7 @@ class Graphql extends AbstractTool
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _listTokens(): array
@@ -231,7 +231,7 @@ class Graphql extends AbstractTool
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _schemaRow(GqlSchema $schema): array
@@ -252,7 +252,7 @@ class Graphql extends AbstractTool
     /**
      * @param GqlSchema[] $schemas
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _schemaInList(GqlSchema $needle, array $schemas): bool
@@ -267,7 +267,7 @@ class Graphql extends AbstractTool
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _findSchemaByName(string $name): ?GqlSchema
@@ -287,7 +287,7 @@ class Graphql extends AbstractTool
      * leaking the value. `__PUBLIC__` and empty strings get `null` so
      * the LLM doesn't try to use the placeholder as a real token.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _fingerprint(string $token): ?string

@@ -62,7 +62,7 @@ use yii\caching\CacheInterface;
  * is honoured if any sibling test happens to be using it.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class RateLimiter extends Component
@@ -108,7 +108,7 @@ class RateLimiter extends Component
      * @param array<string,mixed>               $config Yii component
      *                                                  configuration.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(?Closure $now = null, array $config = [])
@@ -125,7 +125,7 @@ class RateLimiter extends Component
      *
      * @param Closure(): DateTimeImmutable $now
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setNow(Closure $now): void
@@ -145,7 +145,7 @@ class RateLimiter extends Component
      * should wait before retrying — the HTTP controller stamps this
      * onto the `Retry-After` response header.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function consume(int $userId, int $cost = 1): RateLimitStatus
@@ -165,7 +165,7 @@ class RateLimiter extends Component
      *
      * @throws RateLimitExceededException When the bucket lacks `$cost`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function consumeKey(string $key, int $cost = 1): RateLimitStatus
@@ -191,7 +191,7 @@ class RateLimiter extends Component
      * Returns a `RateLimitStatus` with the bucket's available tokens
      * floor'd to int. Throws if the bucket lacks enough for `$cost`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function check(int $userId, int $cost = 1): RateLimitStatus
@@ -216,7 +216,7 @@ class RateLimiter extends Component
      * only here) but does not persist. The next live `consume()`
      * will re-walk the same arc.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getStatus(int $userId): RateLimitStatus
@@ -232,7 +232,7 @@ class RateLimiter extends Component
      * can call this through a future admin console command, but the
      * service surface is currently test-only.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function clear(int $userId): void
@@ -246,7 +246,7 @@ class RateLimiter extends Component
      * tests that need to start the IP-keyed throttle from a known
      * state.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function clearKey(string $key): void
@@ -266,7 +266,7 @@ class RateLimiter extends Component
      *
      * @throws RateLimitExceededException When the bucket lacks `$cost`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _consume(int|string $key, int $cost): RateLimitStatus
@@ -295,7 +295,7 @@ class RateLimiter extends Component
      * token available. `retryAfter` is 0 when the projected
      * `remaining` is >= 1, otherwise the ceil of one refill-second.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildAvailableStatus(float $tokens): RateLimitStatus
@@ -316,7 +316,7 @@ class RateLimiter extends Component
      * refill the deficit, floored at 1 so the HTTP `Retry-After`
      * header always carries a positive integer.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildExhaustedStatus(float $tokens, int $cost): RateLimitStatus
@@ -340,7 +340,7 @@ class RateLimiter extends Component
      *
      * @return array{tokens: float, lastRefillAt: float}
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _loadAndRefill(int|string $key): array
@@ -380,7 +380,7 @@ class RateLimiter extends Component
      *
      * @param array{tokens: float, lastRefillAt: float} $state
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _save(int|string $key, array $state): void
@@ -401,7 +401,7 @@ class RateLimiter extends Component
      * @throws RuntimeException When Craft is misconfigured to the
      *                          point of having no cache component.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _cache(): CacheInterface
@@ -420,7 +420,7 @@ class RateLimiter extends Component
      * namespace so the existing user-keyed format
      * (`herald:ratelimit:user:<id>`) is preserved unchanged.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _cacheKey(int|string $key): string
@@ -429,7 +429,7 @@ class RateLimiter extends Component
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _burst(): int
@@ -438,7 +438,7 @@ class RateLimiter extends Component
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _refillRate(): float

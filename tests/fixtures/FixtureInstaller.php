@@ -166,7 +166,7 @@ use DateTimeZone;
  * references `bio` by name. On the playground the installer leaves the
  * CKEditor field alone.
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class FixtureInstaller
@@ -350,7 +350,7 @@ class FixtureInstaller
     /**
      * @param \Closure(string): void|null $output Progress sink, one line at a time.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     public function __construct(?\Closure $output = null)
     {
@@ -367,7 +367,7 @@ class FixtureInstaller
      * @throws \RuntimeException if preflight refuses, or if Craft rejects a save.
      * @throws \Throwable from the underlying Craft service calls.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     public function install(): void
     {
@@ -412,7 +412,7 @@ class FixtureInstaller
     /**
      * Whether every invariant the suite depends on is already satisfied.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     public function isSatisfied(): bool
     {
@@ -429,7 +429,7 @@ class FixtureInstaller
      *
      * @return array{errors: list<string>, warnings: list<string>}
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     public function preflight(): array
     {
@@ -469,7 +469,7 @@ class FixtureInstaller
      *     missing: list<string>,
      * }
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     public function report(): array
     {
@@ -505,7 +505,7 @@ class FixtureInstaller
      *
      * @return list<int>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _authorIds(): array
     {
@@ -522,7 +522,7 @@ class FixtureInstaller
      *
      * @return array<string, list<string>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _categoryTitles(): array
     {
@@ -547,7 +547,7 @@ class FixtureInstaller
      *
      * @return array{key: string, label: string, satisfied: bool, detail: string}
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _check(string $key, string $label, bool $satisfied, string $detail): array
     {
@@ -565,7 +565,7 @@ class FixtureInstaller
      *
      * @return list<array{key: string, label: string, satisfied: bool, detail: string}>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _contentChecks(): array
     {
@@ -648,7 +648,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects the save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureActivityViewer(): void
     {
@@ -707,7 +707,7 @@ class FixtureInstaller
      * @throws \yii\base\Exception if the PNG can't be written.
      * @throws \craft\errors\InvalidFieldException if `tagline` leaves the hero layout.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureAssets(Volume $volume, Section $heroes, array $createdHeroes): void
     {
@@ -805,7 +805,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects a save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureCategories(array $groups): void
     {
@@ -856,7 +856,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects a save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureCategoryGroups(): array
     {
@@ -911,7 +911,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects a save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureEntryTypes(array $fields): array
     {
@@ -951,7 +951,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects a save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureFields(Volume $volume): array
     {
@@ -990,7 +990,7 @@ class FixtureInstaller
      * @throws \RuntimeException if Craft rejects the save.
      * @throws \yii\base\Exception if the uploads directory can't be created.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureFilesystem(): Local
     {
@@ -1045,7 +1045,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects a save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureFury(): void
     {
@@ -1106,7 +1106,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects the save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureGlobalSet(array $fields): GlobalSet
     {
@@ -1160,7 +1160,7 @@ class FixtureInstaller
      * @throws \RuntimeException if Craft rejects a save.
      * @throws \Exception from the DateTime arithmetic.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureHeroes(Section $section, EntryType $entryType): array
     {
@@ -1219,7 +1219,7 @@ class FixtureInstaller
      * @throws \RuntimeException if Craft rejects a save.
      * @throws \Exception from the DateTime arithmetic.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureMinorHeroes(Section $section, EntryType $entryType): void
     {
@@ -1286,7 +1286,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects a save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureSections(array $entryTypes): array
     {
@@ -1339,7 +1339,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects the save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureTagGroup(): TagGroup
     {
@@ -1372,7 +1372,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects a save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureTags(TagGroup $group): void
     {
@@ -1413,7 +1413,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects a save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureTeams(Section $section, EntryType $entryType): void
     {
@@ -1465,7 +1465,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects the save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _ensureVolume(Local $fs): Volume
     {
@@ -1502,7 +1502,7 @@ class FixtureInstaller
     /**
      * Count entries in a section, tolerating a section that doesn't exist.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _entryCount(string $sectionHandle): int
     {
@@ -1521,7 +1521,7 @@ class FixtureInstaller
      *
      * @return array<string, true>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _existingSlugs(Section $section): array
     {
@@ -1545,7 +1545,7 @@ class FixtureInstaller
      *
      * @throws \craft\errors\InvalidFieldException if `tagline` leaves the hero layout.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _fixtureOwnedHeroes(Section $section): array
     {
@@ -1582,7 +1582,7 @@ class FixtureInstaller
      *
      * @throws \yii\base\ErrorException if the YAML files can't be written.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _flushProjectConfig(): void
     {
@@ -1605,7 +1605,7 @@ class FixtureInstaller
      *     power: string,
      * }>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _heroRoster(): array
     {
@@ -1650,7 +1650,7 @@ class FixtureInstaller
      *
      * @throws \InvalidArgumentException on an unknown handle.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _newEntryType(string $handle, array $fields): EntryType
     {
@@ -1708,7 +1708,7 @@ class FixtureInstaller
      *
      * @throws \InvalidArgumentException on an unknown handle.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _newField(string $handle, Volume $volume): FieldInterface
     {
@@ -1844,7 +1844,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects the save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _populateAbout(Section $section): void
     {
@@ -1876,7 +1876,7 @@ class FixtureInstaller
      *
      * @throws \RuntimeException if Craft rejects the save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _populateGlobalSet(GlobalSet $set): void
     {
@@ -1906,7 +1906,7 @@ class FixtureInstaller
      * Count assets that are the target of a `heroImage` relation. Raw query
      * rather than `relatedTo`, which needs a concrete source element.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _relatedAssetCount(): int
     {
@@ -1928,7 +1928,7 @@ class FixtureInstaller
     /**
      * Emit one progress line, if a sink was given.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _say(string $line): void
     {
@@ -1943,7 +1943,7 @@ class FixtureInstaller
      *
      * @return list<array{key: string, label: string, satisfied: bool, detail: string}>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _schemaChecks(): array
     {
@@ -2034,7 +2034,7 @@ class FixtureInstaller
      *
      * @return list<array{title: string, slug: string, tagline: string, parent: string|null}>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _teamRoster(): array
     {
@@ -2063,7 +2063,7 @@ class FixtureInstaller
      *
      * @return list<array{key: string, label: string, satisfied: bool, detail: string}>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      */
     private function _userChecks(): array
     {

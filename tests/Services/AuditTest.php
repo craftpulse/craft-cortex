@@ -28,7 +28,7 @@
  * prefix and are swept in `beforeEach` / `afterEach`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.1.0
  */
 

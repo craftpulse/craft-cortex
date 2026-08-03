@@ -55,7 +55,7 @@ use Throwable;
  * Streaming-cooperative — same cancellation surface as `bulk_entries`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsDestructive]
@@ -98,7 +98,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -109,7 +109,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -128,7 +128,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -177,7 +177,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterFor(?User $user = null): bool
@@ -201,7 +201,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -220,7 +220,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function stream(array $arguments, InvocationContext $ctx): Generator
@@ -251,7 +251,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -268,7 +268,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
@@ -291,7 +291,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
      * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _runCreate(array $arguments, InvocationContext $ctx): Generator
@@ -460,7 +460,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
      *   - `_substitute('Imported Hero {n}', 7)` -> `'Imported Hero 7'`
      *   - `_substitute('Imported Hero {n:04d}', 7)` -> `'Imported Hero 0007'`
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _substitute(string $template, int $index): string
@@ -483,7 +483,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
     /**
      * Whether the given section is assigned the given entry type.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _sectionAllowsEntryType(\craft\models\Section $section, \craft\models\EntryType $entryType): bool
@@ -501,7 +501,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _progressInterval(array $arguments): int
@@ -516,7 +516,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
      * @param array<int,array<string,mixed>> $results
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _terminalEnvelope(
@@ -546,7 +546,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
      * @param array<string,string> $errors
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _terminalErrorEnvelope(array $errors): array
@@ -570,7 +570,7 @@ class ScaffoldEntries extends AbstractTool implements StreamableToolInterface
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _progressFrame(int $progress, int $total, string $message): array

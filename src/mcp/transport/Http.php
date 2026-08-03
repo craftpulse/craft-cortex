@@ -27,7 +27,7 @@ use JsonException;
  * session lookup via `services/Sessions`, dispatcher construction.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class Http
@@ -70,7 +70,7 @@ final class Http
      *
      * @return array<string,mixed>|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function parseRequest(string $body): ?array
@@ -106,7 +106,7 @@ final class Http
      *
      * @param array<string,mixed> $response
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function encodeResponse(array $response): string
@@ -129,7 +129,7 @@ final class Http
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function parseError(): array

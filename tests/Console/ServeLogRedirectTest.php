@@ -11,7 +11,7 @@
  * while leaving file handlers (the default) untouched.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

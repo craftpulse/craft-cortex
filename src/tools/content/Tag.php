@@ -48,7 +48,7 @@ use craftpulse\herald\tools\ToolException;
  * `entry`. Idempotency cache prefix: `herald:tag:idem:`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsDestructive]
@@ -80,7 +80,7 @@ class Tag extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -91,7 +91,7 @@ class Tag extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -109,7 +109,7 @@ class Tag extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -162,7 +162,7 @@ class Tag extends AbstractTool
      * so there's no granular path that could authorise tag writes for
      * a non-admin.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterFor(?User $user = null): bool
@@ -180,7 +180,7 @@ class Tag extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -213,7 +213,7 @@ class Tag extends AbstractTool
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -232,7 +232,7 @@ class Tag extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _assertAdmin(): void
@@ -260,7 +260,7 @@ class Tag extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _create(array $arguments): array
@@ -301,7 +301,7 @@ class Tag extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _update(array $arguments): array
@@ -336,7 +336,7 @@ class Tag extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _delete(array $arguments): array
@@ -366,7 +366,7 @@ class Tag extends AbstractTool
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveGroup(array $arguments): ?TagGroup
@@ -411,7 +411,7 @@ class Tag extends AbstractTool
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveTag(array $arguments): TagElement
@@ -458,7 +458,7 @@ class Tag extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyAttributes(TagElement $element, array $arguments, bool $isCreate): void
@@ -483,7 +483,7 @@ class Tag extends AbstractTool
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _successEnvelope(TagElement $element, string $mode): array

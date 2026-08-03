@@ -42,7 +42,7 @@ use craftpulse\herald\tools\ToolException;
  * should narrow the filter (or page via `offset`).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -98,7 +98,7 @@ class Entries extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -109,7 +109,7 @@ class Entries extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -125,7 +125,7 @@ class Entries extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -170,7 +170,7 @@ class Entries extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -226,7 +226,7 @@ class Entries extends AbstractTool
      * @param string[] $eagerHandles
      * @throws ToolException from `_orderBy()` when the sort expression is not allowlisted.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildQuery(array $arguments, array $eagerHandles): EntryQuery

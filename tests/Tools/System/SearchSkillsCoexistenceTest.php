@@ -27,7 +27,7 @@
  *   - PROMPT_MAP whitelist NOT auto-extended.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

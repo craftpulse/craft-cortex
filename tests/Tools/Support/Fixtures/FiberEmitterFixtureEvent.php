@@ -12,7 +12,7 @@ use yii\base\Event;
  * surface in isolation.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class FiberEmitterFixtureEvent extends Event

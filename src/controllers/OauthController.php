@@ -78,7 +78,7 @@ use yii\web\Response;
  * when `Settings::$httpEnabled` is false.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class OauthController extends AbstractOauthController
@@ -149,7 +149,7 @@ class OauthController extends AbstractOauthController
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _throttledActionIds(): array
@@ -178,7 +178,7 @@ class OauthController extends AbstractOauthController
      * @throws \yii\web\BadRequestHttpException When the `authorize`
      *         consent POST is missing or carries an invalid CSRF token.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function beforeAction($action): bool
@@ -207,7 +207,7 @@ class OauthController extends AbstractOauthController
      *         are not yet generated. Operators run
      *         `herald/oauth/init-keys` once per install.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionAuthorize(): Response
@@ -278,7 +278,7 @@ class OauthController extends AbstractOauthController
     /**
      * POST `/oauth/token` — code-exchange and refresh.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionToken(): Response
@@ -312,7 +312,7 @@ class OauthController extends AbstractOauthController
     /**
      * POST `/oauth/register` — RFC 7591 DCR.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionRegister(): Response
@@ -359,7 +359,7 @@ class OauthController extends AbstractOauthController
      * revocation and a request against an unknown token (no
      * information leakage). The body is empty.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionRevoke(): Response
@@ -419,7 +419,7 @@ class OauthController extends AbstractOauthController
      *         not yet generated.
      * @throws \Throwable                       from template rendering.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionElevate(): Response
@@ -454,7 +454,7 @@ class OauthController extends AbstractOauthController
      *
      * @throws \Throwable from template rendering.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _completeElevation(User $identity): Response
@@ -505,7 +505,7 @@ class OauthController extends AbstractOauthController
      *
      * @throws \Throwable from template rendering.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _renderElevateScreen(User $identity, ?string $error = null): Response
@@ -525,7 +525,7 @@ class OauthController extends AbstractOauthController
      * @param array<string,mixed> $variables
      * @throws \Throwable from template rendering.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _renderElevateTemplate(string $template, array $variables): Response
@@ -543,7 +543,7 @@ class OauthController extends AbstractOauthController
      * Whether the user has an active two-step-verification method (and
      * 2FA is not globally disabled). Mirrors the `users/login` check.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _userHasActiveMfa(User $identity): bool
@@ -560,7 +560,7 @@ class OauthController extends AbstractOauthController
      * Build a Nyholm PSR-7 ServerRequest from the live Yii request.
      * Carries headers, query string, parsed body, and method.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildPsrRequest(): ServerRequestInterface
@@ -638,7 +638,7 @@ class OauthController extends AbstractOauthController
      * value that survived that check. The consent POST is CSRF-gated on
      * top of that, so the parameters cannot be forged cross-site either.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildAuthorizePsrRequest(): ServerRequestInterface
@@ -668,7 +668,7 @@ class OauthController extends AbstractOauthController
     /**
      * Pipe a league PSR-7 response back onto Yii's response object.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _emitPsr7Response(ResponseInterface $psr): Response
@@ -696,7 +696,7 @@ class OauthController extends AbstractOauthController
      *
      * @throws \Throwable from template rendering.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _renderConsentScreen(AuthorizationRequestInterface $authRequest, User $user): Response
@@ -736,7 +736,7 @@ class OauthController extends AbstractOauthController
      * league redirects back to the client with the code; denied →
      * league redirects back with `error=access_denied`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _completeAuthorization(
@@ -777,7 +777,7 @@ class OauthController extends AbstractOauthController
      * re-submits them as hidden body fields, and a query-only read
      * silently resolves null on the POST.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _queryOrBodyParam(string $name): ?string
@@ -794,7 +794,7 @@ class OauthController extends AbstractOauthController
      * indicator (query for GET on authorize, body for POST on token /
      * authorize). Returns null when absent.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resourceParam(): ?string
@@ -807,7 +807,7 @@ class OauthController extends AbstractOauthController
      * body on the consent POST, where the template re-submits it as a
      * hidden field). Returns null when absent from both.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _clientIdParam(): ?string
@@ -832,7 +832,7 @@ class OauthController extends AbstractOauthController
      * The plaintext-safe `clientName` is rendered through the consent
      * template's escaping; no client-controlled value is emitted raw.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _rejectIfClientPendingApproval(): ?Response
@@ -860,7 +860,7 @@ class OauthController extends AbstractOauthController
     /**
      * Shape an RFC 7591 §3.2.2 error response.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _dcrError(int $status, string $error, string $description): Response

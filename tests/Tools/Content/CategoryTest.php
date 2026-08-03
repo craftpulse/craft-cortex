@@ -21,7 +21,7 @@
  * Tests skip when no category group exists.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

@@ -14,7 +14,7 @@
  * by name match, never touching real operator-issued tokens.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

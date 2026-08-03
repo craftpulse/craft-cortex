@@ -19,14 +19,14 @@ use Attribute;
  * to override an inherited stdio-only flag (uncommon).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[Attribute(Attribute::TARGET_CLASS)]
 final class IsStdioOnly
 {
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(

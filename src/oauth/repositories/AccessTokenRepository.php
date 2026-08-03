@@ -32,7 +32,7 @@ use League\OAuth2\Server\Repositories\AccessTokenRepositoryInterface;
  * after league returns it from `issueAccessToken()`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class AccessTokenRepository implements AccessTokenRepositoryInterface
@@ -46,7 +46,7 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
      * @param ClientEntityInterface $clientEntity
      * @param array<int,\League\OAuth2\Server\Entities\ScopeEntityInterface> $scopes
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getNewToken(
@@ -79,7 +79,7 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
      *         the SHA-256 of the freshly-minted JTI collides — never
      *         happens in practice given 40 chars of entropy.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function persistNewAccessToken(AccessTokenEntityInterface $accessTokenEntity): void
@@ -128,7 +128,7 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function revokeAccessToken(string $tokenId): void
@@ -143,7 +143,7 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function isAccessTokenRevoked(string $tokenId): bool

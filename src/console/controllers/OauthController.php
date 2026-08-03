@@ -24,7 +24,7 @@ use yii\helpers\Console;
  * deploys (Git ignores the storage directory); rotating the keys
  * invalidates every in-flight JWT access token.
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class OauthController extends Controller
@@ -46,7 +46,7 @@ class OauthController extends Controller
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function options($actionID): array
@@ -61,7 +61,7 @@ class OauthController extends Controller
      * Generate the JWT key pair. Creates the storage directory if
      * missing.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionInitKeys(): int

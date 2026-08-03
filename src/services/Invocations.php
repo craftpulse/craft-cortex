@@ -17,9 +17,9 @@ use yii\base\Component;
  * Subscribes to `InvocationLogger::EVENT_LOG_CALL` (wired in
  * `Herald::init()`) and persists one row per HTTP `tools/call` to
  * `herald_invocations`. stdio invocations are silently dropped per the
- * locked decision in `docs/plans/gate-7.md` item 11: stdio is single-
- * process trusted-local; the DB audit log exists for the HTTP
- * transport's forensic surface, not for the in-process surface.
+ * locked decision: stdio is single-process trusted-local; the DB audit
+ * log exists for the HTTP transport's forensic surface, not for the
+ * in-process surface.
  *
  * Soft-write contract: a DB failure in `record()` MUST NOT break the
  * dispatch. Every exception is caught, logged to Craft's error log under
@@ -38,7 +38,7 @@ use yii\base\Component;
  * Carbon over `DateTimeHelper` here per the services rule.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Invocations extends Component
@@ -72,7 +72,7 @@ class Invocations extends Component
      *
      * @param array<string,mixed> $entry
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function record(array $entry): ?InvocationRecord
@@ -141,7 +141,7 @@ class Invocations extends Component
      * `Herald::init()`. The delete is a single indexed range scan on
      * `dateCreated` so it stays cheap even on large audit tables.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function prune(): int
@@ -175,7 +175,7 @@ class Invocations extends Component
      * `InvocationQuery::init()`. Routing every read through this method
      * keeps the call sites column-uniform.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function find(): InvocationQuery
@@ -192,7 +192,7 @@ class Invocations extends Component
      * applicable") as null so the DB stores semantic absence rather
      * than the wire-format placeholder.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _stringOrNull(mixed $value): ?string
@@ -208,7 +208,7 @@ class Invocations extends Component
      * integers are cast; anything else (including the `-` placeholder)
      * becomes null.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _intOrNull(mixed $value): ?int

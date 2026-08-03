@@ -23,7 +23,7 @@
  * backed thunk in the constructor.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

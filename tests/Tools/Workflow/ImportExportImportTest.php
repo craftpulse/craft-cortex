@@ -21,7 +21,7 @@
  * fixture entry safely.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

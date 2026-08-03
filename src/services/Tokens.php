@@ -29,7 +29,7 @@ use yii\web\ForbiddenHttpException;
  * Carbon over `DateTimeHelper` here per the services rule.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Tokens extends Component
@@ -107,7 +107,7 @@ class Tokens extends Component
      * @throws ForbiddenHttpException when the install is not licensed for the HTTP transport.
      * @throws \yii\base\InvalidConfigException from `Herald::getInstance()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function issue(int $userId, string $name, ?int $ttlSeconds = null, ?array $scopes = null): array
@@ -172,7 +172,7 @@ class Tokens extends Component
      * `like` injection against the lookup query is impossible — the
      * input space is `[0-9a-f]{64}` by construction.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function lookup(string $plaintext): ?Token
@@ -221,7 +221,7 @@ class Tokens extends Component
      *
      * @throws Exception when the underlying record fails to save.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function revoke(int $id): bool
@@ -253,7 +253,7 @@ class Tokens extends Component
      * `revoke <id>` flow to surface the row before / after for the
      * operator's confirmation.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getById(int $id): ?Token
@@ -271,7 +271,7 @@ class Tokens extends Component
      *
      * @return Token[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getAllForUser(int $userId): array
@@ -290,7 +290,7 @@ class Tokens extends Component
      *
      * @return Token[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getAll(): array
@@ -319,7 +319,7 @@ class Tokens extends Component
      * @param string[]|null $scopes
      * @throws \yii\base\InvalidConfigException from `Herald::getInstance()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _normalizeScopes(?array $scopes): ?string
@@ -338,7 +338,7 @@ class Tokens extends Component
      * 64-char lowercase hex (256 bits of entropy). No shell exec, no
      * userspace PRNG.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _generatePlaintext(): string
@@ -351,7 +351,7 @@ class Tokens extends Component
      * isolated from ActiveRecord magic — service consumers see a
      * plain value object with typed properties.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _hydrate(TokenRecord $record): Token

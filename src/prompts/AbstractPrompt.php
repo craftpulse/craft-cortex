@@ -10,7 +10,7 @@ namespace craftpulse\herald\prompts;
  * take none — and leaves everything else to concrete classes.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 abstract class AbstractPrompt implements PromptInterface
@@ -24,7 +24,7 @@ abstract class AbstractPrompt implements PromptInterface
      * Default: prompt takes no arguments. Override to declare
      * `PromptArgument` entries when a future prompt needs them.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getArguments(): array

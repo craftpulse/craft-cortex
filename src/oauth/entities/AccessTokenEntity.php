@@ -44,7 +44,7 @@ use RuntimeException;
  * still works as a fallback path.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class AccessTokenEntity implements AccessTokenEntityInterface
@@ -75,7 +75,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setPrivateKey(CryptKeyInterface $privateKey): void
@@ -88,7 +88,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
      * `Oauth` service after league issues the token but before the
      * JWT is generated. Embedded as the `aud` claim.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setAudience(?string $audience): void
@@ -100,7 +100,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
      * Expose the bound audience so the resource server can verify it
      * matches the MCP endpoint URL at validation time.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getAudience(): ?string
@@ -111,7 +111,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function toString(): string
@@ -128,7 +128,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
      * claim so herald's own validator can correlate the token back to
      * its issuing client.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _convertToJWT(): Token
@@ -164,7 +164,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
      * @throws RuntimeException When the private key contents are
      *                          empty (misconfigured install).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _jwtConfiguration(): Configuration
@@ -186,7 +186,7 @@ class AccessTokenEntity implements AccessTokenEntityInterface
      * client-credentials-style tokens (not used in herald today, but
      * reserved) fall back to the client id.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _subjectIdentifier(): string

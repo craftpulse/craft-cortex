@@ -40,7 +40,7 @@ use yii\base\Component;
  * transport-is-the-security-boundary rule.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Scopes extends Component
@@ -251,7 +251,7 @@ class Scopes extends Component
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function all(): array
@@ -275,7 +275,7 @@ class Scopes extends Component
      * to decide whether to mint a `ScopeEntity` or return null
      * (`invalid_scope`).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function isKnown(string $identifier): bool
@@ -292,7 +292,7 @@ class Scopes extends Component
      * unmapped tool is denied over HTTP (no token can carry `NONE`)
      * rather than inheriting a read scope it was never granted.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function scopeForTool(string $toolName): string
@@ -311,7 +311,7 @@ class Scopes extends Component
      * @param string[]|null $grantedScopes Scopes carried by the access
      *                                     token, or null for stdio.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function grantsTool(string $toolName, ?array $grantedScopes): bool
@@ -332,7 +332,7 @@ class Scopes extends Component
      * @param string[] $scopes
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function expandLegacyScopes(array $scopes): array
@@ -362,7 +362,7 @@ class Scopes extends Component
      * @param string[] $requested
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterKnown(array $requested): array
@@ -381,7 +381,7 @@ class Scopes extends Component
      * screen. Falls back to a generic line for legacy / unknown
      * identifiers so the consent UI never renders a blank cell.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function describe(string $scope): string
@@ -410,7 +410,7 @@ class Scopes extends Component
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _readCluster(): array

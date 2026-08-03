@@ -27,7 +27,7 @@
  * playground state — if the section isn't there, the test skips.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

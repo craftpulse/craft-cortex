@@ -87,7 +87,7 @@ use yii\base\Component;
  * nothing logged, and a control panel that looks entirely healthy.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.1.0
  */
 class Audit extends Component
@@ -163,7 +163,7 @@ class Audit extends Component
      *
      * @param RegisterAuditEventsEvent $event
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public function registerEventTypes(RegisterAuditEventsEvent $event): void
@@ -221,7 +221,7 @@ class Audit extends Component
      * client's posture travel as scalar details. The client secret is
      * never emitted.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public function recordClientRegistered(int $clientRowId, string $clientId, bool $isPublic, bool $approved): void
@@ -245,7 +245,7 @@ class Audit extends Component
      * Emit `herald.oauth.client_approved` when an admin approves a
      * registered client on the Clients CP screen.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public function recordClientApproved(int $clientRowId, string $clientId): void
@@ -266,7 +266,7 @@ class Audit extends Component
      * Emit `herald.oauth.client_revoked` when an admin revokes a client
      * (un-approving it and cutting off its live tokens).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public function recordClientRevoked(int $clientRowId, string $clientId): void
@@ -289,7 +289,7 @@ class Audit extends Component
      * (they re-authenticated) and the target (the elevation is bound to
      * them).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public function recordElevationGranted(int $userId): void
@@ -311,7 +311,7 @@ class Audit extends Component
      * on the console path). The token label and the bound subject user
      * travel as scalar details — the plaintext never does.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public function recordTokenIssued(int $tokenId, string $name, int $boundUserId): void
@@ -334,7 +334,7 @@ class Audit extends Component
     /**
      * Emit `herald.token.revoked` when a bearer token is revoked.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public function recordTokenRevoked(int $tokenId): void
@@ -375,7 +375,7 @@ class Audit extends Component
      *
      * @param LogCallEvent $event
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public function handleToolInvocation(LogCallEvent $event): void
@@ -423,7 +423,7 @@ class Audit extends Component
      * capturing sink lets a test assert emissions without a real
      * recorder in the loop.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public function setBus(?Bus $bus): void
@@ -440,7 +440,7 @@ class Audit extends Component
      * not break the flow that triggered it. With no sink registered the
      * bus itself is a cheap no-op.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     private function _emit(AuditEvent $event): void
@@ -471,7 +471,7 @@ class Audit extends Component
      * a security product whose value is the trail means auditing can
      * stop with nothing thrown and nothing logged.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     private function _bus(): Bus
@@ -495,7 +495,7 @@ class Audit extends Component
      *
      * @param array<string,mixed> $entry
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     private function _isWriteTool(string $toolName, array $entry): ?bool
@@ -530,7 +530,7 @@ class Audit extends Component
      *
      * @param array<string,mixed> $entry
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     private function _isWriteMode(DualModeToolInterface $tool, array $entry): bool
@@ -554,7 +554,7 @@ class Audit extends Component
      *
      * @param array<string,mixed> $entry
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     private function _resolveMode(array $entry): ?string
@@ -579,7 +579,7 @@ class Audit extends Component
      * everything else (rate-limited, cancelled, or an unknown kind) is a
      * warning.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     private function _outcomeForKind(string $kind): string
@@ -596,7 +596,7 @@ class Audit extends Component
      * band. A raw duration is a fingerprinting side channel; a bucket
      * keeps the audit useful (fast vs slow) without leaking timing.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     private function _bucketDuration(int $ms): string
@@ -615,7 +615,7 @@ class Audit extends Component
      * The acting Craft user id, or null on the console path (where a
      * token is issued or revoked without a CP identity).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     private function _currentActorId(): ?int

@@ -46,7 +46,7 @@ use Throwable;
  *     gaps and incomplete propagation. Filterable to a single section.
  *
  * Pro fix modes (Gate 8.8b — mode-unlock composition contract, locked
- * decision 6 of `docs/plans/gate-8.md`):
+ * decision):
  *   - `fix_relations` — deletes the broken relation rows that the
  *     `relations` read mode lists. Per-row permission resolved from the
  *     source element's owner: `saveEntries:{sectionUid}` /
@@ -79,7 +79,7 @@ use Throwable;
  * context window. Default limit 200, hard cap 1000.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -148,7 +148,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -159,7 +159,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -187,7 +187,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      *
      * @return array<string,bool>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public static function getModeWriteMap(): array
@@ -209,7 +209,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * runtime gate in `execute()`. HTTP callers on Pro are further
      * filtered down per Craft permissions in `inputSchemaFor($user)`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -244,7 +244,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * already omitted them). `execute()` still re-validates the
      * resolved mode for security AND blocks Pro modes on Free installs.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function inputSchemaFor(?User $user = null): array
@@ -314,7 +314,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -358,8 +358,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * Streaming entry point. Only Pro fix modes are streamable — read
      * modes return paged arrays in a single shot via `execute()`.
      *
-     * Per-mode progress shape per `docs/plans/gate-8.9.md` locked
-     * decision 1:
+     * Per-mode progress shape, locked decision 1:
      *   - `fix_relations` — frame every `progressInterval` rows;
      *     message `"Fixing broken relation src={sourceId} → target={targetId}"`.
      *   - `prune_unused_assets` — frame every `progressInterval` rows;
@@ -373,7 +372,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function stream(array $arguments, InvocationContext $ctx): Generator
@@ -427,7 +426,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -474,7 +473,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
@@ -514,7 +513,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _relations(array $arguments): array
@@ -557,7 +556,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      *
      * @return Query<array-key,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _brokenRelationsQuery(): Query
@@ -576,7 +575,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _unusedAssets(array $arguments): array
@@ -623,7 +622,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * @param array<string,mixed> $arguments
      * @return \craft\elements\db\AssetQuery<array-key,Asset>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _unusedAssetsQuery(array $arguments): \craft\elements\db\AssetQuery
@@ -647,7 +646,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeAsset(Asset $asset): array
@@ -678,7 +677,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _propagation(array $arguments): array
@@ -736,7 +735,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * @param array<string,mixed> $arguments
      * @return array{0: array<int,array<string,mixed>>, 1: array<int,string>, 2: bool}
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _collectPropagationGaps(array $arguments): array
@@ -844,7 +843,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * @param array<string,mixed> $arguments
      * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _fixRelations(array $arguments, InvocationContext $ctx): Generator
@@ -929,7 +928,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * @param array<string,mixed> $row
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _fixOneRelation(array $row): array
@@ -1018,7 +1017,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * @param array<string,mixed> $arguments
      * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _pruneUnusedAssets(array $arguments, InvocationContext $ctx): Generator
@@ -1097,7 +1096,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _pruneOneAsset(Asset $asset): array
@@ -1167,7 +1166,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * @param array<string,mixed> $arguments
      * @return Generator<int,array<string,mixed>,mixed,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _repairPropagation(array $arguments, InvocationContext $ctx): Generator
@@ -1250,7 +1249,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * @param array<string,mixed> $gap
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _repairOnePropagation(array $gap): array
@@ -1353,7 +1352,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _progressInterval(array $arguments): int
@@ -1371,7 +1370,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      * Used by `_fixOneRelation()` to determine the source element's
      * owning section / group / volume for the permission gate.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _loadAnyElement(int $id): ?ElementInterface
@@ -1392,7 +1391,7 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
      *
      * @return array<string,string>|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _relationPermissionArgs(ElementInterface $source): ?array

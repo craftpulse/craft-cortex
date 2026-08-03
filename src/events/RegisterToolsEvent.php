@@ -36,7 +36,7 @@ use yii\base\Event;
  * the same trust model Craft itself uses for plugins.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class RegisterToolsEvent extends Event
@@ -44,7 +44,7 @@ class RegisterToolsEvent extends Event
     /**
      * @var ToolInterface[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public array $tools = [];

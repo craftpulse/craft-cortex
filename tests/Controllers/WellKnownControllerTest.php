@@ -10,7 +10,7 @@
  * response payload shape without spinning up a real HTTP server.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

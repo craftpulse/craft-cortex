@@ -41,7 +41,7 @@ use Throwable;
  *   - `apply_draft` — load a draft by `id` / `uid`, apply to canonical.
  *     Requires `saveEntries:{sectionUid}` on the canonical's section.
  *
- * Permission contract (locked decision 4 of `docs/plans/gate-8.md`):
+ * Permission contract (locked):
  *   - `_requiredPermissions(array $arguments): array` returns the
  *     Craft permission strings the arguments imply. The same method
  *     drives both `filterFor()` (whole-tool visibility, sentinel
@@ -75,12 +75,11 @@ use Throwable;
  *     with corrected fields.
  *
  * Cancellation: this is a single-mutation tool, not streaming. The
- * Gate 7.4 InvocationContext is irrelevant here per locked decision 8
- * of `docs/plans/gate-8.md` — the operation either completes or
+ * Gate 7.4 InvocationContext is irrelevant here: the operation either completes or
  * doesn't. No `getCancellationToken()` polling.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsDestructive]
@@ -113,7 +112,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -124,7 +123,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -144,7 +143,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -211,7 +210,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      * filterFor is for the LLM's tool-selection UX; execute is the
      * security boundary; both fail closed.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterFor(?User $user = null): bool
@@ -250,7 +249,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      * the user can't reach is wasted work. `execute()` still
      * re-validates the resolved mode for security.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function inputSchemaFor(?User $user = null): array
@@ -312,7 +311,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -357,7 +356,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -405,7 +404,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      * @param array<string,mixed> $arguments
      * @throws ToolException When the request is not elevated.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _assertPublishElevation(string $mode, array $arguments): void
@@ -434,7 +433,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _create(array $arguments): array
@@ -500,7 +499,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _update(array $arguments): array
@@ -555,7 +554,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _delete(array $arguments): array
@@ -596,7 +595,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _restore(array $arguments): array
@@ -646,7 +645,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyDraft(array $arguments): array
@@ -710,7 +709,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
@@ -735,7 +734,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveSection(array $arguments): ?Section
@@ -779,7 +778,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveSectionUid(array $arguments): ?string
@@ -803,7 +802,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveEntryType(array $arguments, Section $section): ?EntryType
@@ -868,7 +867,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveEntry(array $arguments): EntryElement
@@ -920,7 +919,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyAttributes(EntryElement $element, array $arguments, bool $isCreate): void
@@ -980,7 +979,7 @@ class Entry extends AbstractTool implements ContextAwareToolInterface
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _successEnvelope(EntryElement $element, string $mode): array

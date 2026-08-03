@@ -10,7 +10,7 @@
  * across runs, so isolation matters.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

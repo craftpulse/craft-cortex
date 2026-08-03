@@ -31,7 +31,7 @@ use Nette\PhpGenerator\PhpNamespace;
  * The generator prints the registration snippet on success.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Tool extends BaseGenerator
@@ -40,19 +40,19 @@ class Tool extends BaseGenerator
     // =========================================================================
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private string $_className;
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private string $_namespace;
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private string $_toolName;
@@ -63,7 +63,7 @@ class Tool extends BaseGenerator
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function name(): string
@@ -74,7 +74,7 @@ class Tool extends BaseGenerator
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function description(): string
@@ -85,7 +85,7 @@ class Tool extends BaseGenerator
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function run(): bool
@@ -136,7 +136,7 @@ the tool actually behaves — `#[IsDestructive]` if it mutates or deletes,
 read-only, idempotent, closed-world tool.
 =========================================================================
 
-@author Craftpulse
+@author CraftPulse
 @since  5.0.0
 COMMENT);
 
@@ -150,19 +150,19 @@ COMMENT);
         $class->addMethod('getName')
             ->setStatic()
             ->setReturnType('string')
-            ->setComment("@author Craftpulse\n@since  5.0.0")
+            ->setComment("@author CraftPulse\n@since  5.0.0")
             ->setBody("return '{$this->_toolName}';");
 
         $class->addMethod('getDescription')
             ->setStatic()
             ->setReturnType('string')
-            ->setComment("@author Craftpulse\n@since  5.0.0")
+            ->setComment("@author CraftPulse\n@since  5.0.0")
             ->setBody("return 'TODO: describe this tool for the LLM.';");
 
         $class->addMethod('getInputSchema')
             ->setStatic()
             ->setReturnType('array')
-            ->setComment("@inheritdoc\n\n@author Craftpulse\n@since  5.0.0")
+            ->setComment("@inheritdoc\n\n@author CraftPulse\n@since  5.0.0")
             ->setBody(<<<'BODY'
 return Schema::object([
     // TODO: declare your tool's input schema here.
@@ -170,7 +170,7 @@ return Schema::object([
 BODY);
 
         $class->getMethod('execute')
-            ->setComment("@inheritdoc\n\n@author Craftpulse\n@since  5.0.0")
+            ->setComment("@inheritdoc\n\n@author CraftPulse\n@since  5.0.0")
             ->setBody(<<<'BODY'
 // TODO: implement. Return a JSON-serialisable associative array — the
 // dispatcher wraps it in the MCP `content[]` envelope (and emits it as
@@ -222,7 +222,7 @@ MD;
      * Convert PascalCase to snake_case using Craft's StringHelper. Used
      * to derive a default MCP tool name from the user's class name.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _toSnakeCase(string $value): string

@@ -37,7 +37,7 @@ use craftpulse\herald\tools\support\InvocationContext;
  * context.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 trait ElevationGatedToolTrait
@@ -61,7 +61,7 @@ trait ElevationGatedToolTrait
      * Store the per-invocation context the dispatcher injects before
      * `execute()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setInvocationContext(InvocationContext $ctx): void
@@ -82,7 +82,7 @@ trait ElevationGatedToolTrait
      *                          content") woven into the error message.
      * @throws ToolException When the request is not elevated.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _assertElevated(string $operation): void

@@ -67,7 +67,7 @@ use Generator;
  *     wire is forward-compatible.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 interface StreamableToolInterface extends ToolInterface
@@ -106,7 +106,7 @@ interface StreamableToolInterface extends ToolInterface
      * @param InvocationContext   $ctx       Per-invocation context — carries the cancellation token, transport, user, audit fields.
      * @return Generator<int,array<string,mixed>,mixed,array<int|string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function stream(array $arguments, InvocationContext $ctx): Generator;

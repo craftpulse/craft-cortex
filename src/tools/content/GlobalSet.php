@@ -30,8 +30,7 @@ use craftpulse\herald\tools\ToolException;
  * (future modes can be added additively without breaking existing
  * payloads). Any other mode value throws.
  *
- * Permission contract — `editGlobalSet:{globalSetUid}` per locked
- * decision 4 of `docs/plans/gate-8.md`.
+ * Permission contract: `editGlobalSet:{globalSetUid}`.
  *
  * Lookup: a global set is identifiable by `id`, `uid`, OR `handle`.
  * Operators usually know the handle; `id` and `uid` are accepted for
@@ -47,7 +46,7 @@ use craftpulse\herald\tools\ToolException;
  * Cache prefix: `herald:global_set:idem:`. TTL 24h. Skipped on stdio.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsDestructive]
@@ -75,7 +74,7 @@ class GlobalSet extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -86,7 +85,7 @@ class GlobalSet extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -105,7 +104,7 @@ class GlobalSet extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -146,7 +145,7 @@ class GlobalSet extends AbstractTool
      * at least one global set. `execute()` performs its own per-set
      * re-check.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterFor(?User $user = null): bool
@@ -174,7 +173,7 @@ class GlobalSet extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -201,7 +200,7 @@ class GlobalSet extends AbstractTool
      * @param array<string,mixed> $arguments
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -220,7 +219,7 @@ class GlobalSet extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
@@ -245,7 +244,7 @@ class GlobalSet extends AbstractTool
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _update(array $arguments): array
@@ -284,7 +283,7 @@ class GlobalSet extends AbstractTool
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveGlobalSet(array $arguments): GlobalSetElement
@@ -331,7 +330,7 @@ class GlobalSet extends AbstractTool
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveGlobalSetUid(array $arguments): ?string
@@ -349,7 +348,7 @@ class GlobalSet extends AbstractTool
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _successEnvelope(GlobalSetElement $element): array

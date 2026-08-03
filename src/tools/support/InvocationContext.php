@@ -55,7 +55,7 @@ use craftpulse\herald\mcp\Server;
  * one is a contract bump.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class InvocationContext
@@ -126,7 +126,7 @@ final class InvocationContext
      *                                                 call sites don't have to know
      *                                                 about it.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(
@@ -147,7 +147,7 @@ final class InvocationContext
      * Get the cancellation token. Streaming tools call this between
      * yields and bail when `isCancelled()` returns true.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getCancellationToken(): CancellationToken

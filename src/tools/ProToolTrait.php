@@ -36,7 +36,7 @@ use craftpulse\herald\Herald;
  * - `filterFor(?User $user)` is the per-request gate — runs on every
  *   `tools/list` and `tools/call`, gates visibility on Craft
  *   permissions. Pro tools override it to consult `User::can()`
- *   against the matrix from `docs/plans/gate-8.md` locked decision 4.
+ *   against the tool's own permission matrix.
  * - `inputSchemaFor(?User $user)` is the per-request schema rewriter —
  *   filters the `mode` enum based on the resolved user's permissions.
  *
@@ -58,7 +58,7 @@ use craftpulse\herald\Herald;
  * the mutation only — never globally for the whole test.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 trait ProToolTrait
@@ -71,7 +71,7 @@ trait ProToolTrait
      * `ToolInterface` static contract — the boot loop in
      * `Tools::_buildRegistry()` honours the per-tool decision.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function shouldRegister(): bool

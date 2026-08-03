@@ -29,7 +29,7 @@ use DateTimeInterface;
  *
  * @extends Query<int, array<string, mixed>>
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class InvocationQuery extends Query
@@ -44,7 +44,7 @@ class InvocationQuery extends Query
      * every column. Callers narrow with `select()` when they want a
      * lean payload.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function init(): void
@@ -59,7 +59,7 @@ class InvocationQuery extends Query
      * `Db::parseParam()` sentinels (`not foo`, `:empty:`, etc.). Null
      * is a no-op so chained calls stay clean.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function toolName(mixed $value): self
@@ -72,7 +72,7 @@ class InvocationQuery extends Query
      * Filter by audit `kind` — `success` / `tool_error` /
      * `internal_error`. Null is a no-op.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function kind(mixed $value): self
@@ -86,7 +86,7 @@ class InvocationQuery extends Query
      * log writes today; the column stays open for forward-compat per
      * locked decision 11. Null is a no-op.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function transport(mixed $value): self
@@ -99,7 +99,7 @@ class InvocationQuery extends Query
      * Filter by authenticated user id. Pass `:empty:` to find rows
      * where the user was deleted (FK SET NULL).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function userId(mixed $value): self
@@ -114,7 +114,7 @@ class InvocationQuery extends Query
      * to find them. Pass `not :empty:` for bearer-authenticated rows
      * only.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function tokenId(mixed $value): self
@@ -126,7 +126,7 @@ class InvocationQuery extends Query
     /**
      * Filter by MCP session id (`Mcp-Session-Id` header).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function sessionId(mixed $value): self
@@ -138,7 +138,7 @@ class InvocationQuery extends Query
     /**
      * Filter by MCP client name (`clientInfo.name` from initialize).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function clientName(mixed $value): self
@@ -150,7 +150,7 @@ class InvocationQuery extends Query
     /**
      * Filter by JSON-RPC request id propagated from the call site.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function requestId(mixed $value): self
@@ -163,7 +163,7 @@ class InvocationQuery extends Query
      * Restrict to rows created strictly before the given instant.
      * Null is a no-op.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function before(?DateTimeInterface $dt): self
@@ -178,7 +178,7 @@ class InvocationQuery extends Query
      * Restrict to rows created at or after the given instant. Null is
      * a no-op.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function after(?DateTimeInterface $dt): self
@@ -194,7 +194,7 @@ class InvocationQuery extends Query
      * carrying an `errorClass`; `false` returns only clean-success
      * rows. Null is a no-op.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function hasError(?bool $value = true): self
@@ -214,7 +214,7 @@ class InvocationQuery extends Query
      * range. Either bound is optional — pass nulls to leave the side
      * unbounded.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function durationMs(?int $min = null, ?int $max = null): self
@@ -246,7 +246,7 @@ class InvocationQuery extends Query
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function distinctToolNames(): array
@@ -274,7 +274,7 @@ class InvocationQuery extends Query
      * value collapses to nothing (an empty array, etc.); that branch
      * is also treated as a no-op.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _applyFilter(string $column, mixed $value): void

@@ -10,7 +10,7 @@
  * boundary is non-negotiable and independent of elevation state.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

@@ -18,7 +18,7 @@
  * audience so the teardown can purge them without touching real rows.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

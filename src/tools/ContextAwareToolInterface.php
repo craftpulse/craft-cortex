@@ -34,7 +34,7 @@ use craftpulse\herald\tools\support\InvocationContext;
  * dispatcher skips injection and calls `execute()` as before.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 interface ContextAwareToolInterface extends ToolInterface
@@ -47,7 +47,7 @@ interface ContextAwareToolInterface extends ToolInterface
      *
      * @param InvocationContext $ctx Per-invocation context — carries transport, resolved user, request id, audit fields.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setInvocationContext(InvocationContext $ctx): void;

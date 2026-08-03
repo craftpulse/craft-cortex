@@ -7,7 +7,7 @@
  * straight into `new DateInterval(...)` at authorization-server build.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

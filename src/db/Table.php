@@ -11,7 +11,7 @@ namespace craftpulse\herald\db;
  * rather than scattering string literals.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class Table
@@ -22,7 +22,7 @@ final class Table
      * `config/herald.php` overrides remain the canonical source; this
      * table layers temporary additions on top.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public const RUNTIME_OVERRIDES = '{{%herald_runtime_overrides}}';
@@ -34,7 +34,7 @@ final class Table
      * again by any service method. Soft-delete via `dateDeleted`
      * keeps the lookup index small while preserving audit history.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public const TOKENS = '{{%herald_tokens}}';
@@ -46,7 +46,7 @@ final class Table
      * `clientSecretHash` null; confidential clients store a hashed
      * secret. `redirectUris` is a JSON-encoded list per RFC 6749 §3.1.2.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public const OAUTH_CLIENTS = '{{%herald_oauth_clients}}';
@@ -61,7 +61,7 @@ final class Table
      * `$authCodeTTL` DateInterval, this row's `expiresAt` is the
      * mirror for lookup / pruning.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public const OAUTH_CODES = '{{%herald_oauth_codes}}';
@@ -75,7 +75,7 @@ final class Table
      * hash and persist them the same way. `audience` carries the
      * RFC 8707 resource indicator bound at issue time.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public const OAUTH_TOKENS = '{{%herald_oauth_tokens}}';
@@ -91,7 +91,7 @@ final class Table
      * the same byte-form a SIEM forwarder would see in the file
      * log.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public const INVOCATIONS = '{{%herald_invocations}}';
@@ -105,7 +105,7 @@ final class Table
      * join. The body lives in the field-layout custom-field surface
      * (per Gate 8.6 locked decision 13).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public const SKILLS = '{{%herald_skills}}';

@@ -27,7 +27,7 @@ use yii\console\ExitCode;
  * process; oversized lines are drained and rejected with JSON-RPC
  * `-32600` rather than buffered.
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class ServeController extends Controller
@@ -92,7 +92,7 @@ class ServeController extends Controller
      *
      * @return int Exit code per yii\console\ExitCode
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionIndex(): int
@@ -155,7 +155,7 @@ class ServeController extends Controller
      *
      * @return array<string,mixed>|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _handleLine(Server $server, string $line): ?array
@@ -216,7 +216,7 @@ class ServeController extends Controller
      *                                         is empty when oversized),
      *                                         or null at EOF
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _readMessage($stdin, int $maxBytes): ?array
@@ -263,7 +263,7 @@ class ServeController extends Controller
      * @param resource $stdout
      * @param array<string,mixed> $response
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _writeResponse($stdout, array $response): bool
@@ -295,7 +295,7 @@ class ServeController extends Controller
      *
      * @param resource $stdout
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _registerFatalHandler($stdout): void
@@ -316,7 +316,7 @@ class ServeController extends Controller
      * gracefully: the server still exits on EOF and on a broken pipe,
      * just not on a signal.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _registerSignalHandlers(): void
@@ -343,7 +343,7 @@ class ServeController extends Controller
      * @param resource $stdout
      * @param array{type:int,message:string,file:string,line:int}|null $lastError
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _handleFatalShutdown($stdout, ?array $lastError): void
@@ -370,7 +370,7 @@ class ServeController extends Controller
      * Whether a PHP error type is one of the unrecoverable fatals that
      * bypass userland try/catch and trigger the shutdown function.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _isFatalErrorType(int $type): bool
@@ -404,7 +404,7 @@ class ServeController extends Controller
      * One-way for the process lifetime: the serve process is dedicated
      * and exits when STDIN closes, so there is no meaningful "restore".
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _redirectStdoutLogHandlers(): void
@@ -452,7 +452,7 @@ class ServeController extends Controller
      * the file-descriptor form `php://fd/1` is matched too for the rare
      * config that uses it.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _isStdoutUrl(?string $url): bool

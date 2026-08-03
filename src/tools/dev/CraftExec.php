@@ -50,7 +50,7 @@ use Throwable;
  * is the six gates above.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[Title('Evaluate Craft Expression')]
@@ -91,7 +91,7 @@ class CraftExec extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -102,7 +102,7 @@ class CraftExec extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -119,7 +119,7 @@ class CraftExec extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -140,7 +140,7 @@ class CraftExec extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -203,7 +203,7 @@ class CraftExec extends AbstractTool
     /**
      * Whether the expression matches any destructive pattern.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _isDestructive(string $expression): bool
@@ -225,7 +225,7 @@ class CraftExec extends AbstractTool
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _dryRun(string $expression, bool $isDestructive, bool $blocked): array
@@ -254,7 +254,7 @@ class CraftExec extends AbstractTool
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _evaluate(string $expression, bool $isDestructive): array
@@ -323,7 +323,7 @@ class CraftExec extends AbstractTool
      * to arrays; closures and resources stringify; arrays are walked
      * through `SecretRedactor::redactArray`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _normaliseResult(mixed $value): mixed
@@ -373,7 +373,7 @@ class CraftExec extends AbstractTool
      * @param array<int|string,mixed> $value
      * @return array<int|string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _recursiveNormalise(array $value): array

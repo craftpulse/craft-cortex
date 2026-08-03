@@ -17,7 +17,7 @@ use League\OAuth2\Server\Entities\Traits\RefreshTokenTrait;
  * association before minting.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class RefreshTokenEntity implements RefreshTokenEntityInterface

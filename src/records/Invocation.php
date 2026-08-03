@@ -43,7 +43,7 @@ use craftpulse\herald\tools\support\InvocationLogger;
  * @property string $dateCreated
  * @property string $uid
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Invocation extends ActiveRecord
@@ -54,7 +54,7 @@ class Invocation extends ActiveRecord
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function tableName(): string
@@ -72,7 +72,7 @@ class Invocation extends ActiveRecord
      * source of truth — so a new kind (e.g. `security` for the
      * refresh-token theft event) only has to be declared in one place.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function rules(): array

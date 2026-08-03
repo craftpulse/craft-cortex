@@ -17,7 +17,7 @@ use Craft;
  * `project_locked_decisions.md` under "Collision behavior".
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class RegistryLog
@@ -31,7 +31,7 @@ final class RegistryLog
      * what kind of registry rejected the duplicate (e.g. "Tool" /
      * "name", "Resource" / "URI"). `$key` is the colliding value.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function collision(

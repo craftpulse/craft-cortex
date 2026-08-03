@@ -23,7 +23,7 @@ use craft\elements\User;
  * as `notifications/progress` messages.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 interface ToolInterface
@@ -33,7 +33,7 @@ interface ToolInterface
      * in the registry and as the `name` field in `tools/list` /
      * `tools/call`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string;
@@ -43,7 +43,7 @@ interface ToolInterface
      * answer "when would I call this?" in one to three sentences. Avoid
      * implementation detail; describe the user-visible effect.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string;
@@ -54,7 +54,7 @@ interface ToolInterface
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array;
@@ -68,7 +68,7 @@ interface ToolInterface
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function outputSchema(): array;
@@ -87,7 +87,7 @@ interface ToolInterface
      * decision contracts (`ComponentInterface::isSelectable()`,
      * `ElementInterface::hasUris()`, `FieldInterface::isMultiInstance()`).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function shouldRegister(): bool;
@@ -110,11 +110,9 @@ interface ToolInterface
      * selection UX; `execute()` filtering is the security boundary;
      * both fail closed.
      *
-     * Locked architectural contract — see
-     * `.claude/rules/architecture.md` "Per-user tool visibility" and
-     * `docs/plans/gate-7.md` locked decision 3.
+     * Locked architectural contract: per-user tool visibility.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterFor(?User $user = null): bool;
@@ -133,13 +131,11 @@ interface ToolInterface
      * write-permitted user sees the full set. stdio passes `null`
      * and the default delegates to the static schema.
      *
-     * Locked architectural contract — see
-     * `.claude/rules/architecture.md` "Per-user tool visibility" and
-     * `docs/plans/gate-7.md` locked decision 3.
+     * Locked architectural contract: per-user tool visibility.
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function inputSchemaFor(?User $user = null): array;
@@ -160,7 +156,7 @@ interface ToolInterface
      * @return array<int|string,mixed>|\Generator<int,mixed,mixed,array<int|string,mixed>>
      * @throws ToolException For tool-level errors (returned to client as `isError: true`).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array|\Generator;

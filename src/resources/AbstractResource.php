@@ -12,7 +12,7 @@ namespace craftpulse\herald\resources;
  * surface non-Markdown content.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 abstract class AbstractResource implements ResourceInterface
@@ -25,7 +25,7 @@ abstract class AbstractResource implements ResourceInterface
      *
      * Default: every herald's bundled resource is a Markdown document.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getMimeType(): string

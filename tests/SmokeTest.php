@@ -8,7 +8,7 @@
  * than 50 individual tool tests would.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

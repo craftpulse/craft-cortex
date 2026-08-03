@@ -26,7 +26,7 @@ use League\OAuth2\Server\Repositories\AuthCodeRepositoryInterface;
  * revoked by `isAuthCodeRevoked()` below, so the prune is fail-closed.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class AuthCodeRepository implements AuthCodeRepositoryInterface
@@ -37,7 +37,7 @@ class AuthCodeRepository implements AuthCodeRepositoryInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getNewAuthCode(): AuthCodeEntityInterface
@@ -52,7 +52,7 @@ class AuthCodeRepository implements AuthCodeRepositoryInterface
      *         the generated identifier collides — vanishingly
      *         unlikely given 80 chars of entropy.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function persistNewAuthCode(AuthCodeEntityInterface $authCodeEntity): void
@@ -79,7 +79,7 @@ class AuthCodeRepository implements AuthCodeRepositoryInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function revokeAuthCode(string $codeId): void
@@ -95,7 +95,7 @@ class AuthCodeRepository implements AuthCodeRepositoryInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function isAuthCodeRevoked(string $codeId): bool

@@ -17,7 +17,7 @@ use yii\console\ExitCode;
  * test under the `herald-test-secret` controller id, then removed.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class SecretEmittingController extends Controller
@@ -29,7 +29,7 @@ class SecretEmittingController extends Controller
      * Emit a `DB_PASSWORD=...` line to stdout. The token is recognisable
      * so the test can assert it never survives redaction.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionEmit(): int

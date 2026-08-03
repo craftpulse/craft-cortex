@@ -28,7 +28,7 @@ use craftpulse\herald\elements\Skill;
  * @extends ElementQuery<TKey,TElement>
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class SkillQuery extends ElementQuery
@@ -41,7 +41,7 @@ class SkillQuery extends ElementQuery
      *           a string, an array of strings, or a `Db::parseParam`-
      *           shaped negation (e.g. `'not foo'`, `['not', 'foo']`).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public mixed $handle = null;
@@ -51,7 +51,7 @@ class SkillQuery extends ElementQuery
      *           a string for substring match, an array for IN-list, or
      *           a `'not'`-prefixed array for negation.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public mixed $description = null;
@@ -69,7 +69,7 @@ class SkillQuery extends ElementQuery
      * @param mixed $value The handle filter.
      * @return static
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function handle(mixed $value): static
@@ -89,7 +89,7 @@ class SkillQuery extends ElementQuery
      * @param mixed $value The description filter.
      * @return static
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function description(mixed $value): static
@@ -104,7 +104,7 @@ class SkillQuery extends ElementQuery
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function beforePrepare(): bool

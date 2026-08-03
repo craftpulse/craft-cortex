@@ -64,7 +64,7 @@ use yii\base\Component;
  * name-keyed map.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Tools extends Component
@@ -99,7 +99,7 @@ class Tools extends Component
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function init(): void
@@ -141,7 +141,7 @@ class Tools extends Component
      *
      * @return ToolInterface[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getAll(): array
@@ -154,7 +154,7 @@ class Tools extends Component
      * name is registered — the dispatcher converts that to JSON-RPC
      * error -32602 (Invalid params).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getByName(string $name): ?ToolInterface
@@ -165,7 +165,7 @@ class Tools extends Component
     /**
      * Number of registered tools. Cheap helper for diagnostics / tests.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getCount(): int
@@ -186,7 +186,7 @@ class Tools extends Component
      *
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function asListPayload(): array
@@ -205,16 +205,14 @@ class Tools extends Component
      * applies — `asListPayloadFor(null) === asListPayload()` is the
      * locked invariant (tested in `tests/Services/ToolsTest.php`).
      *
-     * Locked architectural contract — see
-     * `.claude/rules/architecture.md` "Per-user tool visibility" and
-     * `docs/plans/gate-7.md` locked decision 3.
+     * Locked architectural contract: per-user tool visibility.
      *
      * @param string[]|null $grantedScopes OAuth capability scopes carried
      *                                     by the access token, or null for
      *                                     stdio / bearer (not scope-gated).
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function asListPayloadFor(?User $user, ?array $grantedScopes = null): array
@@ -241,15 +239,13 @@ class Tools extends Component
      * never been registered. Failing closed: a hidden tool is
      * indistinguishable from a missing tool to the caller.
      *
-     * Locked architectural contract — see
-     * `.claude/rules/architecture.md` "Per-user tool visibility" and
-     * `docs/plans/gate-7.md` locked decision 3.
+     * Locked architectural contract: per-user tool visibility.
      *
      * @param string[]|null $grantedScopes OAuth capability scopes carried
      *                                     by the access token, or null for
      *                                     stdio / bearer (not scope-gated).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getByNameFor(string $name, ?User $user, ?array $grantedScopes = null): ?ToolInterface
@@ -278,7 +274,7 @@ class Tools extends Component
      *
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildListEntry(ToolInterface $tool, ?User $user): array
@@ -309,7 +305,7 @@ class Tools extends Component
      *
      * @return ToolInterface[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildRegistry(): array

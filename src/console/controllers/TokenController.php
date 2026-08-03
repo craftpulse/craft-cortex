@@ -27,7 +27,7 @@ use yii\helpers\Console;
  * any service method beyond `issue()`. The console output is the only
  * surface it ever appears on.
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class TokenController extends Controller
@@ -72,7 +72,7 @@ class TokenController extends Controller
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function options($actionID): array
@@ -91,7 +91,7 @@ class TokenController extends Controller
      * output should revoke the just-issued token (`herald/token/revoke
      * <id>`) and re-issue.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionIssue(string $user): int
@@ -161,7 +161,7 @@ class TokenController extends Controller
      * stays in the table with `dateDeleted` set so audit history
      * survives. Subsequent lookups against the plaintext return null.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionRevoke(int $id): int
@@ -197,7 +197,7 @@ class TokenController extends Controller
      * never shown; only the 8-char prefix lets operators correlate
      * a row back to a client.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionList(): int
@@ -262,7 +262,7 @@ class TokenController extends Controller
      * Truncate a string to fit a fixed-width column. Trailing
      * ellipsis stays visible inside the column budget.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _truncate(string $value, int $max): string

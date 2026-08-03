@@ -5,7 +5,7 @@
  * User custom-field allowlist invariants — Gate 8.10.
  *
  * Service-level test that locks the cross-permission allowlist
- * invariant per `docs/plans/gate-8.10.md` locked decision 9:
+ * invariant, locked:
  *
  *   - Default empty allowlist → custom fields absent regardless of
  *     caller permission tier (admin, editUsers, viewUsers, stdio).
@@ -43,7 +43,7 @@
  * serialiser doesn't crash on a non-existent handle.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

@@ -32,7 +32,7 @@ use craftpulse\herald\db\Table;
  * @property string $dateCreated
  * @property string $dateUpdated
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class OauthCode extends ActiveRecord
@@ -43,7 +43,7 @@ class OauthCode extends ActiveRecord
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function tableName(): string
@@ -58,7 +58,7 @@ class OauthCode extends ActiveRecord
      * explicit declaration because the column doesn't follow the
      * default `id` convention.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function primaryKey(): array
@@ -69,7 +69,7 @@ class OauthCode extends ActiveRecord
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function rules(): array

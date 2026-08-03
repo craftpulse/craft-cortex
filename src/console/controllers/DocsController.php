@@ -27,7 +27,7 @@ use yii\helpers\Console;
  * relative to the herald package root). Tests use this to write into
  * a tmp directory and assert the output shape.
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class DocsController extends Controller
@@ -47,7 +47,7 @@ class DocsController extends Controller
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function options($actionID): array
@@ -58,7 +58,7 @@ class DocsController extends Controller
     /**
      * Generate `TOOLS.md`, `PROMPTS.md`, and `RESOURCES.md`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionAll(): int
@@ -80,7 +80,7 @@ class DocsController extends Controller
     /**
      * Generate `TOOLS.md`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionTools(): int
@@ -93,7 +93,7 @@ class DocsController extends Controller
     /**
      * Generate `PROMPTS.md`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionPrompts(): int
@@ -106,7 +106,7 @@ class DocsController extends Controller
     /**
      * Generate `RESOURCES.md`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function actionResources(): int
@@ -120,7 +120,7 @@ class DocsController extends Controller
     // =========================================================================
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _outDir(): string
@@ -133,7 +133,7 @@ class DocsController extends Controller
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _writeDoc(string $filename, string $contents): int
@@ -158,7 +158,7 @@ class DocsController extends Controller
     /**
      * @param \craftpulse\herald\tools\ToolInterface[] $tools
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _renderToolsMarkdown(array $tools): string
@@ -218,7 +218,7 @@ class DocsController extends Controller
     /**
      * @param \craftpulse\herald\prompts\PromptInterface[] $prompts
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _renderPromptsMarkdown(array $prompts): string
@@ -259,7 +259,7 @@ class DocsController extends Controller
     /**
      * @param \craftpulse\herald\resources\ResourceInterface[] $resources
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _renderResourcesMarkdown(array $resources): string

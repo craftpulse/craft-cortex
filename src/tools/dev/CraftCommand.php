@@ -26,8 +26,8 @@ use craftpulse\herald\tools\ToolException;
  * The allowlist is enforced at the tool layer before dispatch: a
  * non-allowlisted command never reaches the `runAction()` call.
  *
- * Allowlist is split into two arrays per `docs/plans/gate-8.md`
- * locked decision 14:
+ * Allowlist is split into two arrays per the locked
+ * `allowAdminChanges` policy:
  *
  *   - `Settings::$allowedCommands`     — content-level patterns, always admitted.
  *   - `Settings::$adminLevelCommands`  — admin-level patterns, admitted ONLY
@@ -53,7 +53,7 @@ use craftpulse\herald\tools\ToolException;
  * crossings and rejected boundary attempts.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[Title('Run Craft Command')]
@@ -108,7 +108,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
      * `execute()`. Read for the resolved user id when resolving the
      * per-user effective allowlist.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setInvocationContext(InvocationContext $ctx): void
@@ -130,7 +130,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
      * but the branch is explicit so a reconfigured permission system
      * cannot quietly lock out admins.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function filterFor(?User $user = null): bool
@@ -145,7 +145,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -156,7 +156,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -173,7 +173,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -195,7 +195,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -308,7 +308,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
      *
      * @throws ToolException when an identified caller lacks `PERMISSION_RUN_COMMANDS`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _assertMayRunCommands(): void
@@ -349,7 +349,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
      *
      * @throws ToolException when the route is admin-level and `allowAdminChanges` is false.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _assertAdminChangesForRoute(string $command): void
@@ -388,7 +388,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _allowlist(): array
@@ -412,7 +412,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _contentPatterns(): array
@@ -436,7 +436,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
      * Scopes per-user runtime grants so the dispatch gate honours a grant
      * only for the user it was issued to; a null id sees only global grants.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _callingUserId(): ?int
@@ -452,7 +452,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _adminPatterns(): array
@@ -471,7 +471,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
      *
      * @param string[] $patterns
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _matchPattern(string $command, array $patterns): ?string
@@ -493,7 +493,7 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _options(array $arguments): array

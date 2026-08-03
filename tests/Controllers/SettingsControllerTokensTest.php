@@ -24,7 +24,7 @@
  * run under parallel execution — no **SEQUENTIAL ONLY** constraint.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

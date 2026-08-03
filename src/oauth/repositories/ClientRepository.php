@@ -33,7 +33,7 @@ use League\OAuth2\Server\Repositories\ClientRepositoryInterface;
  * `approved = 1` are unaffected.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class ClientRepository implements ClientRepositoryInterface
@@ -44,7 +44,7 @@ class ClientRepository implements ClientRepositoryInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getClientEntity(string $clientIdentifier): ?ClientEntityInterface
@@ -68,7 +68,7 @@ class ClientRepository implements ClientRepositoryInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function validateClient(string $clientIdentifier, ?string $clientSecret, ?string $grantType): bool
@@ -114,7 +114,7 @@ class ClientRepository implements ClientRepositoryInterface
      * an empty list so league rejects the request with
      * `invalid_redirect_uri` rather than crashing on `json_decode`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _hydrate(OauthClientRecord $record): ClientEntity
@@ -145,7 +145,7 @@ class ClientRepository implements ClientRepositoryInterface
      *
      * @return string|string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _decodeRedirectUris(string $json): string|array

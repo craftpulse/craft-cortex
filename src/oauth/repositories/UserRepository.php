@@ -22,7 +22,7 @@ use League\OAuth2\Server\Repositories\UserRepositoryInterface;
  * actionAuthorize()`) from the Craft session user.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class UserRepository implements UserRepositoryInterface
@@ -36,7 +36,7 @@ class UserRepository implements UserRepositoryInterface
      * Herald does not enable Password grant. Returning null forces
      * league to throw `invalidGrant` if the grant ever leaks through.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getUserEntityByUserCredentials(

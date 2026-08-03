@@ -11,7 +11,7 @@
  * shape with `count: 0` when there's nothing to report.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

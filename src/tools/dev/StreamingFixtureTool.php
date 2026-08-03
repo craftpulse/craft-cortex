@@ -42,7 +42,7 @@ use Generator;
  * pure CPU-bound generator would produce.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class StreamingFixtureTool extends AbstractTool implements StreamableToolInterface
@@ -53,7 +53,7 @@ final class StreamingFixtureTool extends AbstractTool implements StreamableToolI
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -64,7 +64,7 @@ final class StreamingFixtureTool extends AbstractTool implements StreamableToolI
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -80,7 +80,7 @@ final class StreamingFixtureTool extends AbstractTool implements StreamableToolI
      * environment — production installs that never set the var never
      * see the tool surface in `tools/list`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function shouldRegister(): bool
@@ -99,7 +99,7 @@ final class StreamingFixtureTool extends AbstractTool implements StreamableToolI
      * @param array<string,mixed> $arguments
      * @return array<int|string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -113,7 +113,7 @@ final class StreamingFixtureTool extends AbstractTool implements StreamableToolI
      * @param array<string,mixed> $arguments
      * @return Generator<int,array<string,mixed>,mixed,array<int|string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function stream(array $arguments, InvocationContext $ctx): Generator

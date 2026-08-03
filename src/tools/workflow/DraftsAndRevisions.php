@@ -33,7 +33,7 @@ use Throwable;
  *     sides.
  *
  * Pro modes (Gate 8.8a — mode-unlock composition contract, locked
- * decision 6 of `docs/plans/gate-8.md`):
+ * decision):
  *   - `apply` — applies a draft to its canonical via Craft's drafts
  *     service. Permission `saveEntries:{canonicalSectionUid}`.
  *   - `discard` — hard-deletes the draft, leaves the canonical untouched.
@@ -62,7 +62,7 @@ use Throwable;
  * `entry.create + draft creation`. The duplicate is deliberate.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -93,7 +93,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -104,7 +104,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -129,7 +129,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
      *
      * @return array<string,bool>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public static function getModeWriteMap(): array
@@ -151,7 +151,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
      * runtime gate in `execute()`. HTTP callers on Pro are further
      * filtered down per Craft permissions in `inputSchemaFor($user)`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -192,7 +192,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
      * re-validates the resolved mode for security AND blocks Pro modes
      * on Free installs.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function inputSchemaFor(?User $user = null): array
@@ -225,7 +225,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -268,7 +268,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
      * @return string[]
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _requiredPermissions(array $arguments): array
@@ -294,7 +294,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
@@ -317,7 +317,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _listDrafts(array $arguments): array
@@ -363,7 +363,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeDraft(Entry $entry): array
@@ -395,7 +395,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _listRevisions(array $arguments): array
@@ -439,7 +439,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeRevision(Entry $entry): array
@@ -461,7 +461,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _compare(array $arguments): array
@@ -505,7 +505,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _apply(array $arguments): array
@@ -560,7 +560,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
      * @return array<string,mixed>
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _discard(array $arguments): array
@@ -615,7 +615,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _resolveDraft(array $arguments): Entry
@@ -647,7 +647,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _loadAnyEntry(int $id): Entry
@@ -668,7 +668,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _compareSummary(Entry $entry): array
@@ -692,7 +692,7 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _extractFieldValues(Entry $entry): array

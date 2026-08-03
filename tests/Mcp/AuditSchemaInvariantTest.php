@@ -22,7 +22,7 @@
  * to a column on the table via `craft\db\TableSchema::$columns`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

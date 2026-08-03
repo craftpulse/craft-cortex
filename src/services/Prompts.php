@@ -23,7 +23,7 @@ use yii\base\Component;
  * service init and never mutated. Same shape as `Tools` for symmetry.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Prompts extends Component
@@ -119,7 +119,7 @@ class Prompts extends Component
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function init(): void
@@ -151,7 +151,7 @@ class Prompts extends Component
      *
      * @return PromptInterface[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getAll(): array
@@ -164,7 +164,7 @@ class Prompts extends Component
      * prompt with that name is registered — the dispatcher converts
      * that to JSON-RPC error -32602 (Invalid params).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getByName(string $name): ?PromptInterface
@@ -175,7 +175,7 @@ class Prompts extends Component
     /**
      * Number of registered prompts.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getCount(): int
@@ -190,7 +190,7 @@ class Prompts extends Component
      *
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function asListPayload(): array
@@ -225,7 +225,7 @@ class Prompts extends Component
      *
      * @return PromptInterface[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _buildRegistry(): array

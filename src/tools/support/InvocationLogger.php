@@ -64,7 +64,7 @@ use yii\base\Event;
  * invariant.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class InvocationLogger
@@ -139,7 +139,7 @@ final class InvocationLogger
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function logCall(
@@ -182,7 +182,7 @@ final class InvocationLogger
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function formatEntry(
@@ -250,7 +250,7 @@ final class InvocationLogger
      * @param array<string,mixed> $arguments
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function buildEntry(
@@ -301,7 +301,7 @@ final class InvocationLogger
      * the guard keeps standalone unit tests calling `formatEntry()`
      * directly from blowing up.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _excerptResponse(string $payload): string
@@ -319,7 +319,7 @@ final class InvocationLogger
     }
 
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _resolveKind(?Throwable $error): string
@@ -339,7 +339,7 @@ final class InvocationLogger
      * placeholder) so the field is always present and the line shape
      * stays stable across transports.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _orDash(string|int|null $value): string
@@ -355,7 +355,7 @@ final class InvocationLogger
      * whitespace or `=`; otherwise emit bare. Newlines and control bytes
      * are stripped — the line is meant to grep cleanly.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _quoteForLog(string $value): string

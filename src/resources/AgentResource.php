@@ -21,7 +21,7 @@ use Michtio\CraftCmsClaudeSkills\Skills;
  * fixed first segment (`agents/`) to avoid collision with skill names.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class AgentResource extends AbstractResource
@@ -51,7 +51,7 @@ class AgentResource extends AbstractResource
     /**
      * @param string $agent Bundled agent file basename without `.md`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(string $agent)
@@ -63,7 +63,7 @@ class AgentResource extends AbstractResource
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getUri(): string
@@ -77,7 +77,7 @@ class AgentResource extends AbstractResource
      * Display label: `agents / <name>` so the resource picker groups
      * agents visually under the skills surface.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getName(): string
@@ -88,7 +88,7 @@ class AgentResource extends AbstractResource
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getDescription(): string
@@ -104,7 +104,7 @@ class AgentResource extends AbstractResource
      *
      * @throws \InvalidArgumentException If the backing agent cannot be read.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function read(): array

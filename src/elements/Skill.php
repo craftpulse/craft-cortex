@@ -49,7 +49,7 @@ use yii\base\InvalidConfigException;
  * lifecycle event.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Skill extends Element
@@ -89,7 +89,7 @@ class Skill extends Element
      * element-stored skills; element-stored handles MAY collide with
      * bundled handles — that collision IS the override mechanism.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public ?string $handle = null;
@@ -99,7 +99,7 @@ class Skill extends Element
      * native column on `herald_skills` (not in the field layout) so
      * the list-view path doesn't pay for a content-table join.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public ?string $description = null;
@@ -110,7 +110,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function displayName(): string
@@ -121,7 +121,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function lowerDisplayName(): string
@@ -132,7 +132,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function pluralDisplayName(): string
@@ -143,7 +143,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function pluralLowerDisplayName(): string
@@ -154,7 +154,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function refHandle(): ?string
@@ -165,7 +165,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function hasTitles(): bool
@@ -176,7 +176,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function hasStatuses(): bool
@@ -187,7 +187,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function hasUris(): bool
@@ -198,7 +198,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function trackChanges(): bool
@@ -211,7 +211,7 @@ class Skill extends Element
      *
      * @return SkillQuery The newly created `SkillQuery` instance.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function find(): SkillQuery
@@ -225,7 +225,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function canView(User $user): bool
@@ -236,7 +236,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function canSave(User $user): bool
@@ -247,7 +247,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function canDuplicate(User $user): bool
@@ -258,7 +258,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function canDelete(User $user): bool
@@ -269,7 +269,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getFieldLayout(): ?FieldLayout
@@ -291,7 +291,7 @@ class Skill extends Element
      * @throws InvalidConfigException If the underlying record cannot
      *                                be loaded.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function afterSave(bool $isNew): void
@@ -320,7 +320,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function afterDelete(): void
@@ -332,7 +332,7 @@ class Skill extends Element
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function afterRestore(): void
@@ -354,7 +354,7 @@ class Skill extends Element
      *
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected static function defineSources(string $context): array
@@ -379,7 +379,7 @@ class Skill extends Element
      *
      * @return array<int,string|array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected static function defineActions(string $source): array
@@ -402,7 +402,7 @@ class Skill extends Element
      *
      * @return array<int,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function defineRules(): array
@@ -436,7 +436,7 @@ class Skill extends Element
      *
      * @param string $attribute The attribute under validation.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function validateHandleUnique(string $attribute): void
@@ -502,7 +502,7 @@ class Skill extends Element
      *
      * @param string $attribute The attribute under validation.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function validateHandleImmutable(string $attribute): void
@@ -540,7 +540,7 @@ class Skill extends Element
      * `canView/canSave/canDelete/canDuplicate` all share a single
      * implementation.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _userCanManage(User $user): bool

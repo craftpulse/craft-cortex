@@ -10,7 +10,7 @@
  * the tools' `getInputSchema()` returns exactly these shapes.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

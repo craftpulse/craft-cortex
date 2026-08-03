@@ -49,7 +49,7 @@ namespace craftpulse\herald\tools\support;
  * fix everything in one round trip instead of one field per retry.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class SchemaValidator
@@ -100,7 +100,7 @@ final class SchemaValidator
      * @param array<string,mixed> $schema
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function validate(array $schema, mixed $value, string $path = 'arguments'): array
@@ -123,7 +123,7 @@ final class SchemaValidator
      * @param array<string,mixed> $schema
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _validate(array $schema, mixed $value, string $path): array
@@ -172,7 +172,7 @@ final class SchemaValidator
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _validateType(mixed $type, mixed $value, string $path): array
@@ -202,7 +202,7 @@ final class SchemaValidator
      * array satisfies both, because `[]` and `{}` decode identically and
      * nothing in the wire format distinguishes them.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _matchesType(string $type, mixed $value): bool
@@ -225,7 +225,7 @@ final class SchemaValidator
      * spec); a numeric string qualifies under the documented tolerance
      * for LLM clients that stringify numbers.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _isInteger(mixed $value): bool
@@ -246,7 +246,7 @@ final class SchemaValidator
      * arrays are excluded — `is_numeric()` alone would let `"1e5"` in,
      * which is fine, but nothing non-string may take this path.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _isNumericString(mixed $value): bool
@@ -260,7 +260,7 @@ final class SchemaValidator
      * @param array<string,mixed> $schema
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _validateString(array $schema, string $value, string $path): array
@@ -296,7 +296,7 @@ final class SchemaValidator
      * @param array<string,mixed> $schema
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _validateNumber(array $schema, int|float $value, string $path): array
@@ -330,7 +330,7 @@ final class SchemaValidator
      * @param array<string,mixed> $schema
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _validateArray(array $schema, array $value, string $path): array
@@ -352,7 +352,7 @@ final class SchemaValidator
      * @param array<string,mixed> $schema
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _validateList(array $schema, array $value, string $path): array
@@ -394,7 +394,7 @@ final class SchemaValidator
      * @param array<string,mixed> $schema
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _validateObject(array $schema, array $value, string $path): array
@@ -437,7 +437,7 @@ final class SchemaValidator
      * @param array<int|string,mixed> $properties
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _validateAdditionalProperty(
@@ -476,7 +476,7 @@ final class SchemaValidator
      * @param array<string,mixed> $schema
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _validateCompositions(array $schema, mixed $value, string $path): array
@@ -518,7 +518,7 @@ final class SchemaValidator
      *
      * @param array<int|string,mixed> $branches
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _matchCount(array $branches, mixed $value, string $path): int
@@ -537,7 +537,7 @@ final class SchemaValidator
     /**
      * The JSON Schema type name for a decoded value, for error copy.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _typeOf(mixed $value): string
@@ -558,7 +558,7 @@ final class SchemaValidator
      * so `"1"` is visibly distinct from `1`; everything else round-trips
      * through `json_encode`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private static function _render(mixed $value): string

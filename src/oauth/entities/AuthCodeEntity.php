@@ -17,7 +17,7 @@ use League\OAuth2\Server\Entities\Traits\TokenEntityTrait;
  * `EntityTrait` adds the identifier accessors.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class AuthCodeEntity implements AuthCodeEntityInterface

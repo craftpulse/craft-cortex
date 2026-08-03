@@ -46,7 +46,7 @@ use craftpulse\herald\db\Table;
  * @property string $dateUpdated
  * @property string $uid
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class OauthToken extends ActiveRecord
@@ -57,7 +57,7 @@ class OauthToken extends ActiveRecord
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function tableName(): string
@@ -68,7 +68,7 @@ class OauthToken extends ActiveRecord
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function rules(): array

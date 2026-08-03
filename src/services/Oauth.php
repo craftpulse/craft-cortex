@@ -84,7 +84,7 @@ use yii\base\InvalidConfigException;
  * Carbon over `DateTimeHelper` here per the services rule.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Oauth extends Component
@@ -191,7 +191,7 @@ class Oauth extends Component
      * token time. Cleared after league hands the entity back to the
      * repository for persistence.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setPendingAudience(?string $audience): void
@@ -203,7 +203,7 @@ class Oauth extends Component
      * Read the pending audience back. Consumed by the
      * `AccessTokenRepository` when stamping the entity's `aud`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getPendingAudience(): ?string
@@ -218,7 +218,7 @@ class Oauth extends Component
      * exchanged, so the rotated access + refresh tokens stay in the
      * same family. Cleared after the pair is persisted.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function setPendingFamilyId(?string $familyId): void
@@ -232,7 +232,7 @@ class Oauth extends Component
      * stamping the rotated token rows. Null on the auth-code flow,
      * where `AccessTokenRepository` mints a fresh family instead.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getPendingFamilyId(): ?string
@@ -253,7 +253,7 @@ class Oauth extends Component
      *
      * Returns the number of token rows revoked.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function revokeFamily(string $familyId, string $reason): int
@@ -307,7 +307,7 @@ class Oauth extends Component
      * to inherit the lineage and during theft detection to target the
      * family-wide revoke.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function familyIdForTokenHash(string $tokenHash): ?string
@@ -323,7 +323,7 @@ class Oauth extends Component
      * Mint a fresh rotation-family identifier. A UUID keeps the column
      * a fixed 36 chars and is collision-free across the install.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function newFamilyId(): string
@@ -341,7 +341,7 @@ class Oauth extends Component
      *                                `herald/oauth/init-keys` once per
      *                                install.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getAuthorizationServer(): AuthorizationServer
@@ -385,7 +385,7 @@ class Oauth extends Component
      * @throws InvalidConfigException When the JWT key pair is
      *                                missing.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getResourceServer(): ResourceServer
@@ -426,7 +426,7 @@ class Oauth extends Component
      *
      * @return array{userId:?int,clientId:string,scope:string,audience:?string,jti:string}|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function lookupAccessToken(string $jwt): ?array
@@ -495,7 +495,7 @@ class Oauth extends Component
      * Craft's own session-elevation model (which is also per-user, not
      * per-credential).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function elevationCacheKey(int $userId): string
@@ -510,7 +510,7 @@ class Oauth extends Component
      * (password + 2FA) has been verified for that exact user. Tracked
      * server-side in the cache — never a client-supplied claim.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function grantElevation(int $userId): void
@@ -532,7 +532,7 @@ class Oauth extends Component
      * to — so high-stakes tools can gate on the elevated state threaded
      * through `InvocationContext`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function isElevated(int $userId): bool
@@ -568,7 +568,7 @@ class Oauth extends Component
      *                                   catches and surfaces as a
      *                                   400 with `error: invalid_client_metadata`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function registerClient(array $payload): array
@@ -656,7 +656,7 @@ class Oauth extends Component
      *
      * @return OauthClientRecord[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getAllClients(): array
@@ -674,7 +674,7 @@ class Oauth extends Component
      * flipped, false when the id is unknown. Idempotent: approving an
      * already-approved client is a no-op that still returns true.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function approveClient(int $id): bool
@@ -701,7 +701,7 @@ class Oauth extends Component
      * than only being blocked from re-authorizing. Returns true when a
      * row was matched, false when the id is unknown.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function revokeClient(int $id): bool
@@ -737,7 +737,7 @@ class Oauth extends Component
      * boolean is for herald internal use, not for shaping the HTTP
      * response. The controller always returns 200.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function revokeToken(string $plaintext): bool
@@ -790,7 +790,7 @@ class Oauth extends Component
      * Wired to `Gc::EVENT_RUN` in `PluginTrait::_registerGcListener()`
      * alongside the runtime-override and invocation prunes.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function pruneExpired(): int
@@ -815,7 +815,7 @@ class Oauth extends Component
      *
      * @throws InvalidConfigException When the file is missing.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getPrivateKeyPath(): string
@@ -835,7 +835,7 @@ class Oauth extends Component
      *
      * @throws InvalidConfigException When the file is missing.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getPublicKeyPath(): string
@@ -855,7 +855,7 @@ class Oauth extends Component
      * storage path so the keys live alongside other long-lived
      * server-side state.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getKeysDirectory(): string
@@ -871,7 +871,7 @@ class Oauth extends Component
      * `Craft::$app->getPath()->getStoragePath()` + the herald
      * subdir.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _keysDir(): string
@@ -888,7 +888,7 @@ class Oauth extends Component
      * Returned as a base64-encoded 32-byte string per league's
      * documented contract.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _encryptionKey(): string
@@ -921,7 +921,7 @@ class Oauth extends Component
      *   - `StrictValidAt` — validates `iat`, `nbf`, and `exp` in a single
      *     constraint, rejecting future-`nbf` tokens and already-expired tokens.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _parseAndValidateJwt(string $jwt): ?UnencryptedToken
@@ -972,7 +972,7 @@ class Oauth extends Component
      * JWT; this method handles both raw strings and entity-shaped
      * arrays so the lookup is robust against either claim shape.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _renderScopes(mixed $scopes): string
@@ -999,7 +999,7 @@ class Oauth extends Component
      * builder writes `aud` as either a string or a single-element
      * list depending on shape; we handle both.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _audienceFromClaims(mixed $aud): ?string
@@ -1021,7 +1021,7 @@ class Oauth extends Component
      *
      * @throws \InvalidArgumentException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _requireString(array $payload, string $key, int $maxLength = 255): string
@@ -1049,7 +1049,7 @@ class Oauth extends Component
      *
      * @throws \InvalidArgumentException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _requireRedirectUriList(array $payload): array
@@ -1093,7 +1093,7 @@ class Oauth extends Component
      * Returns null when the plaintext is malformed (empty, not a JWT
      * and not a recognisable opaque format).
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _hashRevocationKey(string $plaintext): ?string

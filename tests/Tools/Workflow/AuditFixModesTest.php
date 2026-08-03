@@ -33,7 +33,7 @@
  *     the path. afterEach() hard-deletes any survivors.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

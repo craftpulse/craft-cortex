@@ -31,7 +31,7 @@ use craftpulse\herald\tools\AbstractTool;
  * can add as a parameter.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[IsReadOnly]
@@ -44,7 +44,7 @@ class VolumesAndFilesystems extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -55,7 +55,7 @@ class VolumesAndFilesystems extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -72,7 +72,7 @@ class VolumesAndFilesystems extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -133,7 +133,7 @@ class VolumesAndFilesystems extends AbstractTool
     /**
      * @return array<string,mixed>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeFs(FsInterface $fs): array
@@ -156,7 +156,7 @@ class VolumesAndFilesystems extends AbstractTool
      *
      * @return array<int,array<string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _serializeRegisteredTypes(): array

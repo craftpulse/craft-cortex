@@ -35,7 +35,7 @@ use DateTimeImmutable;
  * header carries a sensible integer second count.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 final class RateLimitStatus
@@ -69,7 +69,7 @@ final class RateLimitStatus
      *                                      integer ceil of the refill
      *                                      delta otherwise.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(

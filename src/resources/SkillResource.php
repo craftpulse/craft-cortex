@@ -23,7 +23,7 @@ use Michtio\CraftCmsClaudeSkills\Skills;
  * input here, build it.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class SkillResource extends AbstractResource
@@ -60,7 +60,7 @@ class SkillResource extends AbstractResource
      * @param string|null $reference Reference name without `.md`, or
      *                               null for the skill's SKILL.md.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(string $skill, ?string $reference = null)
@@ -75,7 +75,7 @@ class SkillResource extends AbstractResource
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getUri(): string
@@ -90,7 +90,7 @@ class SkillResource extends AbstractResource
      * for a deep-dive document. Plain-text label suitable for picker
      * UIs in MCP clients.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getName(): string
@@ -103,7 +103,7 @@ class SkillResource extends AbstractResource
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getDescription(): string
@@ -119,7 +119,7 @@ class SkillResource extends AbstractResource
      * @throws \InvalidArgumentException If the backing skill or
      *                                   reference cannot be read.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function read(): array

@@ -44,7 +44,7 @@ use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
  * the same client — not a theft vector.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class RefreshTokenRepository implements RefreshTokenRepositoryInterface
@@ -55,7 +55,7 @@ class RefreshTokenRepository implements RefreshTokenRepositoryInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getNewRefreshToken(): ?RefreshTokenEntityInterface
@@ -69,7 +69,7 @@ class RefreshTokenRepository implements RefreshTokenRepositoryInterface
      * @throws UniqueTokenIdentifierConstraintViolationException When
      *         the freshly-minted identifier collides.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function persistNewRefreshToken(RefreshTokenEntityInterface $refreshTokenEntity): void
@@ -108,7 +108,7 @@ class RefreshTokenRepository implements RefreshTokenRepositoryInterface
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function revokeRefreshToken(string $tokenId): void
@@ -174,7 +174,7 @@ class RefreshTokenRepository implements RefreshTokenRepositoryInterface
      * family is already gone, so re-revoking is a no-op and emitting a
      * second security event would be noise.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function isRefreshTokenRevoked(string $tokenId): bool

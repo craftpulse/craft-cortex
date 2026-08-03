@@ -18,14 +18,14 @@ use Attribute;
  * a hosted API.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[Attribute(Attribute::TARGET_CLASS)]
 final class IsOpenWorld
 {
     /**
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function __construct(

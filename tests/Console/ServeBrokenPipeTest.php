@@ -12,7 +12,7 @@
  * asserted here; the `fwrite()===false` branch IS unit-tested.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

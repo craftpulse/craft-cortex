@@ -33,7 +33,7 @@ use yii\base\InvalidArgumentException;
  * recoverable and routine.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 #[Title('Clear Caches')]
@@ -46,7 +46,7 @@ class ClearCaches extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getName(): string
@@ -57,7 +57,7 @@ class ClearCaches extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getDescription(): string
@@ -72,7 +72,7 @@ class ClearCaches extends AbstractTool
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function getInputSchema(): array
@@ -88,7 +88,7 @@ class ClearCaches extends AbstractTool
      *
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function execute(array $arguments): array
@@ -161,7 +161,7 @@ class ClearCaches extends AbstractTool
      *
      * @param array<string,mixed> $option
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _clear(array $option): ?string
@@ -199,7 +199,7 @@ class ClearCaches extends AbstractTool
      * @param array<int,array<string,mixed>> $options
      * @return array<string,mixed>|null
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     private function _findOption(array $options, string $key): ?array

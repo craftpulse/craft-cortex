@@ -53,7 +53,7 @@ use craftpulse\herald\services\Tools;
  * storage. Herald does not run a license network call.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  *
  * @method static Herald getInstance()
@@ -142,7 +142,7 @@ class Herald extends BasePlugin
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function config(): array
@@ -181,7 +181,7 @@ class Herald extends BasePlugin
      *
      * @return string[]
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function editions(): array
@@ -214,7 +214,7 @@ class Herald extends BasePlugin
      * registration would leave Herald's governance chain silently
      * ungrown on a security product.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function init(): void
@@ -246,7 +246,7 @@ class Herald extends BasePlugin
      *
      * @throws \yii\base\InvalidConfigException from `Craft::$app->getResponse()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getSettingsResponse(): mixed
@@ -288,7 +288,7 @@ class Herald extends BasePlugin
      *
      * @throws \yii\base\InvalidConfigException from `Craft::$app->getUser()`.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getCpNavItem(): ?array
@@ -362,7 +362,7 @@ class Herald extends BasePlugin
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function createSettingsModel(): ?Model

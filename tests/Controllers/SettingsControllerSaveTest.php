@@ -18,7 +18,7 @@
  * restores the original patterns in a `finally`.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

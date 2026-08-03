@@ -16,15 +16,13 @@ use Craft;
  * Contract:
  *   - Consuming class MUST implement
  *     `_requiredPermissions(array $arguments): array` returning the
- *     list of Craft permission strings the resolved arguments imply
- *     (per locked decision 3 of `docs/plans/gate-8.md`).
+ *     list of Craft permission strings the resolved arguments imply.
  *   - Consuming class SHOULD override `_buildPermissionDeniedMessage()`
  *     to emit a tool-specific rich-format error message. The default
  *     implementation emits the bare permission string.
  *
  * Skip rules:
- *   - stdio (no user identity) → skip the check. stdio is trusted per
- *     locked decision 3 of `docs/plans/gate-7.md`.
+ *   - stdio (no user identity) → skip the check. stdio is trusted as a local transport.
  *   - Admin users → skip the check. Craft's `User::can()` already
  *     returns `true` for admins, but the explicit branch is defensive
  *     against accidental permission-system reconfiguration that flips
@@ -48,7 +46,7 @@ use Craft;
  *     on section `posts` requires `saveEntries:{uid}`"`).
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 trait PermissionedToolTrait
@@ -78,7 +76,7 @@ trait PermissionedToolTrait
      * @param array<string,mixed> $arguments
      * @throws ToolException
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _assertPermission(array $arguments): void
@@ -119,7 +117,7 @@ trait PermissionedToolTrait
      *
      * @param array<string,mixed> $arguments
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string

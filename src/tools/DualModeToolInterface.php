@@ -38,7 +38,7 @@ namespace craftpulse\herald\tools;
  * required.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.1.0
  */
 interface DualModeToolInterface extends ToolInterface
@@ -52,7 +52,7 @@ interface DualModeToolInterface extends ToolInterface
      *
      * @return array<string,bool>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.1.0
      */
     public static function getModeWriteMap(): array;

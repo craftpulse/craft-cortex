@@ -18,7 +18,7 @@
  *   - the bounded-read cap -> -32600, and the next message still parses
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

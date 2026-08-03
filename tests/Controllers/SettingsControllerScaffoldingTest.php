@@ -29,11 +29,11 @@
  *
  * **SEQUENTIAL ONLY** — `actionSave` writes plugin settings through
  * `Craft::$app->getPlugins()->savePluginSettings()`, which syncs to
- * project config. Per `.claude/rules/testing.md` PC-writing tests
- * must NOT run under parallel execution.
+ * project config. Tests that write project config must NOT run
+ * under parallel execution.
  * =========================================================================
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 

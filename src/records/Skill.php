@@ -29,7 +29,7 @@ use yii\db\ActiveQueryInterface;
  * @property string $dateUpdated
  * @property string $uid
  *
- * @author Craftpulse
+ * @author CraftPulse
  * @since  5.0.0
  */
 class Skill extends ActiveRecord
@@ -40,7 +40,7 @@ class Skill extends ActiveRecord
     /**
      * @inheritdoc
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public static function tableName(): string
@@ -55,7 +55,7 @@ class Skill extends ActiveRecord
      * to consumers that need to traverse from the herald-specific
      * record back to Craft's element row.
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function getElement(): ActiveQueryInterface
@@ -76,7 +76,7 @@ class Skill extends ActiveRecord
      *
      * @return array<int,array<int|string,mixed>>
      *
-     * @author Craftpulse
+     * @author CraftPulse
      * @since  5.0.0
      */
     public function rules(): array
