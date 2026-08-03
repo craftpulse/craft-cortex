@@ -4,7 +4,7 @@
     "type": "craft-plugin",
     "license": "proprietary",
     "support": {
-        "email": "support@craftpulse.com",
+        "email": "support@craft-pulse.com",
         "issues": "https://github.com/craftpulse/craft-herald/issues",
         "source": "https://github.com/craftpulse/craft-herald",
         "docs": "https://github.com/craftpulse/craft-herald"
@@ -12,7 +12,7 @@
     "authors": [
         {
             "name": "CraftPulse",
-            "homepage": "https://craftpulse.com"
+            "homepage": "https://craft-pulse.com"
         }
     ],
     "keywords": [
@@ -72,7 +72,7 @@
         "name": "Herald MCP",
         "handle": "herald",
         "developer": "CraftPulse",
-        "developerUrl": "https://craftpulse.com",
+        "developerUrl": "https://craft-pulse.com",
         "documentationUrl": "https://github.com/craftpulse/craft-herald",
         "changelogUrl": "https://raw.githubusercontent.com/craftpulse/craft-herald/develop-v5/CHANGELOG.md",
         "class": "craftpulse\\herald\\Herald"
