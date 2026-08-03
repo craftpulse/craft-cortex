@@ -4,6 +4,7 @@ namespace craftpulse\herald\migrations;
 
 use craft\db\Migration;
 use craft\db\Table as CraftTable;
+use craftpulse\auditkit\AuditKit;
 use craftpulse\herald\db\Table;
 
 /**
@@ -76,11 +77,30 @@ class Install extends Migration
     /**
      * @inheritdoc
      *
+     * Pumps the Audit Kit migrator before creating Herald's own tables.
+     * Audit Kit ships as a library-shipped Yii module on its own
+     * `module:audit-kit` migration track, so nothing applies its
+     * migrations on its behalf; each consumer's `Install` is the seam
+     * that lets a kit migration reach every install without a
+     * coordinated release across every consumer. `getInstance()`
+     * registers the module lazily, so this works even when it runs
+     * before Herald's own `init()` wiring.
+     *
+     * There is deliberately no matching `getMigrator()->down()` in
+     * `safeDown()`: the kit is shared by every installed consumer, and
+     * uninstalling Herald must not tear down state the others still rely
+     * on.
+     *
+     * @throws \craft\errors\MigrationException from
+     *         `MigrationManager::up()` when a kit migration fails.
+     *
      * @author Craftpulse
      * @since  5.0.0
      */
     public function safeUp(): bool
     {
+        AuditKit::getInstance()->getMigrator()->up();
+
         $this->_createRuntimeOverridesTable();
         $this->_createSkillsTable();
         $this->_createTokensTable();
@@ -94,6 +114,11 @@ class Install extends Migration
 
     /**
      * @inheritdoc
+     *
+     * Drops Herald's own tables only. The Audit Kit migrator is
+     * deliberately not reverted here: the kit is a library-shipped
+     * module shared by every installed consumer, so tearing its state
+     * down on one plugin's uninstall would break the others.
      *
      * @author Craftpulse
      * @since  5.0.0

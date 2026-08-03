@@ -76,10 +76,15 @@ use yii\base\Component;
  *
  * Fail-soft: every emission is wrapped so a bus / sink failure can
  * never break the flow that triggered it — the same soft-write contract
- * `Invocations::record()` honours for the DB audit table. The
- * `AuditKit::getInstance()` resolution returns null when the kit plugin
- * is present as a dependency but not enabled, in which case emission is
- * a silent no-op.
+ * `Invocations::record()` honours for the DB audit table.
+ *
+ * The bus always resolves. Audit Kit ships as a library-shipped Yii
+ * module, registered from `Herald::init()` via `AuditKit::register()`,
+ * and `AuditKit::getInstance()` registers it lazily on first access, so
+ * there is no "present as a dependency but not enabled" state to fall
+ * through to a null bus. That matters more here than the fail-soft
+ * wrapper does: a null bus would let auditing stop with nothing thrown,
+ * nothing logged, and a control panel that looks entirely healthy.
  * =========================================================================
  *
  * @author Craftpulse
@@ -138,7 +143,7 @@ class Audit extends Component
 
     /**
      * @var Bus|null Explicit bus override. Null in production, where the
-     *              bus resolves from the installed Audit Kit plugin. Set
+     *              bus resolves from the registered Audit Kit module. Set
      *              by tests to inject a bus carrying a capturing sink so
      *              emissions can be asserted in isolation from a real
      *              recorder.
@@ -430,24 +435,18 @@ class Audit extends Component
     // =========================================================================
 
     /**
-     * Record one event on the Audit Kit bus, fail-soft. A missing kit
-     * (present as a dependency but not enabled) resolves to a null bus
-     * and the emission is a silent no-op; a throwing bus / sink is
-     * caught and logged, never propagated — the emission must not break
-     * the flow that triggered it.
+     * Record one event on the Audit Kit bus, fail-soft. A throwing bus /
+     * sink is caught and logged, never propagated — the emission must
+     * not break the flow that triggered it. With no sink registered the
+     * bus itself is a cheap no-op.
      *
      * @author Craftpulse
      * @since  5.1.0
      */
     private function _emit(AuditEvent $event): void
     {
-        $bus = $this->_bus();
-        if ($bus === null) {
-            return;
-        }
-
         try {
-            $bus->record($event);
+            $this->_bus()->record($event);
         } catch (Throwable $e) {
             Craft::error(
                 sprintf(
@@ -462,19 +461,22 @@ class Audit extends Component
 
     /**
      * Resolve the dispatch bus — the injected override in tests, else
-     * the installed Audit Kit plugin's bus, else null when the kit is
-     * not enabled.
+     * the registered Audit Kit module's bus.
+     *
+     * Always a real `Bus`. Audit Kit 1.1.0 ships as a library-shipped
+     * Yii module, so `AuditKit::getInstance()` registers the module on
+     * first access and cannot return null; there is no longer a
+     * "dependency present but not enabled" state to fall through. The
+     * resolution deliberately carries no null branch: a nullable bus on
+     * a security product whose value is the trail means auditing can
+     * stop with nothing thrown and nothing logged.
      *
      * @author Craftpulse
      * @since  5.1.0
      */
-    private function _bus(): ?Bus
+    private function _bus(): Bus
     {
-        if ($this->_bus !== null) {
-            return $this->_bus;
-        }
-
-        return AuditKit::getInstance()?->getBus();
+        return $this->_bus ?? AuditKit::getInstance()->getBus();
     }
 
     /**

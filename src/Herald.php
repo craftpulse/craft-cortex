@@ -7,6 +7,7 @@ use craft\base\Model;
 use craft\base\Plugin as BasePlugin;
 use craft\elements\User;
 use craft\helpers\UrlHelper;
+use craftpulse\auditkit\AuditKit;
 use craftpulse\herald\controllers\SettingsController;
 use craftpulse\herald\models\Settings;
 use craftpulse\herald\plugin\PluginTrait;
@@ -104,7 +105,7 @@ class Herald extends BasePlugin
     /**
      * @inheritdoc
      */
-    public string $schemaVersion = '1.2.0';
+    public string $schemaVersion = '1.3.0';
 
     /**
      * @inheritdoc
@@ -118,8 +119,7 @@ class Herald extends BasePlugin
      * base `Plugin::init()` only auto-flips this when the default
      * implementation is in use. Without the explicit declaration the
      * CP nav link to Herald settings disappears when
-     * `allowAdminChanges = false`. Reference:
-     * `~/.claude-eng/skills/craftcms/references/cp.md` line 516.
+     * `allowAdminChanges = false`.
      */
     public bool $hasReadOnlyCpSettings = true;
 
@@ -195,11 +195,24 @@ class Herald extends BasePlugin
     /**
      * @inheritdoc
      *
-     * Parent-boots, then delegates to `PluginTrait::onPluginInit()`
-     * which wires every Herald event listener and project-config
-     * handler. Splitting registration into the trait keeps the
-     * entry-point class focused on the Plugin Store contract
-     * (`config`, `editions`, settings) and the trait composition.
+     * Parent-boots, registers the Audit Kit module, then delegates to
+     * `PluginTrait::onPluginInit()` which wires every Herald event
+     * listener and project-config handler. Splitting registration into
+     * the trait keeps the entry-point class focused on the Plugin Store
+     * contract (`config`, `editions`, settings) and the trait
+     * composition.
+     *
+     * Audit Kit 1.1.0 ships as a library-shipped Yii module rather than
+     * a Craft plugin, so Craft no longer boots it: nothing constructs
+     * the module and the dispatch bus does not exist until a consumer
+     * calls `AuditKit::register()`. The call is unconditional and
+     * idempotent by design — every consuming plugin makes it, the first
+     * one attaches the module and the rest find it already attached. It
+     * must not be guarded by a `Craft::$app->getModule()` check of our
+     * own, and it must not be deferred: `Audit::_bus()` resolves the bus
+     * through `AuditKit::getInstance()`, so a missing or late
+     * registration would leave Herald's governance chain silently
+     * ungrown on a security product.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -207,6 +220,8 @@ class Herald extends BasePlugin
     public function init(): void
     {
         parent::init();
+
+        AuditKit::register();
 
         $this->onPluginInit();
     }

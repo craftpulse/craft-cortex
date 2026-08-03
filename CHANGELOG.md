@@ -6,6 +6,35 @@ All notable changes to Herald are documented here. Format follows
 
 ## [Unreleased]
 
+### Changed - Herald installs from Packagist, and Audit Kit is a module
+
+- Removed the `path` repository from `composer.json`. It resolved only
+  against a sibling checkout on the author's disk, so
+  `composer require craftpulse/craft-herald` could not resolve anywhere
+  else. Both dependencies it covered are published, so no replacement
+  repository entry is needed.
+- Updated `craftpulse/craft-audit-kit` to `^1.1.0`, which ships the kit as
+  a library-shipped Yii module rather than a Craft plugin.
+- Herald now registers the Audit Kit module itself, from
+  `craftpulse\herald\Herald::init()`. Craft no longer discovers the kit as
+  an installable plugin, so nothing constructs the dispatch bus until a
+  consumer registers the module.
+- Added the `m260803_123946_adopt_audit_kit_module` migration, which sheds
+  the plugin-era `audit-kit` registration: it re-tracks any plugin-era
+  migration history onto the module track, deletes the `audit-kit` row
+  from the `plugins` table, and removes the `plugins.audit-kit` project
+  config entry. Audit chains, exports, and anchors are untouched. Audit
+  Kit stops appearing under **Settings** &rarr; **Plugins** after it runs.
+- `craftpulse\herald\migrations\Install` now pumps the Audit Kit migrator
+  on a fresh install, so a kit migration reaches every install without a
+  coordinated release across every consumer. Uninstalling Herald
+  deliberately does not revert it, because the kit is shared by every
+  installed consumer.
+- Fixed a bug where a failure to resolve the Audit Kit dispatch bus
+  discarded every audit emission silently, with nothing thrown and
+  nothing logged. `craftpulse\herald\services\Audit` no longer carries a
+  null branch on bus resolution.
+
 ### Security - authorization hardening on the Pro HTTP transport
 
 > [!WARNING]
