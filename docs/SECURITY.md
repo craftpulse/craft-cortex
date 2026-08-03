@@ -1,238 +1,269 @@
 # Herald security model
 
-Herald exposes Craft internals to an LLM. That's a powerful capability, and Herald's design treats security as a first-class concern rather than a feature to retrofit.
+Herald exposes Craft internals to an agent. That is a powerful capability, and Herald's design treats security as the primary concern rather than a feature to retrofit.
 
-This document covers the security model in full. If you're integrating Herald into a sensitive project (production with PII, regulated industries, multi-tenant), read it end-to-end before turning the plugin on.
+This document covers the model in full. If you are integrating Herald into a sensitive project (production with PII, a regulated industry, multi-tenant hosting), read it end to end before turning the plugin on.
 
+- [What Herald guarantees](#what-herald-guarantees)
 - [Threat model](#threat-model)
 - [Transport boundary](#transport-boundary)
-- [`craft_exec`: six security gates](#craft_exec--six-security-gates)
-- [`craft_command`: allowlist model](#craft_command--allowlist-model)
+- [OAuth 2.1 authorization](#oauth-21-authorization)
+- [`craft_exec`: six security gates](#craft_exec-six-security-gates)
+- [`craft_command`: allowlist model](#craft_command-allowlist-model)
+- [Write paths: service layer only](#write-paths-service-layer-only)
 - [No shell-execution surface](#no-shell-execution-surface)
 - [Secret redaction](#secret-redaction)
 - [PII separation](#pii-separation)
 - [Audit logging](#audit-logging)
 - [Reporting a vulnerability](#reporting-a-vulnerability)
 
+## What Herald guarantees
+
+These are the properties Herald holds, each enforced in one named place in the source rather than spread across every tool. They are listed first because they are what the rest of this page details.
+
+**Arguments are validated before a tool sees them.** Every tool declares a JSON Schema, and the dispatcher validates the caller's arguments against that schema before dispatch. A tool never receives an argument of the wrong type, an unknown property, or a missing required field, so no tool carries its own hand-rolled argument parsing that could drift from what it advertises.
+
+**Sort order is an allowlist, not a passthrough.** Element queries forward `orderBy` into the SQL `ORDER BY` clause, so a caller-supplied string reaching a query is a read primitive over every table in the database. Herald's list tools accept only aliases from a per-tool allowlist and map each one to a fully qualified column. A value outside the allowlist is refused with an error naming the accepted aliases, so the calling agent corrects itself in one round trip. Declaring `orderBy` as a schema string does not close this, because the payload legitimately is a string; only allowlisting the values does.
+
+**Console-command execution is its own permission and its own scope.** Running a Craft console route reaches Craft's own controllers, so it is the broadest capability Herald offers wearing the narrowest possible label. It sits behind a dedicated permission checked inside the tool's `execute()`, independent of whatever `tools/list` chose to show, and behind a dedicated `system:write` scope rather than folded into a read scope. A read-only grant cannot run a command.
+
+**An absent scope denies.** Every HTTP credential carries capability scopes, and a credential with no scope authorises nothing: it is refused with `403` on its first request rather than read as "unscoped, therefore unlimited".
+
+**Account state is re-checked on every request, not only at issue.** Suspension, locking and deactivation all happen long after a credential is minted. Herald resolves the bound account on every authenticated request and refuses when it can no longer authenticate, so revoking a person's access in Craft revokes their agent's access at the same moment.
+
+**`allowAdminChanges` is honoured by the grant path too.** A temporary runtime grant cannot admit an admin-level command route on an install where Craft itself has admin changes turned off. The read-side view of the effective allowlist and the dispatch-time gate consult the same policy, so what an operator sees in the control panel is what the dispatcher enforces.
+
+**Code execution cannot cross the transport boundary.** `craft_exec` is refused at the dispatcher on HTTP regardless of permissions, token scope, elevation, or any setting. It is not a configuration option.
+
+**There is no shell.** Console commands dispatch through Craft's in-process console runner. There is no `exec()`, `shell_exec()`, `proc_open()`, `passthru()`, `popen()`, or backtick operator anywhere in the source, so there is no string being interpolated into a command line to escape. An architecture test walks PHP's token stream to keep it that way.
+
 ## Threat model
 
-Herald's primary security model assumes:
+Herald's model assumes:
 
-1. The **stdio transport is trusted**: the user invoking the MCP client and the user running Craft are the same person on the same machine. There is no per-request authentication. If you wouldn't let the local user run `php craft <anything>`, don't connect them to Herald over stdio.
-2. The **HTTP transport** (Phase 2) **is untrusted**. Every HTTP request authenticates against a Craft user via OAuth 2.1 / bearer tokens before any tool is dispatched. Tool visibility is filtered per-user (`shouldRegister()` consults Craft permissions); audit logging captures the authenticated user; rate limits apply at the controller layer.
-3. **The LLM itself is adversarial.** Herald assumes the model will, given the chance, call `craft_exec` with `delete_all_users()` or send PII through a prompt-injection payload. Every dangerous tool has its own gate, and none of the safety relies on the LLM "knowing better."
+1. The **stdio transport is trusted**: the person running the MCP client and the person running Craft are the same person on the same machine. There is no per-request authentication. If you would not let that local user run `php craft <anything>`, do not connect them to Herald over stdio.
+2. The **HTTP transport is untrusted**. Every request authenticates against a Craft user through OAuth 2.1 or a bearer token before any tool is dispatched. Tool visibility is filtered per user, authorization is re-checked inside `execute()`, every invocation is audit-logged against the authenticated user, and rate limits apply at the controller layer.
+3. **The model driving the client is adversarial.** Herald assumes the model will, given the chance, call `craft_exec` with a destructive expression, or carry a prompt-injection payload out through a tool argument. Every dangerous capability has its own gate, and no part of the safety model relies on the model knowing better.
 
 What Herald does **not** protect against:
 
-- A compromised host. If an attacker has a shell on the box running Craft, no MCP server is going to save you.
-- A compromised MCP client. The client is on the trusted side of the stdio boundary in Phase 1.
-- Application bugs in tools registered by third-party plugins. Herald enforces the architectural contract (interface implementation, transport gating, dispatch shape) but cannot validate behavioural correctness.
+- A compromised host. With a shell on the box running Craft, no MCP server helps.
+- A compromised client on the stdio side. The client is inside the trusted boundary there by definition.
+- Bugs in tools registered by third-party plugins. Herald enforces the architectural contract (interface implementation, transport gating, dispatch shape, schema validation) but cannot validate someone else's behaviour.
 
 ## Transport boundary
 
-The transport is the boundary. The same tool runs differently depending on which transport invoked it:
+The transport is the boundary. The same tool behaves differently depending on which transport invoked it.
 
-| Concern | stdio (Phase 1, Free) | HTTP (Phase 2, Pro) |
-|---------|-----------------------|---------------------|
-| Authentication | None, trusts the local user | OAuth 2.1 / bearer token, resolved to a Craft user |
-| Authorization | None, full registry visible | Per-user `shouldRegister()` filtering against Craft permissions |
-| Rate limiting | Not applicable (single-process) | Per-controller, per-token |
-| `craft_exec` | Available | **Hard rejected** at the transport layer regardless of token scope |
-| Audit log `user` field | `-` | Populated with Craft user id |
+| Concern | stdio (Free) | HTTP (Pro) |
+|---|---|---|
+| Authentication | None, trusts the local user | OAuth 2.1 or bearer token, resolved to a Craft user |
+| Authorization | None, full registry visible | Capability scope, then `filterFor()` per user, then an `execute()` re-check |
+| Account state | Not applicable | Suspended / locked / inactive refused per request |
+| Rate limiting | Not applicable (single process) | Per user, per token, at the controller |
+| `craft_exec` | Available | Rejected at the dispatcher regardless of scope |
+| Audit log `user` field | `-` | The authenticated Craft user id |
 
-Tools mark themselves stdio-only via the `#[IsStdioOnly]` attribute. The dispatcher checks this at every `tools/call` and returns a JSON-RPC `-32601` error if the transport doesn't match. The check is hard-coded in the dispatcher (`mcp/Server.php`): it isn't a config setting, can't be turned off via the CP, and isn't influenced by token scope.
+Tools mark themselves stdio-only with the `#[IsStdioOnly]` attribute. The dispatcher checks it on every `tools/call` and returns a JSON-RPC `-32601` error when the transport does not match. The check lives in the dispatcher (`mcp/Server.php`): it is not a setting, cannot be turned off from the control panel, and is not influenced by token scope.
 
-`craft_exec` carries `#[IsStdioOnly]`. So does `import_export` (Free has export-only, Pro will lift this restriction once the Pro permission gating lands).
+`craft_exec` is the only tool that carries `#[IsStdioOnly]`.
+
+### Per-user tool gating
+
+Over HTTP, whether a tool is visible and callable is the conjunction of three independent gates: **capability scope, Craft permission, and edition**. All three must hold.
+
+Each tool implements three methods, and `execute()` re-checks regardless:
+
+- `shouldRegister()` runs once at boot and gates whole-tool registration on edition and settings. A Pro tool on a Free install is never loaded into the registry at all.
+- `filterFor(?User)` runs on every `tools/list` and every `tools/call`. A tool the caller cannot use is omitted from the list, and calling it anyway fails closed as `Unknown tool`, which is indistinguishable on the wire from a tool that was never registered.
+- `inputSchemaFor(?User)` rewrites the schema per request. Mode-gated tools filter their `mode` enum down to what the caller may actually do, so the model is never offered an option that will be refused.
+
+List filtering is tool-selection UX. The `execute()` check is the security boundary. Both fail closed.
 
 ### High-stakes operations require elevation over HTTP
 
-Craft's own control panel guards certain operations behind an **elevated session**, meaning the user must re-authenticate (re-enter their password; 2FA is part of the standard login) before the change is accepted. Herald brings the same posture to the HTTP transport with an in-band elevation flow.
+Craft's own control panel guards certain operations behind an **elevated session**, meaning the user re-enters their password. The HTTP transport has no other re-authentication step, so Herald adds an in-band elevation flow and gates the same operations behind it:
 
-The operations that require elevation over HTTP are:
+- **`users` credential and privilege fields**: changing a password (`newPassword`), changing an email address (`email`), or granting or modifying admin status (`admin`).
+- **Content publication status**: toggling `enabled` on the `entry` tool's `create` and `update` modes.
+- **Content deletes**: the `entry` tool's `delete` mode.
 
-- **`users` credential / privilege fields**: changing a password (`newPassword`), changing an email address (`email`), or granting / modifying admin status (`admin`).
-- **Content publish / unpublish**: toggling the `enabled` (publication status) field on the `entry` tool's `create` / `update` modes.
-- **Content / element deletes**: the `entry` tool's `delete` mode.
-
-When one of these is attempted over HTTP **without elevation**, Herald refuses it with a tool error naming the elevation flow:
+Attempting one of these over HTTP without elevation returns a tool error naming the flow:
 
 > `users: changing password/email/admin status over the HTTP transport requires elevation. Re-authenticate via the /oauth/elevate flow, then retry.`
 
-#### The `/oauth/elevate` flow
+The flow itself is documented in [HTTP transport](HTTP-TRANSPORT.md#elevation-for-high-stakes-operations). Elevation is tracked server-side and never trusted from a client claim. When the invocation context cannot be determined, the request is treated as un-elevated HTTP and refused. stdio is implicitly elevated and never gated.
 
-To elevate, the user re-authenticates through Craft:
-
-1. The client opens `/oauth/elevate?token=<access_token>` in a browser.
-2. Herald requires a live Craft session (anonymous visitors are redirected to the CP login).
-3. On confirmation, Herald calls Craft's native `requireElevatedSession()`, a fresh password re-entry (2FA is handled by the standard login).
-4. Herald verifies the token belongs to the logged-in user, then mints a short-lived **elevation marker** bound to that specific access token's `jti`, stored server-side in the cache for `elevationTtl` seconds (default 300 / 5 minutes).
-
-Elevation is tracked **server-side**, never trusted from a client claim. It binds to the exact access token presented, so a second token for the same user is not elevated unless it goes through its own elevate flow. The marker is read on every HTTP request and threaded onto `InvocationContext::$elevated`; the gated tools check that flag.
-
-The gate keys on the real `InvocationContext` threaded from the dispatcher, never on a proxy such as "is a Craft user resolved". When the context cannot be determined, the request is treated as un-elevated HTTP and refused (fail closed). stdio is the trusted local transport and is implicitly elevated, so a stdio caller is never gated.
-
-#### Elevation does NOT unlock code execution
-
-This is a hard, non-negotiable boundary: **`craft_exec` (and any `#[IsStdioOnly]` tool) stays stdio-only ALWAYS, regardless of elevation.** Elevation compensates for the missing HTTP re-authentication on credential and content operations; it never crosses the code-execution transport boundary. An elevated HTTP request that invokes `craft_exec` is still hard-rejected at the dispatcher (`mcp/Server.php`) with the stdio-only error.
+**Elevation does not unlock code execution.** `craft_exec` and any `#[IsStdioOnly]` tool stay stdio-only always. Elevation compensates for the missing HTTP re-authentication on credential and content operations; it never crosses the code-execution boundary. An elevated HTTP request that invokes `craft_exec` is still rejected at the dispatcher.
 
 ## OAuth 2.1 authorization
 
-The HTTP transport authenticates every request against a Craft user via OAuth 2.1 (Authorization Code + PKCE) or a long-lived bearer token. Three layers harden the OAuth surface.
+The HTTP transport authenticates every request against a Craft user through OAuth 2.1 (Authorization Code with PKCE) or a long-lived bearer token. See [HTTP transport](HTTP-TRANSPORT.md) for the wire-level flows; this section covers the authorization model.
 
 ### Capability scopes
 
-Authorization over HTTP is the conjunction of three independent gates: **scope ∧ Craft-permission ∧ edition**. A tool is visible (`tools/list`) and callable (`tools/call`) only when all three hold.
-
-The scope vocabulary is capability-grained:
+The scope vocabulary is capability-grained. These are the scopes Herald advertises under `scopes_supported` and accepts at the authorize and registration boundaries:
 
 | Scope | Grants |
-|-------|--------|
-| `content:read` | Read entries, assets, categories, tags, globals |
-| `content:write` | Create / update content + bulk / scaffold tools |
-| `content:publish` | Change entry publication status |
-| `content:delete` | Delete content |
-| `assets:write` | Mutate assets and address records |
-| `schema:read` | Read sections, fields, entry types, volumes, sites |
-| `system:read` | Read config, plugins, routes, diagnostics |
-| `system:write` | Dispatch allowlisted Craft console commands (`craft_command`) |
-| `users:read` | Read user records (PII-gated) |
-| `users:write` | Create / update / delete users |
+|---|---|
+| `content:read` | Read entries, assets, categories, tags, and globals. |
+| `content:write` | Create, update, publish, and delete entries, categories, tags, and globals. |
+| `assets:write` | Upload and modify assets and address records. |
+| `schema:read` | Read schema: sections, fields, entry types, volumes, and sites. |
+| `system:read` | Read system configuration, plugins, routes, and diagnostics. |
+| `system:write` | Run allowlisted Craft console commands. |
+| `users:read` | Read user records, subject to PII gating. |
+| `users:write` | Create, update, and delete users. |
 
-Every registered tool maps to exactly one required scope in `services/Scopes.php` (the single source of truth). A tool absent from the map defaults to `system:read`, which is fail-safe: an unmapped tool is gated behind a read scope, never granted a write capability by default. stdio is not scope-gated (the trusted local transport). The legacy coarse `read` / `write` scopes are still accepted at the authorize / DCR boundary and expanded to their capability clusters at grant time. A credential carrying no scope at all is refused with `403`: bearer tokens issued before scope enforcement landed have to be re-minted with explicit scopes.
+Every registered tool maps to exactly one required scope in `services/Scopes.php`, which is the single source of truth. A tool absent from that map resolves to an internal deny sentinel that no credential can carry, so an unmapped tool (a future write tool, or a third-party one) is **refused** over HTTP rather than inheriting a read scope it was never deliberately granted. A test asserts there are no such gaps among the built-in tools.
 
-`craft_exec` maps to a scope for completeness but stays stdio-only at the transport boundary regardless, so no scope can reach it over HTTP.
+`craft_command` and `craft_exec` both map to `system:write`, never to a read scope, because both run allowlisted code inside the Craft process. `craft_exec` is mapped for completeness but stays stdio-only at the transport boundary regardless, so no scope reaches it over HTTP.
+
+stdio is not scope-gated, because it is the trusted local transport. The coarse `read` and `write` scopes are still accepted at the authorize and registration boundaries for compatibility and are expanded to their capability clusters at grant time, but they are not advertised.
+
+**A credential carrying no scope at all is refused with `403`.** An absent scope denies; it never means "unscoped, therefore allow".
 
 ### Dynamic Client Registration requires approval
 
-RFC 7591 Dynamic Client Registration lets any caller self-register a client. Herald starts every DCR-registered client **unapproved**: the authorize and token flows reject it (it is invisible to league's client repository) until an admin approves it on the **Clients** CP screen. An unapproved client's authorize request renders a clear "pending admin approval" page rather than a generic OAuth error.
+RFC 7591 Dynamic Client Registration lets any caller self-register a client, so Herald starts every DCR-registered client **unapproved**. The authorize and token flows reject it, and its authorize request renders a "pending admin approval" page rather than a generic OAuth error, until an admin approves it on the **Clients** control panel screen.
 
-The `dcrAutoApprove` setting (default `false`) flips this to zero-friction self-registration for trusted / dev installs. Out-of-band-seeded clients are approved directly. The `/oauth/register` endpoint is also per-IP rate-limited.
+The `dcrAutoApprove` setting (default `false`) turns this into zero-friction self-registration for a trusted or development install. Out-of-band-seeded clients are approved directly. The registration endpoint is per-IP rate-limited.
 
-### Refresh-token rotation + theft detection
+### Refresh-token rotation and theft detection
 
-Refresh tokens rotate on every exchange: league issues a new access + refresh pair and revokes the old refresh token. Herald adds **family lineage** tracking (RFC 6819 §5.2.2.3 / the OAuth 2.1 refresh-rotation BCP): every token minted from one authorization, and every rotation descended from it, shares a `familyId`.
+Refresh tokens rotate on every exchange: a new access and refresh pair is issued and the old refresh token is revoked. Herald adds **family lineage** tracking, so every token minted from one authorization, and every rotation descended from it, shares a family id.
 
-When an **already-consumed** refresh token is presented again (a replay, the canonical stolen-token signal), Herald revokes the **entire family**, every live access and refresh token in the lineage, emits a `kind=security` audit row, and returns an OAuth error. The legitimate client must re-authorize through the consent flow. This bounds the blast radius of a leaked refresh token to a single rotation window.
+Presenting an **already-consumed** refresh token is the canonical stolen-token signal. Herald revokes the **entire family**, every live access and refresh token in the lineage, writes a `kind=security` audit row, and returns an OAuth error. The legitimate client must re-authorize through the consent flow. This bounds the blast radius of a leaked refresh token to a single rotation window.
+
+### Credential storage
+
+Plaintext credentials are never persisted. A long-lived bearer token is `random_bytes(32)` rendered as 64 hex characters and stored only as a SHA-256 hash alongside an 8-character prefix for display. OAuth access tokens store only a hash of their `jti`. The plaintext prints exactly once, at issue.
 
 ## `craft_exec`: six security gates
 
-`craft_exec` evaluates arbitrary PHP expressions through Craft's own `ExecController`. It's the most powerful tool Herald ships, and it's wrapped in six gates that all run before any expression is evaluated. The gates cannot be turned off from outside the dispatcher.
+`craft_exec` evaluates arbitrary PHP expressions through Craft's own `ExecController`. It is the most powerful tool Herald ships, and it runs behind six gates, all of which run before an expression is evaluated. The gates cannot be turned off from outside the dispatcher.
 
-### Gate 1: Dry-run default
+### Gate 1: dry-run default
 
-Without `confirm: true` in the arguments, Herald returns the parsed expression and proposed effect (the type and class of the would-be result) and exits without evaluating. This is the default.
+Without `confirm: true` in the arguments, Herald returns the parsed expression and the proposed effect (the type and class of the would-be result) and exits without evaluating. This is the default.
 
-The default can be flipped via the `execDryRunDefault` setting (see [CONFIGURATION.md](CONFIGURATION.md#execdryrundefault)), but this only changes whether the LLM has to opt in to dry-run; it does not weaken any other gate.
+The default can be flipped with the `execDryRunDefault` setting (see [Configuration](CONFIGURATION.md#execdryrundefault)), which only changes whether the caller has to opt in to dry-run. It weakens no other gate.
 
-### Gate 2: Structured output
+### Gate 2: structured output
 
-Expression results are wrapped in a typed envelope: `{type, class, value, captured_stdout}`. Errors during parsing or runtime are caught and surfaced as `parse_error` / `runtime_error` envelopes with class, file, line, and stack trace. The LLM never sees a raw PHP error or unstructured value. A captured `value` that's an object is serialised with class + relevant properties; circular references are clipped.
+Expression results are wrapped in a typed envelope: `{type, class, value, captured_stdout}`. Parse and runtime errors are caught and surfaced as `parse_error` / `runtime_error` envelopes with class, file, line, and stack trace. The caller never sees a raw PHP error or an unstructured value. An object `value` is serialised with its class and relevant properties, and circular references are clipped.
 
-### Gate 3: Secret redaction
+### Gate 3: secret redaction
 
-Expression values and captured stdout pass through `tools/support/SecretRedactor` before they leave the process. The redactor walks associative-array structures and replaces values whose keys match secret patterns (`password`, `token`, `apiKey`, `secret`, `accessKey`, `privateKey`, `salt`, `cookieValidationKey`, `webhookSecret`, `jwt`, `oauth`, `bearer`) with `[REDACTED]`. Flat strings are scanned for `KEY=value` / `KEY: value` patterns and the value half is redacted.
+Expression values and captured stdout pass through `tools/support/SecretRedactor` before they leave the process. The redactor normalises keys and replaces values whose keys match its needle list (`password`, `securitykey`, `token`, `secret`, `apikey`, `privatekey`, `oauth`, `bearer`, and more) with the literal placeholder `<redacted>`. Flat strings are scanned for `KEY=value` patterns and the value half is redacted.
 
-Redaction is conservative: false positives are preferred over false negatives. If your domain has a secret-like field that Herald is over-redacting, file an issue. Extending the needle list is the right fix.
+Redaction is conservative: false positives are preferred over false negatives. If your domain has a secret-like field Herald over-redacts, open an issue. Extending the needle list is the right fix, and because the redactor is a single source of truth, one addition extends redaction across the whole surface.
 
-### Gate 4: Destructive-op guard
+### Gate 4: destructive-op guard
 
-Expressions matching destructive patterns (`delete*`, `drop*`, `truncate*`, `Elements::deleteElement`, `migrate/down`) require **both** `confirm: true` AND `dangerous: true`. Either alone is rejected. The pattern match is greedy, so `softDelete()` looks like `delete` and gets gated. If you genuinely need to destroy something, you have to opt in twice.
+Expressions matching destructive patterns (`delete*`, `drop*`, `truncate*`, `migrate/down`, `project-config/sync`) require **both** `confirm: true` and `dangerous: true`. Either alone is rejected. The match is greedy, so `softDelete()` reads as `delete` and gets gated. Destroying something takes two explicit opt-ins.
 
-### Gate 5: stdio-only
+### Gate 5: stdio only
 
-`craft_exec` carries the `#[IsStdioOnly]` attribute. The dispatcher's transport gate rejects it on HTTP regardless of token scope, user permissions, or any setting. Phase 2 doesn't relax this.
+`craft_exec` carries the `#[IsStdioOnly]` attribute. The dispatcher's transport gate rejects it on HTTP regardless of token scope, user permissions, elevation, or any setting.
 
-### Gate 6: Destructive annotation
+### Gate 6: destructive annotation
 
-`craft_exec` ships with `#[IsDestructive]` per the MCP spec's tool annotation surface. Spec-compliant clients warn the user before the call goes through. This is a defence-in-depth gate that relies on client cooperation, where gates 1-5 don't.
+`craft_exec` ships the `#[IsDestructive]` annotation from the MCP tool-annotation surface, so a spec-aware client warns the user before the call goes through. This gate relies on client cooperation, where gates 1 to 5 do not.
+
+The `execEnabled` setting is an additional availability switch in front of all six: with it off, the tool is not registered at all.
 
 ## `craft_command`: allowlist model
 
-`craft_command` dispatches Craft / Yii console commands through Craft's internal console runner (no `Process`, no `exec()`). Every dispatch is gated against an allowlist of glob patterns.
+`craft_command` dispatches Craft and Yii console commands through Craft's in-process console runner. There is no `Process` and no `exec()`, so there is no command line to escape.
 
-The effective allowlist is the union of three sources, evaluated at every call:
+Running it requires the `herald:run-commands` permission, checked **inside `execute()`** rather than only at list time, so a caller reaching the tool by any route other than the filtered list is still refused. Over HTTP it also requires the `system:write` scope.
 
-1. **Project config defaults**: `Settings::$allowedCommands`. Synced across environments via `project-config/apply`. Edited via the CP **Settings → Herald** page.
-2. **Runtime overrides**: admin-issued, auto-expiring entries in the `herald_runtime_overrides` DB table. Edited via the CP UI; require `requireAdmin(requireAdminChanges: true)` to mutate.
-3. **`config/herald.php` overrides**: environment-aware file overrides. Highest priority.
+Every dispatch is gated against an allowlist of glob patterns, split in two:
 
-Any of the three granting permission grants permission. Allowlist mutations through the CP and via project config sync; runtime overrides do not sync (they're per-machine, ephemeral grants).
+- **Content-level patterns** (`allowedCommands`) are always admitted.
+- **Admin-level patterns** (`adminLevelCommands`: project config, migrations, scaffolding, section and field DDL, fixtures) are admitted **only when** Craft's own `allowAdminChanges` is `true`. When it is `false`, a matching invocation is refused with a structured error naming the flag, and the refusal still writes a `kind=tool_error` audit row so the boundary attempt is on record.
 
-If the LLM tries to dispatch a command that isn't on the effective allowlist, `craft_command` returns a structured `ToolException` envelope with `isError: true`, and the call never reaches the console runner.
+The effective list is the union of three sources, evaluated on every call:
+
+1. **Project config defaults**, synced across environments and edited on the **Settings** control panel screen.
+2. **Runtime grants**, admin-issued and auto-expiring, stored in the `herald_runtime_overrides` table and managed on the **Allowlist** screen. Mutating them requires `requireAdmin(requireAdminChanges: true)`. A runtime grant cannot admit an admin-level route while `allowAdminChanges` is off, so it is not an escape hatch around the policy above.
+3. **`config/herald.php` overrides**, environment-aware and highest priority.
+
+Runtime grants are per-machine and deliberately do not sync. A command that is not on the effective list returns a structured error envelope and never reaches the console runner.
+
+See [Configuration](CONFIGURATION.md#allowedcommands) for the shipped defaults.
 
 ## Write paths: service layer only
 
-Every mutation Herald can perform is authored through Craft's service layer. Nothing in the tool surface emits project-config YAML or raw SQL.
+Every mutation Herald can perform is authored through Craft's service layer. Nothing in the tool surface emits project-config YAML or raw SQL, and there is no raw-SQL tool at all: element access goes through typed, permission-scoped tools, so the model is "no arbitrary-query primitive" rather than "arbitrary queries behind a keyword blocklist".
 
-- **Content writes** (the Pro `entry`, `bulk_entries`, `category`, `tag`, `global_set`, `address`, and scaffold tools) go through `Craft::$app->getElements()->saveElement()` with validation enabled. Content is database state, so it never touches project config, so these tools work regardless of `allowAdminChanges`.
-- **Schema writes have no dedicated tool and no `schema:write` scope.** Sections, entry types, and fields are mutated only via `craft_command` dispatching core console commands (`sections/create`, `fields/*`, `entrify/*`) or migrations (`make/*` + `migrate/*`), all of which call `saveSection()` / `saveField()` internally. Craft validates the model and writes the project-config YAML itself; the YAML is the reviewable deploy artifact, committed to Git and propagated with `craft up`.
-- **`allowAdminChanges` is enforced at dispatch.** `craft_command` classifies admin-level routes (schema, project config, plugin state) and refuses them with a structured error naming the flag when `allowAdminChanges = false`. Schema authoring therefore only happens on environments where Craft itself allows it (typically local dev) and reaches production through the normal deploy pipeline, never as an out-of-band write.
-
-This matches the bundled skill corpus (`craft-content-modeling` → infrastructure): author schema through the service layer, treat `project-config/apply` as propagation rather than authoring, and keep content writes on the element API.
+- **Content writes** (the Pro `entry`, `bulk_entries`, `scaffold_entries`, `category`, `tag`, `global_set`, and `address` tools) go through `Craft::$app->getElements()->saveElement()` with validation enabled, and re-check the per-section or per-group permission the resolved arguments imply before touching an element. Content is database state, so it never touches project config, and these tools work regardless of `allowAdminChanges`.
+- **Schema writes have no dedicated tool and no `schema:write` scope.** Sections, entry types, and fields are mutated only through `craft_command` dispatching core console commands (`sections/*`, `fields/*`, `entrify/*`) or migrations (`make/*` plus `migrate/*`), all of which call `saveSection()` / `saveField()` internally. Craft validates the model and writes the project-config YAML itself, and that YAML is the reviewable deploy artifact: committed to Git, propagated with `craft up`.
+- **`allowAdminChanges` is enforced at dispatch**, as described above. Schema authoring therefore happens only where Craft itself allows it, typically local development, and reaches production through the deploy pipeline rather than as an out-of-band write.
 
 ## No shell-execution surface
 
-The architecture test suite (`tests/Architecture/ConventionsTest.php`) enforces that no source file under `src/` calls `eval()`, `shell_exec()`, `proc_open()`, `passthru()`, `popen()`, `exec()`, or uses backtick operators. The check tokenises the source rather than regex-matching, so it's false-positive-proof against docblock / string occurrences.
+The architecture test suite (`tests/Architecture/ConventionsTest.php`) asserts that no file under `src/` calls `eval()`, `shell_exec()`, `proc_open()`, `passthru()`, `popen()`, or `exec()`, or uses the backtick operator. The check walks PHP's token stream rather than regex-matching source text, so a docblock or string occurrence cannot produce a false positive and a comment cannot hide a real one. Exactly one file is exempt by name: `tools/dev/CraftExec.php`, whose single `eval` site is the fenced tool described above.
 
-This is a hard rule. Any third-party plugin that registers a tool calling these functions would still pass the herald contract, but it would do so on its own ground. Herald does not, and can not, vet third-party tool internals.
+This is a hard rule for Herald's own source. A third-party plugin registering a tool that calls these functions would still satisfy Herald's contract, but it does so on its own ground; Herald cannot vet third-party tool internals.
 
 ## Secret redaction
 
-In addition to gating `craft_exec`'s output (Gate 3 above), Herald redacts secrets on every audit-log line. Tool arguments pass through `SecretRedactor::redactArray()` before being serialised into the log entry. This means even if your LLM passes a token to a tool argument, that token does not appear in `storage/logs`.
+`SecretRedactor` is the **single source of truth** for the secret-keyword needle list, so adding a keyword extends redaction across every surface at once. It runs in the `config` tool, over `craft_exec` results and captured stdout, and over every persisted audit excerpt at both dispatch sites, which means a token passed as a tool argument does not appear in the logs or in the audit table.
 
-The redactor is the **single source of truth** for the secret-keyword needle list: every part of Herald that touches user input runs through it, so adding a new keyword extends redaction across the entire surface at once.
+The scope is worth stating precisely: the dispatch-site backstop redacts secret-*keyed* fields, and secrets embedded inside flat string values are the tool layer's job. The two tools with live string output, `craft_command` and `craft_exec`, both apply string redaction there.
 
 ## PII separation
 
-Free tier:
+**Free** ships no PII-exposing tool. There is no `users` tool, no `address` tool, and no order or customer surface. `entries`, `assets`, `categories`, `tags`, and `globals` cover content; user and customer data is not on the menu. The `permissions_and_groups` tool returns the permission tree and the group-to-permission mapping, and deliberately does not return user-to-group memberships, emails, or any user identity surface.
 
-- Herald Free does **not** ship a PII-exposing tool. There is no `users` tool, no `addresses` tool, no `orders` tool. `entries`, `assets`, `categories`, `tags`, `globals` cover content; user / customer data is not on the menu.
-- The `permissions_and_groups` tool returns the permission tree and group → permission mappings. It does NOT return user → group memberships, user emails, or any user identity surface.
+**Pro** adds `users` and `address`, both behind explicit per-user authorization. The `users` tool layers several gates: per-target `canSave`, an explicit refusal when a non-admin caller edits an admin target (Craft's `canSave` does not enforce that natively), an `administrateUsers` requirement for status and credential fields, and elevation over HTTP for password, email, and admin changes.
 
-Pro tier (Phase 2):
+Custom-field values on a user envelope are opt-in. `userCustomFieldAllowlist` defaults to empty, so no custom-field value is returned until an operator enumerates the handles in project config, and that allowlist is independent of caller permission: a field not on it is never returned, not even to an admin. Craft has no native per-field-value permission, and field-layout hiding is presentation only, so this is Herald's own gate.
 
-- PII tools (`users`, `address`) ship in Pro and require explicit per-user authorization. Commerce data (orders, customer lookups) is not exposed by Herald; Commerce support is planned as a separate plugin.
-- Pro tools default to `#[IsStdioOnly(false)]` (HTTP-allowed) and add Craft permission checks via `shouldRegister()`. A user without `accessUsers` won't see the `users` tool in `tools/list`.
-
-Even on Pro, PII tools default to read-only with explicit per-call confirmation for any mutation. The same six-gate philosophy applies: destructive write tools require dry-run + dangerous handshake.
+Commerce data (orders, customer lookups) is not exposed by Herald.
 
 ## Audit logging
 
-Every tool invocation emits a structured line on the `herald` log channel:
+Every tool invocation emits one structured line on the `herald` log channel:
 
 ```
-tool=<name> kind=<success|tool_error|internal_error> duration_ms=<int>
+tool=<name> kind=<success|tool_error|internal_error|cancelled|rate_limited> duration_ms=<int>
   transport=<stdio|http> request_id=<id|-> user=<id|->
   client=<name|-> args=<redacted-json>
 ```
 
-The fields are locked across Phase 1 / Phase 2. Phase 2 fills `user` from authenticated bearer tokens, but the line shape doesn't change. External SIEM forwarders pinned against Phase 1 keep working unchanged through the upgrade.
+Over HTTP, each invocation also writes one row to the `herald_invocations` table, carrying the tool, redacted arguments, a redacted response excerpt, the outcome kind, duration, user, client name, session, token correlation, and remaining rate-limit headroom. Every key in the log line has a matching column on the table.
 
-What's logged:
+The audit write is **soft**: a database failure in the audit path is caught, logged for operator awareness, and swallowed, so it can never break the JSON-RPC response. Streamed and non-streamed calls produce forensically identical rows, one per invocation rather than one per frame.
 
-- Every tool invocation (success and failure)
-- Tool name, JSON-RPC request id, transport, client name (from the MCP `initialize` handshake)
-- Duration in milliseconds
-- Tool arguments: secret-redacted
-- For errors: error class, error message (control-character-stripped, single-line)
+What is logged: every invocation, success and failure; the tool name, JSON-RPC request id, transport, and client name from the `initialize` handshake; duration; secret-redacted arguments; and for errors, the error class and a control-character-stripped single-line message.
 
-What's **not** logged:
+What is not logged: full tool return values (the excerpt is bounded by `auditResponseExcerptBytes`), captured stdout from `craft_exec` (already redacted in the result envelope, not duplicated here), and anything the caller did not pass, because Herald does not introspect Craft state for the log.
 
-- Tool return values (the result envelope is too large; redaction would require structural awareness of every tool's return shape)
-- Captured stdout from `craft_exec` (already passes through SecretRedactor, but is not duplicated to the audit log, so the result envelope is the place to look)
-- Anything the user didn't pass to the tool (Herald doesn't introspect Craft state for the log)
+The log surfaces on the **Activity** control panel screen, which is permission-scoped fail-closed: a non-admin holding `herald:view-activity` sees only their own rows, and probing a foreign row id returns 404.
 
-To route Herald logs to a dedicated file or SIEM target, see [CONFIGURATION.md > Logging](CONFIGURATION.md#logging).
+### Audit Kit events
+
+On top of its own two surfaces, Herald emits native [Audit Kit](https://github.com/craftpulse/craft-audit-kit) events onto the shared dispatch bus, so writes reach a tamper-evident chain when a recorder is installed.
+
+- **What is emitted.** One event per write-tool invocation (content, schema, dev, workflow) carrying the tool name, kind, transport, outcome, a coarse duration bucket, and the client and token ids; plus the OAuth and bearer-token lifecycle (client registered, approved, revoked; elevation granted; token issued, revoked). Read-tool calls are not emitted, because the invocation log already covers them and the volume would swamp a chain.
+- **Both transports.** The write-tool event fires on stdio and HTTP alike, so writes made over the local transport reach the chain too.
+- **Privacy by construction.** Event details are scalar-only, carry no content bodies and no PII, and never carry secret values: token and client *ids* travel, token plaintext and client secrets never do. Each event type declares a fail-closed allowlist of exactly which detail keys a recorder may persist.
+- **Zero-config.** With no recorder installed the bus is a no-op, so emission costs nothing and changes no behaviour.
+
+To route Herald's log channel to a dedicated file or a SIEM target, see [Configuration](CONFIGURATION.md#logging).
 
 ## Reporting a vulnerability
 
 If you discover a security issue in Herald, please **do not** open a public GitHub issue.
 
-Email [security@craftpulse.com](mailto:security@craftpulse.com) with:
+Email [security@craft-pulse.com](mailto:security@craft-pulse.com) with:
 
 - A description of the issue
 - Steps to reproduce
 - The Herald version, Craft version, and PHP version
-- Optional: a proposed fix or mitigation
+- Optionally, a proposed fix or mitigation
 
-We aim to acknowledge reports within 48 hours and ship fixes within 7 days for critical issues. We'll credit reporters in the release notes unless you'd rather stay anonymous.
+We aim to acknowledge reports within 48 hours and to ship fixes for critical issues within 7 days. We credit reporters in the release notes unless you would rather stay anonymous.

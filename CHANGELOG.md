@@ -1,41 +1,6 @@
-# Changelog
+# Release Notes for Herald
 
-All notable changes to Herald are documented here. Format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning per
-[Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
-
-### Changed - Herald installs from Packagist, and Audit Kit is a module
-
-- Removed the `path` repository from `composer.json`. It resolved only
-  against a sibling checkout on the author's disk, so
-  `composer require craftpulse/craft-herald` could not resolve anywhere
-  else. Both dependencies it covered are published, so no replacement
-  repository entry is needed.
-- Updated `craftpulse/craft-audit-kit` to `^1.1.0`, which ships the kit as
-  a library-shipped Yii module rather than a Craft plugin.
-- Herald now registers the Audit Kit module itself, from
-  `craftpulse\herald\Herald::init()`. Craft no longer discovers the kit as
-  an installable plugin, so nothing constructs the dispatch bus until a
-  consumer registers the module.
-- Added the `m260803_123946_adopt_audit_kit_module` migration, which sheds
-  the plugin-era `audit-kit` registration: it re-tracks any plugin-era
-  migration history onto the module track, deletes the `audit-kit` row
-  from the `plugins` table, and removes the `plugins.audit-kit` project
-  config entry. Audit chains, exports, and anchors are untouched. Audit
-  Kit stops appearing under **Settings** &rarr; **Plugins** after it runs.
-- `craftpulse\herald\migrations\Install` now pumps the Audit Kit migrator
-  on a fresh install, so a kit migration reaches every install without a
-  coordinated release across every consumer. Uninstalling Herald
-  deliberately does not revert it, because the kit is shared by every
-  installed consumer.
-- Fixed a bug where a failure to resolve the Audit Kit dispatch bus
-  discarded every audit emission silently, with nothing thrown and
-  nothing logged. `craftpulse\herald\services\Audit` no longer carries a
-  null branch on bus resolution.
-
-### Security - authorization hardening on the Pro HTTP transport
+## Unreleased
 
 > [!WARNING]
 > **Every existing bearer token stops working and must be re-minted.**
@@ -48,503 +13,71 @@ All notable changes to Herald are documented here. Format follows
 > and revoke the old row. Do this before deploying, not after, or the
 > first thing an operator sees is an agent that stopped working.
 
-- **Tool arguments are validated against their declared JSON Schema.**
-  `craftpulse\herald\mcp\Server` validated only that `arguments` was an
-  array, so every input schema in the plugin was advisory: declared
-  types, enums, `required` lists, and the implicit
-  `additionalProperties: false` were all unenforced. Validation now runs
-  at the dispatcher, against `inputSchemaFor()` rather than the static
-  schema, so per-user mode-enum narrowing is enforced too. Non-conforming
-  calls come back as a tool-error envelope (`isError: true`) at HTTP 200,
-  per the spec's rule that input-validation errors are tool-execution
-  errors. Adds `craftpulse\herald\tools\support\SchemaValidator`; no new
-  runtime dependency.
-- **Fixed a bug where the `orderBy` argument on the `entries`, `assets`,
-  `categories`, and `tags` tools was forwarded into the element query
-  verbatim.** Yii leaves a column reference unquoted once it contains
-  `(`, so any authenticated caller could read arbitrary columns one bit
-  at a time through the result ordering. Each tool now declares a
-  `SORTABLE_FIELDS` allowlist and accepts only `<field> [asc|desc]`,
-  comma-separated. Sorting by an undeclared field, or by any expression,
-  is refused. Schema validation alone does not cover this: the payload
-  was a valid string.
-- **`craft_command` requires the new `herald:run-commands` permission.**
-  The tool had no `filterFor()` and no permission assertion, so any
-  authenticated caller reached Craft's console runner and every route the
-  allowlist admitted. It is now hidden from `tools/list` for callers
-  without the permission and re-checks it inside `execute()`
-  independently. stdio is unaffected: that caller already holds a shell
-  and the `craft` console.
-- **`craft_command` now requires the `system:write` scope.** It was
-  mapped to `system:read`, so a read-only OAuth grant carried arbitrary
-  allowlisted command execution. `system:write` joins the advertised
-  scope vocabulary; a legacy coarse `read` grant no longer covers the
-  tool.
-- **Bearer-token scopes are recorded and enforced.**
-  `craftpulse\herald\services\Tokens::issue()` takes a `$scopes`
-  argument, persists it, and the transport gates `tools/list` and
-  `tools/call` on it exactly as it already did for OAuth tokens. A null
-  or empty scope set denies rather than granting everything. See the
-  warning above.
-- **Fixed a bug where a suspended, locked, pending, or inactive user kept
-  full access for as long as their token lived.** Account state is now
-  re-read on every authenticated request rather than trusted from
-  issuance, and an unusable account gets `401`.
-- **Fixed a bug where a temporary grant could dispatch an admin-level
-  console route on an install with `allowAdminChanges` disabled.** Grants
-  are stored alongside the content-level allowlist, which is admitted
-  unconditionally, so granting `migrate/up` or `project-config/*`
-  bypassed the flag. `craft_command` now classifies the resolved route
-  instead of trusting which list matched it, and
-  `craftpulse\herald\services\Allowlist::getEffective()` stops
-  advertising a laundered pattern so `get_initial_context` agrees with
-  the dispatch gate.
-- **Bearer-token issuance is Pro-gated at the service layer.**
-  `Tokens::issue()` refuses Free installs, which could previously mint a
-  token that no transport would ever accept: the Streamable HTTP
-  transport is Pro-only. The control panel screen and its actions were
-  already gated; the console `herald/token/issue` command was not.
-- **`herald/token/issue` and the control panel issuance form now require
-  scopes.** The command takes `--scopes=<a,b>` and lists the vocabulary
-  when it is missing; the slideout carries a scope checkbox group and
-  refuses an empty selection.
-
-### Changed - tool error messages no longer use em-dashes
-
-- **Every tool error message MCP clients receive is reworded** to use a
-  colon or a sentence break instead of an em-dash, matching the house
-  copy convention already used by the default permission-denied message
-  (`permission denied: requires ...`). This changes wire text, so any
-  client, prompt, or downstream test matching on the old strings needs
-  updating.
-
-  | Old | New |
-  | --- | --- |
-  | ``permission denied — mode `create` on section `<uid>` requires `<perm>`.`` | ``permission denied: mode `create` on section `<uid>` requires `<perm>`.`` |
-  | `address: create denied — caller cannot save addresses for the resolved owner.` | `address: create denied. Caller cannot save addresses for the resolved owner.` |
-  | `entry: apply_draft failed — <reason>` | `entry: apply_draft failed: <reason>` |
-  | ``import_export: payload `format` mismatch — expected 1, got 2.`` | ``import_export: payload `format` mismatch: expected 1, got 2.`` |
-
-- Tool, prompt, and resource **descriptions are unchanged** - they are
-  protocol payload the model reads, not operator-facing copy, and are
-  deliberately out of scope here.
-
-- **Four progress/log strings missed by the initial sweep are reworded**
-  the same way: the `bulk_entries` and `scaffold_entries` idempotency-hit
-  progress frame, the `content_audit` propagation `hint` payload (both
-  branches), and the registry-collision `Craft::warning()` line.
-
-  | Old | New |
-  | --- | --- |
-  | `Idempotency cache hit — returning cached envelope.` | `Idempotency cache hit: returning cached envelope.` |
-  | `` `totalCount` counts gaps found within the scanned subset only — `` | `` `totalCount` counts gaps found within the scanned subset only: `` |
-  | `... was reached — additional sections were not scanned.` | `... was reached. Additional sections were not scanned.` |
-  | ``%s %s collision on "%s" — first registration (%s) wins; ignoring %s.`` | ``%s %s collision on "%s": first registration (%s) wins; ignoring %s.`` |
-
-### Changed - permission handles are kebab-case
-
-- **Every Herald permission handle is now `herald:<kebab-case-action>`**,
-  matching the estate-wide convention. Craft lowercases permission names
-  on both write and check, so camelCase handles lost their word
-  boundaries in the database (`herald:managesettings`); kebab-case keeps
-  them readable in the `userpermissions` table, in project config, and in
-  exports.
-
-  | Old | New |
-  | --- | --- |
-  | `herald:manageSettings` | `herald:manage-settings` |
-  | `herald:manageGrants` | `herald:manage-grants` |
-  | `herald:viewActivity` | `herald:view-activity` |
-  | `manageHeraldSkills` | `herald:manage-skills` |
-
-- **The skills handle is now namespaced.** It was the one Herald handle
-  registered without the `herald:` prefix, so it is both prefixed and
-  kebab-cased in this change.
-- **A migration carries existing grants over automatically.** User
-  grants, group grants, and the project-config group permission lists are
-  all repointed at the new handles and the old permission rows are
-  removed, so no grantee loses access and no dead handle is left behind.
-  Nothing to do on upgrade beyond `craft up`.
-- Craft's own permissions (`accessCp`, `editUsers`, `utility:queue-manager`
-  and the rest) are untouched, as are Herald's colon-suffixed cache keys
-  (`herald:session:`, `herald:cancel:`, `herald:elevation:` and friends),
-  which were never permissions.
-
-### Added - tamper-evident audit trail (Audit Kit emission)
-
-- **Native Audit Kit emission.** Herald now emits native
-  `craftpulse\craft-audit-kit` `AuditEvent`s onto the kit dispatch bus, so
-  every AI write and every OAuth / bearer-token lifecycle action can land
-  in a tamper-evident Ledger chain when Ledger is installed. This is purely
-  additive: the `herald_invocations` DB audit table and the redacted KV
-  file log are unchanged. With no recorder installed the bus is a no-op, so
-  emission is safe on every install.
-- **Events emitted.** OAuth client `registered` / `approved` / `revoked`,
-  `elevation_granted`, bearer-token `issued` / `revoked` (category
-  `system`), and one `herald.tool.write_invoked` per WRITE-tool invocation
-  (category `content`) carrying tool name, kind, transport, outcome, a
-  coarse duration bucket, and the client / token id. Read-tool calls are
-  not emitted (the invocation log already covers them). The write-tool
-  event fires on both transports, so stdio writes reach a recorder too,
-  closing the gap where stdio calls only ever hit the file log.
-- **Privacy contract.** Event details are scalar-only, carry no content
-  bodies and no PII, and never carry secret *values*: token / client ids
-  travel, token plaintext and client secrets never do. Each event type
-  registers a fail-closed `allowedDetailKeys` allowlist a recorder enforces.
-- Adds `craftpulse/craft-audit-kit` as a required dependency.
-
-### Fixed - dual-mode workflow tools misclassified as read-only for audit emission
-
-- **`herald.tool.write_invoked` now fires for the Pro write modes of
-  `content_audit`, `drafts_and_revisions`, and `import_export`.** These
-  three tools advertise `readOnlyHint: true` at the class level (accurate
-  for their Free-tier modes), so the class-level hint alone classified
-  every invocation as a read and their `fix_relations` /
-  `prune_unused_assets` / `repair_propagation`, `apply` / `discard`, and
-  `import` write modes never reached a recorder.
-- Each tool now implements a new opt-in `DualModeToolInterface`, declaring
-  a `mode` → write-or-read map derived from its own `FREE_MODES` /
-  `PRO_MODES` constants. `services\Audit` classifies these tools
-  per-invocation from the call's actual `mode` instead of the class
-  attribute; every other tool is unaffected. A mode the map doesn't
-  recognise (missing, malformed, or unresolvable `mode`) is treated as a
-  write, deliberately inverting the unresolvable-tool fail-closed-skip in
-  the audit-safe direction.
-
-### Added: authentication and authorization (Pro HTTP transport)
-
-- **Capability-grained OAuth scopes.** Replaced the coarse `read` / `write`
-  scope pair with a capability vocabulary: `content:read`,
-  `content:write`, `content:publish`, `content:delete`, `assets:write`,
-  `schema:read`, `system:read`, `users:read`, `users:write`. Every tool
-  maps to the scope it requires; over the HTTP transport a tool is visible
-  and callable only when the token's granted scopes cover it, the user's
-  Craft permissions allow it, and the edition permits it. The old
-  `read` / `write` scopes are still accepted and expanded to the matching
-  capabilities, so existing tokens keep working.
-- **In-band elevation for high-stakes operations.** Added an
-  `/oauth/elevate` re-authentication flow. Changing a user's password,
-  email, or admin status, and publishing or deleting content, are now
-  permitted over the HTTP transport only after a fresh re-authentication
-  (password + 2FA via Craft's login). The elevation is short-lived,
-  tracked server-side, and bound to the specific access token. Code
-  execution (`craft_exec`) remains stdio-only and is never unlocked by
-  elevation. This reverses the previous blanket refusal of credential
-  mutations over HTTP.
-- **Refresh-token rotation with theft detection.** Refresh tokens now
-  rotate on every use and are grouped into a family. Presenting an
-  already-used refresh token (a sign of token theft) revokes the entire
-  family of tokens, records a security event in the audit log, and forces
-  the client to re-authorize.
-- **Client approval gate for self-registration.** Clients that register
-  themselves automatically now start unapproved and cannot connect until
-  an administrator approves them on the new **Clients** control-panel
-  screen. A new setting auto-approves clients for trusted or development
-  installs.
-
-### Added: control panel
-
-- **Clients screen.** A new admin-only screen listing every registered
-  OAuth client, with inline approve / revoke actions.
-
-### Changed: control panel
-
-- The Herald CP screens now live under a standard sidebar section with a
-  Settings / Temporary grants / Tokens / Activity / Connection subnav
-  (edition- and permission-gated), replacing the in-page tab bar. Added a
-  CP nav icon.
-- The Settings screen's allowed-commands editor is now a grouped toggle
-  browser: every available console command (core plus installed plugins)
-  is listed by group with on/off switches and a live filter, instead of a
-  raw glob-pattern table. Content-level and admin-level commands are shown
-  in separate sections. Admin-level commands (project config, migrations,
-  scaffolding, schema, fixtures) are clearly marked and only dispatch when
-  `allowAdminChanges` is enabled. Hand-written glob patterns are preserved
-  in a per-section "Custom patterns" table.
-- Renamed the "Allowlist" screen to "Temporary grants" and added an
-  "Effective allowlist" panel showing the combined result of the
-  configured defaults plus active grants.
-
-### Added: Gate 7.7 (Pro tier, SSE streaming infrastructure)
-
-- `StreamableToolInterface`: opt-in contract for tools that stream
-  progress. `stream(array, InvocationContext): Generator` yields
-  `{progress, total?, message?}` frames and returns the terminal
-  payload. Non-streamable tools (the existing 33 Free tools) are
-  unaffected, because the dispatcher's degrade-gracefully path collapses
-  them to a single one-frame SSE response.
-- `Server::dispatchStreaming()`: generator-driven counterpart to
-  `dispatch()`. Yields one `notifications/progress` JSON-RPC envelope
-  per progress frame, plus one terminal `tools/call` response. Pulls
-  `_meta.progressToken` from the original `tools/call` and threads it
-  onto every progress frame per MCP spec §progress.
-- `notifications/cancelled` is now wired end-to-end. The client posts
-  a JSON-RPC notification referencing the in-flight request id; the
-  server writes a cache slot the streaming dispatcher's
-  `CancellationToken` poll-callback observes between yields. On flip
-  the tool short-circuits with a `notifications/cancelled` terminal
-  envelope and an audit row with `kind=cancelled`.
-- `SseEmitter`: wire framing for `text/event-stream` responses. Sets
-  the canonical headers (Content-Type, Cache-Control, X-Accel-
-  Buffering, Connection), disables PHP output buffering, writes
-  `id`/`event`/`data` framed lines with UUIDv4 frame ids
-  (forward-compatible with Phase-3 Last-Event-ID resumability),
-  bypasses Yii's response framing.
-- `McpController` upgrades `tools/call` to SSE when the client
-  advertises `Accept: text/event-stream`. Other methods stay on the
-  JSON path even with the SSE Accept header per the spec's
-  "single-frame SSE for non-tools/call is optional" guidance.
-- `herald_invocations.kind` enum gains `cancelled` for mid-stream
-  cancellation events. The schema-invariant test (locked Gate-7.5
-  decision 5) ratifies the addition; existing `success`,
-  `tool_error`, `internal_error`, and `rate_limited` rows are
-  unaffected.
-- `_streaming_test` operator-facing fixture tool under
-  `src/tools/dev/StreamingFixtureTool.php`. Opt-in via
-  `HERALD_STREAMING_FIXTURE=1` env var; production installs never see
-  it. Yields three deterministic progress frames + a terminal
-  payload, with cooperative cancellation between yields. Drive it
-  with `curl -H 'Accept: text/event-stream'` to verify end-to-end
-  SSE health on a new install.
-- 8 new Pest tests across `tests/Mcp/StreamingTest.php` and
-  `tests/Controllers/McpControllerTest.php` covering: progress-frames
-  yielded + terminal envelope, non-streamable degrade to one-frame
-  SSE, `notifications/cancelled` mid-stream flips the token,
-  cancellation writes a `kind=cancelled` row, exactly one audit row
-  per stream completion (not per frame), and the SSE-vs-JSON wire
-  selection based on `Accept` header.
-
-### Deferred to Phase 3
-
-- `Last-Event-ID` SSE resumability (locked decision 14). Frame ids
-  are already emitted on every frame, so the wire is forward-
-  compatible. Phase 3 adds a per-stream replay buffer keyed off the
-  emitted ids and a `GET /herald/mcp?Last-Event-ID=…` resume path
-  without changing the wire shape.
-
-### Added: Gate 7.6 (Pro tier, rate limit + burst-quota observability)
-
-- `RateLimiter` service: token-bucket per authenticated HTTP user.
-  Default burst 60 / refill 5 per second; configurable via
-  `rateLimitBurst` and `rateLimitPerSecond` in `config/herald.php`.
-  Bucket state is stored in Craft's cache so the limiter survives
-  process restarts without losing accumulated debt.
-- `RateLimitStatus` value object returned by `RateLimiter::consume()`
-  carries `allowed`, `remaining`, `resetAt`, and `retryAfter`, the
-  controller reads these without knowing how the limit is implemented.
-- `McpController::beforeAction()` checks the limiter after successful
-  auth. Exhausted callers receive `429 Too Many Requests` with a
-  `Retry-After` header; the body is a standard MCP error envelope.
-- Throttled requests write a `kind=rate_limited` audit row to
-  `herald_invocations` (Gate 7.5 table) with `rateLimitRemaining = 0`
-  and no `toolName` / `responseExcerpt`. Audit retention and the
-  `EVENT_LOG_CALL` event fire for rate-limited rows the same as for
-  tool-call rows.
-- 9 new Pest tests across `tests/Services/RateLimiterTest.php` and
-  `tests/Controllers/McpControllerTest.php` covering: first-request
-  allowed, burst exhaustion returns 429, `Retry-After` header set,
-  bucket refills after the quota window, per-user isolation (user A
-  exhausted does not throttle user B), and `kind=rate_limited` audit
-  row written on 429.
-
-### Added: Gate 7.5 (Pro tier, audit log DB table)
-
-- `herald_invocations` table: one row per authenticated HTTP
-  `tools/call`. Columns: `userId`, `clientId`, `toolName`,
-  `arguments` (post-redaction JSON excerpt), `responseExcerpt`
-  (capped at `auditResponseExcerptBytes`, default 2048),
-  `durationMs`, `kind` (`success`, `tool_error`, `internal_error`,
-  `rate_limited`, `cancelled`), `rateLimitRemaining`, `dateCreated`.
-- `Invocations` service: `log(InvocationRecord): void` is the
-  soft-write contract: failures are logged at `warning` level and
-  suppressed so a DB hiccup never interrupts an MCP response. A
-  configurable `auditRetentionDays` (default `null` = forever)
-  prunes rows during Craft's `gc` sweep via `Gc::EVENT_RUN`.
-- `EVENT_LOG_CALL` fires after each row is persisted, carrying the
-  hydrated `InvocationRecord`. Operators and third-party plugins can
-  forward rows to Elasticsearch, Datadog, etc. without touching core.
-- `InvocationQuery`: fluent query builder over `herald_invocations`.
-  Supports `byUser()`, `byTool()`, `byKind()`, `since()`, `until()`,
-  `limit()`, and `latest()`. Intended as the read surface for a
-  future CP audit dashboard.
-- `auditResponseExcerptBytes` and `auditRetentionDays` settings
-  added to `models/Settings`. Documented in `config/herald.php`.
-- 12 new Pest tests across `tests/Services/InvocationsTest.php`
-  covering: row written on success, suppressed on DB error, retention
-  prune removes old rows only, `InvocationQuery` filters, and
-  `EVENT_LOG_CALL` fires with the correct record.
-
-### Added: Gate 7.4 (Pro tier, per-user tool filtering)
-
-- Three-method gating contract added to `ToolInterface`:
-  `shouldRegister(): bool` is static, runs once at boot, and removes
-  tools nobody on the install can use (e.g. `craft_exec` when
-  `execEnabled = false`); `filterFor(?User $user): bool` is per-
-  request per-user gating, default `true`, Pro tools override to
-  check Craft permissions; `inputSchemaFor(?User $user): array` is
-  per-request schema rewrite, default delegates to static
-  `getInputSchema()`, mode-gated tools filter their `mode` enum.
-- `Tools::asListPayloadFor(?User)` and `Tools::getByNameFor(string,
-  ?User)` are the HTTP variants consumed by `McpController`. The
-  existing `asListPayload()` and `getByName()` stay for stdio (`null`
-  user is the default-true path).
-- `shouldRegister()` promoted from instance to static per the Craft
-  contract idiom, so the service calls it once at registry build time
-  without instantiating the tool.
-- No concrete tool overrides ship in Gate 7.4. All existing Free
-  tools default to `filterFor() = true` and `inputSchemaFor() =
-  getInputSchema()`. The Pro override layer (entry-save gate,
-  user-edit gate, etc.) lands with the first Pro write-tool in a
-  future gate.
-- 8 new Pest tests in `tests/Services/ToolsTest.php` covering:
-  `asListPayloadFor(null)` matches `asListPayload()`, `filterFor`
-  returning `false` hides the tool from `asListPayloadFor`, `getByNameFor`
-  returns null for filtered tools, and `inputSchemaFor` override
-  narrows the schema for the requesting user.
-
-### Added: Gate 7.3 (Pro tier, OAuth 2.1 + DCR + discovery metadata)
-
-- `league/oauth2-server` dependency. Authorization Code + PKCE (S256
-  only, with `plain` rejected) + Refresh Token grants. RSA 2048-bit JWT
-  signing keys generated by `herald/oauth/init-keys` (0600 on the
-  private key) and stored under `storage/herald/oauth-keys/`.
-- Three new tables: `herald_oauth_clients`, `herald_oauth_codes`,
-  `herald_oauth_tokens`. Hashed-at-rest secrets; codes are one-shot;
-  access tokens carry the RFC 8707 audience indicator in `aud`.
-- `Oauth` service orchestrates league's `AuthorizationServer` and
-  `ResourceServer`, plus DCR (RFC 7591) and token revocation
-  (RFC 7009). Six league-adapter repositories under
-  `src/oauth/repositories/`; six entity classes under
-  `src/oauth/entities/`. AccessTokenEntity overrides `convertToJWT`
-  to bake the resource indicator into `aud` (audience binding) with
-  the client id in a custom `cid` claim.
-- Four new web endpoints (`oauth/authorize`, `oauth/token`,
-  `oauth/register`, `oauth/revoke`), plus the two RFC 8414 / 9728
-  discovery endpoints at site root `.well-known/oauth-authorization-server`
-  and `.well-known/oauth-protected-resource`. Twig consent screen at
-  `src/templates/oauth/authorize.twig`.
-- `McpController::beforeAction()` bearer lookup: OAuth-first per the
-  locked precedence in `docs/plans/gate-7.md` decision 17, bearer
-  fallback on miss. Audience binding rejects tokens whose `aud`
-  doesn't match the canonical `herald/mcp` URL (RFC 8707 confused-
-  deputy defense. 401 challenge now carries `resource_metadata=<URL>`
-  per RFC 9728.
-- New settings: `$dcrEnabled = true` (open registration by default),
-  `$oauthAccessTokenTtl = 'PT1H'`, `$oauthRefreshTokenTtl = 'P30D'`.
-- 51 new Pest tests across service, controllers, well-known, and
-  console, including a full PKCE flow E2E (register → authorize →
-  token → MCP call), code-reuse rejection, S256 verifier mismatch,
-  audience binding, token revocation, and init-keys idempotency.
-
-### Added: Gate 7.2 (Pro tier, bearer token auth)
-
-- `herald_tokens` table + `Tokens` service. SHA-256-hashed-at-rest;
-  the plaintext is surfaced ONCE at issuance and never returned by
-  any service method again. Soft-delete + per-request lookup
-  memoization.
-- Three console actions: `herald/token/issue`, `herald/token/revoke`,
-  `herald/token/list`. Plaintext token printed only on issue, never
-  by list. `--ttl=<seconds>` flag on issue; `Settings::$tokenTtlDefault`
-  for the global default (null = no expiry).
-- HTTP transport `/herald/mcp` now requires `Authorization: Bearer
-  <token>`. Missing / invalid credentials return 401 with
-  `WWW-Authenticate: Bearer realm="herald"`. Authenticated user is
-  bound to the session at initialize and validated against the
-  bearer token on every touch (catches mid-session token-swap).
-- In-flight revocation semantics: revoked tokens fail the next
-  `beforeAction()` lookup; in-flight requests on a revoked token
-  complete normally. Per PLANNING.md §4.9 and the locked decision
-  in `docs/plans/gate-7.md`.
-
-### Added: Gate 7.1 (Pro tier, HTTP transport scaffolding)
-
-- HTTP transport skeleton at `POST/GET/DELETE /herald/mcp`. Behind
-  `Settings::$httpEnabled = false` by default; flip to true to expose.
-  Spec target MCP 2025-06-18, with the `MCP-Protocol-Version` header validated,
-  `Origin` header validated against `Settings::$allowedOrigins`,
-  `Mcp-Session-Id` header drives stateful session lookup, single
-  JSON-RPC message per POST.
-- Session storage in PSR-16 cache via new `Sessions` service; sliding
-  TTL via `Settings::$sessionTtl` (default 3600).
-- `CancellationToken` added to `InvocationContext` (contract-now per
-  `docs/plans/gate-7.md`). Wire implementation in 7.7; contract here
-  locks the shape so streaming tools can opt in cooperatively without
-  a later interface break.
-- No auth on the endpoint in 7.1; auth lands in 7.2 (bearer tokens).
-
-## [5.0.0] - 2026-05-14
-
-### Initial release
-
-Herald is a [Model Context Protocol](https://modelcontextprotocol.io/) server for Craft CMS 5. It connects MCP-capable AI assistants — Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, Windsurf — to your Craft project so they can introspect your content model, read your content safely, run guarded dev actions, and learn Craft conventions from a bundled expert-skill corpus.
-
-This release ships the free tier: a stdio-transport MCP server with **33 tools**, **8 prompts**, and **77 resources**. The Pro tier (HTTP transport, content-write capabilities, Craft permission gating, audit-log UI) is on the Phase 2 roadmap.
-
-### Added
-
-#### Tool catalogue (33 tools)
-
-- **Orientation (1):** `get_initial_context` — bootstrap snapshot a fresh agent should call first. Returns Craft version + edition + environment, primary site, sites/sections/element-types index, the bundled `craftcms_*` skill prompts, `craft_exec` posture, effective command allowlist, and a short operating-hints list. Replaces three or four orientation tool calls. Registered first in `tools/list`. Name matches Contentful's convention so clients with heuristics around `get_initial_context` pick it up.
-- **Schema & structure (10):** `sections`, `entry_types`, `fields`, `field_types`, `category_groups`, `tag_groups`, `volumes_and_filesystems`, `sites`, `image_transforms`, `element_types`. Each collapses list / get / count behind a single optional `handle` argument.
-- **Content reading (5):** `entries`, `assets`, `categories`, `tags`, `globals`. Full element-query surface — section / type / status / author / `relatedTo` filters, eager loading via `with: [...]`, structure params, pagination (default 100, max 1000), site filter, count mode, single-id shortcut. Relational fields stub by default (`{type: "relation", loaded: false}`) so the LLM never accidentally triggers an N+1 walk.
-- **System & diagnostics (9):** `system_info`, `config`, `plugins`, `routes`, `system_diagnostics`, `database_schema`, `extensibility`, `permissions_and_groups`, `search_skills`. `config` and `system_diagnostics` are multi-mode introspection tools; `search_skills` does keyword search across the bundled skills corpus.
-- **GraphQL (1):** `graphql` — list schemas, get SDL, list tokens (token values are never returned; a SHA-256 fingerprint surfaces for correlation only).
-- **Dev actions (4):** `clear_caches`, `resave`, `craft_command` (allowlist-gated), `craft_exec` (six security gates, stdio-only).
-- **Workflow & audit (3):** `drafts_and_revisions` (list / compare drafts and revisions), `content_audit` (relations / unused-assets / propagation audits), `import_export` (structured-JSON export with format-versioned envelope; Pro adds the round-trip import).
-
-Five tools (`get_initial_context`, `system_info`, `routes`, `plugins`, `permissions_and_groups`) declare an MCP `outputSchema`. The dispatcher dual-emits `structuredContent` alongside the legacy text-content block per MCP 2025-06-18 §6.2 — spec-aware clients read `structuredContent` and can validate against the schema; older clients still consume the text block. Polymorphic tools (list-or-single-or-count) intentionally skip `outputSchema` to avoid hand-written `oneOf` schemas that drift from runtime; the convention is documented on `AbstractTool::outputSchema()`.
-
-The full per-tool argument schemas, output schemas, and MCP annotations live in [`docs/TOOLS.md`](docs/TOOLS.md), regenerated via `ddev craft herald/docs/all`.
-
-#### Skills (8 prompts + 77 resources)
-
-The bundled `michtio/craftcms-claude-skills` package — ~27,000 lines of authored Craft expertise across 8 skills — surfaces over MCP:
-
-- **Prompts** under the `craftcms_*` namespace: `craftcms_extending`, `craftcms_templates`, `craftcms_cp_javascript`, `craftcms_content_modeling`, `craftcms_php_standards`, `craftcms_twig_standards`, `craftcms_ddev`, `craftcms_setup`. The LLM picks them up automatically when relevant, so Herald's tools answer alongside expert context rather than in a vacuum.
-- **Resources** under the `craft-skills://` URI scheme — one per `SKILL.md` router plus every reference deep-dive — accessible on-demand for the LLM's deeper dives, plus the bundled Claude Code agents under `craft-skills://agents/<name>`.
-
-Catalogue lives in [`docs/PROMPTS.md`](docs/PROMPTS.md) and [`docs/RESOURCES.md`](docs/RESOURCES.md).
-
-#### Install command
-
-- `ddev craft herald/install --client=<name>` prints copy-paste config snippets for the seven supported MCP clients. DDEV-aware — auto-emits the `docker exec` invocation form when running inside a DDEV project.
-- `ddev craft herald/install/apply --client=<name>` writes the entry directly into the client's per-platform config file. Atomic write (temp file + rename), `.bak.<unix-timestamp>` backup of the existing file, idempotent re-runs, `--dry-run` for previewing the diff, `--force` to overwrite an existing Herald entry.
-- `php craft herald/install/detect` scans the host filesystem for installed MCP clients (`/Applications`, `PATH`, `%LOCALAPPDATA%`) and prints a status table. Read-only — never writes.
-- `php craft herald/install/auto` runs detection plus per-client confirm-and-apply in one pass — the "I installed Herald, now wire it up everywhere" flow. Honours `--dry-run` and `--force`. Both `detect` and `auto` refuse to run from inside any container (DDEV, plain Docker, Lando, Sail, Podman, LXC, Kubernetes) because the container can't see the host filesystem; the manual snippet form (`ddev craft herald/install`) is the documented fallback inside DDEV.
-
-Per-client install instructions, troubleshooting, and the manual snippet flow are in [`docs/INSTALL.md`](docs/INSTALL.md).
-
-#### Settings & configuration
-
-- Plugin settings model — `allowedCommands`, `execEnabled`, `execDryRunDefault`, `runtimeOverrideTtl`. All four exposed in the **Settings → Herald** CP page; `allowedCommands` syncs across environments via project config.
-- `config/herald.php` reference template (heavily commented) for environment-specific overrides — `*` wildcard plus named-environment blocks (`production`, `staging`).
-- Runtime allowlist overrides — admin-issued, auto-expiring DB-backed entries that layer on top of the project-config defaults. Useful for short-term command grants without a deploy. Expired rows are pruned inline during Craft's regular GC sweep.
-- Settings reference: [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md).
-
-#### Security model
-
-- **Six security gates on `craft_exec`** — dry-run-default, structured output, secret redaction, destructive-op guard, hard HTTP rejection (stdio-only), `destructiveHint: true` annotation. The full surface is documented per-gate in [`docs/SECURITY.md`](docs/SECURITY.md).
-- **Allowlist-gated `craft_command`** — every console-command dispatch checks the effective allowlist (project-config + runtime overrides + `config/herald.php`). Dispatch goes through Craft's internal console runner — no `Process`, no `exec()`, no `shell_exec()`.
-- **No shell-execution surface anywhere** — verified by an architecture test that tokenises every source file and rejects calls to `eval`, `shell_exec`, `proc_open`, `passthru`, `popen`, `exec`, or backtick operators.
-- **Secret redaction** through `tools/support/SecretRedactor` on every tool argument before it reaches the audit log, on every `craft_exec` value and captured-stdout output, and via the same shared keyword needle list across the codebase.
-- **Locked audit log shape** — every tool invocation emits one structured KV-formatted line on the `herald` log channel. Field set and order are stable across the Phase 1 stdio / Phase 2 HTTP transport upgrade so external SIEM forwarders keep working unchanged.
-
-#### Extensibility
-
-Third-party plugins can register tools, prompts, and resources via class-level events:
-
-- `Tools::EVENT_REGISTER_TOOLS` → `RegisterToolsEvent::$tools` (`ToolInterface[]`)
-- `Prompts::EVENT_REGISTER_PROMPTS` → `RegisterPromptsEvent::$prompts` (`PromptInterface[]`)
-- `Resources::EVENT_REGISTER_RESOURCES` → `RegisterResourcesEvent::$resources` (accepts both `ResourceInterface` and `ResourceTemplateInterface` for dynamic-URI families)
-
-Herald registers its bundled tools / prompts / resources before firing the events, so first-registration-wins behaviour means third-party plugins cannot shadow built-ins. Collisions surface a `Craft::warning()` line on the `herald` channel.
-
-A scaffolder — `ddev craft make herald-tool` — drops a stub tool class with the right attributes, Schema DSL boilerplate, and registration snippet. Hooks into Craft's `make` command via `craftcms/generator`.
-
-Full extension guide (interfaces, attributes, Schema DSL, naming conventions): [`docs/EXTENDING.md`](docs/EXTENDING.md).
-
-### Requirements
-
-- Craft CMS 5.0.0 or later
-- PHP 8.2 or later
-- An MCP-capable client (Claude Desktop, Claude Code, Cursor, Continue.dev, Cline, Zed, or Windsurf)
+> [!WARNING]
+> **Admin-level console routes stop being dispatchable while
+> `allowAdminChanges` is off, wherever they are configured.**
+> `craft_command` classifies the resolved route rather than trusting
+> which allowlist matched it, so a pattern such as `migrate/*` or
+> `project-config/*` sitting in `allowedCommands` or in a temporary grant
+> is refused on an install where Craft itself disallows admin changes.
+> Move those patterns to `adminLevelCommands`, author schema on an
+> environment where `allowAdminChanges` is `true`, and propagate with
+> `php craft up`.
+
+### System
+
+- Added a Model Context Protocol server for Craft CMS, serving 33 tools, 10 prompts, and the bundled skills corpus over a stdio console transport (`php craft herald/serve`).
+- Added a Streamable HTTP transport at `POST /herald/mcp`, off by default, authenticated on every request through OAuth 2.1 or a bearer token (Pro).
+- Added OAuth 2.1 with Authorization Code and PKCE (S256 only), RFC 7591 Dynamic Client Registration, RFC 7009 revocation, RFC 8414 and RFC 9728 discovery metadata, and RFC 8707 audience binding.
+- Added capability scopes on every HTTP credential: `content:read`, `content:write`, `assets:write`, `schema:read`, `system:read`, `system:write`, `users:read`, and `users:write`. A credential carrying no scope authorises nothing.
+- Added refresh-token rotation with family-lineage theft detection, so presenting an already-consumed refresh token revokes the whole family and records a security audit row.
+- Added an approval gate for self-registered OAuth clients, which start unapproved until an admin approves them on the **Clients** screen, with `dcrAutoApprove` to opt out.
+- Added an in-band `/oauth/elevate` re-authentication flow, required over HTTP for password, email, and admin-status changes on the `users` tool and for publishing or deleting content. It never unlocks `craft_exec`.
+- Added dispatcher-level validation of tool arguments against each tool's declared JSON Schema, evaluated against `inputSchemaFor()` so per-user mode narrowing is enforced too. Non-conforming calls return an `isError: true` envelope.
+- Added account-state re-checking on every authenticated request, so a suspended, locked, pending, or inactive account is refused with `401` rather than trusted from issuance.
+- Added per-user rate limiting on the HTTP transport, with a `kind=rate_limited` audit row and a `Retry-After` header on exhaustion.
+- Added SSE streaming for `resave`, `bulk_entries`, `scaffold_entries`, `content_audit`, and `import_export`, with cooperative `notifications/cancelled` handling that survives a dropped connection.
+- Added an `Origin` allowlist that fails closed outside `devMode`, as the MCP spec's DNS-rebinding defence.
+- Added `herald_invocations`, one audit row per invocation over HTTP, plus one redacted structured log line per invocation on the `herald` log channel across both transports.
+- Added native Audit Kit event emission for every write-tool invocation and every credential lifecycle action, so writes reach a tamper-evident chain when a recorder is installed. With no recorder the bus is a no-op.
+- Added `craftpulse\herald\tools\support\SecretRedactor` as the single source of truth for secret redaction, applied to tool arguments, audit excerpts, `craft_exec` output, and the `config` tool.
+- Added MCP protocol revision `2025-11-25`, negotiating `2025-06-18` for older clients.
+
+### Content Management
+
+- Added the `entries`, `assets`, `categories`, `tags`, and `globals` tools, exposing the element-query surface with filters, `relatedTo`, `with` eager loading, pagination, and a `count` mode. Relational fields stub until explicitly materialised.
+- Added the `entry`, `category`, `tag`, `global_set`, `address`, `bulk_entries`, and `scaffold_entries` write tools, which author every change through `craft\services\Elements::saveElement()` and re-check the per-section or per-group permission the resolved arguments imply (Pro).
+- Added an `orderBy` allowlist on every list tool: only aliases the tool declares are accepted, and each maps to a fully qualified column.
+- Added the `drafts_and_revisions`, `content_audit`, and `import_export` tools, with their write modes gated to Pro and to the caller's permissions.
+- Added a `skill` tool and a `craftpulse\herald\elements\Skill` element type, so a team can author its own conventions as Craft content and override a bundled skill by handle (Pro).
+
+### Development
+
+- Added `search_skills`, ranked keyword retrieval over the merged skills corpus, returning the resource URI of each hit for a follow-up `resources/read`.
+- Added `get_initial_context`, a one-call bootstrap returning the Craft version, edition, environment, a thin sites and sections index, the skill-prompt catalogue, the `craft_exec` posture, and the effective command allowlist.
+- Added the `sections`, `entry_types`, `fields`, `field_types`, `category_groups`, `tag_groups`, `volumes_and_filesystems`, `sites`, `image_transforms`, `element_types`, and `database_schema` tools for reading the content model.
+- Added the `system_info`, `config`, `plugins`, `routes`, `system_diagnostics`, `extensibility`, `permissions_and_groups`, and `graphql` tools for reading system state.
+- Added `craft_command`, which dispatches allowlisted Craft console routes through Craft's in-process console runner, with no shell involved, behind the `herald:run-commands` permission and the `system:write` scope.
+- Added `craft_exec` behind six gates: dry-run by default, structured output, secret redaction, a destructive-op guard requiring two opt-ins, hard stdio-only rejection at the dispatcher, and the MCP `destructiveHint` annotation.
+- Added `herald/install`, `herald/install/apply`, `herald/install/detect`, and `herald/install/auto` for wiring MCP clients, with atomic writes, timestamped backups, and idempotent re-runs.
+- Added `herald/docs/all` to regenerate the tool, prompt, and resource references from the live registries.
+
+### Administration
+
+- Added a Herald control panel section with Settings, Temporary grants, Tokens, Clients, Activity, and Connection screens, each gated by permission and edition.
+- Added the `herald:manage-settings`, `herald:manage-grants`, `herald:manage-skills`, `herald:view-activity`, and `herald:run-commands` permissions.
+- Added a grouped console-command browser to the Settings screen, listing every route on the install with content-level and admin-level commands in separate sections, and preserving hand-written glob patterns in a per-section table.
+- Added temporary command grants: admin-issued, auto-expiring allowlist additions that do not sync to project config, with an "effective allowlist right now" panel.
+- Added `auditRetentionDays` and `auditResponseExcerptBytes` to tune the audit table, which is pruned during Craft's garbage-collection sweep.
+- Added `userCustomFieldAllowlist`, empty by default, so the `users` tool returns no custom-field value until an operator enumerates the handles. The allowlist is independent of caller permission.
+- Added `herald/token/issue`, `herald/token/list`, and `herald/token/revoke` for managing bearer tokens from the console. Issuance requires `--scopes` and the Pro edition.
+
+### Extensibility
+
+- Added `craftpulse\herald\services\Tools::EVENT_REGISTER_TOOLS`, `craftpulse\herald\services\Prompts::EVENT_REGISTER_PROMPTS`, and `craftpulse\herald\services\Resources::EVENT_REGISTER_RESOURCES` for registering third-party tools, prompts, and resources. First registration wins, and every collision is logged.
+- Added `craftpulse\herald\tools\support\InvocationLogger::EVENT_LOG_CALL`, carrying the structured invocation entry and the formatted log line, so an integrator can mirror invocations into their own audit surface.
+- Added `craftpulse\herald\tools\ToolInterface` with its three-method gating contract (`shouldRegister()`, `filterFor()`, `inputSchemaFor()`), plus `craftpulse\herald\tools\AbstractTool` and a fluent JSON Schema builder at `craftpulse\herald\tools\support\Schema`.
+- Added `craftpulse\herald\resources\ResourceTemplateInterface` for RFC 6570 Level-1 URI families alongside concrete resource URIs.
+- Added the `#[IsReadOnly]`, `#[IsDestructive]`, `#[IsIdempotent]`, `#[IsOpenWorld]`, `#[IsStdioOnly]`, and `#[Title]` attributes, read into the MCP `ToolAnnotations` payload.
+- Added `craftpulse\herald\tools\DualModeToolInterface`, so a tool whose modes span reads and writes is classified per invocation rather than by its class-level annotation.
+- Added a `herald-tool` generator to Craft's `make` system, scaffolding a `craftpulse\herald\tools\AbstractTool` subclass with its attributes and a schema stub.

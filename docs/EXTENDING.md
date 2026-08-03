@@ -2,7 +2,7 @@
 
 Herald is built around a stable, versioned extension surface. Third-party plugins can register their own tools, prompts, and resources and have them appear alongside the bundled ones in `tools/list`, `prompts/list`, and `resources/list`.
 
-This document covers everything you need to ship an extension. The interfaces, attributes, events, and Schema DSL listed here are part of Herald's locked public surface: once Phase 1 ships, they don't change without a deprecation cycle or a major version bump.
+This document covers everything you need to ship an extension. The interfaces, attributes, events, and Schema DSL listed here are part of Herald's public surface, and they don't change without a deprecation cycle or a major version bump.
 
 - [Quick start](#quick-start)
 - [The generator](#the-generator)
@@ -13,6 +13,7 @@ This document covers everything you need to ship an extension. The interfaces, a
 - [The Schema DSL](#the-schema-dsl)
 - [Tool annotations (attributes)](#tool-annotations-attributes)
 - [Edition gating and conditional registration](#edition-gating-and-conditional-registration)
+- [Observing invocations](#observing-invocations)
 - [Naming conventions](#naming-conventions)
 - [Collision behaviour](#collision-behaviour)
 - [Testing your extension](#testing-your-extension)
@@ -64,7 +65,7 @@ The generator prompts for:
 - **Namespace**: defaults to your plugin's `tools/` directory
 - **MCP tool name**: the `name` field MCP clients see (e.g. `get_wish`)
 
-It writes a stub class extending `AbstractTool` with the right attributes (`#[IsReadOnly]`, `#[IsIdempotent]`) and a Schema DSL skeleton, plus a `// TODO` comment block telling you exactly where to add your registration. It does NOT auto-register the tool. That's deliberate, so you keep full control over which event listener owns the registration.
+It writes a stub class extending `AbstractTool` with the right attributes (`#[IsReadOnly]`, `#[IsIdempotent]`) and a Schema DSL skeleton, plus a comment block telling you exactly where to add your registration. It does NOT auto-register the tool. That's deliberate, so you keep full control over which event listener owns the registration.
 
 `craftcms/generator` is a `require-dev` dependency on Herald but ships with `craftcms/cms`, so it's always available in dev environments.
 
@@ -223,9 +224,27 @@ interface ResourceInterface
 
 `AbstractResource` is provided. Each resource exposes ONE concrete URI.
 
-Register on `services\Resources::EVENT_REGISTER_RESOURCES`. Same pattern as tools and prompts.
+Register on `services\Resources::EVENT_REGISTER_RESOURCES`:
 
-Bundled resources use the `craft-skills://` URI scheme. The `custom-skills://` scheme is reserved for the Pro custom-skills element type (Phase 2). Third-party plugins must use a plugin-specific scheme (`seo://`, `commerce-docs://`, `<vendor>-<topic>://`) to avoid future collisions.
+```php
+use craftpulse\herald\events\RegisterResourcesEvent;
+use craftpulse\herald\services\Resources;
+use yii\base\Event;
+
+Event::on(
+    Resources::class,
+    Resources::EVENT_REGISTER_RESOURCES,
+    function (RegisterResourcesEvent $event): void {
+        $resources = $event->resources;
+
+        $event->resources[] = new MyPlugin\Resources\StyleGuide();
+    },
+);
+```
+
+`$event->resources` accepts both `ResourceInterface` and `ResourceTemplateInterface` instances; the registry routes by `instanceof` at boot, so one listener can contribute concrete resources and templates together.
+
+Bundled resources use the `craft-skills://` URI scheme, and `custom-skills://` is reserved for Herald's own Skill element type. Third-party plugins must use a plugin-specific scheme (`seo://`, `commerce-docs://`, `<vendor>-<topic>://`) to avoid collisions.
 
 ## Resource templates (dynamic URIs)
 
@@ -248,8 +267,6 @@ URI templates use RFC 6570 Level-1 simple substitution: literal characters plus 
 Register through the same event as concrete resources: `RegisterResourcesEvent::$resources` accepts both `ResourceInterface` and `ResourceTemplateInterface` instances. The Herald registry routes by `instanceof` at boot.
 
 `matches()` returns the captured-parameter map for a successful match (or null on miss). `read()` is invoked with the same map after the dispatcher confirms a match. Concrete-URI resources are checked first; templates only fire on miss, so a template can't shadow a concrete resource.
-
-Phase 1 ships the interface; no Phase 1 resource implements it. The first concrete consumer is Pro Gate 8.5 (custom-skills element type).
 
 ## The Schema DSL
 
@@ -417,13 +434,61 @@ Herald distinguishes **protocol errors** from **tool errors**, and they take dif
 
   There is **no** `-32002` code anywhere in this path. The locked decision routes every tool-level failure through the `isError: true` envelope so the LLM can read the message and self-correct rather than treating it as a transport fault. Throw `ToolException` for anything the caller could fix; let other exceptions propagate (the dispatcher converts them to a `-32603` internal error and logs the real cause).
 
+## Observing invocations
+
+Herald provides a collection of events for extending its functionality. Modules and plugins can register event listeners, typically in their `init()` methods, to modify Herald's behavior.
+
+### The `logCall` event
+
+Fired by `craftpulse\herald\tools\support\InvocationLogger::logCall()` after the formatted log line has been written to Craft's logger, once per tool invocation on both transports. Subscribe to mirror invocations into an alternate audit surface: a SIEM forwarder, a metrics counter, a per-tenant usage table. Herald's own `herald_invocations` table is a subscriber to this event, so anything you build sits alongside it rather than under it.
+
+Treat the handler as soft. A thrown exception is caught by the dispatcher's wrapper, but a listener that raises on logging activity still costs the dispatch hot path, so keep the work small and defer anything expensive to a queue job.
+
+```php
+use craftpulse\herald\events\LogCallEvent;
+use craftpulse\herald\tools\support\InvocationLogger;
+use yii\base\Event;
+
+Event::on(
+    InvocationLogger::class,
+    InvocationLogger::EVENT_LOG_CALL,
+    function (LogCallEvent $event): void {
+        $entry = $event->entry;
+        $line = $event->line;
+        // ...
+    },
+);
+```
+
+`$entry` is the structured field map, and `$line` is the formatted key-value string exactly as it was written to the logger, provided so a forwarder pinned to the wire format does not have to re-run the formatter.
+
+The keys on `$entry`:
+
+| Key | Description |
+|---|---|
+| `tool` | The invoked tool's MCP name. |
+| `kind` | Outcome: `success`, `tool_error`, `internal_error`, `cancelled`, or `rate_limited`. |
+| `duration_ms` | Wall-clock duration of the invocation, as an integer. |
+| `transport` | `stdio` or `http`. |
+| `request_id` | The JSON-RPC request id, or `-` when absent. |
+| `user` | The authenticated Craft user id over HTTP, or `-` on stdio. |
+| `client` | The client name from the MCP `initialize` handshake, or `-`. |
+| `args` | The tool's arguments, secret-redacted and JSON-encoded. |
+| `error_class` | The exception class for a failed invocation. |
+| `error_message` | The exception message, control-character-stripped and collapsed to one line. |
+| `token_id` | The credential the request authenticated with, for audit correlation. |
+| `session_id` | The MCP session the invocation belongs to. |
+| `response_excerpt` | The redacted, length-bounded response excerpt. |
+
+Adding a key is backward-compatible, because subscribers ignore keys they do not recognise. Renaming or removing one is a contract bump.
+
 ## Naming conventions
 
 The locked tool/prompt/resource namespaces:
 
 - **Tool names**: bundled tools follow a deliberate pattern. Listing tools use plural nouns (`sections`, `entries`); multi-mode introspection tools use the most descriptive name (`system_diagnostics`, `content_audit`); workflow tools use combined direction (`drafts_and_revisions`, `import_export`). Action verbs for write tools (`resave`, `clear_caches`). Third-party tools should choose a vendor-prefixed handle (`<vendor>_<purpose>`) to avoid future collisions, especially for additions Herald itself might make.
-- **Prompt names**: bundled prompts use the `craftcms_*` prefix (`craftcms_extending`, `craftcms_templates`, …). The `custom_*` prefix is reserved for the Pro custom-skills feature. Third-party plugins should use a plugin-specific prefix (`<vendor>_<purpose>`).
-- **Resource URI schemes**: `craft-skills://` is bundled; `custom-skills://` is reserved. Third-party plugins should use a plugin-specific scheme.
+- **Prompt names**: bundled prompts use the `craftcms_*` prefix (`craftcms_extending`, `craftcms_templates`, …). The `custom_*` prefix is reserved for Herald's own Skill element type. Third-party plugins should use a plugin-specific prefix (`<vendor>_<purpose>`).
+- **Resource URI schemes**: `craft-skills://` is bundled; `custom-skills://` is reserved for Herald's own Skill element type. Third-party plugins should use a plugin-specific scheme.
 
 ## Collision behaviour
 

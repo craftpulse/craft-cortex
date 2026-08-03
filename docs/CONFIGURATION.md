@@ -1,16 +1,17 @@
 # Configuring Herald
 
-Herald ships with sensible defaults; most projects don't need to touch the configuration. When you do, you have three layers of override available, applied in this order (highest priority first):
+Herald ships with sensible defaults; most projects don't need to touch the configuration. When you do, you have four layers of override available, applied in this order (highest priority first):
 
 1. **`config/herald.php`**: file-based overrides, environment-aware. Versioned alongside your project.
-2. **Runtime overrides**: admin-issued, auto-expiring entries via the CP. Applies to the `craft_command` allowlist only.
-3. **Project config**: synced across environments; edited via the CP **Settings → Herald** page.
+2. **Runtime grants**: admin-issued, auto-expiring entries via the control panel. Applies to the `craft_command` allowlist only.
+3. **Project config**: synced across environments; edited on the **Settings** control panel screen.
 4. **Defaults**: baked into `models/Settings`.
 
 This document covers each setting in detail, then explains how to use the CP UI and the `config/herald.php` file.
 
 - [Settings reference](#settings-reference)
   - [`allowedCommands`](#allowedcommands)
+  - [`adminLevelCommands`](#adminlevelcommands)
   - [`execEnabled`](#execenabled)
   - [`execDryRunDefault`](#execdryrundefault)
   - [`runtimeOverrideTtl`](#runtimeoverridettl)
@@ -22,8 +23,11 @@ This document covers each setting in detail, then explains how to use the CP UI 
   - [`dcrAutoApprove`](#dcrautoapprove)
   - [`oauthAccessTokenTtl` / `oauthRefreshTokenTtl`](#oauthaccesstokenttl--oauthrefreshtokenttl)
   - [`elevationTtl`](#elevationttl)
+  - [`tokenTtlDefault`](#tokenttldefault)
+  - [`userCustomFieldAllowlist`](#usercustomfieldallowlist)
+  - [`auditResponseExcerptBytes` / `auditRetentionDays`](#auditresponseexcerptbytes--auditretentiondays)
 - [HTTP transport](#http-transport)
-- [The CP settings page](#the-cp-settings-page)
+- [The CP section](#the-cp-section)
 - [Audit log](#audit-log)
 - [`config/herald.php`](#configheraldphp)
 - [Logging](#logging)
@@ -34,21 +38,37 @@ This document covers each setting in detail, then explains how to use the CP UI 
 
 **Type:** `string[]` &nbsp;&nbsp; **Default:** see below
 
-The set of glob patterns the `craft_command` tool is allowed to dispatch. Patterns use `fnmatch` semantics: `resave/*` matches any `resave/<route>`, `up` matches the literal `up` command, `migrate/all` is a single literal route.
+The set of glob patterns the `craft_command` tool may dispatch, regardless of whether Craft allows admin changes. These are the content-level and operational routes. Patterns use `fnmatch` semantics: `resave/*` matches any `resave/<route>`, `gc` matches the literal `gc` command.
 
-Default allowlist (out-of-the-box, on every environment):
+Default allowlist, on every environment:
 
 ```
-resave/*            project-config/*    cache/*
-invalidate-tags/*   migrate/*           up
-index-assets/*      gc                  make/*
-fixture/*           sections/*          fields/*
-users/create        entrify/*           db/backup
-db/restore          utils/*             clear-deprecations
-mailer/test
+resave/*            cache/*             invalidate-tags/*
+index-assets/*      gc                  users/create
+utils/*             clear-deprecations  mailer/test
 ```
 
-These cover the dev / ops surface most teams need without exposing dangerous commands. To lock things down further (or open more up), override per-environment via [`config/herald.php`](#configheraldphp). For short-lived grants without a deploy, use the [runtime override UI](#the-cp-settings-page).
+These cover the operational surface most teams need without admitting anything that mutates schema or project config. Routes that do sit on [`adminLevelCommands`](#adminlevelcommands) instead. To tighten or widen the set per environment, override via [`config/herald.php`](#configheraldphp); for a short-lived grant without a deploy, use the [Temporary grants screen](#temporary-grants).
+
+### `adminLevelCommands`
+
+**Type:** `string[]` &nbsp;&nbsp; **Default:** see below
+
+The set of glob patterns `craft_command` may dispatch **only when** Craft's own `allowAdminChanges` is `true`. These routes mutate admin-only state: project config, schema migrations, plugin scaffolding, section and field DDL, and fixture loads.
+
+Default admin-level allowlist:
+
+```
+project-config/*    pc/*                migrate/*
+up                  make/*              entrify/*
+sections/*          fields/*            fixture/*
+```
+
+`pc/*` is listed alongside `project-config/*` because `pc` is Craft's own short alias for the same controller, so it must be classified identically or the alias would slip past the gate.
+
+When `allowAdminChanges` is `false`, a `craft_command` invocation matching one of these patterns is refused at dispatch with a structured error naming the flag, and the refusal still writes a `kind=tool_error` audit row. The effective-allowlist view the control panel shows and the dispatch-time gate consult the same policy, so they never disagree.
+
+Classification is fixed in code. Tightening this setting cannot re-class a `migrate/*` route as content-level and slip it into the always-admitted bucket.
 
 ### `execEnabled`
 
@@ -64,7 +84,7 @@ The recommended posture for production is `execEnabled = false`, since `craft_ex
 
 Whether `craft_exec` defaults to dry-run mode. With this on (default), the LLM has to explicitly pass `confirm: true` in the tool call to actually evaluate an expression. Without `confirm`, Herald returns the parsed expression and proposed effect and skips execution.
 
-Flipping this to `false` makes evaluation the default. This is **not** a security override: destructive expressions (`delete*`, `drop*`, `truncate*`, `Elements::deleteElement`, `migrate/down`) still require both `confirm: true` AND `dangerous: true`. The destructive-op guard runs regardless of this setting.
+Flipping this to `false` makes evaluation the default. This is **not** a security override: destructive expressions (`delete*`, `drop*`, `truncate*`, `migrate/down`, `project-config/sync`) still require both `confirm: true` AND `dangerous: true`. The destructive-op guard runs regardless of this setting.
 
 ### `runtimeOverrideTtl`
 
@@ -86,7 +106,7 @@ The 4 MiB default is comfortably larger than any legitimate `tools/call` argumen
 
 **Type:** `bool` &nbsp;&nbsp; **Default:** `false`
 
-Whether the HTTP transport (`POST/GET/DELETE /herald/mcp`) accepts requests. Defaults to off, because the transport is opt-in, not because it is unfinished but because most installs only need stdio. When you do enable it, it enforces full authentication on every request (bearer token or OAuth 2.1, see [HTTP transport](#http-transport) and [SECURITY.md](SECURITY.md)); it is **not** an anonymous endpoint.
+Whether the HTTP transport (`POST/GET/DELETE /herald/mcp`) accepts requests. Defaults to off, because the transport is opt-in and most installs only need stdio. When you do enable it, it enforces full authentication on every request (bearer token or OAuth 2.1, see [HTTP transport](#http-transport) and [SECURITY.md](SECURITY.md)); it is **not** an anonymous endpoint.
 
 When this flag is `false`, every request to `/herald/mcp` returns `503 Service Unavailable` regardless of headers or credentials.
 
@@ -94,11 +114,11 @@ When this flag is `false`, every request to `/herald/mcp` returns `503 Service U
 
 **Type:** `string[]` &nbsp;&nbsp; **Default:** `[]`
 
-Allowlist of `Origin` header values the HTTP transport accepts. The MCP spec mandates Origin validation as DNS-rebinding defense, so when a request's `Origin` header does not match an entry in this list, Herald rejects it with `403 Forbidden`.
+Allowlist of `Origin` header values the HTTP transport accepts. The MCP spec mandates Origin validation as a DNS-rebinding defence, so a request whose `Origin` header does not match an entry here is rejected with `403 Forbidden`.
 
-Empty means permissive (every Origin accepted). That's fine for local development; it is **not** fine for any deployed environment. Herald logs a warning to the `herald` channel on every request when the allowlist is empty and `httpEnabled` is `true`, so configuration drift is visible in your logs.
+**An empty allowlist fails closed outside `devMode`.** With `httpEnabled` on, no configured origins, and `devMode` off, every request is refused with `403` and an error telling the operator to configure the list. In `devMode` an empty list is permissive, so local development is not blocked. Configuration drift therefore surfaces as a refused request rather than an open endpoint.
 
-Set this to the explicit URLs of every client that talks to the endpoint: Claude Desktop's local proxy, Cursor's HTTP setup, etc.
+Set this to the explicit origin of every client that talks to the endpoint.
 
 ### `sessionTtl`
 
@@ -130,11 +150,33 @@ The OAuth access-token and refresh-token lifetimes. Refresh tokens rotate on eve
 
 **Type:** `int` (seconds) &nbsp;&nbsp; **Default:** `300` (5 minutes)
 
-Lifetime of an elevation marker minted by the in-band `/oauth/elevate` re-authentication flow. After a fresh Craft re-auth (password + 2FA), high-stakes operations over HTTP (credential / email / admin-status mutations on `users`, and content publish / delete) are permitted for this window, bound to the specific access token. Tracked server-side, never trusted from a client claim. `craft_exec` is **never** unlocked by elevation. See [SECURITY.md](SECURITY.md).
+Lifetime of an elevation marker minted by the in-band `/oauth/elevate` re-authentication flow. After a fresh Craft re-auth, high-stakes operations over HTTP (credential, email and admin-status mutations on `users`, plus content publish and delete) are permitted for this window. Tracked server-side, never trusted from a client claim. `craft_exec` is **never** unlocked by elevation. See [SECURITY.md](SECURITY.md).
+
+### `tokenTtlDefault`
+
+**Type:** `int|null` (seconds) &nbsp;&nbsp; **Default:** `null`
+
+Default lifetime applied to a bearer token issued without an explicit TTL. `null` means the token does not expire, which is the right default for a credential an admin issues deliberately and revokes deliberately. Set it to a number of seconds to force rotation across the whole install; a per-token `--ttl` always wins.
+
+### `userCustomFieldAllowlist`
+
+**Type:** `string[]` &nbsp;&nbsp; **Default:** `[]`
+
+The custom-field handles whose values the Pro `users` tool may return on a user envelope. The default is empty, so no custom-field value is returned until an operator enumerates the handles here.
+
+The allowlist is independent of caller permission: a handle that is not on it is never returned, not even to an admin. Craft has no native per-field-value permission and field-layout hiding is presentation only, so this is Herald's own gate. Allowlisted handles that do not exist on the User field layout are dropped silently.
+
+### `auditResponseExcerptBytes` / `auditRetentionDays`
+
+**Types:** `int` / `int|null` &nbsp;&nbsp; **Defaults:** `2048` (max `65535`) / `null`
+
+`auditResponseExcerptBytes` is the number of bytes of the post-redaction, JSON-encoded tool response stored in `herald_invocations.responseExcerpt`. The full response still goes over the wire to the client; the excerpt exists for the Activity screen.
+
+`auditRetentionDays` is the retention window for audit rows. `null` keeps history indefinitely, which is the compliance-friendly default. Set it to a number of days to prune older rows during Craft's `gc` sweep.
 
 ## HTTP transport
 
-The Streamable HTTP transport at `/herald/mcp` is **authenticated on every request**, and there is no anonymous access. Setting `httpEnabled = true` opens the endpoint; the controller's `beforeAction` pipeline then enforces, in order: method allowlist, `MCP-Protocol-Version` validation, **bearer-token / OAuth 2.1 authentication**, and per-user rate limiting before the JSON-RPC dispatcher ever sees the request. An unauthenticated request gets `401 Unauthorized` with `WWW-Authenticate: Bearer realm="herald"` per RFC 6750. See [INSTALL.md](INSTALL.md) for issuing tokens and [SECURITY.md](SECURITY.md) for the full auth model.
+The Streamable HTTP transport at `/herald/mcp` requires the Pro edition and is **authenticated on every request**, with no anonymous access. Setting `httpEnabled` to `true` opens the endpoint; the controller's `beforeAction` pipeline then runs, in order: the kill switch, the edition gate, the `Origin` allowlist, the method allowlist, `MCP-Protocol-Version` validation, bearer-token or OAuth 2.1 authentication, an account-state check, the capability-scope check, and a per-user rate limit, all before the JSON-RPC dispatcher sees the request. An unauthenticated request gets `401 Unauthorized` with `WWW-Authenticate: Bearer realm="herald"` per RFC 6750. See [HTTP transport](HTTP-TRANSPORT.md) for issuing credentials and [SECURITY.md](SECURITY.md) for the full authorization model.
 
 Two credential shapes are accepted, disambiguated by format:
 
@@ -146,9 +188,9 @@ The endpoint supports three methods:
 - **`POST`**: single JSON-RPC message per request (or an SSE stream when the client sends `Accept: text/event-stream`). Headers required:
   - `Authorization: Bearer <token>` (missing/malformed → 401; invalid/revoked → 401).
   - `MCP-Protocol-Version: 2025-11-25` or `2025-06-18` (missing → 400; an unsupported version → 400).
-  - `Origin: …` (must match `allowedOrigins` when the list is non-empty → 403).
+  - `Origin: …` (must match `allowedOrigins`; an empty allowlist is itself refused with 403 outside `devMode`).
   - `Mcp-Session-Id: …` (required on every request except `initialize` → 400; unknown id → 404).
-- **`GET`**: reserved for SSE upgrade. Returns 405 today.
+- **`GET`**: not supported. Returns 405.
 - **`DELETE`**: terminates the session identified by the `Mcp-Session-Id` header. Returns 204 on success, 404 if the session is unknown.
 
 `craft_exec` is stdio-only and rejected at the dispatcher when called over HTTP regardless of caller permissions. The rejection comes back as a JSON-RPC error envelope (HTTP 200, JSON-RPC code -32601) so spec-compliant clients can render the message correctly.
@@ -246,14 +288,14 @@ Runtime DB overrides layer **on top of** `allowedCommands` only. They don't over
 Herald emits one structured audit-log line per tool invocation under the `herald` log channel. The line shape is locked across both transports:
 
 ```
-tool=<name> kind=<success|tool_error|internal_error> duration_ms=<int>
+tool=<name> kind=<success|tool_error|internal_error|cancelled|rate_limited> duration_ms=<int>
   transport=<stdio|http> request_id=<id|-> user=<id|->
   client=<name|-> args=<redacted-json>
 ```
 
 Unknown / not-yet-populated fields emit `-` (Apache common-log convention). stdio emits `transport=stdio`, populates `request_id` from the JSON-RPC envelope, captures `client` from the MCP `initialize` handshake's `clientInfo.name`, and leaves `user` as `-` (no per-request identity on the trusted local transport). The HTTP transport emits `transport=http` and fills `user` from the Craft user the bearer/OAuth token resolves to.
 
-Arguments are passed through `tools/support/SecretRedactor` before serialisation. The redactor catches keys named like secrets (`password`, `token`, `apiKey`, `secret`, `accessKey`, `privateKey`, `salt`, `cookieValidationKey`, `webhookSecret`, `jwt`, `oauth`, `bearer`) and replaces values with `[REDACTED]`. Inline `KEY=value` / `KEY: value` patterns in flat strings are also redacted.
+Arguments are passed through `tools/support/SecretRedactor` before serialisation. The redactor normalises keys and catches those named like secrets (`password`, `securitykey`, `token`, `secret`, `apikey`, `privatekey`, `oauth`, `bearer`, and more), replacing the value with the literal placeholder `<redacted>`. Inline `KEY=value` patterns in flat strings are also redacted.
 
 To route Herald logs to a dedicated file, configure a Yii log target in `config/app.php`:
 
