@@ -825,6 +825,166 @@ it('matchTemplate returns null when no template matches', function() {
 });
 
 // -----------------------------------------------------------------------------
+// resources/templates/list — template discovery
+//
+// `matchTemplate()` made a registered template *resolvable* through
+// `resources/read`, but the method table carried no
+// `resources/templates/list`, so it was undiscoverable: a client had no
+// way to learn a template existed. The method is defined at MCP
+// 2025-11-25 under the `resources` capability and has no capability flag
+// of its own (the only sub-features are `subscribe` and `listChanged`),
+// so a client cannot feature-detect its absence and `-32601` is a
+// conformance defect for a server that declares `resources` and holds
+// templates.
+// -----------------------------------------------------------------------------
+
+it('answers resources/templates/list instead of method-not-found', function() {
+    $response = $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 40,
+        'method' => 'resources/templates/list',
+    ]);
+
+    expect($response)->toHaveKey('result');
+    expect($response)->not->toHaveKey('error');
+    expect($response['result'])->toHaveKey('resourceTemplates');
+    expect($response['result']['resourceTemplates'])->toBeArray();
+});
+
+it('surfaces a registered template in resources/templates/list with the spec-required fields', function() {
+    $listener = function(\craftpulse\herald\events\RegisterResourcesEvent $event): void {
+        $event->resources[] = new class() implements \craftpulse\herald\resources\ResourceTemplateInterface {
+            public function getUriTemplate(): string
+            {
+                return '_fake://listed/{id}';
+            }
+
+            public function getName(): string
+            {
+                return 'fake-listed-template';
+            }
+
+            public function getDescription(): string
+            {
+                return 'Fixture template for the discovery endpoint.';
+            }
+
+            public function getMimeType(): string
+            {
+                return 'text/plain';
+            }
+
+            public function matches(string $uri): ?array
+            {
+                if (preg_match('#^_fake://listed/([^/]+)$#', $uri, $m)) {
+                    return ['id' => $m[1]];
+                }
+                return null;
+            }
+
+            public function read(string $uri, array $captures): array
+            {
+                return ['uri' => $uri, 'mimeType' => 'text/plain', 'text' => "id={$captures['id']}"];
+            }
+        };
+    };
+    \yii\base\Event::on(
+        \craftpulse\herald\services\Resources::class,
+        \craftpulse\herald\services\Resources::EVENT_REGISTER_RESOURCES,
+        $listener,
+    );
+
+    $original = Herald::getInstance()->resources;
+    $fresh = new \craftpulse\herald\services\Resources();
+    $fresh->init();
+    Herald::getInstance()->set('resources', $fresh);
+
+    try {
+        $response = $this->server->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 41,
+            'method' => 'resources/templates/list',
+        ]);
+
+        $templates = $response['result']['resourceTemplates'];
+        $uriTemplates = array_column($templates, 'uriTemplate');
+        expect($uriTemplates)->toContain('_fake://listed/{id}');
+
+        $index = array_search('_fake://listed/{id}', $uriTemplates, true);
+        expect($templates[$index])->toBe([
+            'uriTemplate' => '_fake://listed/{id}',
+            'name' => 'fake-listed-template',
+            'description' => 'Fixture template for the discovery endpoint.',
+            'mimeType' => 'text/plain',
+        ]);
+
+        // The listed template is the same one `resources/read` resolves,
+        // so discovery and resolution cannot drift apart.
+        $read = $this->server->dispatch([
+            'jsonrpc' => '2.0',
+            'id' => 42,
+            'method' => 'resources/read',
+            'params' => ['uri' => '_fake://listed/7'],
+        ]);
+        expect($read['result']['contents'][0]['text'])->toBe('id=7');
+    } finally {
+        Herald::getInstance()->set('resources', $original);
+        \yii\base\Event::off(
+            \craftpulse\herald\services\Resources::class,
+            \craftpulse\herald\services\Resources::EVENT_REGISTER_RESOURCES,
+            $listener,
+        );
+    }
+});
+
+it('gates resources/templates/list exactly as its sibling list methods are gated', function() {
+    // `resources/list` and `prompts/list` apply no per-user and no
+    // per-scope filtering: the bearer or OAuth credential is the gate,
+    // and the corpus behind them is the bundled skills documentation,
+    // identical for every caller. A discovery endpoint that filtered
+    // where its siblings do not, or that filtered where they do, would be
+    // the bug. Parity is asserted rather than described so a future scope
+    // gate on one of them cannot silently skip this one.
+    $this->server->setGrantedScopes([]);
+
+    $templates = $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 43,
+        'method' => 'resources/templates/list',
+    ]);
+    $resources = $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 44,
+        'method' => 'resources/list',
+    ]);
+    $prompts = $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 45,
+        'method' => 'prompts/list',
+    ]);
+
+    expect($templates)->toHaveKey('result');
+    expect($resources['result']['resources'])->not->toBeEmpty();
+    expect($prompts['result']['prompts'])->not->toBeEmpty();
+    expect($templates['result']['resourceTemplates'])
+        ->toBe(Herald::getInstance()->resources->asTemplateListPayload());
+});
+
+it('omits nextCursor from resources/templates/list, matching the unpaginated sibling lists', function() {
+    // Pagination is optional at 2025-11-25 and Herald does not paginate
+    // `resources/list` or `prompts/list` either. Emitting a cursor key
+    // would advertise a page the server never serves.
+    $response = $this->server->dispatch([
+        'jsonrpc' => '2.0',
+        'id' => 46,
+        'method' => 'resources/templates/list',
+    ]);
+
+    expect($response['result'])->not->toHaveKey('nextCursor');
+    expect(array_keys($response['result']))->toBe(['resourceTemplates']);
+});
+
+// -----------------------------------------------------------------------------
 // Per-user filtering — HTTP routes through asListPayloadFor / getByNameFor
 // -----------------------------------------------------------------------------
 

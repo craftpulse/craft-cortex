@@ -487,6 +487,7 @@ class Server
             'prompts/list' => $this->_successResponse($id, $this->_promptsList()),
             'prompts/get' => $this->_handlePromptsGet($id, $params),
             'resources/list' => $this->_successResponse($id, $this->_resourcesList()),
+            'resources/templates/list' => $this->_successResponse($id, $this->_resourceTemplatesList()),
             'resources/read' => $this->_handleResourcesRead($id, $params),
             'ping' => $this->_successResponse($id, new \stdClass()),
             default => $this->_errorResponse($id, self::ERR_METHOD_NOT_FOUND, "Method not found: {$method}"),
@@ -734,6 +735,37 @@ class Server
     {
         return [
             'resources' => Herald::getInstance()->resources->asListPayload(),
+        ];
+    }
+
+    /**
+     * Build the `resources/templates/list` payload — template discovery
+     * for the `ResourceTemplateInterface` instances the registry holds.
+     *
+     * The method is defined at MCP 2025-11-25 under the `resources`
+     * capability and has no capability flag of its own: the only
+     * sub-features `resources` advertises are `subscribe` and
+     * `listChanged`. A client therefore cannot feature-detect its
+     * absence, so a server that declares `resources` and resolves
+     * templates through `resources/read` — which Herald does, via
+     * `Resources::matchTemplate()` — has to answer this too, or the
+     * templates are resolvable but undiscoverable.
+     *
+     * Ungated, deliberately, and identically to `_resourcesList()` and
+     * `_promptsList()`: authentication at the transport is the gate for
+     * all three, and none of them applies per-user or per-scope
+     * filtering the way `_toolsList()` does. Filtering here alone would
+     * be the asymmetry.
+     *
+     * @return array<string,mixed>
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private function _resourceTemplatesList(): array
+    {
+        return [
+            'resourceTemplates' => Herald::getInstance()->resources->asTemplateListPayload(),
         ];
     }
 

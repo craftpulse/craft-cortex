@@ -87,6 +87,7 @@
 - Added `craftpulse\herald\tools\support\InvocationLogger::EVENT_LOG_CALL`, carrying the structured invocation entry and the formatted log line, so an integrator can mirror invocations into their own audit surface.
 - Added `craftpulse\herald\tools\ToolInterface` with its three-method gating contract (`shouldRegister()`, `filterFor()`, `inputSchemaFor()`), plus `craftpulse\herald\tools\AbstractTool` and a fluent JSON Schema builder at `craftpulse\herald\tools\support\Schema`.
 - Added `craftpulse\herald\resources\ResourceTemplateInterface` for RFC 6570 Level-1 URI families alongside concrete resource URIs.
+- Added the `resources/templates/list` method, so a registered `craftpulse\herald\resources\ResourceTemplateInterface` is discoverable by clients and not only resolvable through `resources/read`.
 - Added the `#[IsReadOnly]`, `#[IsDestructive]`, `#[IsIdempotent]`, `#[IsOpenWorld]`, `#[IsStdioOnly]`, and `#[Title]` attributes, read into the MCP `ToolAnnotations` payload.
 - Added `craftpulse\herald\tools\DualModeToolInterface`, so a tool whose modes span reads and writes is classified per invocation rather than by its class-level annotation.
 - Added a `herald-tool` generator to Craft's `make` system, scaffolding a `craftpulse\herald\tools\AbstractTool` subclass with its attributes and a schema stub.

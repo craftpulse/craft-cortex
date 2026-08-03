@@ -268,6 +268,8 @@ Register through the same event as concrete resources: `RegisterResourcesEvent::
 
 `matches()` returns the captured-parameter map for a successful match (or null on miss). `read()` is invoked with the same map after the dispatcher confirms a match. Concrete-URI resources are checked first; templates only fire on miss, so a template can't shadow a concrete resource.
 
+Registered templates are discoverable: they appear in `resources/templates/list` as `{uriTemplate, name, description, mimeType}`, built from the four getters above. They do not appear in `resources/list`, which carries concrete URIs only. A client that never calls `resources/templates/list` can still read a templated URI it constructed itself, since `resources/read` falls back to the matcher either way.
+
 ## The Schema DSL
 
 Herald includes a fluent JSON Schema builder for tool input schemas. It generates the same JSON Schema array MCP clients expect, just nicer to author than raw arrays.

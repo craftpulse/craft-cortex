@@ -136,9 +136,10 @@ class Resources extends Component
     }
 
     /**
-     * Registered URI templates in registration order. Used by the
-     * `resources/list` payload to surface templated entries to clients
-     * that support `resources/templates/list` (MCP 2025-06-18).
+     * Registered URI templates in registration order. Read by
+     * `Server::_resourceTemplatesList()` for the
+     * `resources/templates/list` payload, and by `matchTemplate()` for
+     * the `resources/read` fallback.
      *
      * @return ResourceTemplateInterface[]
      *
@@ -206,6 +207,41 @@ class Resources extends Component
                 'mimeType' => $r->getMimeType(),
             ],
             $this->_resources,
+        );
+    }
+
+    /**
+     * `resources/templates/list` payload — an array of
+     * `{uriTemplate, name, description, mimeType}` dicts ready to
+     * JSON-encode.
+     *
+     * `uriTemplate` and `name` are the only fields MCP 2025-11-25
+     * requires on a `ResourceTemplate`; `description` and `mimeType` are
+     * optional and always present here because
+     * `ResourceTemplateInterface` mandates both. The optional `title`,
+     * `icons` and `annotations` fields are not emitted — the interface
+     * carries no source for them, and inventing one would fabricate
+     * display metadata the registering plugin never supplied.
+     *
+     * No `nextCursor`: pagination is optional at this revision and
+     * neither `resources/list` nor `prompts/list` paginates, so
+     * advertising a cursor would promise a page the server never serves.
+     *
+     * @return array<int,array<string,mixed>>
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    public function asTemplateListPayload(): array
+    {
+        return array_map(
+            static fn(ResourceTemplateInterface $t): array => [
+                'uriTemplate' => $t->getUriTemplate(),
+                'name' => $t->getName(),
+                'description' => $t->getDescription(),
+                'mimeType' => $t->getMimeType(),
+            ],
+            $this->_templates,
         );
     }
 
