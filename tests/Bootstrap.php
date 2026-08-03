@@ -23,6 +23,22 @@
 
 require __DIR__ . '/boot-craft.php';
 
+// Belt to the database pin's braces: no test can write project-config YAML
+// into the surrounding install. `ProjectConfig::flush()` writes the *booted
+// database's* config into `<install>/config/project/`, and with the database
+// pinned to a test schema while the install still supplies the playground's
+// `config/`, that would overwrite version-controlled YAML with test values.
+// The `saveModifiedConfigData()` half of a flush still runs, so entities that
+// live only in the config store are unaffected.
+//
+// Deliberately here rather than in `boot-craft.php`: the content-fixtures CLI
+// shares that file and *must* keep writing YAML. Its entities are created
+// through project config, so suppressing the write leaves the database ahead
+// of the YAML, and the first time anything in a later run applies external
+// changes, Craft treats the YAML as truth and deletes the whole fixture set
+// out from under the suite.
+Craft::$app->getProjectConfig()->writeYamlAutomatically = false;
+
 // Pest's auto-discovery looks for `tests/Pest.php` relative to its working
 // directory; under the legacy cms-root invocation that misses our config in
 // herald/tests/, so we load it explicitly here so `uses()` and the custom

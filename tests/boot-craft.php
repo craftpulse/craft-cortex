@@ -14,8 +14,9 @@
  * The install supplies the code, config and storage; the database is pinned
  * to `herald_fixtures` (or `HERALD_TEST_DB`) so no run can write to the
  * development schema. Together with the per-test transaction in
- * `craftpulse\herald\tests\TestCase` and the project-config YAML guard
- * below, that is what makes the suite safe to run against a shared install.
+ * `craftpulse\herald\tests\TestCase` and the YAML-write guard in
+ * `tests/Bootstrap.php`, that is what makes the suite safe to run against a
+ * shared install.
  *
  * Two consumers share this file:
  *
@@ -146,17 +147,6 @@ require CRAFT_VENDOR_PATH . '/craftcms/cms/bootstrap/console.php';
 // offset the fixture happened to land. Re-pin after app creation, not
 // before: init would overwrite an earlier pin.
 date_default_timezone_set('UTC');
-
-// Belt to the database pin's braces: keep project-config YAML writes off the
-// surrounding install's disk. `ProjectConfig::flush()` (called explicitly by
-// the content-fixtures CLI, and hooked to `EVENT_AFTER_REQUEST`, which a test
-// process never fires) writes the *booted database's* project config into
-// `<install>/config/project/`. With the database pinned to a test schema and
-// the install still supplying the playground's `config/`, that would overwrite
-// the playground's version-controlled YAML with the test schema's values. The
-// `saveModifiedConfigData()` half of `flush()` still runs, so entities that
-// live only in the config store (filesystems above all) still persist.
-Craft::$app->getProjectConfig()->writeYamlAutomatically = false;
 
 // Fail closed. If the pins above are ever edited out, drift from
 // `phpunit.xml.dist`, or get beaten by an environment nobody anticipated,
