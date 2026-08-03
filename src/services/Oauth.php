@@ -28,7 +28,6 @@ use Lcobucci\JWT\Validation\Constraint\StrictValidAt;
 use League\OAuth2\Server\AuthorizationServer;
 use League\OAuth2\Server\Grant\AuthCodeGrant;
 use League\OAuth2\Server\Grant\RefreshTokenGrant;
-use League\OAuth2\Server\ResourceServer;
 use Throwable;
 use yii\base\Component;
 use yii\base\InvalidConfigException;
@@ -40,11 +39,14 @@ use yii\base\InvalidConfigException;
  * Responsibilities:
  *
  *   1. **Server construction.** Builds the `AuthorizationServer` (with
- *      AuthCode + Refresh grants) and the `ResourceServer` lazily,
- *      memoized per-request. The AuthCode grant is configured for
- *      PKCE-required, S256-only — `plain` PKCE is rejected at the
- *      controller layer (league enables both verifiers; we filter at
- *      our boundary).
+ *      AuthCode + Refresh grants) lazily, memoized per-request. The
+ *      AuthCode grant is configured for PKCE-required, S256-only —
+ *      `plain` PKCE is rejected at the controller layer (league
+ *      enables both verifiers; we filter at our boundary). There is
+ *      no league `ResourceServer`: incoming bearer tokens are
+ *      validated by `lookupAccessToken()` below, which additionally
+ *      enforces the RFC 8707 audience binding league does not know
+ *      about.
  *
  *   2. **Audience binding (RFC 8707).** Every access token's `aud`
  *      claim carries the resource URI passed in the `resource=` query
@@ -180,12 +182,6 @@ class Oauth extends Component
      *                               per-request on first access.
      */
     private ?AuthorizationServer $_authorizationServer = null;
-
-    /**
-     * @var ResourceServer|null Lazy memoization of the league
-     *                          `ResourceServer`.
-     */
-    private ?ResourceServer $_resourceServer = null;
 
     /**
      * @var string|null Audience to stamp onto the next access token
@@ -329,24 +325,6 @@ class Oauth extends Component
     }
 
     /**
-     * The family id of the token row a hashed refresh / access token
-     * belongs to, or null when no row matches. Used during rotation
-     * to inherit the lineage and during theft detection to target the
-     * family-wide revoke.
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    public function familyIdForTokenHash(string $tokenHash): ?string
-    {
-        $record = OauthTokenRecord::findOne(['tokenHash' => $tokenHash]);
-        if (!$record instanceof OauthTokenRecord) {
-            return null;
-        }
-        return $record->familyId;
-    }
-
-    /**
      * Mint a fresh rotation-family identifier. A UUID keeps the column
      * a fixed 36 chars and is collision-free across the install.
      *
@@ -403,29 +381,6 @@ class Oauth extends Component
 
         $this->_authorizationServer = $server;
         return $server;
-    }
-
-    /**
-     * Lazy-build the league `ResourceServer`. Validates incoming
-     * access tokens against the public key. Memoized per-request.
-     *
-     * @throws InvalidConfigException When the JWT key pair is
-     *                                missing.
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    public function getResourceServer(): ResourceServer
-    {
-        if ($this->_resourceServer !== null) {
-            return $this->_resourceServer;
-        }
-
-        $this->_resourceServer = new ResourceServer(
-            new AccessTokenRepository(),
-            'file://' . $this->getPublicKeyPath(),
-        );
-        return $this->_resourceServer;
     }
 
     /**

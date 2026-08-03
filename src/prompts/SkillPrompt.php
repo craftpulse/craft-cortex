@@ -92,17 +92,6 @@ class SkillPrompt extends AbstractPrompt
     }
 
     /**
-     * The on-disk skill directory name backing this prompt.
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    public function getSkill(): string
-    {
-        return $this->_skill;
-    }
-
-    /**
      * @inheritdoc
      *
      * Returns the `prompts/get` result envelope per MCP spec:

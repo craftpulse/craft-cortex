@@ -412,23 +412,6 @@ class Server
     }
 
     /**
-     * Most-recently captured client name from the `initialize`
-     * handshake's `clientInfo.name`, or null when no handshake has
-     * yet occurred (or the handshake omitted `clientInfo`). Exposed
-     * publicly so the HTTP controller can stamp the same name onto
-     * the Session row without re-parsing the request body — single
-     * source of truth across `_initializeResult()` and the session
-     * write.
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    public function getClientName(): ?string
-    {
-        return $this->_clientName;
-    }
-
-    /**
      * The `CancellationToken` for the currently-streaming `tools/call`,
      * or null when this dispatcher is between streaming invocations.
      * Exposed publicly so `McpController::_streamPost()` can flip the
