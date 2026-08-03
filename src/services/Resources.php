@@ -16,10 +16,17 @@ use yii\base\Component;
  * =========================================================================
  * MCP resource registry.
  *
- * Builds one resource per addressable URI in the bundled-skills
- * package: each skill's SKILL.md (the router) plus every reference
- * document under `references/`. For 8 skills with N references each,
- * the registry holds `8 + sum(N)` entries.
+ * Built in two passes at service init. Pass 1 (`getBundled()`) is one
+ * resource per addressable URI the package ships: each bundled skill's
+ * SKILL.md router plus every reference document under `references/`,
+ * then one per bundled agent. For 8 skills with N references each, that
+ * pass holds `8 + sum(N)` skill entries. Pass 2 appends one resource per
+ * element-authored skill handle with no bundled counterpart, which is the
+ * install's own content.
+ *
+ * `getAll()` is both passes plus third-party event registrations, and is
+ * what `resources/list` serves. `getBundled()` is pass 1 alone, for the
+ * docs generator.
  *
  * Lookups are O(1) via a URI-keyed map; the registry is built once at
  * service init and never mutated. Same shape as `Tools` and `Prompts`.
@@ -46,6 +53,15 @@ class Resources extends Component
      * @var ResourceInterface[] Registered resources, in registration order.
      */
     private array $_resources = [];
+
+    /**
+     * @var ResourceInterface[] The subset of `$_resources` that the
+     *     package itself ships: one per bundled-skill document, one per
+     *     bundled agent. Captured before the registration event fires, so
+     *     it carries neither element-authored skills nor third-party
+     *     registrations. Read by the docs generator.
+     */
+    private array $_bundled = [];
 
     /**
      * @var array<string,ResourceInterface> URI-keyed lookup map.
@@ -79,8 +95,10 @@ class Resources extends Component
     {
         parent::init();
 
+        $this->_bundled = $this->_bundledResources();
+
         $event = new RegisterResourcesEvent();
-        $event->resources = $this->_buildRegistry();
+        $event->resources = array_merge($this->_bundled, $this->_elementOnlyResources());
         $this->trigger(self::EVENT_REGISTER_RESOURCES, $event);
 
         foreach ($event->resources as $resource) {
@@ -152,7 +170,10 @@ class Resources extends Component
     }
 
     /**
-     * All registered resources, in registration order.
+     * All registered resources, in registration order. This is the
+     * install's live surface: bundled resources, the resources for any
+     * element-authored skill, and anything a third-party plugin added
+     * through `EVENT_REGISTER_RESOURCES`. `resources/list` serves it.
      *
      * @return ResourceInterface[]
      *
@@ -162,6 +183,29 @@ class Resources extends Component
     public function getAll(): array
     {
         return $this->_resources;
+    }
+
+    /**
+     * The resources the package itself ships, in registration order: one
+     * per document in the bundled skills corpus, one per bundled agent.
+     * Derived from the filesystem alone.
+     *
+     * Captured before `EVENT_REGISTER_RESOURCES` fires and before the
+     * element-stored pass, so it excludes both an operator's own
+     * element-authored skills and third-party registrations. That is the
+     * point: `docs/RESOURCES.md` is committed package documentation, and
+     * regenerating it on a real install must never write that install's
+     * content into it. Use `getAll()` for anything describing what an
+     * install currently exposes.
+     *
+     * @return ResourceInterface[]
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    public function getBundled(): array
+    {
+        return $this->_bundled;
     }
 
     /**
@@ -249,50 +293,30 @@ class Resources extends Component
     // =========================================================================
 
     /**
-     * Build the resource registry by iterating every bundled skill and
-     * every reference inside it. Order: per skill, the SKILL.md router
-     * first, then its references in alphabetical order (the order
-     * `Skills::references()` returns them).
+     * Registry pass 1: everything the package ships. One resource per
+     * bundled skill's SKILL.md, then that skill's references in the order
+     * `Skills::references()` returns them (alphabetical), then one per
+     * bundled agent.
+     *
+     * Depends only on the installed `michtio/craftcms-claude-skills`
+     * version, never on database state, which is what makes
+     * `getBundled()` safe to render into committed documentation.
      *
      * @return ResourceInterface[]
      *
      * @author CraftPulse
      * @since  5.0.0
      */
-    private function _buildRegistry(): array
+    private function _bundledResources(): array
     {
         $registry = [];
-        $bundledHandles = Skills::skillNames();
 
-        foreach ($bundledHandles as $skill) {
+        foreach (Skills::skillNames() as $skill) {
             $registry[] = new SkillResource(skill: $skill);
 
             foreach (Skills::references($skill) as $reference) {
                 $registry[] = new SkillResource(skill: $skill, reference: $reference);
             }
-        }
-
-        // Gate 8.6 — second pass for element-stored handles that have
-        // no bundled counterpart. The merged-corpus `read()` path
-        // synthesises markdown for these on demand; we register one
-        // `SkillResource` per element-only handle so the URI surfaces
-        // in `resources/list` and resolves on `resources/read`.
-        //
-        // The boot-time element query is fail-soft: if the
-        // `herald_skills` table doesn't exist yet (fresh install
-        // pre-migration) the call returns an empty array. A defensive
-        // try/catch lets the registry boot cleanly in that window.
-        try {
-            $elementHandles = Herald::getInstance()->skills->allHandles();
-        } catch (\Throwable) {
-            $elementHandles = [];
-        }
-        $bundledSet = array_flip($bundledHandles);
-        foreach ($elementHandles as $handle) {
-            if (isset($bundledSet[$handle])) {
-                continue;
-            }
-            $registry[] = new SkillResource(skill: $handle);
         }
 
         // Agent resources from `michtio/craftcms-claude-skills` v1.4.2+
@@ -303,6 +327,46 @@ class Resources extends Component
         // older install.
         foreach (Skills::agentNames() as $agent) {
             $registry[] = new AgentResource(agent: $agent);
+        }
+
+        return $registry;
+    }
+
+    /**
+     * Registry pass 2 (Gate 8.6): one resource per element-stored skill
+     * handle that has no bundled counterpart. This is the operator's own
+     * content — tone of voice, brand and copywriting guidance authored as
+     * `herald_skills` elements. The merged-corpus `read()` path
+     * synthesises markdown for these on demand; registering them here is
+     * what makes the URI surface in `resources/list` and resolve on
+     * `resources/read`.
+     *
+     * The boot-time element query is fail-soft: if the `herald_skills`
+     * table doesn't exist yet (fresh install pre-migration) the call
+     * returns an empty array. A defensive try/catch lets the registry
+     * boot cleanly in that window.
+     *
+     * @return ResourceInterface[]
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private function _elementOnlyResources(): array
+    {
+        try {
+            $elementHandles = Herald::getInstance()->skills->allHandles();
+        } catch (\Throwable) {
+            return [];
+        }
+
+        $bundledSet = array_flip(Skills::skillNames());
+        $registry = [];
+
+        foreach ($elementHandles as $handle) {
+            if (isset($bundledSet[$handle])) {
+                continue;
+            }
+            $registry[] = new SkillResource(skill: $handle);
         }
 
         return $registry;

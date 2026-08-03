@@ -96,6 +96,8 @@ interface ToolInterface
 
 `AbstractTool` provides defaults for `getInputSchema` (object with no properties), `outputSchema` (`[]`, no schema declared), `shouldRegister` (`true`), `filterFor` (`true`, visible to everyone), and `inputSchemaFor` (delegates to the static `getInputSchema()`). Subclassing it leaves you to implement `getName`, `getDescription`, and `execute`; override the three gating methods only when your tool needs edition or permission gating.
 
+`AbstractTool` also carries `docsInputSchema()`, which the `herald/docs/tools` generator reads and the MCP server never does. It defaults to `getInputSchema()` and only needs overriding if your `getInputSchema()` varies by edition or license, so that generated documentation describes the same surface everywhere. Herald's four dual-edition tools override it; tools that implement `ToolInterface` directly are documented from `getInputSchema()`.
+
 ### The three-method gating contract
 
 `shouldRegister`, `filterFor`, and `inputSchemaFor` form the locked tool-visibility contract. Each runs at a different point in the request lifecycle:

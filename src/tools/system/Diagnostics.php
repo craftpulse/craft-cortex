@@ -137,24 +137,23 @@ class Diagnostics extends AbstractTool
             ? array_merge(self::FREE_TYPES, self::PRO_TYPES)
             : self::FREE_TYPES;
 
-        return Schema::object([
-            'type' => Schema::string()
-                ->enum($types)
-                ->description('Required.')
-                ->required(),
-            'channel' => Schema::string()
-                ->description('Log file basename (e.g. "web", "queue"). Defaults to "web".'),
-            'minLevel' => Schema::string()
-                ->enum(['trace', 'info', 'warning', 'error'])
-                ->description('Minimum severity to include. Defaults to "warning".'),
-            'action' => Schema::string()
-                ->enum(self::MANAGE_QUEUE_ACTIONS)
-                ->description('Required for `type=manage_queue`. `release` deletes the job; ' .
-                    'Craft has no `cancel()` — `release` IS the cancel action.'),
-            'jobId' => Schema::string()
-                ->description('Queue row id (string). Required for `manage_queue` action=retry / release.'),
-            'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
-        ])->toArray();
+        return self::_schemaWithTypes($types);
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Documentation surface: the Free + Pro `type` enum unconditionally,
+     * so `docs/TOOLS.md` is identical whichever edition the generator ran
+     * on. Shares `_schemaWithTypes()` with `getInputSchema()`, so the two
+     * cannot drift apart when a property or a type is added.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    public static function docsInputSchema(): array
+    {
+        return self::_schemaWithTypes(array_merge(self::FREE_TYPES, self::PRO_TYPES));
     }
 
     /**
@@ -277,6 +276,39 @@ class Diagnostics extends AbstractTool
 
     // Private Methods
     // =========================================================================
+
+    /**
+     * The tool's input schema with the `type` enum set to `$types`. Sole
+     * definition of the schema body: `getInputSchema()` passes the
+     * edition-appropriate enum, `docsInputSchema()` passes the union.
+     *
+     * @param list<string> $types
+     * @return array<string,mixed>
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private static function _schemaWithTypes(array $types): array
+    {
+        return Schema::object([
+            'type' => Schema::string()
+                ->enum($types)
+                ->description('Required.')
+                ->required(),
+            'channel' => Schema::string()
+                ->description('Log file basename (e.g. "web", "queue"). Defaults to "web".'),
+            'minLevel' => Schema::string()
+                ->enum(['trace', 'info', 'warning', 'error'])
+                ->description('Minimum severity to include. Defaults to "warning".'),
+            'action' => Schema::string()
+                ->enum(self::MANAGE_QUEUE_ACTIONS)
+                ->description('Required for `type=manage_queue`. `release` deletes the job; ' .
+                    'Craft has no `cancel()` — `release` IS the cancel action.'),
+            'jobId' => Schema::string()
+                ->description('Queue row id (string). Required for `manage_queue` action=retry / release.'),
+            'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
+        ])->toArray();
+    }
 
     /**
      * @return array<string,mixed>

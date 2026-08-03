@@ -43,6 +43,34 @@ abstract class AbstractTool implements ToolInterface
     }
 
     /**
+     * The complete, edition-independent input schema, for documentation
+     * generators only. Defaults to `getInputSchema()`, which is the right
+     * answer for every tool whose schema does not vary by edition.
+     *
+     * Tools that gate an enum on the live edition inside
+     * `getInputSchema()` (`content_audit`, `drafts_and_revisions`,
+     * `import_export`, `system_diagnostics`) override this to return the
+     * union of every value the source carries, so `docs/TOOLS.md`
+     * describes the same surface no matter which edition the generator
+     * ran on.
+     *
+     * **Never consulted on the wire.** `tools/list` and `tools/call`
+     * validation read `getInputSchema()` / `inputSchemaFor()`; those keep
+     * gating on edition and permissions. This method exists so the
+     * committed reference does not encode the generating install's
+     * license state.
+     *
+     * @return array<string,mixed>
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    public static function docsInputSchema(): array
+    {
+        return static::getInputSchema();
+    }
+
+    /**
      * @inheritdoc
      *
      * Default: no output schema declared.

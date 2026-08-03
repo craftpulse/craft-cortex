@@ -11,7 +11,11 @@
  * The tool-reference tests are the guard on edition independence: this
  * suite runs against a Free install (`plugins.herald.edition` is `free`
  * in `herald_fixtures`), so a `TOOLS.md` generator that read the gated
- * registry would drop every Pro write tool and fail them.
+ * registry would drop every Pro write tool and fail them, and one that
+ * read `getInputSchema()` instead of `docsInputSchema()` would ship four
+ * shortened enums and fail the byte-comparison below. The per-tool half
+ * of that contract lives in
+ * `tests/Architecture/DocsSchemaInvariantTest.php`.
  * =========================================================================
  *
  * @author CraftPulse
@@ -116,6 +120,61 @@ it('documents every tool the source registers regardless of the install edition'
     expect($contents)->not->toContain('## `_streaming_test`');
 });
 
+it('documents the complete mode and type enums of the edition-gated tools', function() {
+    // This install is Free, so `content_audit`, `drafts_and_revisions`,
+    // `import_export` and `system_diagnostics` all serve a shortened enum
+    // on the wire. The reference documents the whole surface anyway.
+    Craft::$app->runAction('herald/docs/tools', ['out' => $this->tmp]);
+
+    $contents = file_get_contents($this->tmp . '/TOOLS.md');
+
+    foreach ([
+        'fix_relations',
+        'prune_unused_assets',
+        'repair_propagation',
+        'apply',
+        'discard',
+        'import',
+        'manage_queue',
+    ] as $value) {
+        expect($contents)->toContain("\"{$value}\"");
+    }
+});
+
+it('generates a byte-identical TOOLS.md on Free and on Pro', function() {
+    // The whole point of `docsInputSchema()`: the committed reference does
+    // not encode the generating install's license state. Only the
+    // generated-at line legitimately differs between the two runs.
+    $strip = static fn(string $md): string => (string) preg_replace(
+        '/^- \*\*Generated:\*\*.*$/m',
+        '',
+        $md,
+    );
+
+    Craft::$app->runAction('herald/docs/tools', ['out' => $this->tmp]);
+    $onFree = $strip((string) file_get_contents($this->tmp . '/TOOLS.md'));
+
+    herald_with_edition('pro', function() {
+        Craft::$app->runAction('herald/docs/tools', ['out' => $this->tmp]);
+    });
+    $onPro = $strip((string) file_get_contents($this->tmp . '/TOOLS.md'));
+
+    expect($onPro)->toBe($onFree);
+});
+
+it('stamps no edition caveat into the generated TOOLS.md', function() {
+    // The interim Free-install note and its stderr twin are gone; the
+    // reference is complete on every edition, so there is nothing to warn
+    // about and nothing for a reader to have to trust.
+    Craft::$app->runAction('herald/docs/tools', ['out' => $this->tmp]);
+
+    $contents = file_get_contents($this->tmp . '/TOOLS.md');
+
+    expect($contents)
+        ->not->toContain('Generated on a Free install')
+        ->not->toContain('Regenerate on Pro');
+});
+
 it('documents one heading per tool, in registration order', function() {
     Craft::$app->runAction('herald/docs/tools', ['out' => $this->tmp]);
 
@@ -148,8 +207,14 @@ it('generates RESOURCES.md with a Markdown table', function() {
     $path = $this->tmp . '/RESOURCES.md';
     expect(file_exists($path))->toBeTrue();
 
+    // Counted against `getBundled()`, not `getCount()`: the two coincide
+    // on this install only because the fixtures' `herald_skills` table is
+    // empty, and an assertion that holds by coincidence would stop
+    // detecting a generator that reads the whole registry.
+    // `tests/Resources/BundledRegistryTest.php` seeds a row and asserts
+    // the difference.
     $contents = file_get_contents($path);
-    $expectedCount = Herald::getInstance()->resources->getCount();
+    $expectedCount = count(Herald::getInstance()->resources->getBundled());
     expect($contents)->toContain("**Total resources:** {$expectedCount}");
     expect($contents)->toContain('| URI | Name | MIME | Description |');
 });

@@ -160,24 +160,23 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
             ? array_merge(self::FREE_MODES, self::PRO_MODES)
             : self::FREE_MODES;
 
-        return Schema::object([
-            'mode' => Schema::string()
-                ->enum($modes)
-                ->required()
-                ->description('Required.'),
-            'section' => Schema::string()->description('Section handle. Filters list_drafts.'),
-            'canonicalId' => Schema::integer()
-                ->description('Canonical entry id. Required for list_revisions; optional filter for list_drafts.'),
-            'creatorId' => Schema::integer()->description('User id of draft creator. Filters list_drafts.'),
-            'leftId' => Schema::integer()->description('First entry/draft/revision id for `compare` mode.'),
-            'rightId' => Schema::integer()->description('Second entry/draft/revision id for `compare` mode.'),
-            'id' => Schema::integer()->description('Draft id for `apply` / `discard` modes.'),
-            'uid' => Schema::string()->description('Draft uid for `apply` / `discard` modes.'),
-            'siteId' => Schema::integer()->description('Site id for the draft lookup in `apply` / `discard`.'),
-            'siteHandle' => Schema::string()->description('Site handle for the draft lookup in `apply` / `discard`.'),
-            'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
-            'offset' => Schema::integer()->minimum(0),
-        ])->toArray();
+        return self::_schemaWithModes($modes);
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Documentation surface: the Free + Pro enum unconditionally, so
+     * `docs/TOOLS.md` is identical whichever edition the generator ran
+     * on. Shares `_schemaWithModes()` with `getInputSchema()`, so the
+     * two cannot drift apart when a property or a mode is added.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    public static function docsInputSchema(): array
+    {
+        return self::_schemaWithModes(array_merge(self::FREE_MODES, self::PRO_MODES));
     }
 
     /**
@@ -312,6 +311,39 @@ class DraftsAndRevisions extends AbstractTool implements DualModeToolInterface
 
     // Private Methods
     // =========================================================================
+
+    /**
+     * The tool's input schema with the `mode` enum set to `$modes`. Sole
+     * definition of the schema body: `getInputSchema()` passes the
+     * edition-appropriate enum, `docsInputSchema()` passes the union.
+     *
+     * @param list<string> $modes
+     * @return array<string,mixed>
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private static function _schemaWithModes(array $modes): array
+    {
+        return Schema::object([
+            'mode' => Schema::string()
+                ->enum($modes)
+                ->required()
+                ->description('Required.'),
+            'section' => Schema::string()->description('Section handle. Filters list_drafts.'),
+            'canonicalId' => Schema::integer()
+                ->description('Canonical entry id. Required for list_revisions; optional filter for list_drafts.'),
+            'creatorId' => Schema::integer()->description('User id of draft creator. Filters list_drafts.'),
+            'leftId' => Schema::integer()->description('First entry/draft/revision id for `compare` mode.'),
+            'rightId' => Schema::integer()->description('Second entry/draft/revision id for `compare` mode.'),
+            'id' => Schema::integer()->description('Draft id for `apply` / `discard` modes.'),
+            'uid' => Schema::string()->description('Draft uid for `apply` / `discard` modes.'),
+            'siteId' => Schema::integer()->description('Site id for the draft lookup in `apply` / `discard`.'),
+            'siteHandle' => Schema::string()->description('Site handle for the draft lookup in `apply` / `discard`.'),
+            'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
+            'offset' => Schema::integer()->minimum(0),
+        ])->toArray();
+    }
 
     /**
      * @param array<string,mixed> $arguments

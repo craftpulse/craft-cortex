@@ -3,8 +3,13 @@
 Auto-generated reference for the herald MCP prompt surface. Run
 `ddev craft herald/docs/prompts` to refresh.
 
+One prompt is registered per bundled skill that herald maps to a
+prompt name, so the total moves with the skills corpus version
+below.
+
 - **Total prompts:** 10
-- **Generated:** 2026-08-03T16:33:36+00:00
+- **Skills corpus:** `v1.6.2` (michtio/craftcms-claude-skills)
+- **Generated:** 2026-08-03T18:25:32+00:00
 
 ## `craftcms_cloud`
 

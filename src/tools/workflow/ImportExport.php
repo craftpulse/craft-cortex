@@ -215,26 +215,23 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
             ? array_merge(self::FREE_MODES, self::PRO_MODES)
             : self::FREE_MODES;
 
-        return Schema::object([
-            'mode' => Schema::string()
-                ->enum($modes)
-                ->required()
-                ->description('Required.'),
-            'section' => Schema::string()->description('Section handle filter (for `export`).'),
-            'id' => Schema::any()->description('Single entry id or array of ids. Overrides section filter (for `export`).'),
-            'site' => Schema::string()->description('Site handle. Defaults to primary site (for `export`).'),
-            'siteHandle' => Schema::string()->description('Site handle override for `import` — picks the per-entry site context if the payload\'s `site` is unknown to this install.'),
-            'payload' => Schema::object()
-                ->additionalProperties(true)
-                ->description('Required for `import`. The envelope shape returned by `export`: `{format, entries: [...]}`.'),
-            'dryRun' => Schema::boolean()
-                ->description('Defaults to `true` for `import`. Pass `false` to actually write. Validates against the target section\'s field layout either way.'),
-            'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
-            'offset' => Schema::integer()->minimum(0),
-            'progressInterval' => Schema::integer()
-                ->minimum(1)
-                ->description('Streaming-only. Emit one `notifications/progress` frame every N items processed (default 100). Ignored on non-streaming dispatch.'),
-        ])->toArray();
+        return self::_schemaWithModes($modes);
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Documentation surface: the Free + Pro enum unconditionally, so
+     * `docs/TOOLS.md` is identical whichever edition the generator ran
+     * on. Shares `_schemaWithModes()` with `getInputSchema()`, so the
+     * two cannot drift apart when a property or a mode is added.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    public static function docsInputSchema(): array
+    {
+        return self::_schemaWithModes(array_merge(self::FREE_MODES, self::PRO_MODES));
     }
 
     /**
@@ -409,6 +406,41 @@ class ImportExport extends AbstractTool implements StreamableToolInterface, Dual
 
     // Private Methods
     // =========================================================================
+
+    /**
+     * The tool's input schema with the `mode` enum set to `$modes`. Sole
+     * definition of the schema body: `getInputSchema()` passes the
+     * edition-appropriate enum, `docsInputSchema()` passes the union.
+     *
+     * @param list<string> $modes
+     * @return array<string,mixed>
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private static function _schemaWithModes(array $modes): array
+    {
+        return Schema::object([
+            'mode' => Schema::string()
+                ->enum($modes)
+                ->required()
+                ->description('Required.'),
+            'section' => Schema::string()->description('Section handle filter (for `export`).'),
+            'id' => Schema::any()->description('Single entry id or array of ids. Overrides section filter (for `export`).'),
+            'site' => Schema::string()->description('Site handle. Defaults to primary site (for `export`).'),
+            'siteHandle' => Schema::string()->description('Site handle override for `import` — picks the per-entry site context if the payload\'s `site` is unknown to this install.'),
+            'payload' => Schema::object()
+                ->additionalProperties(true)
+                ->description('Required for `import`. The envelope shape returned by `export`: `{format, entries: [...]}`.'),
+            'dryRun' => Schema::boolean()
+                ->description('Defaults to `true` for `import`. Pass `false` to actually write. Validates against the target section\'s field layout either way.'),
+            'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
+            'offset' => Schema::integer()->minimum(0),
+            'progressInterval' => Schema::integer()
+                ->minimum(1)
+                ->description('Streaming-only. Emit one `notifications/progress` frame every N items processed (default 100). Ignored on non-streaming dispatch.'),
+        ])->toArray();
+    }
 
     /**
      * @param array<string,mixed> $arguments

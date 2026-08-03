@@ -2,8 +2,10 @@
 
 namespace craftpulse\herald\console\controllers;
 
+use Composer\InstalledVersions;
 use craft\console\Controller;
 use craftpulse\herald\Herald;
+use craftpulse\herald\tools\AbstractTool;
 use craftpulse\herald\tools\ProToolTrait;
 use craftpulse\herald\tools\support\AttributeReader;
 use craftpulse\herald\tools\ToolInterface;
@@ -29,16 +31,26 @@ use yii\helpers\Console;
  * relative to the herald package root). Tests use this to write into
  * a tmp directory and assert the output shape.
  *
- * The tool set is edition-independent on purpose: TOOLS.md documents
- * every tool the source registers and labels each one Free or Pro,
- * rather than only the tools the generating install happens to have
- * registered. What is still edition-scoped is the mode enum inside the
- * four dual-edition tools' input schemas (content_audit,
- * drafts_and_revisions, import_export, system_diagnostics), because
- * their getInputSchema() gates the enum on the live edition by design.
- * Generate the committed reference on a Pro install to capture the
- * complete schema surface; on a Free install the generator says so in
- * the output and on stderr rather than shrinking the file silently.
+ * TOOLS.md is edition-independent, byte for byte. The tool list comes
+ * from Tools::getAllUnfiltered(), so it documents every tool the source
+ * registers and labels each one Free or Pro rather than only the tools
+ * the generating install happens to have registered. The schemas come
+ * from AbstractTool::docsInputSchema(), which the four dual-edition
+ * tools (content_audit, drafts_and_revisions, import_export,
+ * system_diagnostics) override to return their complete mode/type enum:
+ * their getInputSchema() still gates that enum on the live edition for
+ * the wire, and the generator never reads it.
+ *
+ * RESOURCES.md is install-independent for the same reason: it renders
+ * Resources::getBundled(), the resources the package itself ships, and
+ * never the element-authored skills an operator added on the generating
+ * install.
+ *
+ * What all three files do depend on is the version of the bundled skills
+ * corpus, because the resource and prompt registries enumerate it and
+ * search_skills names its size. Each file states that version in its
+ * header, so a count that moved is attributable to the corpus rather than
+ * to the machine that ran the generator.
  *
  * @author CraftPulse
  * @since  5.0.0
@@ -64,6 +76,15 @@ class DocsController extends Controller
      * @since 5.0.0
      */
     public const INTERNAL_TOOL_PREFIX = '_';
+
+    /**
+     * Composer package that ships the skills corpus the resource and
+     * prompt registries enumerate. Read for the provenance line every
+     * generated file carries in its header.
+     *
+     * @since 5.0.0
+     */
+    public const SKILLS_PACKAGE = 'michtio/craftcms-claude-skills';
 
     // Public Properties
     // =========================================================================
@@ -118,15 +139,6 @@ class DocsController extends Controller
      */
     public function actionTools(): int
     {
-        if (!Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
-            $this->stderr(
-                "Generating on a Free install: every tool is documented, but the mode enums of "
-                . "content_audit, drafts_and_revisions, import_export and system_diagnostics omit "
-                . "their Pro modes. Regenerate on Pro before committing the reference.\n",
-                Console::FG_YELLOW,
-            );
-        }
-
         $md = $this->_renderToolsMarkdown($this->_documentedTools());
         return $this->_writeDoc('TOOLS.md', $md);
     }
@@ -147,12 +159,18 @@ class DocsController extends Controller
     /**
      * Generate `RESOURCES.md`.
      *
+     * Reads `Resources::getBundled()`, not `getAll()`: the runtime
+     * registry also carries a resource per element-authored skill, which
+     * is the generating install's own content and has no business in the
+     * package's committed documentation. The runtime registry keeps
+     * serving those resources; only this generator looks away.
+     *
      * @author CraftPulse
      * @since  5.0.0
      */
     public function actionResources(): int
     {
-        $resources = Herald::getInstance()->resources->getAll();
+        $resources = Herald::getInstance()->resources->getBundled();
         $md = $this->_renderResourcesMarkdown($resources);
         return $this->_writeDoc('RESOURCES.md', $md);
     }
@@ -234,6 +252,53 @@ class DocsController extends Controller
     }
 
     /**
+     * The input schema to document for a tool: `docsInputSchema()` when
+     * the tool extends `AbstractTool`, the static `getInputSchema()`
+     * otherwise.
+     *
+     * The fallback is for third-party tools, which `docs/EXTENDING.md`
+     * invites to implement `ToolInterface` directly. `docsInputSchema()`
+     * is deliberately not on that interface: it is a documentation
+     * concern, and widening the wire contract for it would make every
+     * third-party tool implement a method the MCP server never calls.
+     *
+     * @return array<string,mixed>
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private function _documentedSchema(ToolInterface $tool): array
+    {
+        return $tool instanceof AbstractTool
+            ? $tool::docsInputSchema()
+            : $tool::getInputSchema();
+    }
+
+    /**
+     * Version of the bundled skills corpus, as Composer resolved it.
+     * Every generated file's counts move with that corpus, so each one
+     * states the version and the number stops being unattributable.
+     *
+     * Returns `unknown` when the Composer runtime API cannot answer,
+     * which happens in a classmap-only autoload setup.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private function _skillsCorpusVersion(): string
+    {
+        if (!class_exists(InstalledVersions::class)) {
+            return 'unknown';
+        }
+
+        try {
+            return InstalledVersions::getPrettyVersion(self::SKILLS_PACKAGE) ?? 'unknown';
+        } catch (\OutOfBoundsException) {
+            return 'unknown';
+        }
+    }
+
+    /**
      * Whether a tool only registers on Pro installs, resolved from the
      * `ProToolTrait` opt-in that owns the edition gate. Walks parents so
      * a future intermediate base class that carries the trait still
@@ -266,6 +331,7 @@ class DocsController extends Controller
         $count = count($tools);
         $proCount = count(array_filter($tools, fn(ToolInterface $tool): bool => $this->_requiresPro($tool)));
         $freeCount = $count - $proCount;
+        $corpus = $this->_skillsCorpusVersion();
         $generatedAt = date('c');
 
         $md = <<<MD
@@ -274,25 +340,22 @@ class DocsController extends Controller
         Auto-generated reference for the herald MCP tool surface. Run
         `ddev craft herald/docs/tools` to refresh.
 
+        Every tool herald registers is documented and labelled Free or Pro,
+        on any edition. `search_skills` names the size of the bundled skills
+        corpus in its description, so that one description moves with the
+        corpus version below.
+
         - **Total tools:** {$count} ({$freeCount} Free, {$proCount} Pro)
+        - **Skills corpus:** `{$corpus}` (michtio/craftcms-claude-skills)
         - **Generated:** {$generatedAt}
 
 
         MD;
 
-        if (!Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
-            // Stays out of the header on a Pro run, so a Free-generated
-            // reference is visible in review as an added line rather than
-            // as four quietly shortened enums.
-            $md .= "> Generated on a Free install: the mode enums of `content_audit`,\n"
-                . "> `drafts_and_revisions`, `import_export` and `system_diagnostics` omit their\n"
-                . "> Pro modes. Regenerate on Pro for the complete schema surface.\n\n";
-        }
-
         foreach ($tools as $tool) {
             $name = $tool::getName();
             $description = $tool::getDescription();
-            $schema = $tool::getInputSchema();
+            $schema = $this->_documentedSchema($tool);
             $annotations = AttributeReader::annotationsFor($tool);
             $stdioOnly = AttributeReader::isStdioOnly($tool);
             $edition = $this->_requiresPro($tool) ? 'Pro' : 'Free';
@@ -337,6 +400,7 @@ class DocsController extends Controller
     private function _renderPromptsMarkdown(array $prompts): string
     {
         $count = count($prompts);
+        $corpus = $this->_skillsCorpusVersion();
         $generatedAt = date('c');
 
         $md = <<<MD
@@ -345,7 +409,12 @@ class DocsController extends Controller
         Auto-generated reference for the herald MCP prompt surface. Run
         `ddev craft herald/docs/prompts` to refresh.
 
+        One prompt is registered per bundled skill that herald maps to a
+        prompt name, so the total moves with the skills corpus version
+        below.
+
         - **Total prompts:** {$count}
+        - **Skills corpus:** `{$corpus}` (michtio/craftcms-claude-skills)
         - **Generated:** {$generatedAt}
 
 
@@ -378,6 +447,7 @@ class DocsController extends Controller
     private function _renderResourcesMarkdown(array $resources): string
     {
         $count = count($resources);
+        $corpus = $this->_skillsCorpusVersion();
         $generatedAt = date('c');
 
         $md = <<<MD
@@ -386,7 +456,14 @@ class DocsController extends Controller
         Auto-generated reference for the herald MCP resource surface. Run
         `ddev craft herald/docs/resources` to refresh.
 
+        These are the resources the package ships: one per document in the
+        bundled skills corpus, plus one per bundled agent. The total moves
+        with the corpus version below. An install also exposes one resource
+        per skill authored as a `herald_skills` element, and those are
+        per-install content that this reference never lists.
+
         - **Total resources:** {$count}
+        - **Skills corpus:** `{$corpus}` (michtio/craftcms-claude-skills)
         - **Generated:** {$generatedAt}
 
         | URI | Name | MIME | Description |

@@ -3,8 +3,14 @@
 Auto-generated reference for the herald MCP tool surface. Run
 `ddev craft herald/docs/tools` to refresh.
 
+Every tool herald registers is documented and labelled Free or Pro,
+on any edition. `search_skills` names the size of the bundled skills
+corpus in its description, so that one description moves with the
+corpus version below.
+
 - **Total tools:** 42 (33 Free, 9 Pro)
-- **Generated:** 2026-08-03T16:33:36+00:00
+- **Skills corpus:** `v1.6.2` (michtio/craftcms-claude-skills)
+- **Generated:** 2026-08-03T18:25:32+00:00
 
 ## `get_initial_context`
 

@@ -3,8 +3,15 @@
 Auto-generated reference for the herald MCP resource surface. Run
 `ddev craft herald/docs/resources` to refresh.
 
+These are the resources the package ships: one per document in the
+bundled skills corpus, plus one per bundled agent. The total moves
+with the corpus version below. An install also exposes one resource
+per skill authored as a `herald_skills` element, and those are
+per-install content that this reference never lists.
+
 - **Total resources:** 98
-- **Generated:** 2026-08-03T16:33:36+00:00
+- **Skills corpus:** `v1.6.2` (michtio/craftcms-claude-skills)
+- **Generated:** 2026-08-03T18:25:32+00:00
 
 | URI | Name | MIME | Description |
 | --- | ---- | ---- | ----------- |

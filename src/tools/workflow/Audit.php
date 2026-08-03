@@ -218,19 +218,23 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
             ? array_merge(self::FREE_MODES, self::PRO_MODES)
             : self::FREE_MODES;
 
-        return Schema::object([
-            'mode' => Schema::string()
-                ->enum($modes)
-                ->required()
-                ->description('Required.'),
-            'volume' => Schema::string()->description('Volume handle filter for `unused_assets` / `prune_unused_assets`.'),
-            'section' => Schema::string()->description('Section handle filter for `propagation` / `repair_propagation`.'),
-            'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
-            'offset' => Schema::integer()->minimum(0),
-            'progressInterval' => Schema::integer()
-                ->minimum(1)
-                ->description('Streaming-only. Emit one `notifications/progress` frame every N rows processed (default 100). Ignored on non-streaming dispatch.'),
-        ])->toArray();
+        return self::_schemaWithModes($modes);
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Documentation surface: the Free + Pro enum unconditionally, so
+     * `docs/TOOLS.md` is identical whichever edition the generator ran
+     * on. Shares `_schemaWithModes()` with `getInputSchema()`, so the
+     * two cannot drift apart when a property or a mode is added.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    public static function docsInputSchema(): array
+    {
+        return self::_schemaWithModes(array_merge(self::FREE_MODES, self::PRO_MODES));
     }
 
     /**
@@ -504,6 +508,34 @@ class Audit extends AbstractTool implements StreamableToolInterface, DualModeToo
 
     // Private Methods
     // =========================================================================
+
+    /**
+     * The tool's input schema with the `mode` enum set to `$modes`. Sole
+     * definition of the schema body: `getInputSchema()` passes the
+     * edition-appropriate enum, `docsInputSchema()` passes the union.
+     *
+     * @param list<string> $modes
+     * @return array<string,mixed>
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private static function _schemaWithModes(array $modes): array
+    {
+        return Schema::object([
+            'mode' => Schema::string()
+                ->enum($modes)
+                ->required()
+                ->description('Required.'),
+            'volume' => Schema::string()->description('Volume handle filter for `unused_assets` / `prune_unused_assets`.'),
+            'section' => Schema::string()->description('Section handle filter for `propagation` / `repair_propagation`.'),
+            'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
+            'offset' => Schema::integer()->minimum(0),
+            'progressInterval' => Schema::integer()
+                ->minimum(1)
+                ->description('Streaming-only. Emit one `notifications/progress` frame every N rows processed (default 100). Ignored on non-streaming dispatch.'),
+        ])->toArray();
+    }
 
     /**
      * Find rows in `{{%relations}}` whose target element doesn't exist
