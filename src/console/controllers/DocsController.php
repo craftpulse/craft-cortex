@@ -54,8 +54,16 @@ class DocsController extends Controller
      * member is `_streaming_test`, the env-gated SSE wire fixture in
      * `tools/dev/StreamingFixtureTool`; every shipped tool name is
      * plain snake_case with no leading underscore.
+     *
+     * Public because this controller owns the convention and the tool
+     * architecture test reads it rather than re-declaring the prefix.
+     * That test also holds the prefixed set to exactly `_streaming_test`,
+     * so the exclusion cannot become a way past the authorization
+     * classification.
+     *
+     * @since 5.0.0
      */
-    private const INTERNAL_TOOL_PREFIX = '_';
+    public const INTERNAL_TOOL_PREFIX = '_';
 
     // Public Properties
     // =========================================================================
