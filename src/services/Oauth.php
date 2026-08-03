@@ -93,6 +93,33 @@ class Oauth extends Component
     // =========================================================================
 
     /**
+     * Timezone every `herald_oauth_tokens` and `herald_oauth_codes`
+     * datetime column is written in and read back in. Referenced by the
+     * league repository adapters in `craftpulse\herald\oauth\repositories`
+     * so the whole OAuth layer names one zone.
+     *
+     * Craft's datetime columns hold **naive** UTC strings: nothing in the
+     * value records an offset, and `dateCreated` / `dateUpdated` are
+     * stamped in UTC by `craft\db\ActiveRecord`. A bare `Carbon::now()`
+     * follows the PHP process timezone, which Craft sets to
+     * `system.timeZone` — so on any non-UTC install the columns this
+     * layer writes (`expiresAt`, `dateRevoked`, `consumedAt`) would land
+     * in local wall-clock time next to UTC siblings in the same row.
+     *
+     * The same zone has to be named on the read side. `pruneExpired()` is
+     * the only place these columns are compared against a clock (access
+     * and refresh expiry at validation time come from the JWT's `exp`
+     * claim and league's encrypted refresh payload respectively, and the
+     * revocation columns are null-checked), so it is the one read that
+     * moves with the writes. Naming the zone on both halves is what makes
+     * the round trip preserve the instant instead of merely being
+     * self-consistent.
+     *
+     * @since 5.0.0
+     */
+    public const COLUMN_TIME_ZONE = 'UTC';
+
+    /**
      * Directory under Craft's storage path where the JWT key pair
      * lives. Gitignored. Operators that don't want to ship keys with
      * the storage volume can mount this path separately.
@@ -259,7 +286,7 @@ class Oauth extends Component
     public function revokeFamily(string $familyId, string $reason): int
     {
         $count = (int) OauthTokenRecord::updateAll(
-            ['dateRevoked' => Carbon::now()->toDateTimeString()],
+            ['dateRevoked' => Carbon::now(self::COLUMN_TIME_ZONE)->toDateTimeString()],
             ['familyId' => $familyId, 'dateRevoked' => null],
         );
 
@@ -718,7 +745,7 @@ class Oauth extends Component
         // should not leave its already-issued access tokens live until
         // they expire.
         OauthTokenRecord::updateAll(
-            ['dateRevoked' => Carbon::now()->toDateTimeString()],
+            ['dateRevoked' => Carbon::now(self::COLUMN_TIME_ZONE)->toDateTimeString()],
             ['clientId' => $record->clientId, 'dateRevoked' => null],
         );
 
@@ -756,7 +783,7 @@ class Oauth extends Component
         }
 
         $count = OauthTokenRecord::updateAll(
-            ['dateRevoked' => Carbon::now()->toDateTimeString()],
+            ['dateRevoked' => Carbon::now(self::COLUMN_TIME_ZONE)->toDateTimeString()],
             ['tokenHash' => $hash, 'dateRevoked' => null],
         );
 
@@ -790,12 +817,19 @@ class Oauth extends Component
      * Wired to `Gc::EVENT_RUN` in `PluginTrait::_registerGcListener()`
      * alongside the runtime-override and invocation prunes.
      *
+     * This is the only place an OAuth `expiresAt` column is compared
+     * against a clock, so the cutoff is taken in `COLUMN_TIME_ZONE` to
+     * match what the repositories wrote. Taking it from the process
+     * timezone instead would shift the cutoff by the install's UTC
+     * offset: ahead of UTC it prunes live credentials, behind UTC it
+     * keeps dead rows.
+     *
      * @author CraftPulse
      * @since  5.0.0
      */
     public function pruneExpired(): int
     {
-        $now = Carbon::now()->toDateTimeString();
+        $now = Carbon::now(self::COLUMN_TIME_ZONE)->toDateTimeString();
 
         $codes = (int) OauthCodeRecord::deleteAll(['<', 'expiresAt', $now]);
 

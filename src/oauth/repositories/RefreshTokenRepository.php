@@ -7,6 +7,7 @@ use Craft;
 use craftpulse\herald\Herald;
 use craftpulse\herald\oauth\entities\RefreshTokenEntity;
 use craftpulse\herald\records\OauthToken as OauthTokenRecord;
+use craftpulse\herald\services\Oauth;
 use League\OAuth2\Server\Entities\RefreshTokenEntityInterface;
 use League\OAuth2\Server\Exception\UniqueTokenIdentifierConstraintViolationException;
 use League\OAuth2\Server\Repositories\RefreshTokenRepositoryInterface;
@@ -96,7 +97,13 @@ class RefreshTokenRepository implements RefreshTokenRepositoryInterface
             static fn($scope): string => $scope->getIdentifier(),
             $access->getScopes(),
         ));
-        $record->expiresAt = Carbon::instance($refreshTokenEntity->getExpiryDateTime())->toDateTimeString();
+        // League builds the expiry from `new DateTimeImmutable()`, so it
+        // carries the process timezone. Converting to the column's zone
+        // preserves the instant; formatting it as-is would write local
+        // wall clock next to a UTC `dateCreated`.
+        $record->expiresAt = Carbon::instance($refreshTokenEntity->getExpiryDateTime())
+            ->setTimezone(Oauth::COLUMN_TIME_ZONE)
+            ->toDateTimeString();
 
         if (!$record->save()) {
             throw UniqueTokenIdentifierConstraintViolationException::create();
@@ -114,7 +121,7 @@ class RefreshTokenRepository implements RefreshTokenRepositoryInterface
     public function revokeRefreshToken(string $tokenId): void
     {
         $hash = hash('sha256', $tokenId);
-        $now = Carbon::now()->toDateTimeString();
+        $now = Carbon::now(Oauth::COLUMN_TIME_ZONE)->toDateTimeString();
         $db = Craft::$app->getDb();
 
         // Consume atomically: a single conditional UPDATE inside a

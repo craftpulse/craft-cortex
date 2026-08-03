@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use craftpulse\herald\Herald;
 use craftpulse\herald\oauth\entities\AccessTokenEntity;
 use craftpulse\herald\records\OauthToken as OauthTokenRecord;
+use craftpulse\herald\services\Oauth;
 use League\OAuth2\Server\Entities\AccessTokenEntityInterface;
 use League\OAuth2\Server\Entities\ClientEntityInterface;
 use League\OAuth2\Server\Exception\UniqueTokenIdentifierConstraintViolationException;
@@ -118,7 +119,13 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
             $accessTokenEntity->getScopes(),
         ));
         $record->audience = $audience;
-        $record->expiresAt = Carbon::instance($accessTokenEntity->getExpiryDateTime())->toDateTimeString();
+        // League builds the expiry from `new DateTimeImmutable()`, so it
+        // carries the process timezone. Converting to the column's zone
+        // preserves the instant; formatting it as-is would write local
+        // wall clock next to a UTC `dateCreated`.
+        $record->expiresAt = Carbon::instance($accessTokenEntity->getExpiryDateTime())
+            ->setTimezone(Oauth::COLUMN_TIME_ZONE)
+            ->toDateTimeString();
 
         if (!$record->save()) {
             throw UniqueTokenIdentifierConstraintViolationException::create();
@@ -135,7 +142,7 @@ class AccessTokenRepository implements AccessTokenRepositoryInterface
     {
         $hash = hash('sha256', $tokenId);
         OauthTokenRecord::updateAll(
-            ['dateRevoked' => Carbon::now()->toDateTimeString()],
+            ['dateRevoked' => Carbon::now(Oauth::COLUMN_TIME_ZONE)->toDateTimeString()],
             ['tokenType' => 'access', 'tokenHash' => $hash, 'dateRevoked' => null],
         );
     }

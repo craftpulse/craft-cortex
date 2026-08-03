@@ -5,6 +5,7 @@ namespace craftpulse\herald\oauth\repositories;
 use Carbon\Carbon;
 use craftpulse\herald\oauth\entities\AuthCodeEntity;
 use craftpulse\herald\records\OauthCode as OauthCodeRecord;
+use craftpulse\herald\services\Oauth;
 use League\OAuth2\Server\Entities\AuthCodeEntityInterface;
 use League\OAuth2\Server\Exception\UniqueTokenIdentifierConstraintViolationException;
 use League\OAuth2\Server\Repositories\AuthCodeRepositoryInterface;
@@ -69,7 +70,13 @@ class AuthCodeRepository implements AuthCodeRepositoryInterface
             $authCodeEntity->getScopes(),
         ));
         $record->isRevoked = false;
-        $record->expiresAt = Carbon::instance($authCodeEntity->getExpiryDateTime())->toDateTimeString();
+        // League builds the expiry from `new DateTimeImmutable()`, so it
+        // carries the process timezone. Converting to the column's zone
+        // preserves the instant; formatting it as-is would write local
+        // wall clock next to a UTC `dateCreated`.
+        $record->expiresAt = Carbon::instance($authCodeEntity->getExpiryDateTime())
+            ->setTimezone(Oauth::COLUMN_TIME_ZONE)
+            ->toDateTimeString();
 
         if (!$record->save()) {
             throw UniqueTokenIdentifierConstraintViolationException::create();
