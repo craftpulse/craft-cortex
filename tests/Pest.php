@@ -180,8 +180,9 @@ function herald_with_pro_registry(callable $fn): mixed
 {
     return herald_with_edition(Herald::EDITION_PRO, function() use ($fn) {
         $original = Herald::getInstance()->tools;
+        // Yii's constructor runs `init()`, which is where the registry is
+        // built — no explicit second call.
         $fresh = new \craftpulse\herald\services\Tools();
-        $fresh->init();
         Herald::getInstance()->set('tools', $fresh);
 
         try {

@@ -4,7 +4,9 @@ namespace craftpulse\herald\console\controllers;
 
 use craft\console\Controller;
 use craftpulse\herald\Herald;
+use craftpulse\herald\tools\ProToolTrait;
 use craftpulse\herald\tools\support\AttributeReader;
+use craftpulse\herald\tools\ToolInterface;
 use yii\console\ExitCode;
 use yii\helpers\Console;
 
@@ -27,11 +29,34 @@ use yii\helpers\Console;
  * relative to the herald package root). Tests use this to write into
  * a tmp directory and assert the output shape.
  *
+ * The tool set is edition-independent on purpose: TOOLS.md documents
+ * every tool the source registers and labels each one Free or Pro,
+ * rather than only the tools the generating install happens to have
+ * registered. What is still edition-scoped is the mode enum inside the
+ * four dual-edition tools' input schemas (content_audit,
+ * drafts_and_revisions, import_export, system_diagnostics), because
+ * their getInputSchema() gates the enum on the live edition by design.
+ * Generate the committed reference on a Pro install to capture the
+ * complete schema surface; on a Free install the generator says so in
+ * the output and on stderr rather than shrinking the file silently.
+ *
  * @author CraftPulse
  * @since  5.0.0
  */
 class DocsController extends Controller
 {
+    // Constants
+    // =========================================================================
+
+    /**
+     * Tool names starting with this prefix are internal fixtures, not
+     * product surface, and are left out of `TOOLS.md`. The only current
+     * member is `_streaming_test`, the env-gated SSE wire fixture in
+     * `tools/dev/StreamingFixtureTool`; every shipped tool name is
+     * plain snake_case with no leading underscore.
+     */
+    private const INTERNAL_TOOL_PREFIX = '_';
+
     // Public Properties
     // =========================================================================
 
@@ -85,8 +110,16 @@ class DocsController extends Controller
      */
     public function actionTools(): int
     {
-        $tools = Herald::getInstance()->tools->getAll();
-        $md = $this->_renderToolsMarkdown($tools);
+        if (!Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
+            $this->stderr(
+                "Generating on a Free install: every tool is documented, but the mode enums of "
+                . "content_audit, drafts_and_revisions, import_export and system_diagnostics omit "
+                . "their Pro modes. Regenerate on Pro before committing the reference.\n",
+                Console::FG_YELLOW,
+            );
+        }
+
+        $md = $this->_renderToolsMarkdown($this->_documentedTools());
         return $this->_writeDoc('TOOLS.md', $md);
     }
 
@@ -156,7 +189,66 @@ class DocsController extends Controller
     }
 
     /**
-     * @param \craftpulse\herald\tools\ToolInterface[] $tools
+     * Tools to document: every registration the source carries, in
+     * registration order, minus internal fixtures.
+     *
+     * Reads `Tools::getAllUnfiltered()` rather than `getAll()` so the
+     * output does not depend on the generating install's edition. The
+     * per-tool `**Edition:**` line carries what `getAll()` would have
+     * silently encoded by omission.
+     *
+     * @return ToolInterface[]
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private function _documentedTools(): array
+    {
+        $tools = [];
+        $seen = [];
+
+        foreach (Herald::getInstance()->tools->getAllUnfiltered() as $tool) {
+            $name = $tool::getName();
+            if (str_starts_with($name, self::INTERNAL_TOOL_PREFIX)) {
+                continue;
+            }
+            if (isset($seen[$name])) {
+                // First registration wins, same as the registry's own
+                // collision guard, so a third-party tool shadowing a
+                // bundled name can't emit a duplicate heading.
+                continue;
+            }
+            $seen[$name] = true;
+            $tools[] = $tool;
+        }
+
+        return $tools;
+    }
+
+    /**
+     * Whether a tool only registers on Pro installs, resolved from the
+     * `ProToolTrait` opt-in that owns the edition gate. Walks parents so
+     * a future intermediate base class that carries the trait still
+     * resolves.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private function _requiresPro(ToolInterface $tool): bool
+    {
+        $classes = array_merge([$tool::class], array_values(class_parents($tool) ?: []));
+
+        foreach ($classes as $class) {
+            if (in_array(ProToolTrait::class, class_uses($class) ?: [], true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param ToolInterface[] $tools
      *
      * @author CraftPulse
      * @since  5.0.0
@@ -164,6 +256,8 @@ class DocsController extends Controller
     private function _renderToolsMarkdown(array $tools): string
     {
         $count = count($tools);
+        $proCount = count(array_filter($tools, fn(ToolInterface $tool): bool => $this->_requiresPro($tool)));
+        $freeCount = $count - $proCount;
         $generatedAt = date('c');
 
         $md = <<<MD
@@ -172,11 +266,20 @@ class DocsController extends Controller
         Auto-generated reference for the herald MCP tool surface. Run
         `ddev craft herald/docs/tools` to refresh.
 
-        - **Total tools:** {$count}
+        - **Total tools:** {$count} ({$freeCount} Free, {$proCount} Pro)
         - **Generated:** {$generatedAt}
 
 
         MD;
+
+        if (!Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
+            // Stays out of the header on a Pro run, so a Free-generated
+            // reference is visible in review as an added line rather than
+            // as four quietly shortened enums.
+            $md .= "> Generated on a Free install: the mode enums of `content_audit`,\n"
+                . "> `drafts_and_revisions`, `import_export` and `system_diagnostics` omit their\n"
+                . "> Pro modes. Regenerate on Pro for the complete schema surface.\n\n";
+        }
 
         foreach ($tools as $tool) {
             $name = $tool::getName();
@@ -184,8 +287,10 @@ class DocsController extends Controller
             $schema = $tool::getInputSchema();
             $annotations = AttributeReader::annotationsFor($tool);
             $stdioOnly = AttributeReader::isStdioOnly($tool);
+            $edition = $this->_requiresPro($tool) ? 'Pro' : 'Free';
 
             $md .= "## `{$name}`\n\n";
+            $md .= "**Edition:** {$edition}\n\n";
             $md .= trim($description) . "\n\n";
 
             if ($annotations !== [] || $stdioOnly) {

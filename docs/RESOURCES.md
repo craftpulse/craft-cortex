@@ -4,7 +4,7 @@ Auto-generated reference for the herald MCP resource surface. Run
 `ddev craft herald/docs/resources` to refresh.
 
 - **Total resources:** 98
-- **Generated:** 2026-06-10T08:12:17-07:00
+- **Generated:** 2026-08-03T16:33:36+00:00
 
 | URI | Name | MIME | Description |
 | --- | ---- | ---- | ----------- |

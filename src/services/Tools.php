@@ -93,6 +93,14 @@ class Tools extends Component
      */
     private array $_byName = [];
 
+    /**
+     * @var ToolInterface[] Every tool the registry considered, in
+     *     registration order, *before* `shouldRegister()` gating — so it
+     *     holds the Pro write tools on a Free install and the streaming
+     *     fixture on an install that never set its env var.
+     */
+    private array $_allUnfiltered = [];
+
     // Public Methods
     // =========================================================================
 
@@ -106,6 +114,16 @@ class Tools extends Component
     {
         parent::init();
 
+        // Idempotent: Yii's constructor already calls `init()`, and a
+        // handful of tests re-call it on a freshly constructed instance to
+        // rebuild the registry after flipping the edition. Without the
+        // reset those runs would double every list — the name-keyed map
+        // dedupes itself, but the ordered arrays do not, and
+        // `getAllUnfiltered()` is recorded ahead of the collision guard.
+        $this->_tools = [];
+        $this->_byName = [];
+        $this->_allUnfiltered = [];
+
         $event = new RegisterToolsEvent();
         $event->tools = $this->_buildRegistry();
         $this->trigger(self::EVENT_REGISTER_TOOLS, $event);
@@ -114,6 +132,10 @@ class Tools extends Component
             if (!$tool instanceof ToolInterface) {
                 continue;
             }
+            // Recorded before the gate so `getAllUnfiltered()` describes
+            // the whole shipped surface rather than this install's slice
+            // of it. Dispatch never reads this list.
+            $this->_allUnfiltered[] = $tool;
             if (!$tool::shouldRegister()) {
                 // Boot-time license / edition / settings gating per
                 // the static class-level contract. Per-request per-user
@@ -147,6 +169,30 @@ class Tools extends Component
     public function getAll(): array
     {
         return $this->_tools;
+    }
+
+    /**
+     * Every tool the registry considered, in registration order,
+     * regardless of what `shouldRegister()` decided for this install.
+     *
+     * Documentation and diagnostics only. This is deliberately NOT a
+     * dispatch surface: `getByName()` / `getByNameFor()` keep reading
+     * the gated map, so a tool skipped at boot stays unresolvable over
+     * both transports. The one consumer is `console/controllers/
+     * DocsController`, which has to describe the whole shipped tool
+     * surface — a `docs/TOOLS.md` regenerated on a Free install would
+     * otherwise silently drop the nine Pro write tools, and the
+     * committed reference would be a function of whoever ran the
+     * generator rather than of the source.
+     *
+     * @return ToolInterface[]
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    public function getAllUnfiltered(): array
+    {
+        return $this->_allUnfiltered;
     }
 
     /**
