@@ -82,26 +82,35 @@ class Scopes extends Component
 
     /**
      * Read system + diagnostic surfaces — config, plugins, routes,
-     * GraphQL introspection, the orientation tool, skills, and the dev
-     * action tools (clear-caches, resave, command, exec).
+     * GraphQL introspection, the orientation tool, and skills.
+     *
+     * The dev action tools are deliberately absent: `craft_command`,
+     * `craft_exec`, `clear_caches` and `resave` all mutate state and
+     * carry `SYSTEM_WRITE`.
      *
      * @since 5.0.0
      */
     public const SYSTEM_READ = 'system:read';
 
     /**
-     * Dispatch a Craft console route through the `craft_command` tool.
+     * Run one of the dev action tools — `craft_command`, `craft_exec`,
+     * `clear_caches`, `resave`.
      *
-     * Its own scope because a console route reaches Craft's own
-     * controllers: `users/create`, `resave/*`, `migrate/*` and anything
-     * else the operator allowlists. Folding that into `system:read`
-     * (where it sat until the 2026-08-02 remediation) meant a read-only
-     * OAuth grant carried arbitrary command execution, which is the
-     * broadest possible capability wearing the narrowest possible label.
+     * Its own scope because each of these executes allowlisted code
+     * inside the Craft process. A console route reaches Craft's own
+     * controllers (`users/create`, `resave/*`, `migrate/*` and anything
+     * else the operator allowlists); `resave` walks and re-saves every
+     * matching element, firing every plugin's save hooks; `clear_caches`
+     * flushes caches an install depends on for its response times.
+     * Folding any of that into `system:read` (where `craft_command` sat
+     * until the 2026-08-02 remediation, and where `clear_caches` and
+     * `resave` sat until 2026-08-03) meant a read-only OAuth grant
+     * carried mutation, which is the broadest possible capability wearing
+     * the narrowest possible label.
      *
-     * Grants of this scope are still subject to the `craft_command`
-     * permission gate and the command allowlist — the scope widens
-     * nothing on its own.
+     * Grants of this scope are still subject to each tool's own
+     * permission gate, and `craft_command` additionally to the command
+     * allowlist — the scope widens nothing on its own.
      *
      * @since 5.0.0
      */
@@ -220,16 +229,22 @@ class Scopes extends Component
         'permissions_and_groups' => self::SYSTEM_READ,
         'search_skills' => self::SYSTEM_READ,
 
-        // GraphQL + dev actions.
+        // GraphQL introspection + execution against Craft's own schema,
+        // which applies its own scope rules per query.
         'graphql' => self::SYSTEM_READ,
-        'clear_caches' => self::SYSTEM_READ,
-        'resave' => self::SYSTEM_READ,
 
-        // Console dispatch. `system:write`, never `system:read` — both
-        // of these run arbitrary allowlisted code inside the Craft
-        // process, so a read grant must not carry them. `craft_exec`
-        // stays mapped for completeness but is refused at the HTTP
-        // transport boundary regardless of the scope a token carries.
+        // Dev actions. `system:write`, never `system:read` — every one of
+        // these runs code inside the Craft process, so a read grant must
+        // not carry them. `clear_caches` and `resave` are convenience
+        // wrappers over the `clear-caches/*` and `resave/*` console
+        // routes `craft_command` also reaches, and sat on `system:read`
+        // until the 2026-08-03 remediation, which let a read-shaped token
+        // through the gate the 2026-08-02 remediation installed.
+        // `craft_exec` stays mapped for completeness but is refused at
+        // the HTTP transport boundary regardless of the scope a token
+        // carries.
+        'clear_caches' => self::SYSTEM_WRITE,
+        'resave' => self::SYSTEM_WRITE,
         'craft_command' => self::SYSTEM_WRITE,
         'craft_exec' => self::SYSTEM_WRITE,
 
@@ -392,7 +407,7 @@ class Scopes extends Component
             self::ASSETS_WRITE => 'Upload and modify assets and address records.',
             self::SCHEMA_READ => 'Read schema: sections, fields, entry types, volumes, and sites.',
             self::SYSTEM_READ => 'Read system configuration, plugins, routes, and diagnostics.',
-            self::SYSTEM_WRITE => 'Run allowlisted Craft console commands.',
+            self::SYSTEM_WRITE => 'Run allowlisted Craft console commands, resave elements, and clear caches.',
             self::USERS_READ => 'Read user records (subject to PII gating).',
             self::USERS_WRITE => 'Create, update, and delete users.',
             self::LEGACY_READ => 'Read content, schema, and configuration. No writes.',

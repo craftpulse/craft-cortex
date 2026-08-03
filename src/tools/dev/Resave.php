@@ -19,6 +19,8 @@ use craftpulse\herald\attributes\IsIdempotent;
 use craftpulse\herald\attributes\IsOpenWorld;
 use craftpulse\herald\attributes\Title;
 use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\ContextAwareToolInterface;
+use craftpulse\herald\tools\PermissionedToolTrait;
 use craftpulse\herald\tools\StreamableToolInterface;
 use craftpulse\herald\tools\support\FiberProgressBridge;
 use craftpulse\herald\tools\support\InvocationContext;
@@ -75,6 +77,23 @@ use Throwable;
  * which Herald doesn't re-implement here. Operators wanting field-
  * rewrites get a future gate; for now drop them or use `craft_command`
  * for the raw controller surface.
+ *
+ * # Authorization
+ *
+ * This tool is the `resave/*` console route wearing a nicer coat: its
+ * own envelope reports the dispatched route, `resave/*` ships on
+ * `Settings::$allowedCommands`, and the description points at
+ * `craft_command` for the raw surface. It therefore reuses
+ * `CraftCommand::PERMISSION_RUN_COMMANDS` and the `system:write` scope
+ * rather than inventing a weaker handle onto the same work. Until the
+ * 2026-08-03 remediation it required no permission at all and sat on
+ * `system:read`, so a read-shaped OAuth grant could resave every element
+ * in the install while the tool advertised `destructiveHint: true`.
+ *
+ * The gate lives at the top of `stream()`, which is the single choke
+ * point: `execute()` drains `stream()`, so both transports are covered
+ * by one assertion, and it fires before argument validation so an
+ * unauthorized caller learns nothing about the option surface.
  * =========================================================================
  *
  * @author CraftPulse
@@ -84,8 +103,10 @@ use Throwable;
 #[IsDestructive]
 #[IsIdempotent]
 #[IsOpenWorld(false)]
-class Resave extends AbstractTool implements StreamableToolInterface
+class Resave extends AbstractTool implements ContextAwareToolInterface, StreamableToolInterface
 {
+    use PermissionedToolTrait;
+
     // Constants
     // =========================================================================
 
@@ -151,6 +172,66 @@ class Resave extends AbstractTool implements StreamableToolInterface
         'users' => User::class,
         'addresses' => Address::class,
     ];
+
+    // Private Properties
+    // =========================================================================
+
+    /**
+     * @var InvocationContext|null Per-invocation context injected by the
+     *                             dispatcher immediately before
+     *                             `execute()`. Read by `execute()` so the
+     *                             non-streaming path drives `stream()`
+     *                             with the real transport, request id and
+     *                             cancellation token rather than a
+     *                             fabricated stdio default. Null on call
+     *                             paths that bypass the dispatcher
+     *                             (direct calls from tests or the
+     *                             console), which keeps the stdio
+     *                             default.
+     */
+    private ?InvocationContext $_invocationContext = null;
+
+    // Public Methods
+    // =========================================================================
+
+    /**
+     * Store the per-invocation context the dispatcher injects before
+     * `execute()`. The streaming path receives its context as a
+     * `stream()` argument instead and never consults this slot.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    public function setInvocationContext(InvocationContext $ctx): void
+    {
+        $this->_invocationContext = $ctx;
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Hides the tool from `tools/list` (and refuses `tools/call` with
+     * the same "Unknown tool" shape) for any caller that does not hold
+     * `CraftCommand::PERMISSION_RUN_COMMANDS`.
+     *
+     * A null user is the stdio path and passes: the security boundary is
+     * the HTTP transport, and the stdio caller already holds a shell plus
+     * the `craft` console, so gating them buys nothing (ruled
+     * 2026-08-02). Admins pass through Craft's own `can()` semantics, but
+     * the branch is explicit so a reconfigured permission system cannot
+     * quietly lock out admins.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    public function filterFor(?User $user = null): bool
+    {
+        if ($user === null) {
+            return true;
+        }
+
+        return $user->admin || $user->can(CraftCommand::PERMISSION_RUN_COMMANDS);
+    }
 
     /**
      * @inheritdoc
@@ -227,7 +308,16 @@ class Resave extends AbstractTool implements StreamableToolInterface
      */
     public function execute(array $arguments): array
     {
-        $ctx = new InvocationContext();
+        // Reuse the context the dispatcher injected. `InvocationContext`
+        // defaults to stdio, so fabricating a fresh one here would lose
+        // the real transport, request id and cancellation token for both
+        // the audit row and cooperative cancellation. `BulkEntries` had
+        // the identical shape and there it made an elevation gate
+        // bypassable on the JSON path; `resave` has no elevation gate, so
+        // the loss is fidelity rather than authority, but the fix is the
+        // same. Null is a direct call that bypassed the dispatcher
+        // entirely (tests, console), which keeps the stdio default.
+        $ctx = $this->_invocationContext ?? new InvocationContext();
         $gen = $this->stream($arguments, $ctx);
 
         // Drain progress frames — they're for the streaming surface.
@@ -262,6 +352,14 @@ class Resave extends AbstractTool implements StreamableToolInterface
      */
     public function stream(array $arguments, InvocationContext $ctx): Generator
     {
+        // Defence-in-depth permission gate, independent of the
+        // `tools/list` filtering `filterFor()` performs, and the single
+        // choke point for both transports: `execute()` drains this
+        // generator. It runs before any argument validation so an
+        // unauthorized caller cannot use the error messages to enumerate
+        // the supported element kinds or the option surface.
+        $this->_assertPermission($arguments);
+
         $type = isset($arguments['type']) && is_string($arguments['type']) ? $arguments['type'] : null;
         if ($type === null) {
             throw new ToolException('`type` is required (one of: ' . implode(', ', array_keys(self::TYPE_ROUTES)) . ').');
@@ -439,6 +537,50 @@ class Resave extends AbstractTool implements StreamableToolInterface
             'cancelled' => $token->isCancelled(),
             'results' => array_values($failures),
         ];
+    }
+
+    // Protected Methods
+    // =========================================================================
+
+    /**
+     * @inheritdoc
+     *
+     * Whole-tool gate: every element type and filter combination implies
+     * the same single permission, so the resolved arguments never widen
+     * or narrow it. Per-element authorization is not layered on top —
+     * Craft's own `resave/*` controller does not apply it either, and
+     * pretending otherwise would advertise a guarantee the underlying
+     * pipeline does not make.
+     *
+     * @param array<string,mixed> $arguments
+     * @return string[]
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    protected function _requiredPermissions(array $arguments): array
+    {
+        return [CraftCommand::PERMISSION_RUN_COMMANDS];
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Matches the message shape `CraftCommand::_assertMayRunCommands()`
+     * emits, since the permission is the same one and a caller refused
+     * here would be refused there too.
+     *
+     * @param array<string,mixed> $arguments
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    protected function _buildPermissionDeniedMessage(string $missingPermission, array $arguments): string
+    {
+        return sprintf(
+            'permission denied: resaving elements runs the `resave/*` console route and requires `%s`.',
+            $missingPermission,
+        );
     }
 
     // Private Methods

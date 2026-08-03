@@ -167,27 +167,30 @@ function herald_read_only_allowlist(): array
  * Tools that mutate state, are reachable over HTTP, and carry no
  * authorization gate inside `execute()` today.
  *
- * Asserted as an exact set. This is a ratchet: a new ungated mutating
- * tool fails, and so does gating one of these without deleting it from
- * here. Neither direction can happen quietly.
+ * Empty, and meant to stay empty. Asserted as an exact set, so this is a
+ * ratchet in both directions: a new ungated mutating tool fails, and so
+ * does gating one of these without deleting it from here. Neither
+ * direction can happen quietly.
  *
- * `clear_caches` and `resave` are both convenience wrappers over
- * console routes that `craft_command` also reaches (`clear-caches/*`,
- * `resave/*`), and `craft_command` requires
+ * It held `clear_caches` and `resave` for exactly one day. Both are
+ * convenience wrappers over console routes `craft_command` also reaches
+ * (`clear-caches/*`, `resave/*`), and `craft_command` has required
  * `CraftCommand::PERMISSION_RUN_COMMANDS` plus the `system:write` scope
- * as of the 2026-08-02 remediation. Reaching the same work through the
- * wrapper requires neither, and `resave` additionally advertises
- * `#[IsDestructive]` while sitting on `system:read`. Recorded here so
- * the asymmetry is visible and reviewable rather than implicit.
+ * since the 2026-08-02 remediation, so reaching the same work through
+ * the wrapper required neither — a `system:read` token could resave every
+ * element in the install, and `resave` advertised `#[IsDestructive]` from
+ * a read scope. The 2026-08-03 remediation gated both:
+ * `Resave::stream()` on `herald:run-commands` (the same handle, because
+ * it is the same console route), `ClearCaches::execute()` on its own
+ * narrower `herald:clear-caches`, and both onto `system:write`. See
+ * `tests/Tools/Dev/DevActionAuthorizationTest.php` for the behavioural
+ * coverage.
  *
  * @return string[]
  */
 function herald_known_ungated_mutating_tools(): array
 {
-    return [
-        'clear_caches',
-        'resave',
-    ];
+    return [];
 }
 
 // -----------------------------------------------------------------------------

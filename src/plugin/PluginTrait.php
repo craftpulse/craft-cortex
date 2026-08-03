@@ -19,6 +19,7 @@ use craftpulse\herald\generator\Tool as ToolGenerator;
 use craftpulse\herald\Herald;
 use craftpulse\herald\services\Invocations;
 use craftpulse\herald\services\Skills;
+use craftpulse\herald\tools\dev\ClearCaches;
 use craftpulse\herald\tools\dev\CraftCommand;
 use craftpulse\herald\tools\support\InvocationLogger;
 use Throwable;
@@ -251,7 +252,18 @@ trait PluginTrait
      *     its `tools/list` visibility (`filterFor()`) and its dispatch
      *     (`execute()`). Separate from `manage-grants`, which controls
      *     which routes are allowlisted for a user rather than whether
-     *     that user may dispatch at all.
+     *     that user may dispatch at all. The `resave` tool reuses it:
+     *     `resave` is the `resave/*` console route behind a structured
+     *     argument shape, and `resave/*` ships on the content-level
+     *     allowlist, so anyone holding this can already do that work
+     *     through `craft_command`.
+     *   - `ClearCaches::PERMISSION_CLEAR_CACHES` (`herald:clear-caches`)
+     *     — gates the `clear_caches` tool. Its own permission rather
+     *     than a reuse of `run-commands`, because `clear-caches/*` is
+     *     absent from the default allowlist: the two authorities are
+     *     genuinely disjoint, and requiring the broader one to flush a
+     *     cache after a deploy would push operators into over-granting.
+     *     Flat, as Craft's permissions are — neither implies the other.
      *
      * Shape verified against
      * `vendor/craftcms/cms/src/services/UserPermissions.php:85-96`.
@@ -300,7 +312,14 @@ trait PluginTrait
                             'label' => Craft::t('herald', 'Run Craft console commands'),
                             'info' => Craft::t(
                                 'herald',
-                                'Allows the craft_command tool to dispatch allowlisted Craft console commands for this user over the HTTP transport. The command allowlist and allowAdminChanges still apply.',
+                                'Allows the craft_command and resave tools to dispatch allowlisted Craft console commands for this user over the HTTP transport. The command allowlist and allowAdminChanges still apply.',
+                            ),
+                        ],
+                        ClearCaches::PERMISSION_CLEAR_CACHES => [
+                            'label' => Craft::t('herald', 'Clear Craft caches'),
+                            'info' => Craft::t(
+                                'herald',
+                                'Allows the clear_caches tool to flush Craft caches for this user over the HTTP transport. Separate from the console-command permission, which does not grant it.',
                             ),
                         ],
                     ],

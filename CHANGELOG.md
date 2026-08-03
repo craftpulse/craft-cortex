@@ -12,6 +12,12 @@
 > `php craft herald/token/issue <user> --scopes=schema:read,content:read`,
 > and revoke the old row. Do this before deploying, not after, or the
 > first thing an operator sees is an agent that stopped working.
+> Pick the scopes deliberately while you are there: every dev action tool
+> (`craft_command`, `craft_exec`, `clear_caches`, `resave`) requires
+> `system:write`, so a credential minted with `system:read` reads
+> diagnostics and nothing else. Each of those tools also requires a Craft
+> permission on the user the credential is bound to, which the scope does
+> not grant.
 
 > [!WARNING]
 > **Admin-level console routes stop being dispatchable while
@@ -60,13 +66,14 @@
 - Added the `system_info`, `config`, `plugins`, `routes`, `system_diagnostics`, `extensibility`, `permissions_and_groups`, and `graphql` tools for reading system state.
 - Added `craft_command`, which dispatches allowlisted Craft console routes through Craft's in-process console runner, with no shell involved, behind the `herald:run-commands` permission and the `system:write` scope.
 - Added `craft_exec` behind six gates: dry-run by default, structured output, secret redaction, a destructive-op guard requiring two opt-ins, hard stdio-only rejection at the dispatcher, and the MCP `destructiveHint` annotation.
+- Added `resave` and `clear_caches`, structured wrappers over Craft's `resave/*` and `clear-caches/*` routes, on the `system:write` scope. `resave` requires the same `herald:run-commands` permission as `craft_command`, since it runs the same route; `clear_caches` requires its own `herald:clear-caches`.
 - Added `herald/install`, `herald/install/apply`, `herald/install/detect`, and `herald/install/auto` for wiring MCP clients, with atomic writes, timestamped backups, and idempotent re-runs.
 - Added `herald/docs/all` to regenerate the tool, prompt, and resource references from the live registries.
 
 ### Administration
 
 - Added a Herald control panel section with Settings, Temporary grants, Tokens, Clients, Activity, and Connection screens, each gated by permission and edition.
-- Added the `herald:manage-settings`, `herald:manage-grants`, `herald:manage-skills`, `herald:view-activity`, and `herald:run-commands` permissions.
+- Added the `herald:manage-settings`, `herald:manage-grants`, `herald:manage-skills`, `herald:view-activity`, `herald:run-commands`, and `herald:clear-caches` permissions.
 - Added a grouped console-command browser to the Settings screen, listing every route on the install with content-level and admin-level commands in separate sections, and preserving hand-written glob patterns in a per-section table.
 - Added temporary command grants: admin-issued, auto-expiring allowlist additions that do not sync to project config, with an "effective allowlist right now" panel.
 - Added `auditRetentionDays` and `auditResponseExcerptBytes` to tune the audit table, which is pruned during Craft's garbage-collection sweep at exactly the configured age on any install timezone.
