@@ -459,6 +459,230 @@ it('search matches the tool name', function() {
     expect($response->data['data'][0]['tool']['tool'])->toBe('entry');
 });
 
+it('search matches the client name', function() {
+    _heraldSeedInvocation(['tool' => 'entry', 'client' => 'claude-desktop']);
+    _heraldSeedInvocation(['tool' => 'asset', 'client' => 'cursor']);
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['search' => 'cursor'])
+        ->actionActivityTableData();
+
+    expect($response->data['pagination']['total'])->toBe(1);
+    expect($response->data['data'][0]['tool']['tool'])->toBe('asset');
+});
+
+it('search matches the error message', function() {
+    // Searching the error text is how an operator finds every row that hit
+    // the same failure, so the haystack spans three columns.
+    _heraldSeedInvocation(['tool' => 'entry']);
+    _heraldSeedInvocation([
+        'tool' => 'asset',
+        'kind' => 'tool_error',
+        'error_class' => 'RuntimeException',
+        'error_message' => 'volume unreachable',
+    ]);
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['search' => 'unreachable'])
+        ->actionActivityTableData();
+
+    expect($response->data['pagination']['total'])->toBe(1);
+    expect($response->data['data'][0]['tool']['tool'])->toBe('asset');
+});
+
+it('treats an empty filter value as no filter at all', function(string $key) {
+    // The filter bar posts every control on every submit, so a cleared
+    // dropdown arrives as an empty string. Reading that as a literal value
+    // would match nothing and empty the table.
+    _heraldSeedInvocation(['tool' => 'entry']);
+    _heraldSeedInvocation(['tool' => 'asset']);
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['filters' => [$key => '']])
+        ->actionActivityTableData();
+
+    expect($response->data['pagination']['total'])->toBe(2);
+})->with([
+    'kind' => ['kind'],
+    'toolName' => ['toolName'],
+    'userId' => ['userId'],
+    'from' => ['from'],
+    'to' => ['to'],
+]);
+
+it('ignores a non-array filters param', function() {
+    _heraldSeedInvocation(['tool' => 'entry']);
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['filters' => 'not-an-array'])
+        ->actionActivityTableData();
+
+    expect($response->data['pagination']['total'])->toBe(1);
+});
+
+it('ignores a non-numeric filters[userId] for an admin', function() {
+    $userA = _heraldActivityNonAdmin('herald-activity-a');
+    _heraldSeedInvocation(['user' => (int) $userA->id]);
+    _heraldSeedInvocation(['user' => null]);
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['filters' => ['userId' => 'abc']])
+        ->actionActivityTableData();
+
+    expect($response->data['pagination']['total'])->toBe(2);
+});
+
+it('admin can narrow to a single user with filters[userId]', function() {
+    $userA = _heraldActivityNonAdmin('herald-activity-a');
+    $userB = _heraldActivityNonAdmin('herald-activity-b');
+    _heraldSeedInvocation(['user' => (int) $userA->id]);
+    _heraldSeedInvocation(['user' => (int) $userB->id]);
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['filters' => ['userId' => (int) $userB->id]])
+        ->actionActivityTableData();
+
+    expect($response->data['pagination']['total'])->toBe(1);
+    expect($response->data['data'][0]['user']['id'])->toBe((int) $userB->id);
+});
+
+it('filters by an upper date bound', function() {
+    $old = _heraldSeedInvocation(['tool' => 'old']);
+    _heraldSeedInvocation(['tool' => 'new']);
+
+    Craft::$app->getDb()->createCommand()->update(
+        Table::INVOCATIONS,
+        ['dateCreated' => (new DateTime('-7 days'))->format('Y-m-d H:i:s')],
+        ['id' => $old->id],
+    )->execute();
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['filters' => ['to' => (new DateTime('-1 day'))->format('Y-m-d')]])
+        ->actionActivityTableData();
+
+    expect($response->data['pagination']['total'])->toBe(1);
+    expect($response->data['data'][0]['tool']['tool'])->toBe('old');
+});
+
+it('serialises a null userId row with a null user cell', function() {
+    // `herald_invocations.userId` is SET NULL on user delete so audit
+    // history outlives the user; the cell is null, not a half-built dict.
+    _heraldSeedInvocation(['user' => null]);
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams([])
+        ->actionActivityTableData();
+
+    expect($response->data['data'][0]['user'])->toBeNull();
+});
+
+it('sorts ascending when the caller asks for it', function() {
+    $first = _heraldSeedInvocation(['tool' => 'first']);
+    _heraldSeedInvocation(['tool' => 'second']);
+
+    Craft::$app->getDb()->createCommand()->update(
+        Table::INVOCATIONS,
+        ['dateCreated' => (new DateTime('-1 hour', new DateTimeZone('UTC')))->format('Y-m-d H:i:s')],
+        ['id' => $first->id],
+    )->execute();
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['sort.0.field' => 'dateCreated', 'sort.0.direction' => 'asc'])
+        ->actionActivityTableData();
+
+    expect($response->data['data'][0]['tool']['tool'])->toBe('first');
+});
+
+it('sorts by the mapped column for each sortable field', function(string $field) {
+    _heraldSeedInvocation(['tool' => 'alpha', 'kind' => 'success', 'duration_ms' => 5]);
+    _heraldSeedInvocation(['tool' => 'zulu', 'kind' => 'tool_error', 'duration_ms' => 9, 'error_message' => 'x']);
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['sort.0.field' => $field, 'sort.0.direction' => 'asc'])
+        ->actionActivityTableData();
+
+    // `tool`, `kind` and `durationMs` all order alpha before zulu here, so
+    // one expectation pins every mapping without a per-field fixture.
+    expect($response->data['data'][0]['tool']['tool'])->toBe('alpha');
+})->with([
+    'tool' => ['tool'],
+    'kind' => ['kind'],
+    'durationMs' => ['durationMs'],
+]);
+
+it('falls back to dateCreated for an unknown sort field', function() {
+    $first = _heraldSeedInvocation(['tool' => 'first']);
+    _heraldSeedInvocation(['tool' => 'second']);
+
+    Craft::$app->getDb()->createCommand()->update(
+        Table::INVOCATIONS,
+        ['dateCreated' => (new DateTime('-1 hour', new DateTimeZone('UTC')))->format('Y-m-d H:i:s')],
+        ['id' => $first->id],
+    )->execute();
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['sort.0.field' => 'bogusColumn', 'sort.0.direction' => 'asc'])
+        ->actionActivityTableData();
+
+    expect($response->data['data'][0]['tool']['tool'])->toBe('first');
+});
+
+it('pagination respects per_page', function() {
+    for ($i = 1; $i <= 5; $i++) {
+        _heraldSeedInvocation(['tool' => "tool-{$i}"]);
+    }
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['per_page' => 2, 'page' => 1])
+        ->actionActivityTableData();
+
+    expect($response->data['pagination']['total'])->toBe(5);
+    expect($response->data['pagination']['per_page'])->toBe(2);
+    expect($response->data['pagination']['last_page'])->toBe(3);
+    expect($response->data['data'])->toHaveCount(2);
+});
+
+it('caps per_page at 100', function() {
+    _heraldSeedInvocation();
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['per_page' => 5000])
+        ->actionActivityTableData();
+
+    expect($response->data['pagination']['per_page'])->toBe(100);
+});
+
+it('leaves the mode null when the redacted args carry none', function(mixed $args) {
+    _heraldSeedInvocation(['args' => $args]);
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams([])
+        ->actionActivityTableData();
+
+    expect($response->data['data'][0]['tool']['mode'])->toBeNull();
+})->with([
+    'no mode key' => ['{"other":1}'],
+    'empty mode' => ['{"mode":""}'],
+    'non-string mode' => ['{"mode":42}'],
+    'not json' => ['not json at all'],
+    'json scalar' => ['"just a string"'],
+    'empty string' => [''],
+]);
+
 it('defaults to dateCreated DESC', function() {
     $first = _heraldSeedInvocation(['tool' => 'first']);
     $second = _heraldSeedInvocation(['tool' => 'second']);
@@ -524,6 +748,64 @@ it('row detail survives a truncated (non-JSON) response excerpt', function() {
     expect($response->data)->toHaveKey('html');
     expect($response->data['html'])->toBeString()->not->toBe('');
 });
+
+it('row detail pretty-prints the redacted args without escaping slashes', function() {
+    // `Json::encode(..., JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)` — the
+    // pretty-print puts a space after each colon, and unescaped slashes keep
+    // URLs readable instead of rendering as `https:\/\/`.
+    $row = _heraldSeedInvocation([
+        'args' => json_encode(['mode' => 'list', 'url' => 'https://example.test/cb']),
+    ]);
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['id' => (int) $row->id])
+        ->actionActivityRow();
+
+    expect($response->data['html'])->toContain('&quot;mode&quot;: &quot;list&quot;');
+    expect($response->data['html'])->toContain('https://example.test/cb');
+    expect($response->data['html'])->not->toContain('https:\/\/');
+});
+
+it('row detail falls back to raw text for a non-array JSON payload', function() {
+    // A JSON scalar decodes fine but is not an array, so it is echoed
+    // verbatim rather than re-encoded.
+    $row = _heraldSeedInvocation(['response_excerpt' => '"a bare string"']);
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['id' => (int) $row->id])
+        ->actionActivityRow();
+
+    expect($response->data['html'])->toContain('a bare string');
+});
+
+it('row detail resolves the bound user for the slideout header', function() {
+    $userA = _heraldActivityNonAdmin('herald-activity-a');
+    $row = _heraldSeedInvocation(['user' => (int) $userA->id]);
+
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+    $response = (new _HeraldActivityHarness('settings', Herald::getInstance()))
+        ->withParams(['id' => (int) $row->id])
+        ->actionActivityRow();
+
+    expect($response->data['html'])->toContain($userA->getName());
+});
+
+it('row detail rejects a missing or non-positive id with 404', function(mixed $id) {
+    Craft::$app->getUser()->setIdentity(_heraldActivityAdmin());
+
+    expect(function() use ($id) {
+        (new _HeraldActivityHarness('settings', Herald::getInstance()))
+            ->withParams($id === 'omitted' ? [] : ['id' => $id])
+            ->actionActivityRow();
+    })->toThrow(NotFoundHttpException::class);
+})->with([
+    'omitted' => ['omitted'],
+    'zero' => [0],
+    'negative' => [-1],
+    'non-numeric' => ['abc'],
+]);
 
 it('non-admin requesting a foreign row gets 404, not 403', function() {
     $userA = _heraldActivityNonAdmin('herald-activity-a');

@@ -169,6 +169,37 @@ function _heraldTokenTestUser(): craft\elements\User
     return $user;
 }
 
+/**
+ * Rewrite a token row's `dateCreated` to a deterministic UTC instant.
+ * Tokens issued inside the same second share a timestamp, which makes any
+ * `dateCreated` ordering assertion a coin flip.
+ */
+function _heraldBackdateToken(int $id, string $modifier): void
+{
+    TokenRecord::updateAll(
+        ['dateCreated' => (new DateTime($modifier, new DateTimeZone('UTC')))->format('Y-m-d H:i:s')],
+        ['id' => $id],
+    );
+}
+
+/**
+ * Read the controller's capability-scope option list for the token-issue
+ * slideout. Private on the controller (it is a view-model builder for one
+ * partial), so the pin reaches it by reflection.
+ *
+ * @return array<int,array{label:string,value:string}>
+ */
+function _heraldScopeOptions(SettingsController $controller): array
+{
+    $method = new ReflectionMethod(SettingsController::class, '_scopeOptions');
+    $method->setAccessible(true);
+
+    /** @var array<int,array{label:string,value:string}> $options */
+    $options = $method->invoke($controller);
+
+    return $options;
+}
+
 beforeEach(function() {
     // Hard-truncate the tokens table — `Tokens::revoke` only
     // soft-deletes, so prior runs would otherwise leak rows.
@@ -432,6 +463,115 @@ it('actionTokensTableData sort name DESC reverses default order', function() {
 
     expect($response->data['data'][0]['name'])->toBe('zulu');
     expect($response->data['data'][1]['name'])->toBe('alpha');
+});
+
+it('actionTokensTableData search matches the token prefix', function() {
+    // The search haystack is `name + ' ' + tokenPrefix`, so the operator
+    // can paste the prefix hint they see in the table and find the row.
+    $user = _heraldTokenTestUser();
+    $issued = Herald::getInstance()->tokens->issue((int) $user->id, 'by-prefix', 3600);
+    Herald::getInstance()->tokens->issue((int) $user->id, 'other', 3600);
+
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
+    $controller->withParams(['search' => $issued['model']->tokenPrefix]);
+    $response = $controller->actionTokensTableData();
+
+    expect($response->data['data'])->toHaveCount(1);
+    expect($response->data['data'][0]['name'])->toBe('by-prefix');
+});
+
+it('actionTokensTableData sorts by expiresAt', function() {
+    $user = _heraldTokenTestUser();
+    Herald::getInstance()->tokens->issue((int) $user->id, 'long-lived', 86400);
+    Herald::getInstance()->tokens->issue((int) $user->id, 'short-lived', 60);
+
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
+    $controller->withParams(['sort.0.field' => 'expiresAt', 'sort.0.direction' => 'asc']);
+    $response = $controller->actionTokensTableData();
+
+    expect($response->data['data'][0]['name'])->toBe('short-lived');
+    expect($response->data['data'][1]['name'])->toBe('long-lived');
+});
+
+it('actionTokensTableData sorts by lastUsedAt', function() {
+    // `lookup()` touches `lastUsedAt`; the untouched row keeps null, which
+    // sorts as the empty string and therefore lands last under DESC.
+    $user = _heraldTokenTestUser();
+    $used = Herald::getInstance()->tokens->issue((int) $user->id, 'used', 3600);
+    Herald::getInstance()->tokens->issue((int) $user->id, 'never-used', 3600);
+    Herald::getInstance()->tokens->lookup($used['token']);
+
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
+    $controller->withParams(['sort.0.field' => 'lastUsedAt', 'sort.0.direction' => 'desc']);
+    $response = $controller->actionTokensTableData();
+
+    expect($response->data['data'][0]['name'])->toBe('used');
+    expect($response->data['data'][1]['name'])->toBe('never-used');
+});
+
+it('actionTokensTableData falls back to dateCreated for an unknown sort field', function() {
+    // An unmapped `sort.0.field` must not sort on a column that isn't in
+    // the row tuple — it falls back to `dateCreated` with the requested
+    // direction. Timestamps are backdated explicitly: two tokens issued in
+    // the same second share a `dateCreated` and the comparison is a no-op.
+    $user = _heraldTokenTestUser();
+    $first = Herald::getInstance()->tokens->issue((int) $user->id, 'first', 3600);
+    $second = Herald::getInstance()->tokens->issue((int) $user->id, 'second', 3600);
+
+    _heraldBackdateToken((int) $first['model']->id, '-2 minutes');
+    _heraldBackdateToken((int) $second['model']->id, '-1 minute');
+
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
+    $controller->withParams(['sort.0.field' => 'bogusColumn', 'sort.0.direction' => 'desc']);
+    $response = $controller->actionTokensTableData();
+
+    expect($response->data['data'][0]['name'])->toBe('second');
+    expect($response->data['data'][1]['name'])->toBe('first');
+});
+
+it('actionTokensTableData serialises an unresolvable bound user as null', function() {
+    // The row's `user` cell resolves the bound user record; when that
+    // record no longer resolves (soft-deleted here — a hard delete
+    // cascades the token row away) the cell is null rather than a
+    // half-built dict.
+    $orphan = new \craft\elements\User();
+    $orphan->username = '_test_tokens_orphan_' . bin2hex(random_bytes(4));
+    $orphan->email = $orphan->username . '@example.test';
+    expect(Craft::$app->getElements()->saveElement($orphan))->toBeTrue();
+
+    Herald::getInstance()->tokens->issue((int) $orphan->id, 'orphaned', 3600);
+
+    try {
+        expect(Craft::$app->getElements()->deleteElement($orphan))->toBeTrue();
+
+        $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
+        $response = $controller->withParams([])->actionTokensTableData();
+
+        expect($response->data['data'])->toHaveCount(1);
+        expect($response->data['data'][0]['user'])->toBeNull();
+    } finally {
+        Craft::$app->getElements()->deleteElement($orphan, true);
+    }
+});
+
+it('labels each token scope as "<scope> (<description>)"', function() {
+    // The issue slideout's checkbox labels pair the identifier with the
+    // same description the OAuth consent screen renders, so the two
+    // surfaces cannot drift. Asserted on the option builder rather than
+    // the rendered partial — the partial's `csrfInput()` needs a web
+    // request/response pair the console bootstrap does not carry.
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
+    $options = _heraldScopeOptions($controller);
+
+    $scopes = Herald::getInstance()->scopes;
+    expect($options)->toHaveCount(count($scopes->all()));
+
+    foreach ($options as $index => $option) {
+        expect(array_keys($option))->toBe(['label', 'value']);
+        $scope = $scopes->all()[$index];
+        expect($option['value'])->toBe($scope);
+        expect($option['label'])->toBe(sprintf('%s (%s)', $scope, $scopes->describe($scope)));
+    }
 });
 
 it('actionTokensTableData pagination respects per_page', function() {

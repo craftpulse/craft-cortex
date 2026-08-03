@@ -252,6 +252,76 @@ it('clients-table-data returns the locked row tuple', function() {
         ->and($row['redirectUris'])->toBeArray();
 });
 
+it('clients-table-data search filters by client name substring', function() {
+    _heraldMakeClient('_test_/claude-desktop', false);
+    _heraldMakeClient('_test_/cursor', false);
+
+    $controller = new _HeraldClientsHarness('settings', Herald::getInstance());
+    $response = $controller->withParams(['search' => 'claude'])->actionClientsTableData();
+
+    expect($response->data['data'])->toHaveCount(1);
+    expect($response->data['data'][0]['clientName'])->toBe('_test_/claude-desktop');
+});
+
+it('clients-table-data search filters by client id substring', function() {
+    // The search haystack is `clientName + ' ' + clientId`, so an operator
+    // can paste the identifier a client reported back.
+    $client = _heraldMakeClient('_test_/by-id', false);
+    _heraldMakeClient('_test_/other', false);
+
+    $controller = new _HeraldClientsHarness('settings', Herald::getInstance());
+    $response = $controller->withParams(['search' => $client->clientId])->actionClientsTableData();
+
+    expect($response->data['data'])->toHaveCount(1);
+    expect($response->data['data'][0]['clientName'])->toBe('_test_/by-id');
+});
+
+it('clients-table-data pagination respects per_page', function() {
+    for ($i = 1; $i <= 5; $i++) {
+        _heraldMakeClient("_test_/page-{$i}", false);
+    }
+
+    $controller = new _HeraldClientsHarness('settings', Herald::getInstance());
+    $response = $controller->withParams(['per_page' => 2, 'page' => 1])->actionClientsTableData();
+
+    expect($response->data['pagination']['total'])->toBe(5);
+    expect($response->data['pagination']['per_page'])->toBe(2);
+    expect($response->data['pagination']['last_page'])->toBe(3);
+    expect($response->data['data'])->toHaveCount(2);
+});
+
+it('clients-table-data projects the inline approve action into its own cell', function() {
+    // VueAdminTable column callbacks receive only the cell value, never the
+    // row, so the inline approve button needs both the id and the approval
+    // flag inside `approveAction`.
+    $client = _heraldMakeClient('_test_/approve-cell', false);
+
+    $controller = new _HeraldClientsHarness('settings', Herald::getInstance());
+    $response = $controller->withParams([])->actionClientsTableData();
+
+    $row = $response->data['data'][0];
+    expect($row['approveAction'])->toBe(['id' => (int) $client->id, 'approved' => false]);
+});
+
+it('clients-table-data decodes the redirect-uri JSON column', function() {
+    $record = new OauthClientRecord();
+    $record->clientId = bin2hex(random_bytes(16));
+    $record->clientName = '_test_/uris';
+    $record->redirectUris = '["https://a.example/cb", 42, "https://b.example/cb"]';
+    $record->isPublic = false;
+    $record->approved = true;
+    $record->save();
+
+    $controller = new _HeraldClientsHarness('settings', Herald::getInstance());
+    $response = $controller->withParams([])->actionClientsTableData();
+
+    $row = $response->data['data'][0];
+    // Non-string entries are dropped and the list is re-indexed.
+    expect($row['redirectUris'])->toBe(['https://a.example/cb', 'https://b.example/cb']);
+    expect($row['type'])->toBe('confidential');
+    expect($row['approved'])->toBeTrue();
+});
+
 // -----------------------------------------------------------------------------
 // Approve / revoke
 // -----------------------------------------------------------------------------

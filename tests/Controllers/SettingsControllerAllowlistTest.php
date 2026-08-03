@@ -311,6 +311,154 @@ it('actionAllowlistTableData pagination respects per_page', function() {
     expect($response->data['data'])->toHaveCount(2);
 });
 
+it('actionAllowlistTableData search filters by note substring', function() {
+    // The search haystack is `pattern + ' ' + note`, so the ticket
+    // reference an operator typed into the note is findable.
+    Herald::getInstance()->allowlist->add(pattern: 'resave/*', userId: null, note: 'ticket-4711', ttlSeconds: 3600);
+    Herald::getInstance()->allowlist->add(pattern: 'mailer/test', userId: null, note: 'unrelated', ttlSeconds: 3600);
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['search' => '4711']);
+    $response = $controller->actionAllowlistTableData();
+
+    expect($response->data['data'])->toHaveCount(1);
+    expect($response->data['data'][0]['pattern']['pattern'])->toBe('resave/*');
+});
+
+it('actionAllowlistTableData sorts by pattern', function() {
+    Herald::getInstance()->allowlist->add(pattern: 'alpha/*', userId: null, note: null, ttlSeconds: 3600);
+    Herald::getInstance()->allowlist->add(pattern: 'zulu/*', userId: null, note: null, ttlSeconds: 3600);
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['sort.0.field' => 'pattern', 'sort.0.direction' => 'asc']);
+    $response = $controller->actionAllowlistTableData();
+
+    expect($response->data['data'][0]['pattern']['pattern'])->toBe('alpha/*');
+    expect($response->data['data'][1]['pattern']['pattern'])->toBe('zulu/*');
+});
+
+it('actionAllowlistTableData sorts by expiresAt', function() {
+    Herald::getInstance()->allowlist->add(pattern: 'long/*', userId: null, note: null, ttlSeconds: 86400);
+    Herald::getInstance()->allowlist->add(pattern: 'short/*', userId: null, note: null, ttlSeconds: 60);
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['sort.0.field' => 'expiresAt', 'sort.0.direction' => 'asc']);
+    $response = $controller->actionAllowlistTableData();
+
+    expect($response->data['data'][0]['pattern']['pattern'])->toBe('short/*');
+    expect($response->data['data'][1]['pattern']['pattern'])->toBe('long/*');
+});
+
+it('actionAllowlistTableData falls back to dateCreated for an unknown sort field', function() {
+    $earlier = (new \DateTime('-2 minutes'))->format('Y-m-d H:i:s');
+    $later = (new \DateTime('-1 minute'))->format('Y-m-d H:i:s');
+
+    $r1 = new RuntimeOverride();
+    $r1->pattern = 'first/*';
+    $r1->dateCreated = $earlier;
+    $r1->save();
+
+    $r2 = new RuntimeOverride();
+    $r2->pattern = 'second/*';
+    $r2->dateCreated = $later;
+    $r2->save();
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['sort.0.field' => 'bogusColumn', 'sort.0.direction' => 'desc']);
+    $response = $controller->actionAllowlistTableData();
+
+    expect($response->data['data'][0]['pattern']['pattern'])->toBe('second/*');
+    expect($response->data['data'][1]['pattern']['pattern'])->toBe('first/*');
+});
+
+it('actionAllowlistTableData status=active hides expired grants', function() {
+    // The Temporary grants screen renders active grants in the main table
+    // and expired ones in a collapsed history section; each hits this
+    // endpoint with its own `status`.
+    Herald::getInstance()->allowlist->add(pattern: 'live/*', userId: null, note: null, ttlSeconds: 3600);
+
+    $expired = new RuntimeOverride();
+    $expired->pattern = 'dead/*';
+    $expired->expiresAt = (new \DateTime('-1 hour', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s');
+    $expired->save();
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $response = $controller->withParams(['status' => 'active'])->actionAllowlistTableData();
+
+    expect($response->data['pagination']['total'])->toBe(1);
+    expect($response->data['data'][0]['pattern']['pattern'])->toBe('live/*');
+});
+
+it('actionAllowlistTableData status=expired hides active grants', function() {
+    Herald::getInstance()->allowlist->add(pattern: 'live/*', userId: null, note: null, ttlSeconds: 3600);
+
+    $expired = new RuntimeOverride();
+    $expired->pattern = 'dead/*';
+    $expired->expiresAt = (new \DateTime('-1 hour', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s');
+    $expired->save();
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $response = $controller->withParams(['status' => 'expired'])->actionAllowlistTableData();
+
+    expect($response->data['pagination']['total'])->toBe(1);
+    expect($response->data['data'][0]['pattern']['pattern'])->toBe('dead/*');
+});
+
+it('actionAllowlistTableData treats a never-expiring grant as active', function() {
+    $forever = new RuntimeOverride();
+    $forever->pattern = 'forever/*';
+    $forever->expiresAt = null;
+    $forever->save();
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+
+    expect($controller->withParams(['status' => 'active'])->actionAllowlistTableData()->data['pagination']['total'])->toBe(1);
+    expect($controller->withParams(['status' => 'expired'])->actionAllowlistTableData()->data['pagination']['total'])->toBe(0);
+});
+
+it('actionAllowlistTableData status=all keeps the single-table contract', function() {
+    Herald::getInstance()->allowlist->add(pattern: 'live/*', userId: null, note: null, ttlSeconds: 3600);
+
+    $expired = new RuntimeOverride();
+    $expired->pattern = 'dead/*';
+    $expired->expiresAt = (new \DateTime('-1 hour', new \DateTimeZone('UTC')))->format('Y-m-d H:i:s');
+    $expired->save();
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+
+    // Both the explicit `all` and an unrecognised value fall through to
+    // the unfiltered set.
+    expect($controller->withParams(['status' => 'all'])->actionAllowlistTableData()->data['pagination']['total'])->toBe(2);
+    expect($controller->withParams(['status' => 'bogus'])->actionAllowlistTableData()->data['pagination']['total'])->toBe(2);
+});
+
+it('actionAllowlistTableData serialises an unresolvable createdBy as null', function() {
+    // `createdByUserId` is SET NULL on user delete, so a grant outlives
+    // its grantor; the cell is null rather than a half-built dict.
+    $grantor = new User();
+    $grantor->username = '_test_grantor_' . bin2hex(random_bytes(4));
+    $grantor->email = $grantor->username . '@example.test';
+    expect(Craft::$app->getElements()->saveElement($grantor))->toBeTrue();
+
+    Herald::getInstance()->allowlist->add(pattern: 'orphan/*', userId: (int) $grantor->id, note: null, ttlSeconds: 3600);
+    Craft::$app->getElements()->deleteElement($grantor, true);
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $response = $controller->withParams([])->actionAllowlistTableData();
+
+    expect($response->data['data'])->toHaveCount(1);
+    expect($response->data['data'][0]['createdBy'])->toBeNull();
+});
+
+it('actionAllowlistTableData serialises a global grant with a null subject', function() {
+    Herald::getInstance()->allowlist->add(pattern: 'global/*', userId: null, note: null, ttlSeconds: 3600);
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $response = $controller->withParams([])->actionAllowlistTableData();
+
+    expect($response->data['data'][0]['subject'])->toBeNull();
+});
+
 it('actionAllowlistTableData serialises createdBy from the user record', function() {
     $user = herald_admin_user();
     expect($user)->not->toBeNull();
@@ -419,6 +567,134 @@ it('actionAddOverride resolves a duration preset into the grant expiry', functio
     // ~1 hour from now (UTC); allow a small execution-time window.
     $expires = strtotime((string) $stored->expiresAt . ' UTC');
     expect($expires)->toBeGreaterThan(time() + 3500)->toBeLessThan(time() + 3700);
+});
+
+it('actionAddOverride resolves the custom duration into the grant expiry', function() {
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams([
+        'pattern' => '_test_/custom',
+        'durationPreset' => 'custom',
+        'customTtlSeconds' => 7200,
+    ]);
+
+    $response = $controller->actionAddOverride();
+    expect($response->statusCode)->toBe(200);
+
+    $stored = RuntimeOverride::find()->where(['pattern' => '_test_/custom'])->one();
+    $expires = strtotime((string) $stored->expiresAt . ' UTC');
+    expect($expires)->toBeGreaterThan(time() + 7100)->toBeLessThan(time() + 7300);
+});
+
+it('actionAddOverride prefers a posted ttlSeconds over the duration preset', function() {
+    // The raw `ttlSeconds` param is the API / legacy path and wins over
+    // the guided slideout's duration control.
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams([
+        'pattern' => '_test_/ttl-wins',
+        'ttlSeconds' => 7200,
+        'durationPreset' => '3600',
+    ]);
+
+    $response = $controller->actionAddOverride();
+    expect($response->statusCode)->toBe(200);
+
+    $stored = RuntimeOverride::find()->where(['pattern' => '_test_/ttl-wins'])->one();
+    $expires = strtotime((string) $stored->expiresAt . ' UTC');
+    expect($expires)->toBeGreaterThan(time() + 7100)->toBeLessThan(time() + 7300);
+});
+
+it('actionAddOverride falls back to the plugin default when no duration is posted', function() {
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['pattern' => '_test_/default-ttl', 'durationPreset' => 'custom']);
+
+    $response = $controller->actionAddOverride();
+    expect($response->statusCode)->toBe(200);
+
+    $expected = Herald::getInstance()->getSettings()->runtimeOverrideTtl;
+    $stored = RuntimeOverride::find()->where(['pattern' => '_test_/default-ttl'])->one();
+    $expires = strtotime((string) $stored->expiresAt . ' UTC');
+    expect($expires)->toBeGreaterThan(time() + $expected - 100)->toBeLessThan(time() + $expected + 100);
+});
+
+it('actionAddOverride skips non-string entries in the posted pattern list', function() {
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['patterns' => ['_test_/keep', ['nested'], 42, '  ', null]]);
+
+    $response = $controller->actionAddOverride();
+
+    expect($response->statusCode)->toBe(200);
+    expect($response->data['models'])->toHaveCount(1);
+    expect($response->data['models'][0]['pattern']['pattern'])->toBe('_test_/keep');
+});
+
+it('actionAddOverride trims each posted pattern', function() {
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['patterns' => ['  _test_/trim  ']]);
+
+    $response = $controller->actionAddOverride();
+
+    expect($response->statusCode)->toBe(200);
+    expect((new Query())->from(Table::RUNTIME_OVERRIDES)->where(['pattern' => '_test_/trim'])->exists())->toBeTrue();
+});
+
+it('actionAddOverride treats an omitted or empty-string subjectUserId as a global grant', function(mixed $posted) {
+    // `elementSelectField` renders a hidden placeholder input, so clearing
+    // the picker posts an empty string rather than dropping the key. Both
+    // that and an absent key mean "global grant".
+    $params = ['pattern' => '_test_/no-subject'];
+    if ($posted !== 'omitted') {
+        $params['subjectUserId'] = $posted;
+    }
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $response = $controller->withParams($params)->actionAddOverride();
+
+    expect($response->statusCode)->toBe(200);
+    expect($response->data['model']['subject'])->toBeNull();
+
+    $stored = RuntimeOverride::find()->where(['pattern' => '_test_/no-subject'])->one();
+    expect($stored->subjectUserId)->toBeNull();
+})->with([
+    'omitted' => ['omitted'],
+    'empty string' => [''],
+    'null' => [null],
+]);
+
+it('actionAddOverride rejects an empty subjectUserId array', function() {
+    // Documents current behaviour, not desired behaviour: `reset([])`
+    // yields `false`, which clears neither the `!== null` nor the
+    // `!== ''` guard, so an empty array is cast to the user id 0 and
+    // refused. No CP path posts this shape (the macro's hidden
+    // placeholder posts an empty string), but an API caller can.
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $response = $controller->withParams(['pattern' => '_test_/empty-array', 'subjectUserId' => []])->actionAddOverride();
+
+    expect($response->statusCode)->toBe(400);
+    expect($response->data)->toHaveKey('message', 'The selected user could not be found.');
+    expect((new Query())->from(Table::RUNTIME_OVERRIDES)->where(['pattern' => '_test_/empty-array'])->exists())->toBeFalse();
+});
+
+it('actionAddOverride accepts the elementSelect array form for subjectUserId', function() {
+    $subject = User::find()->status(null)->one();
+    expect($subject)->not->toBeNull();
+
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['pattern' => '_test_/array-subject', 'subjectUserId' => [(int) $subject->id]]);
+
+    $response = $controller->actionAddOverride();
+
+    expect($response->statusCode)->toBe(200);
+    expect($response->data['model']['subject']['id'])->toBe((int) $subject->id);
+});
+
+it('actionAddOverride normalises an empty note to null', function() {
+    $controller = new _HeraldAllowlistHarness('settings', Herald::getInstance());
+    $controller->withParams(['pattern' => '_test_/blank-note', 'note' => '']);
+
+    $response = $controller->actionAddOverride();
+
+    expect($response->statusCode)->toBe(200);
+    expect($response->data['model']['note'])->toBeNull();
 });
 
 it('actionAddOverride empty pattern returns 400 with message', function() {

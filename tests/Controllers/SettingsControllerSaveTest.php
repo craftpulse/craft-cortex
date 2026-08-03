@@ -245,6 +245,85 @@ it('ignores off (empty-string) toggle values from the lightswitch macro', functi
     expect($patterns)->not->toContain('resave/entries');
 });
 
+it('accepts every truthy toggle representation the macro can post', function(mixed $on) {
+    // The lightswitch posts the string '1', but a JSON caller or a future
+    // macro change can hand over the int or the bool. All three mean on;
+    // anything else means off.
+    $patterns = _heraldRunSave([
+        'heraldCommandGroups' => ['resave' => $on],
+        'heraldCommandActions' => [],
+        'settings' => ['allowedCommands' => []],
+    ]);
+
+    expect($patterns)->toContain('resave/*');
+})->with([
+    "string '1'" => ['1'],
+    'int 1' => [1],
+    'bool true' => [true],
+]);
+
+it('treats other truthy-looking toggle values as off', function(mixed $off) {
+    $patterns = _heraldRunSave([
+        'heraldCommandGroups' => ['resave' => $off],
+        'heraldCommandActions' => [],
+        'settings' => ['allowedCommands' => []],
+    ]);
+
+    expect($patterns)->not->toContain('resave/*');
+})->with([
+    "string 'on'" => ['on'],
+    "string 'true'" => ['true'],
+    'int 2' => [2],
+    'null' => [null],
+    'bool false' => [false],
+]);
+
+it('ignores a non-array toggle payload', function() {
+    $patterns = _heraldRunSave([
+        'heraldCommandGroups' => 'not-an-array',
+        'heraldCommandActions' => 'not-an-array',
+        'settings' => ['allowedCommands' => [['pattern' => 'kept/*']]],
+    ]);
+
+    expect($patterns)->toBe(['kept/*']);
+});
+
+it('ignores a non-array custom-patterns payload', function() {
+    $patterns = _heraldRunSave([
+        'heraldCommandGroups' => ['resave' => '1'],
+        'heraldCommandActions' => [],
+        'settings' => ['allowedCommands' => 'not-an-array'],
+    ]);
+
+    expect($patterns)->toBe(['resave/*']);
+});
+
+it('ignores a non-array settings payload', function() {
+    $patterns = _heraldRunSave([
+        'heraldCommandGroups' => ['resave' => '1'],
+        'heraldCommandActions' => [],
+        'settings' => 'not-an-array',
+    ]);
+
+    expect($patterns)->toBe(['resave/*']);
+});
+
+it('drops blank and whitespace-only custom patterns', function() {
+    $patterns = _heraldRunSave([
+        'heraldCommandGroups' => [],
+        'heraldCommandActions' => [],
+        'settings' => ['allowedCommands' => [
+            ['pattern' => '  spaced/*  '],
+            ['pattern' => '   '],
+            ['pattern' => ''],
+            ['notPattern' => 'ignored/*'],
+            'not-a-row',
+        ]],
+    ]);
+
+    expect($patterns)->toBe(['spaced/*']);
+});
+
 it('preserves custom patterns from the editable table verbatim', function() {
     $patterns = _heraldRunSave([
         'heraldCommandGroups' => [],
