@@ -26,8 +26,15 @@ use ReflectionClass;
  *
  * Both methods accept either a `ToolInterface` instance or a
  * fully-qualified class string — the registry has instances; the
- * dispatcher already resolved one too. Reflection costs are negligible
- * at server boot (~30 attribute reads, once per process).
+ * dispatcher already resolved one too.
+ *
+ * Both memoize per class for the life of the process. Tool classes are
+ * immutable once loaded, so a second read can only produce the same
+ * answer, and the calls sit on hot paths: `annotationsFor()` runs once
+ * per tool on every `tools/list`, which is the first thing every client
+ * does on connect, and again per `tools/call` through the audit emitter.
+ * Un-memoized that is five `ReflectionClass` constructions and five
+ * `newInstance()` calls per tool per list.
  * =========================================================================
  *
  * @author CraftPulse
@@ -37,6 +44,15 @@ final class AttributeReader
 {
     // Private Properties
     // =========================================================================
+
+    /**
+     * Per-class memoization of `annotationsFor()`. Keyed by class name
+     * and populated even when the result is empty, so a tool that
+     * declares no attributes stops re-reflecting too.
+     *
+     * @var array<class-string,array<string,bool|string>>
+     */
+    private static array $_annotationsCache = [];
 
     /**
      * Per-class memoization of `isStdioOnly()`. Tool classes are
@@ -58,6 +74,8 @@ final class AttributeReader
      * declarations. Absent attributes are simply not emitted; explicit
      * `#[Is*(false)]` emits the corresponding hint as `false`.
      *
+     * Memoized per class — see `$_annotationsCache`.
+     *
      * @param ToolInterface|class-string<ToolInterface> $toolOrClass
      * @return array<string,bool|string>
      *
@@ -66,6 +84,11 @@ final class AttributeReader
      */
     public static function annotationsFor(ToolInterface|string $toolOrClass): array
     {
+        $class = is_string($toolOrClass) ? $toolOrClass : $toolOrClass::class;
+        if (array_key_exists($class, self::$_annotationsCache)) {
+            return self::$_annotationsCache[$class];
+        }
+
         $rc = new ReflectionClass($toolOrClass);
         $annotations = [];
 
@@ -94,7 +117,7 @@ final class AttributeReader
             $annotations['title'] = $title[0]->newInstance()->value;
         }
 
-        return $annotations;
+        return self::$_annotationsCache[$class] = $annotations;
     }
 
     /**

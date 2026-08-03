@@ -17,6 +17,8 @@ use craftpulse\herald\attributes\IsReadOnly;
 use craftpulse\herald\attributes\IsStdioOnly;
 use craftpulse\herald\attributes\Title;
 use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\content\Entries;
+use craftpulse\herald\tools\dev\StreamingFixtureTool;
 use craftpulse\herald\tools\support\AttributeReader;
 
 // -----------------------------------------------------------------------------
@@ -171,4 +173,61 @@ it('reads Resave annotations from class-level attributes', function() {
         'openWorldHint' => false,
         'title' => 'Resave Elements',
     ]);
+});
+
+// -----------------------------------------------------------------------------
+// Memoization
+// -----------------------------------------------------------------------------
+
+it('memoizes annotation reads per class', function() {
+    // `tools/list` is the first request every client makes, and it reads
+    // annotations once per tool. Un-memoized that is five
+    // `ReflectionClass` constructions plus five attribute
+    // `newInstance()` calls per tool per list.
+    //
+    // Asserted by poisoning the cache rather than by counting
+    // reflections: a sentinel that survives the call proves the cache is
+    // consulted, not merely populated.
+    $cache = new ReflectionProperty(AttributeReader::class, '_annotationsCache');
+
+    /** @var array<class-string,array<string,bool|string>> $original */
+    $original = $cache->getValue();
+
+    try {
+        $cache->setValue(null, []);
+
+        $first = AttributeReader::annotationsFor(Entries::class);
+        expect($first)->toBe(['readOnlyHint' => true, 'idempotentHint' => true]);
+
+        /** @var array<class-string,array<string,bool|string>> $populated */
+        $populated = $cache->getValue();
+        expect($populated)->toHaveKey(Entries::class);
+
+        $cache->setValue(null, [Entries::class => ['title' => 'sentinel']]);
+        expect(AttributeReader::annotationsFor(Entries::class))->toBe(['title' => 'sentinel']);
+    } finally {
+        $cache->setValue(null, $original);
+    }
+});
+
+it('memoizes an empty annotation set too', function() {
+    // A tool declaring no attributes must stop re-reflecting as well,
+    // which needs an `array_key_exists()` cache probe rather than a
+    // truthiness check.
+    $cache = new ReflectionProperty(AttributeReader::class, '_annotationsCache');
+
+    /** @var array<class-string,array<string,bool|string>> $original */
+    $original = $cache->getValue();
+
+    try {
+        $cache->setValue(null, []);
+
+        expect(AttributeReader::annotationsFor(StreamingFixtureTool::class))->toBe([]);
+
+        /** @var array<class-string,array<string,bool|string>> $populated */
+        $populated = $cache->getValue();
+        expect($populated)->toHaveKey(StreamingFixtureTool::class);
+    } finally {
+        $cache->setValue(null, $original);
+    }
 });
