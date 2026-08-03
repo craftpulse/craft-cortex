@@ -49,7 +49,12 @@ jobs:
   # element types). This job therefore has to build a real Craft install
   # before Pest can run. The harness needs, in order:
   #
-  #   1. a MySQL 8 service and a database Craft can install into,
+  #   1. a MySQL 8 service and a database Craft can install into. It is named
+  #      `herald_fixtures` because that is the database the suite pins itself
+  #      to (`phpunit.xml.dist` and `tests/boot-craft.php`); the pin exists to
+  #      keep a local run off the development schema, and the bootstrap aborts
+  #      rather than run against anything else, so this job provisions the same
+  #      name instead of relying on the override,
   #   2. a Craft project with the plugin required in from this checkout,
   #      so `craftcms/plugin-installer` registers it and
   #      `Herald::getInstance()` resolves,
@@ -98,8 +103,12 @@ jobs:
   # fallback is `pest --log-junit junit.xml` plus a grep asserting the
   # file contains no `<skipped` elements.
   #
-  # Note also that the suite consumes the activity-viewer grant, so a
-  # second local run needs `composer test:fixtures` again.
+  # Every test now runs inside a transaction that is rolled back on teardown
+  # (`craftpulse\herald\tests\TestCase`), so the suite no longer consumes the
+  # activity-viewer grant, and no longer needs `composer test:fixtures` re-run
+  # between runs. The fixture step below is still required on a fresh database,
+  # because the fixtures are committed on purpose: they are the contract, not
+  # per-test state.
   pest:
     name: Pest
     runs-on: ubuntu-latest
@@ -108,7 +117,7 @@ jobs:
         image: mysql:8.0
         env:
           MYSQL_ROOT_PASSWORD: root
-          MYSQL_DATABASE: db_test
+          MYSQL_DATABASE: herald_fixtures
         ports:
           - 3306:3306
         options: >-
@@ -151,7 +160,7 @@ jobs:
           CRAFT_DB_DRIVER=mysql
           CRAFT_DB_SERVER=127.0.0.1
           CRAFT_DB_PORT=3306
-          CRAFT_DB_DATABASE=db_test
+          CRAFT_DB_DATABASE=herald_fixtures
           CRAFT_DB_USER=root
           CRAFT_DB_PASSWORD=root
           CRAFT_DB_TABLE_PREFIX=

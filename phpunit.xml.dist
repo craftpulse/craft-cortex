@@ -13,6 +13,7 @@
             <directory>tests</directory>
             <exclude>tests/Bootstrap.php</exclude>
             <exclude>tests/Pest.php</exclude>
+            <exclude>tests/TestCase.php</exclude>
         </testsuite>
     </testsuites>
 
@@ -26,5 +27,47 @@
         <ini name="error_reporting" value="-1"/>
         <ini name="display_errors" value="stderr"/>
         <env name="APP_ENV" value="testing" force="true"/>
+
+        <!--
+            Database isolation. The suite boots the *surrounding* Craft
+            install (see tests/boot-craft.php), whose .env names the
+            development database, and DDEV additionally exports
+            CRAFT_DB_DATABASE=db into the container shell. Both are
+            overridden here so no run can write to the development schema.
+
+            herald_fixtures is Herald's own test database, deliberately not
+            the estate-shared db_test: a tier of this suite asserts against
+            named content, and the fixture contract in
+            tests/fixtures/FixtureInstaller.php writes sections, fields, a
+            volume and users that other plugins' suites must not inherit.
+            Provision it with the commands in CLAUDE.md, or point
+            HERALD_TEST_DB somewhere else.
+
+            Only the database name and the table prefix are forced: those are
+            the two values an ambient environment gets wrong for a suite that
+            needs its own schema. Connection coordinates (driver, host, port,
+            user, password) are deliberately absent — they come from the
+            surrounding install's .env, which loads through an *immutable*
+            Dotenv repository, so anything set here would win over .env and
+            break every environment that reaches MySQL differently from the
+            local one.
+
+            force="true" reaches putenv() and $_ENV but NOT $_SERVER, which
+            craft\helpers\App::env() reads first, so these entries alone
+            cannot beat DDEV's ambient value. tests/boot-craft.php pins all
+            three stores; keep the value below in step with the
+            HERALD_TEST_DB default there. Drift aborts the run rather than
+            silently redirecting it.
+
+            Run the suite from this plugin's own root: `vendor/bin/pest`,
+            `composer test`, or
+            `ddev exec -d <plugin dir> vendor/bin/pest`. Never point a
+            `configuration` flag at this file from a project root: PHPUnit
+            still discovers the tests, so the run looks isolated while some
+            harnesses read their env pins from the working directory instead
+            and never see this file at all.
+        -->
+        <env name="CRAFT_DB_DATABASE" value="herald_fixtures" force="true"/>
+        <env name="CRAFT_DB_TABLE_PREFIX" value="" force="true"/>
     </php>
 </phpunit>

@@ -5,9 +5,12 @@
  * Pest configuration for Herald.
  *
  * Wires up:
- *   - The base TestCase used by every test (PHPUnit\Framework\TestCase by
- *     default; switch later if we adopt Codeception). The bootstrap has
- *     already booted Craft, so tests can rely on Craft::$app being set.
+ *   - The base TestCase used by every test. `craftpulse\herald\tests\
+ *     TestCase` wraps each test in a database transaction and rolls it back
+ *     on teardown, so nothing a test writes survives it — see that class for
+ *     what the rollback does and does not cover. The bootstrap has already
+ *     booted Craft against the pinned test database, so tests can rely on
+ *     Craft::$app being set.
  *   - `expect()` extensions — `toBeMcpToolListItem`, `toBeMcpToolErrorEnvelope`,
  *     etc. Keeps assertions readable in tests.
  * =========================================================================
@@ -18,7 +21,7 @@
 
 use craft\elements\User;
 use craftpulse\herald\Herald;
-use PHPUnit\Framework\TestCase;
+use craftpulse\herald\tests\TestCase;
 
 uses(TestCase::class)->in(__DIR__);
 

@@ -6,21 +6,30 @@
  *
  * Boots Craft's console application against the *surrounding* install (the
  * playground at /var/www/html/cms when run via `ddev exec` from the
- * playground, or whatever `HERALD_TEST_CRAFT_BASE` points at), then leaves
- * `Craft::$app` primed so callers can use `Herald::getInstance()->tools->…`
- * and the `craftpulse\herald\tests\` namespace directly.
+ * playground, or whatever `HERALD_TEST_CRAFT_BASE` points at) but against a
+ * *dedicated test database*, then leaves `Craft::$app` primed so callers can
+ * use `Herald::getInstance()->tools->…` and the `craftpulse\herald\tests\`
+ * namespace directly.
+ *
+ * The install supplies the code, config and storage; the database is pinned
+ * to `herald_fixtures` (or `HERALD_TEST_DB`) so no run can write to the
+ * development schema. Together with the per-test transaction in
+ * `craftpulse\herald\tests\TestCase` and the project-config YAML guard
+ * below, that is what makes the suite safe to run against a shared install.
  *
  * Two consumers share this file:
  *
  *   - `tests/Bootstrap.php`   — the Pest / PHPUnit bootstrap.
- *   - `tests/fixtures/install.php` — the content-fixtures CLI.
+ *   - `tests/fixtures/install.php` — the content-fixtures CLI. It writes
+ *     committed fixtures, so it targets the same pinned test database.
  *
  * The logic lives here rather than in `Bootstrap.php` because it is neither
- * short nor obvious (Craft-base resolution order, the shared-autoloader
- * demotion that prevents a `Cannot declare class Yii` fatal, the runtime
- * PSR-4 registration that stands in for an `autoload-dev` block the
- * surrounding install's vendor never receives), and two divergent copies of
- * it would be a slow-burning maintenance trap.
+ * short nor obvious (Craft-base resolution order, the database pins and the
+ * order they have to land in, the shared-autoloader demotion that prevents a
+ * `Cannot declare class Yii` fatal, the runtime PSR-4 registration that
+ * stands in for an `autoload-dev` block the surrounding install's vendor
+ * never receives), and two divergent copies of it would be a slow-burning
+ * maintenance trap.
  * =========================================================================
  *
  * @author Craftpulse
@@ -71,6 +80,49 @@ if (is_object($sharedLoader) && method_exists($sharedLoader, 'unregister')) {
     $sharedLoader->register(false);
 }
 
+// =========================================================================
+// Database isolation. MUST come before the .env load and the Craft boot.
+//
+// The surrounding install's `.env` names the *development* database (`db`
+// in the DDEV playground), and DDEV additionally exports `CRAFT_DB_DATABASE`
+// into the container shell, so a suite that boots that install connects to
+// the live development schema and every write it makes commits there
+// permanently.
+//
+// `craft\helpers\App::env()` reads `$_SERVER` first, then `$_ENV`, then
+// `getenv()`, and PHP's CLI SAPI copies the whole container environment into
+// `$_SERVER` — so PHPUnit's own `<env force="true">` entries (which only
+// touch `putenv()` and `$_ENV`, see `PHPUnit\TextUI\Configuration\
+// PhpHandler::handleEnvVariables()`) cannot beat DDEV's ambient value on
+// their own. All three stores are pinned here, which is the half of the
+// belt-and-braces that works no matter how the suite was invoked, including
+// from the `tests/fixtures/install.php` CLI, which PHPUnit never touches.
+//
+// The pins land before `Dotenv::createUnsafeImmutable()` on purpose: an
+// immutable Dotenv repository skips any name that is already set, so the
+// surrounding install's `.env` cannot take the database back.
+//
+// Connection *coordinates* (driver, host, port, user, password) are
+// deliberately NOT pinned anywhere. They differ per environment and the
+// surrounding install's `.env` is their source of truth; because that load
+// is immutable, anything set here would win over `.env` and break the
+// coordinates on any host whose database is not reachable the same way as
+// the local one (a CI runner reaching MySQL on 127.0.0.1, for one).
+//
+// `HERALD_TEST_DB` overrides the default database for an operator or a CI
+// job that provisions its own. Keep the default in step with the
+// `CRAFT_DB_DATABASE` entry in `phpunit.xml.dist`; if the two ever drift,
+// the assertion after the boot below aborts the run rather than letting it
+// write somewhere unexpected.
+// =========================================================================
+$heraldTestDatabase = getenv('HERALD_TEST_DB') ?: 'herald_fixtures';
+
+foreach (['CRAFT_DB_DATABASE' => $heraldTestDatabase, 'CRAFT_DB_TABLE_PREFIX' => ''] as $name => $value) {
+    $_SERVER[$name] = $value;
+    $_ENV[$name] = $value;
+    putenv("{$name}={$value}");
+}
+
 // Load the playground's .env (has CRAFT_APP_ID, security key, db creds).
 if (file_exists(CRAFT_BASE_PATH . '/.env')) {
     Dotenv\Dotenv::createUnsafeImmutable(CRAFT_BASE_PATH)->safeLoad();
@@ -84,6 +136,51 @@ if (!defined('CRAFT_ENVIRONMENT')) {
 // ConsoleApplication, plugins are registered, and Herald::getInstance()
 // resolves herald.
 require CRAFT_VENDOR_PATH . '/craftcms/cms/bootstrap/console.php';
+
+// Craft's init just called `date_default_timezone_set()` with
+// `system.timeZone`, which is whatever the booted install was created with
+// (Craft's own install migration seeds `America/Los_Angeles`). Craft stores
+// datetimes in UTC, so every DateTime a test constructs after this point
+// would otherwise sit a full UTC offset away from the values it compares
+// against, and expiry assertions would pass or fail on which side of the
+// offset the fixture happened to land. Re-pin after app creation, not
+// before: init would overwrite an earlier pin.
+date_default_timezone_set('UTC');
+
+// Belt to the database pin's braces: keep project-config YAML writes off the
+// surrounding install's disk. `ProjectConfig::flush()` (called explicitly by
+// the content-fixtures CLI, and hooked to `EVENT_AFTER_REQUEST`, which a test
+// process never fires) writes the *booted database's* project config into
+// `<install>/config/project/`. With the database pinned to a test schema and
+// the install still supplying the playground's `config/`, that would overwrite
+// the playground's version-controlled YAML with the test schema's values. The
+// `saveModifiedConfigData()` half of `flush()` still runs, so entities that
+// live only in the config store (filesystems above all) still persist.
+Craft::$app->getProjectConfig()->writeYamlAutomatically = false;
+
+// Fail closed. If the pins above are ever edited out, drift from
+// `phpunit.xml.dist`, or get beaten by an environment nobody anticipated,
+// abort before a single test runs rather than committing to the development
+// database. The check asks the connection itself rather than re-reading the
+// environment, so it holds regardless of how the value was resolved.
+$connectedDatabase = (string)Craft::$app->getDb()->createCommand('SELECT DATABASE()')->queryScalar();
+
+if ($connectedDatabase !== $heraldTestDatabase) {
+    fwrite(STDERR, "Herald test bootstrap refused to run: Craft connected to '{$connectedDatabase}', not the test database '{$heraldTestDatabase}'.\n");
+    fwrite(STDERR, "Check the CRAFT_DB_DATABASE pins in tests/boot-craft.php and phpunit.xml.dist, or set HERALD_TEST_DB.\n");
+    exit(1);
+}
+
+// Install the plugin under test. Nothing else does: the surrounding install
+// may or may not carry Herald, and a fresh test database certainly does not,
+// in which case every test would fail on a null `Herald::getInstance()`
+// rather than on the behaviour it exercises. Idempotent, and deliberately
+// here rather than in a test lifecycle hook: `installPlugin()` writes project
+// config, which must not happen inside the per-test transaction that
+// `craftpulse\herald\tests\TestCase` rolls back.
+if (Craft::$app->getIsInstalled(true) && !Craft::$app->getPlugins()->isPluginInstalled('herald')) {
+    Craft::$app->getPlugins()->installPlugin('herald');
+}
 
 // Register the test-namespace PSR-4 mapping on the playground's
 // autoloader so test fixtures under `tests/Tools/Fixtures/` (and the
