@@ -6,6 +6,7 @@ use craft\db\Migration;
 use craft\db\Table as CraftTable;
 use craftpulse\auditkit\AuditKit;
 use craftpulse\herald\db\Table;
+use craftpulse\herald\elements\Skill;
 
 /**
  * =========================================================================
@@ -115,10 +116,13 @@ class Install extends Migration
     /**
      * @inheritdoc
      *
-     * Drops Herald's own tables only. The Audit Kit migrator is
-     * deliberately not reverted here: the kit is a library-shipped
-     * module shared by every installed consumer, so tearing its state
-     * down on one plugin's uninstall would break the others.
+     * Drops Herald's own tables, then hands off to `removeContent()` for
+     * the core-table rows that outlive them.
+     *
+     * The Audit Kit migrator is deliberately not reverted here: the kit
+     * is a library-shipped module shared by every installed consumer, so
+     * tearing its state down on one plugin's uninstall would break the
+     * others.
      *
      * @author CraftPulse
      * @since  5.0.0
@@ -133,7 +137,38 @@ class Install extends Migration
         $this->dropTableIfExists(Table::SKILLS);
         $this->dropTableIfExists(Table::RUNTIME_OVERRIDES);
 
+        $this->removeContent();
+
         return true;
+    }
+
+    /**
+     * Delete the core-table rows that Herald's own tables leave behind.
+     *
+     * `herald_skills` is the extension table of the `Skill` element type,
+     * so dropping it leaves one row per authored skill in `elements`
+     * (plus its `elements_sites`, search-index and relation rows) with
+     * nothing left to own them, and no registered element type that
+     * garbage collection could route them through. The field layout is
+     * orphaned the same way.
+     *
+     * Public and separate from `safeDown()` for the reason `verbb\formie`
+     * keeps `Install::removeContent()` public: it is the only part of the
+     * teardown that can be exercised without executing DDL. The two
+     * statements are the established plugin idiom for this cleanup —
+     * Formie's `removeContent()` for the element rows,
+     * `craftcms\commerce`'s `Install::safeDown()` for the field layouts.
+     *
+     * @throws \yii\db\Exception from `Migration::delete()`.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    public function removeContent(): void
+    {
+        // Cascades through every core table keyed on `elements.id`.
+        $this->delete(CraftTable::ELEMENTS, ['type' => Skill::class]);
+        $this->delete(CraftTable::FIELDLAYOUTS, ['type' => Skill::class]);
     }
 
     // Private Methods

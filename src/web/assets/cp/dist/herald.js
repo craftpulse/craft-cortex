@@ -227,10 +227,11 @@
 
         /**
          * Fill every `[data-herald-countdown]` element with the remaining
-         * time until its `data-expires` timestamp. The stored value is a
-         * naive UTC datetime (Craft's DB convention), so it is normalised to
-         * an explicit UTC instant before the diff — a bare `new Date(...)`
-         * would parse it as local time and skew the countdown by the offset.
+         * time until its `data-expires` timestamp. Row serializers emit
+         * offset-bearing ISO-8601, but the normalisation below is kept for
+         * any caller that hands over a naive UTC datetime (Craft's DB
+         * convention): a bare `new Date(...)` would parse an offset-less
+         * value as local time and skew the countdown by the offset.
          */
         refreshCountdowns: function() {
             var nodes = document.querySelectorAll('[data-herald-countdown]');

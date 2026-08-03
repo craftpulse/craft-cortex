@@ -151,7 +151,13 @@ class Invocations extends Component
             return 0;
         }
 
-        $cutoff = Carbon::now()->subDays($retentionDays)->toDateTimeString();
+        // The zone is named rather than left to the process default:
+        // `dateCreated` is a naive UTC string stamped by
+        // `craft\db\ActiveRecord`, while `Carbon::now()` follows
+        // `system.timeZone`. A local-time cutoff is wrong by the whole
+        // UTC offset, so the sweep either destroys an extra window of
+        // audit rows or silently retains one.
+        $cutoff = Carbon::now('UTC')->subDays($retentionDays)->toDateTimeString();
         return (int) InvocationRecord::deleteAll(['<', 'dateCreated', $cutoff]);
     }
 

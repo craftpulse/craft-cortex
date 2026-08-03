@@ -159,7 +159,8 @@
                 return '<span class="light">' + Craft.t('herald', 'Never') + '</span>';
             }
             // Live countdown span — Herald.refreshCountdowns() fills it and
-            // keeps it ticking. data-expires is the naive-UTC stored value.
+            // keeps it ticking. data-expires is the offset-bearing ISO-8601
+            // value the row serializer emits.
             return (
                 '<span class="herald-countdown" data-herald-countdown data-expires="' +
                 Craft.escapeHtml(value.value) +

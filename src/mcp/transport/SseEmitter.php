@@ -173,8 +173,18 @@ final class SseEmitter
      * from `start()` and again from each `emit()` in defense-in-depth
      * against late-installed handlers.
      *
-     * Suppress the `@` on `ob_end_flush()` because PHP raises a notice
-     * when there are no buffers to flush; the loop guard is the
+     * The manual level counting is Yii's own idiom for the same hazard
+     * (`yii\base\Response::clearOutputBuffers()`, whose comment names
+     * `zlib.output_compression` explicitly): that setting installs an
+     * output handler PHP will not tear down, so `ob_end_flush()` returns
+     * false while `ob_get_level()` stays put, and a
+     * `while (ob_get_level() > 0)` loop spins forever inside a streaming
+     * transport. Counting down from the level captured up front bounds
+     * the walk no matter what a handler refuses to do, and `ob_flush()`
+     * pushes the contents of a buffer that cannot be removed.
+     *
+     * Suppress with `@` because PHP raises a notice when a buffer cannot
+     * be flushed or there is nothing to flush; the loop bound is the
      * authority, not the notice.
      *
      * @author CraftPulse
@@ -182,8 +192,10 @@ final class SseEmitter
      */
     public function disableBuffering(): void
     {
-        while (ob_get_level() > 0) {
-            @ob_end_flush();
+        for ($level = ob_get_level(); $level > 0; --$level) {
+            if (!@ob_end_flush()) {
+                @ob_flush();
+            }
         }
         flush();
     }

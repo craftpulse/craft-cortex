@@ -36,12 +36,13 @@
 - Added dispatcher-level validation of tool arguments against each tool's declared JSON Schema, evaluated against `inputSchemaFor()` so per-user mode narrowing is enforced too. Non-conforming calls return an `isError: true` envelope.
 - Added account-state re-checking on every authenticated request, so a suspended, locked, pending, or inactive account is refused with `401` rather than trusted from issuance.
 - Added per-user rate limiting on the HTTP transport, with a `kind=rate_limited` audit row and a `Retry-After` header on exhaustion.
-- Added SSE streaming for `resave`, `bulk_entries`, `scaffold_entries`, `content_audit`, and `import_export`, with cooperative `notifications/cancelled` handling that survives a dropped connection.
+- Added SSE streaming for `resave`, `bulk_entries`, `scaffold_entries`, `content_audit`, and `import_export`, with cooperative `notifications/cancelled` handling that survives a dropped connection. Every `notifications/progress` frame carries the spec-required `progressToken`, falling back to the request id when the client supplied none.
 - Added an `Origin` allowlist that fails closed outside `devMode`, as the MCP spec's DNS-rebinding defence.
 - Added `herald_invocations`, one audit row per invocation over HTTP, plus one redacted structured log line per invocation on the `herald` log channel across both transports.
 - Added native Audit Kit event emission for every write-tool invocation and every credential lifecycle action, so writes reach a tamper-evident chain when a recorder is installed. With no recorder the bus is a no-op.
 - Added `craftpulse\herald\tools\support\SecretRedactor` as the single source of truth for secret redaction, applied to tool arguments, audit excerpts, `craft_exec` output, and the `config` tool.
 - Added MCP protocol revision `2025-11-25`, negotiating `2025-06-18` for older clients.
+- Added a complete uninstall: removing Herald drops its own tables and the element and field-layout rows behind authored skills, so nothing is left orphaned in Craft's core tables.
 
 ### Content Management
 
@@ -68,7 +69,8 @@
 - Added the `herald:manage-settings`, `herald:manage-grants`, `herald:manage-skills`, `herald:view-activity`, and `herald:run-commands` permissions.
 - Added a grouped console-command browser to the Settings screen, listing every route on the install with content-level and admin-level commands in separate sections, and preserving hand-written glob patterns in a per-section table.
 - Added temporary command grants: admin-issued, auto-expiring allowlist additions that do not sync to project config, with an "effective allowlist right now" panel.
-- Added `auditRetentionDays` and `auditResponseExcerptBytes` to tune the audit table, which is pruned during Craft's garbage-collection sweep.
+- Added `auditRetentionDays` and `auditResponseExcerptBytes` to tune the audit table, which is pruned during Craft's garbage-collection sweep at exactly the configured age on any install timezone.
+- Added timezone-correct timestamps across the control panel: expiry, last-used, and creation times render in the viewer's own timezone, and a token's "expired" marker flips on the same instant the transport starts refusing the credential.
 - Added `userCustomFieldAllowlist`, empty by default, so the `users` tool returns no custom-field value until an operator enumerates the handles. The allowlist is independent of caller permission.
 - Added `herald/token/issue`, `herald/token/list`, and `herald/token/revoke` for managing bearer tokens from the console. Issuance requires `--scopes` and the Pro edition.
 

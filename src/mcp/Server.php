@@ -1041,7 +1041,17 @@ class Server
         array $arguments,
         array $callParams,
     ): Generator {
-        $progressToken = $this->_progressToken($callParams);
+        $requestedProgressToken = $this->_progressToken($callParams);
+
+        // `progressToken` is REQUIRED on `notifications/progress`, so a
+        // client that omitted `_meta.progressToken` falls back to the
+        // request id, which keeps the request-to-stream mapping 1:1. The
+        // trailing `0` only covers the malformed `{"id": null}` shape.
+        // `notifications/cancelled` keeps the nullable form below: there
+        // the token is an optional correlation aid and `requestId`
+        // already carries the correlation.
+        $progressToken = $requestedProgressToken ?? $id ?? 0;
+
         $context = $this->_invocationContextWithCancellation($id);
         $cancellationToken = $context->getCancellationToken();
 
@@ -1108,7 +1118,7 @@ class Server
             // `buildEntry()`; we drive both directly here so the
             // logger doesn't have to special-case cancellation.
             $this->_logCancelled($name, $arguments, $context, $this->_elapsedMs($startNs));
-            yield $this->_cancelledEnvelope($id, $progressToken);
+            yield $this->_cancelledEnvelope($id, $requestedProgressToken);
             return;
         }
 
@@ -1223,12 +1233,13 @@ class Server
      * Build a `notifications/progress` JSON-RPC envelope from a tool's
      * yielded frame. Per MCP 2025-06-18 §progress:
      *
-     *   - `progressToken` MUST be the value the client supplied in the
-     *     original request's `_meta.progressToken`. When the client
-     *     omitted it the server still emits progress frames (the
-     *     client may ignore them), so the envelope falls back to the
-     *     request id — that's a sensible default that preserves a
-     *     1:1 mapping between request and progress stream.
+     *   - `progressToken` is REQUIRED and carries the value the client
+     *     supplied in the original request's `_meta.progressToken`. It is
+     *     never conditional here: an envelope without it is malformed,
+     *     and a client validating notifications against the schema is
+     *     entitled to reject the whole stream. `_streamToolCall()` owns
+     *     the fallback for a client that omitted the token, so this
+     *     method receives a resolved one.
      *   - `progress` is required, monotonically non-decreasing. The
      *     tool is responsible for the increment; we pass through what
      *     it yielded.
@@ -1241,12 +1252,9 @@ class Server
      * @author CraftPulse
      * @since  5.0.0
      */
-    private function _progressEnvelope(string|int|null $progressToken, array $frame): array
+    private function _progressEnvelope(string|int $progressToken, array $frame): array
     {
-        $params = [];
-        if ($progressToken !== null) {
-            $params['progressToken'] = $progressToken;
-        }
+        $params = ['progressToken' => $progressToken];
         if (array_key_exists('progress', $frame)) {
             $params['progress'] = $frame['progress'];
         }
@@ -1290,9 +1298,9 @@ class Server
     /**
      * Pull `_meta.progressToken` out of a `tools/call` params blob.
      * Per MCP §progress the token MUST be a string or integer; any
-     * other shape (or absence) returns null and the dispatcher emits
-     * progress envelopes without a `progressToken` field. Spec-aware
-     * clients ignore those; non-spec clients see no frames.
+     * other shape (or absence) returns null, and `_streamToolCall()`
+     * substitutes the request id so the required `progressToken` field
+     * is still present on every emitted frame.
      *
      * @param array<string,mixed> $callParams
      *

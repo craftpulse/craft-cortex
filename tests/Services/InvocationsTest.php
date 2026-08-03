@@ -294,6 +294,58 @@ it('prune() does not delete rows newer than the retention window', function() {
     }
 });
 
+it('prune() cuts at the UTC boundary, not the local one', function() {
+    $settings = Herald::getInstance()->getSettings();
+    $originalRetention = $settings->auditRetentionDays;
+    $settings->auditRetentionDays = 1;
+
+    // A positive offset points the skew at over-deletion: a local-time
+    // cutoff sits `offset` hours LATER than the true UTC one, so rows
+    // inside that band are destroyed even though they are inside the
+    // retention window. Herald's own audit log is the data being lost.
+    $originalTimeZone = Craft::$app->getTimeZone();
+    Craft::$app->setTimeZone('Europe/Brussels');
+
+    // Exact counts need an empty table. The per-test transaction rolls
+    // this back, so nothing outside the case observes it.
+    InvocationRecord::deleteAll();
+
+    try {
+        $ages = [
+            '_test_/prune-tz-outside' => 25,
+            '_test_/prune-tz-inside-band' => 23,
+            '_test_/prune-tz-recent' => 1,
+        ];
+
+        foreach ($ages as $tool => $hoursAgo) {
+            $row = $this->service->record([
+                'tool' => $tool,
+                'kind' => 'success',
+                'duration_ms' => 1,
+                'transport' => 'http',
+                'args' => '{}',
+            ]);
+            expect($row)->not->toBeNull();
+            $row->dateCreated = Carbon::now('UTC')->subHours($hoursAgo)->toDateTimeString();
+            $row->save(false);
+        }
+
+        // Exactly one row is older than 24 hours. The 23-hour row is
+        // inside the window but inside the offset band, so a local-time
+        // cutoff would take it too.
+        expect($this->service->prune())->toBe(1);
+
+        $survivors = InvocationRecord::find()
+            ->select(['toolName'])
+            ->orderBy(['dateCreated' => SORT_ASC])
+            ->column();
+        expect($survivors)->toBe(['_test_/prune-tz-inside-band', '_test_/prune-tz-recent']);
+    } finally {
+        Craft::$app->setTimeZone($originalTimeZone);
+        $settings->auditRetentionDays = $originalRetention;
+    }
+});
+
 // -----------------------------------------------------------------------------
 // Round-trip parity (locked decision 5)
 // -----------------------------------------------------------------------------

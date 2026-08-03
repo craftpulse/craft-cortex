@@ -129,6 +129,39 @@ it('a streamable tool yields N notifications/progress frames + one terminal tool
     }
 });
 
+it('progress frames still carry a progressToken when the client omitted _meta', function() {
+    $ctx = _herald_streaming_register_fixture();
+
+    try {
+        $server = new Server(Server::TRANSPORT_HTTP);
+        $server->setSessionId('sess-progress-token-fallback');
+        $frames = _herald_drain_streaming($server->dispatchStreaming([
+            'jsonrpc' => '2.0',
+            'id' => 42,
+            'method' => 'tools/call',
+            'params' => [
+                'name' => '_streaming_test',
+                'arguments' => [],
+                // No `_meta.progressToken` — the shape most clients send.
+            ],
+        ]));
+
+        expect($frames)->toHaveCount(4);
+
+        // `progressToken` is required on `notifications/progress`. Omitting
+        // it emits a malformed notification that a schema-validating
+        // client is entitled to reject, so the dispatcher falls back to
+        // the request id.
+        for ($i = 0; $i < 3; $i++) {
+            expect($frames[$i])->toHaveKey('method', 'notifications/progress');
+            expect($frames[$i]['params'])->toHaveKey('progressToken');
+            expect($frames[$i]['params']['progressToken'])->toBe(42);
+        }
+    } finally {
+        _herald_streaming_restore_fixture($ctx);
+    }
+});
+
 // -----------------------------------------------------------------------------
 // A non-streaming tool collapses to a single one-frame SSE
 // -----------------------------------------------------------------------------

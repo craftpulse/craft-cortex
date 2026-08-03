@@ -80,7 +80,56 @@ it('issue() with a TTL writes a future expiresAt; without TTL writes null', func
 
     $withTtl = $this->service->issue($this->userId, '_test_/with-ttl', 3600);
     expect($withTtl['model']->expiresAt)->not->toBeNull();
-    expect(Carbon::parse($withTtl['model']->expiresAt)->isFuture())->toBeTrue();
+    expect(Carbon::parse($withTtl['model']->expiresAt, 'UTC')->isFuture())->toBeTrue();
+});
+
+it('issue() writes expiresAt in the same UTC zone as the row dateCreated', function() {
+    // A non-UTC system timezone is what makes the skew observable: on a
+    // UTC install the process default and the column's zone agree, so the
+    // test has to name a zone that disagrees with UTC.
+    $originalTimeZone = Craft::$app->getTimeZone();
+    Craft::$app->setTimeZone('Europe/Brussels');
+
+    try {
+        $issued = $this->service->issue($this->userId, '_test_/tz-parity', 3600);
+        $record = TokenRecord::findOne(['id' => (int) $issued['model']->id]);
+        expect($record)->not->toBeNull();
+
+        // `dateCreated` is stamped in UTC by `craft\db\ActiveRecord`. An
+        // expiry taken from the process timezone instead lands an offset
+        // away from its own row, so the gap between the two columns reads
+        // as `ttl + offset` rather than `ttl`.
+        $utc = new DateTimeZone('UTC');
+        $created = new DateTimeImmutable((string) $record->dateCreated, $utc);
+        $expires = new DateTimeImmutable((string) $record->expiresAt, $utc);
+
+        expect($expires->getTimestamp() - $created->getTimestamp())
+            ->toBeGreaterThanOrEqual(3600)
+            ->toBeLessThanOrEqual(3602);
+    } finally {
+        Craft::$app->setTimeZone($originalTimeZone);
+    }
+});
+
+it('lookup() honours an expiry stored as naive UTC on a non-UTC install', function() {
+    $originalTimeZone = Craft::$app->getTimeZone();
+    // A NEGATIVE offset is the dangerous direction on the read side:
+    // misreading a naive UTC column as local time moves the instant
+    // forward, so a bare `Carbon::parse()` places a just-past expiry
+    // hours into the future and keeps honouring a dead credential.
+    Craft::$app->setTimeZone('America/Los_Angeles');
+
+    try {
+        $issued = $this->service->issue($this->userId, '_test_/tz-expired', 3600);
+        $record = TokenRecord::findOne(['id' => (int) $issued['model']->id]);
+        $record->expiresAt = Carbon::now('UTC')->subSecond()->toDateTimeString();
+        $record->save(false);
+
+        $service = new \craftpulse\herald\services\Tokens();
+        expect($service->lookup($issued['token']))->toBeNull();
+    } finally {
+        Craft::$app->setTimeZone($originalTimeZone);
+    }
 });
 
 it('issue() defaults to Settings::$tokenTtlDefault when no TTL passed', function() {
@@ -91,7 +140,7 @@ it('issue() defaults to Settings::$tokenTtlDefault when no TTL passed', function
     try {
         $result = $this->service->issue($this->userId, '_test_/ttl-default');
         expect($result['model']->expiresAt)->not->toBeNull();
-        expect(Carbon::parse($result['model']->expiresAt)->isFuture())->toBeTrue();
+        expect(Carbon::parse($result['model']->expiresAt, 'UTC')->isFuture())->toBeTrue();
     } finally {
         $settings->tokenTtlDefault = $original;
     }
@@ -149,7 +198,9 @@ it('lookup() on an expired token returns null', function() {
     $issued = $this->service->issue($this->userId, '_test_/lookup-expired');
     // Force expiry into the past via the Record directly.
     $record = TokenRecord::findOne($issued['model']->id);
-    $record->expiresAt = Carbon::now()->subSecond()->toDateTimeString();
+    // Naive UTC, matching what the column actually holds — a local-time
+    // string here would only read as past on a negative-offset install.
+    $record->expiresAt = Carbon::now('UTC')->subSecond()->toDateTimeString();
     $record->save(false);
 
     $service = new \craftpulse\herald\services\Tokens();

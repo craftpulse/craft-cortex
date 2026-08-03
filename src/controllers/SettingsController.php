@@ -1446,7 +1446,8 @@ class SettingsController extends Controller
      *   - `user`        — `{id, label, cpEditUrl}` or null (anonymous /
      *                      deleted user).
      *   - `durationMs`  — int wall-clock duration.
-     *   - `dateCreated` — string ISO-8601.
+     *   - `dateCreated` — string|null offset-bearing ISO-8601 (see
+     *                      `_serializeDate`).
      *
      * Never surfaces `argsRedacted` / `responseExcerpt` / error payloads —
      * those live only in the detail slideout (locked decision 11).
@@ -1482,7 +1483,7 @@ class SettingsController extends Controller
             'kind' => (string) ($row['kind'] ?? ''),
             'user' => $user,
             'durationMs' => (int) ($row['durationMs'] ?? 0),
-            'dateCreated' => (string) ($row['dateCreated'] ?? ''),
+            'dateCreated' => $this->_serializeDate($row['dateCreated'] ?? null),
         ];
     }
 
@@ -1604,10 +1605,12 @@ class SettingsController extends Controller
      *                       renderer mutes on must travel inside the value.
      *   - `note`         — string|null (admin freeform).
      *   - `expiresAt`    — `{value, isExpired}` composite; `value` is
-     *                       string|null ISO-8601, null = never.
+     *                       string|null offset-bearing ISO-8601, null =
+     *                       never.
      *   - `createdBy`    — `{id, label, cpEditUrl}` or null when the
      *                       issuing user record is missing.
-     *   - `dateCreated`  — string ISO-8601.
+     *   - `dateCreated`  — string|null offset-bearing ISO-8601 (see
+     *                       `_serializeDate`).
      *
      * @param array<string,mixed> $row The raw DB row from `Allowlist::getAllOverrides`
      *                                 or `RuntimeOverride::toArray()`.
@@ -1639,13 +1642,42 @@ class SettingsController extends Controller
             ],
             'note' => isset($row['note']) && $row['note'] !== '' ? (string) $row['note'] : null,
             'expiresAt' => [
-                'value' => is_string($expiresAt) && $expiresAt !== '' ? $expiresAt : null,
+                'value' => $this->_serializeDate($expiresAt),
                 'isExpired' => $isExpired,
             ],
             'createdBy' => $createdBy,
             'subject' => $subject,
-            'dateCreated' => (string) ($row['dateCreated'] ?? ''),
+            'dateCreated' => $this->_serializeDate($row['dateCreated'] ?? null),
         ];
+    }
+
+    /**
+     * Render a datetime cell for a VueAdminTable row as an offset-bearing
+     * ISO-8601 string, or null when the value is absent.
+     *
+     * Every datetime column in Herald's tables stores a **naive** UTC
+     * string (`Y-m-d H:i:s`, no offset) because that is what
+     * `Db::prepareDateForDb()` writes. Handing that string to the table
+     * unchanged is not ISO-8601, and the browser's `new Date(...)` parses
+     * an offset-less datetime as **local** time — so every rendered
+     * timestamp landed shifted by the viewer's UTC offset, and the
+     * client-side "expired" comparison in `tokens.twig` flipped by the
+     * same amount. Naming the offset on the wire fixes both at the source
+     * and keeps the cell renderers free of timezone logic.
+     *
+     * @throws \Exception from `DateTimeHelper::toDateTime()` when the
+     *         system timezone cannot be resolved.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private function _serializeDate(mixed $value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return DateTimeHelper::toIso8601($value) ?: null;
     }
 
     /**
@@ -1781,7 +1813,8 @@ class SettingsController extends Controller
      *   - `type`         — `public` (PKCE-only) or `confidential`.
      *   - `approved`     — bool; the DCR approval gate state.
      *   - `redirectUris` — string[] decoded from the JSON column.
-     *   - `dateCreated`  — string ISO-8601.
+     *   - `dateCreated`  — string|null offset-bearing ISO-8601 (see
+     *                      `_serializeDate`).
      *
      * Never surfaces `clientSecretHash` — the hashed secret is internal.
      *
@@ -1812,7 +1845,7 @@ class SettingsController extends Controller
                 'approved' => (bool) $client->approved,
             ],
             'redirectUris' => $redirectUris,
-            'dateCreated' => (string) $client->dateCreated,
+            'dateCreated' => $this->_serializeDate($client->dateCreated),
         ];
     }
 
@@ -1832,9 +1865,11 @@ class SettingsController extends Controller
      *   - `tokenPrefix` — string (first 8 chars of the plaintext, a hint).
      *   - `user`        — `{id, label, cpEditUrl}` or null when the bound
      *                      user record is missing.
-     *   - `expiresAt`   — string|null ISO-8601, or null = never.
-     *   - `lastUsedAt`  — string|null ISO-8601, or null = never used.
-     *   - `dateCreated` — string ISO-8601.
+     *   - `expiresAt`   — string|null offset-bearing ISO-8601, null = never.
+     *   - `lastUsedAt`  — string|null offset-bearing ISO-8601, null = never
+     *                      used.
+     *   - `dateCreated` — string|null offset-bearing ISO-8601 (see
+     *                      `_serializeDate`).
      *
      * @return array<string,mixed>
      *
@@ -1858,9 +1893,9 @@ class SettingsController extends Controller
             'name' => $token->name,
             'tokenPrefix' => $token->tokenPrefix,
             'user' => $user,
-            'expiresAt' => $token->expiresAt,
-            'lastUsedAt' => $token->lastUsedAt,
-            'dateCreated' => (string) $token->dateCreated,
+            'expiresAt' => $this->_serializeDate($token->expiresAt),
+            'lastUsedAt' => $this->_serializeDate($token->lastUsedAt),
+            'dateCreated' => $this->_serializeDate($token->dateCreated),
         ];
     }
 }

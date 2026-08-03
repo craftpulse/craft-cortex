@@ -31,6 +31,7 @@
 use craftpulse\herald\controllers\SettingsController;
 use craftpulse\herald\db\Table;
 use craftpulse\herald\Herald;
+use craftpulse\herald\records\Token as TokenRecord;
 use craftpulse\herald\services\Scopes;
 use yii\web\Response;
 
@@ -361,6 +362,49 @@ it('actionTokensTableData handles a never-expiring token (expiresAt null)', func
     $row = $response->data['data'][0];
     expect($row['expiresAt'])->toBeNull();
     expect($row['lastUsedAt'])->toBeNull();
+});
+
+it('actionTokensTableData renders every timestamp as an offset-bearing instant', function() {
+    $user = _heraldTokenTestUser();
+    $issued = Herald::getInstance()->tokens->issue((int) $user->id, 'tz', 3600);
+
+    // Stamp known naive-UTC column values so the assertion isolates the
+    // serializer from whatever `issue()` wrote.
+    $record = TokenRecord::findOne(['id' => (int) $issued['model']->id]);
+    expect($record)->not->toBeNull();
+    $record->expiresAt = '2026-01-15 23:30:00';
+    $record->lastUsedAt = '2026-01-15 22:15:00';
+    $record->dateCreated = '2026-01-15 21:00:00';
+    $record->save(false);
+
+    // A non-UTC system timezone is what makes the bug observable: on a
+    // UTC install a naive string and an offset-bearing one denote the
+    // same instant, so the assertion has to name the zone itself.
+    $originalTimeZone = Craft::$app->getTimeZone();
+    Craft::$app->setTimeZone('Europe/Brussels');
+
+    try {
+        $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
+        $controller->withParams([]);
+        $row = $controller->actionTokensTableData()->data['data'][0];
+
+        $expected = [
+            'expiresAt' => '2026-01-15 23:30:00',
+            'lastUsedAt' => '2026-01-15 22:15:00',
+            'dateCreated' => '2026-01-15 21:00:00',
+        ];
+
+        foreach ($expected as $key => $naiveUtc) {
+            // Without an offset on the wire the browser's `new Date(...)`
+            // reads the value as local time, shifting every rendered
+            // timestamp (and the "expired" pill) by the viewer's offset.
+            expect($row[$key])->toMatch('/[+-]\d\d:\d\d$/');
+            expect((new DateTimeImmutable((string) $row[$key]))->getTimestamp())
+                ->toBe((new DateTimeImmutable($naiveUtc, new DateTimeZone('UTC')))->getTimestamp());
+        }
+    } finally {
+        Craft::$app->setTimeZone($originalTimeZone);
+    }
 });
 
 it('actionTokensTableData search filters by name substring', function() {

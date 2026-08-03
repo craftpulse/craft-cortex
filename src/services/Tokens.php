@@ -26,7 +26,8 @@ use yii\web\ForbiddenHttpException;
  * both need the bound user — one DB probe per request regardless of
  * how many call sites ask.
  *
- * Carbon over `DateTimeHelper` here per the services rule.
+ * Carbon over `DateTimeHelper` here per the services rule, always with
+ * the zone named explicitly — see `COLUMN_TIME_ZONE`.
  * =========================================================================
  *
  * @author CraftPulse
@@ -36,6 +37,24 @@ class Tokens extends Component
 {
     // Constants
     // =========================================================================
+
+    /**
+     * Timezone every `herald_tokens` datetime column is written in and
+     * read back in.
+     *
+     * Craft's datetime columns hold **naive** UTC strings: nothing in the
+     * value records an offset, and `dateCreated` / `dateUpdated` are
+     * stamped in UTC by `craft\db\ActiveRecord`. A bare `Carbon::now()`
+     * follows the PHP process timezone, which Craft sets to
+     * `system.timeZone` — so on any non-UTC install the columns this
+     * service writes (`expiresAt`, `lastUsedAt`, `dateDeleted`) would
+     * land in local wall-clock time next to UTC siblings in the same
+     * row. Naming the zone rather than relying on the process default is
+     * what keeps the row internally consistent.
+     *
+     * @since 5.0.0
+     */
+    public const COLUMN_TIME_ZONE = 'UTC';
 
     /**
      * Bytes of entropy when generating a token. 32 random bytes →
@@ -131,7 +150,7 @@ class Tokens extends Component
         $record->userId = $userId;
         $record->scope = $this->_normalizeScopes($scopes);
         $record->expiresAt = $ttl !== null
-            ? Carbon::now()->addSeconds($ttl)->toDateTimeString()
+            ? Carbon::now(self::COLUMN_TIME_ZONE)->addSeconds($ttl)->toDateTimeString()
             : null;
 
         if (!$record->save()) {
@@ -199,11 +218,17 @@ class Tokens extends Component
         // filter so the path stays the same for the null-expiry case
         // (no expiry) and the explicit-expiry case. Comparing Carbon
         // instances avoids subtle DB-string-format mismatches.
-        if ($record->expiresAt !== null && Carbon::parse($record->expiresAt)->isPast()) {
+        //
+        // The zone is named on the parse for the same reason it is named
+        // on the write: the column holds a naive UTC string, while the
+        // process timezone is `system.timeZone`. A bare `Carbon::parse()`
+        // would read the value as local time and move every expiry by the
+        // install's UTC offset.
+        if ($record->expiresAt !== null && Carbon::parse($record->expiresAt, self::COLUMN_TIME_ZONE)->isPast()) {
             return $this->_lookupCache[$hash] = null;
         }
 
-        $record->lastUsedAt = Carbon::now()->toDateTimeString();
+        $record->lastUsedAt = Carbon::now(self::COLUMN_TIME_ZONE)->toDateTimeString();
         // `lastUsedAt` is a free-text timestamp column with no rule
         // attached on the Record; saving without validation skips the
         // FK / required-field round-trip and keeps the lookup hot
@@ -231,7 +256,7 @@ class Tokens extends Component
             return false;
         }
 
-        $record->dateDeleted = Carbon::now()->toDateTimeString();
+        $record->dateDeleted = Carbon::now(self::COLUMN_TIME_ZONE)->toDateTimeString();
         if (!$record->save()) {
             throw new Exception(sprintf(
                 'Failed to revoke bearer token #%d: %s',
