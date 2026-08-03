@@ -5,13 +5,12 @@ namespace craftpulse\herald\controllers;
 use Craft;
 use craft\elements\User;
 use craft\helpers\DateTimeHelper;
-use craft\helpers\Db;
 use craft\web\Controller;
-use craftpulse\herald\db\InvocationQuery;
 use craftpulse\herald\Herald;
 use craftpulse\herald\models\Token;
 use craftpulse\herald\records\OauthClient as OauthClientRecord;
 use craftpulse\herald\tools\support\InvocationLogger;
+use craftpulse\herald\web\cp\ActivityFilter;
 use craftpulse\herald\web\cp\RowSerializer;
 use craftpulse\herald\web\cp\TableData;
 use craftpulse\herald\web\cp\TableParams;
@@ -100,6 +99,12 @@ class SettingsController extends Controller
 
     // Private Properties
     // =========================================================================
+
+    /**
+     * @var ActivityFilter|null Memoized Activity-log query filter. Built
+     * lazily so the non-Activity actions never construct it.
+     */
+    private ?ActivityFilter $_activity = null;
 
     /**
      * @var RowSerializer|null Memoized view-model mapper for the
@@ -612,11 +617,8 @@ class SettingsController extends Controller
 
         $this->requirePermission(Herald::PERMISSION_VIEW_ACTIVITY);
 
-        $identity = Craft::$app->getUser()->getIdentity();
-        $isAdmin = $identity instanceof User && $identity->admin;
-
         return $this->renderTemplate('herald/_cp/activity', [
-            'isAdmin' => $isAdmin,
+            'isAdmin' => $this->_activity()->isCallerAdmin(),
             'kinds' => [
                 InvocationLogger::KIND_SUCCESS,
                 InvocationLogger::KIND_TOOL_ERROR,
@@ -669,64 +671,11 @@ class SettingsController extends Controller
         $this->requirePermission(Herald::PERMISSION_VIEW_ACTIVITY);
 
         $params = $this->_tableParams();
-        $search = $params->search;
 
-        $filters = $this->request->getParam('filters', []);
-        if (!is_array($filters)) {
-            $filters = [];
-        }
-
+        // The scope is applied inside `apply()`, ahead of every
+        // caller-supplied filter — see `ActivityFilter`.
         $query = Herald::getInstance()->invocations->find();
-
-        // Fail-closed scope FIRST — a non-admin is pinned to their own
-        // userId before any caller filter is applied. `filters[userId]`
-        // from a non-admin is ignored: the forced `andWhere` cannot be
-        // widened by a second `andWhere` (both must hold).
-        $this->_scopeActivityQueryToUser($query);
-
-        $kind = $this->_filterValue($filters, 'kind');
-        if ($kind !== null) {
-            $query->kind($kind);
-        }
-
-        $toolName = $this->_filterValue($filters, 'toolName');
-        if ($toolName !== null) {
-            $query->toolName($toolName);
-        }
-
-        // Admin-only user filter — a non-admin is already pinned above, so
-        // skip applying their (ignored) value entirely.
-        if ($this->_callerIsAdmin()) {
-            $userId = $this->_filterValue($filters, 'userId');
-            if ($userId !== null && ctype_digit((string) $userId)) {
-                $query->userId((int) $userId);
-            }
-        }
-
-        $from = $this->_filterValue($filters, 'from');
-        if ($from !== null) {
-            $fromClause = Db::parseDateParam('dateCreated', $from, '>=');
-            if ($fromClause !== null) {
-                $query->andWhere($fromClause);
-            }
-        }
-
-        $to = $this->_filterValue($filters, 'to');
-        if ($to !== null) {
-            $toClause = Db::parseDateParam('dateCreated', $to, '<=');
-            if ($toClause !== null) {
-                $query->andWhere($toClause);
-            }
-        }
-
-        if ($search !== '') {
-            $query->andWhere([
-                'or',
-                Db::parseParam('toolName', '*' . $search . '*'),
-                Db::parseParam('clientName', '*' . $search . '*'),
-                Db::parseParam('errorMessage', '*' . $search . '*'),
-            ]);
-        }
+        $this->_activity()->apply($query, $this->request->getParam('filters', []), $params->search);
 
         // Unlike the other three tables this one pages in SQL — the audit
         // log is append-only with no upper bound, so the full set is never
@@ -795,7 +744,7 @@ class SettingsController extends Controller
         }
 
         $query = Herald::getInstance()->invocations->find()->andWhere(['id' => $id]);
-        $this->_scopeActivityQueryToUser($query);
+        $this->_activity()->scopeToUser($query);
 
         $row = $query->one();
         if (!is_array($row)) {
@@ -1292,63 +1241,6 @@ class SettingsController extends Controller
     }
 
     /**
-     * Whether the current CP user is an admin. Centralised so the
-     * Activity scoping logic reads the identity in exactly one place.
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _callerIsAdmin(): bool
-    {
-        $identity = Craft::$app->getUser()->getIdentity();
-        return $identity instanceof User && $identity->admin;
-    }
-
-    /**
-     * Apply the fail-closed Activity-log scope to a query. Admins are
-     * unscoped (they audit everyone); a non-admin is pinned to their own
-     * `userId`. A non-admin with no resolvable identity is pinned to a
-     * sentinel `userId` of 0 so the result is empty rather than
-     * accidentally global — defense in depth, the permission gate already
-     * rejected the anonymous case upstream.
-     *
-     * The pin is an `andWhere` so it composes with (and cannot be widened
-     * by) any caller-supplied `filters[userId]`.
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _scopeActivityQueryToUser(InvocationQuery $query): void
-    {
-        if ($this->_callerIsAdmin()) {
-            return;
-        }
-
-        $identity = Craft::$app->getUser()->getIdentity();
-        $ownId = $identity instanceof User ? (int) $identity->id : 0;
-        $query->userId($ownId);
-    }
-
-    /**
-     * Read a single Activity filter value from the `filters` map,
-     * normalising the empty string + missing key to null so the query
-     * builder treats them as "no filter requested".
-     *
-     * @param array<string,mixed> $filters
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _filterValue(array $filters, string $key): ?string
-    {
-        $value = $filters[$key] ?? null;
-        if ($value === null || $value === '') {
-            return null;
-        }
-        return (string) $value;
-    }
-
-    /**
      * Throw unless the install is Pro. Tokens / Activity / Connection
      * are Pro surfaces (PLANNING.md §4 — they exist to operate the
      * Pro-only HTTP transport); the registry's `shouldRegister()` gate
@@ -1504,6 +1396,19 @@ class SettingsController extends Controller
     private function _rows(): RowSerializer
     {
         return $this->_rows ??= new RowSerializer();
+    }
+
+    /**
+     * The Activity-log query filter, which also owns the fail-closed
+     * own-rows scope. Held here rather than open-coded so the scope cannot
+     * be applied out of order.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private function _activity(): ActivityFilter
+    {
+        return $this->_activity ??= new ActivityFilter();
     }
 
     /**
