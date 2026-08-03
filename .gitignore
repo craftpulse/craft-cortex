@@ -3,19 +3,15 @@
 /.phpunit.result.cache
 /.phpunit.cache/
 
-# Personal Claude Code settings (per-developer permissions, not shared)
-/.claude/settings.local.json
-/.claude/memory/
-/.claude/scheduled_tasks.lock
-
-# Internal agent operating rules and review-prompt templates, local only
-/.claude/rules/
-/.claude/prompts/
+# Per-developer agent configuration, operating rules and prompt
+# templates. Local only, in full.
+/.claude/
 
 # Internal dev knowledge — full gate-by-gate history, audit findings,
 # smoke results, anything that's "our knowledge" rather than user-facing
 # documentation. Each developer keeps their own.
 /.internal/
+/internal-docs/
 /docs/plans/
 
 # AI-assisted smoke-run checklists and evidence, local only
