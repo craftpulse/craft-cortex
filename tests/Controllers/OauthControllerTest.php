@@ -19,6 +19,12 @@
  *   5. Exchange code+verifier at `/oauth/token`.
  *   6. Hit `herald/mcp` with the resulting access token.
  *   7. Refresh, repeat MCP call.
+ *
+ * Every consent POST goes through `_herald_consent_post()`, which
+ * reproduces the shape `oauth/authorize.twig` actually submits:
+ * authorization parameters in the BODY, empty query string. Passing them
+ * as `queryParams` instead tests a request no browser sends and keeps a
+ * broken flow green, which is exactly how the body/query split shipped.
  * =========================================================================
  *
  * @author Craftpulse
@@ -241,6 +247,52 @@ function _herald_pkce(): array
     return ['verifier' => $verifier, 'challenge' => $challenge];
 }
 
+/**
+ * Count the authorization codes issued to one client. Scoped to the
+ * client under test so the assertion doesn't depend on whatever else the
+ * fixtures database happens to hold.
+ */
+function _herald_code_count(string $clientId): int
+{
+    return (int) OauthCodeRecord::find()
+        ->where(['clientId' => $clientId])
+        ->count();
+}
+
+/**
+ * Build the consent POST in the EXACT shape the shipped
+ * `oauth/authorize.twig` produces.
+ *
+ * That shape is the whole point of this helper, and it is the inverse of
+ * what a hand-written harness reaches for: the form action is a bare
+ * `url('oauth/authorize')` with no query string, and every original
+ * authorization parameter is re-emitted as a hidden BODY field next to
+ * `approve`. So the consent POST carries an EMPTY query string, and the
+ * authorization parameters live in the body and nowhere else.
+ *
+ * Every consent-POST test in this file goes through here. A test that
+ * passes the authorization parameters as `queryParams` is testing a shape
+ * no browser ever submits, and will stay green against a flow that 400s
+ * in production. The `posts the authorization parameters as hidden body
+ * fields to a bare action URL` test below pins the template to this
+ * contract.
+ *
+ * @param array<string,mixed> $authParams The parameters the consent GET
+ *        received, which the template echoes back as hidden fields.
+ */
+function _herald_consent_post(
+    array $authParams,
+    string $approve,
+    string $url = 'https://test.invalid/oauth/authorize',
+): _HeraldOauthControllerHarness {
+    return _herald_oauth_request(
+        method: 'POST',
+        queryParams: [],
+        bodyParams: $authParams + ['approve' => $approve],
+        url: $url,
+    );
+}
+
 beforeEach(function() {
     $admin = herald_admin_user();
     expect($admin)->not->toBeNull();
@@ -415,6 +467,32 @@ it('HTML-escapes a script payload in the consent-screen client name', function()
         ->toContain('&lt;script&gt;');
 });
 
+it('posts the authorization parameters as hidden body fields to a bare action URL', function() {
+    // Pins the premise every consent-POST test in this file depends on.
+    // The template's form action is a bare `url('oauth/authorize')` — an
+    // HTML form action replaces the whole URL, so any query string added
+    // here would put `client_id`, `redirect_uri`, `scope` and `state`
+    // back into a URL on the POST. The parameters instead ride as hidden
+    // BODY fields, which is why `OauthController` has to merge them into
+    // the PSR request's query params on the resume.
+    //
+    // If the action URL ever grows a query string, or the hidden-field
+    // loop disappears, `_herald_consent_post()` stops matching what
+    // browsers submit and this fails.
+    $template = (string) file_get_contents(
+        dirname(__DIR__, 2) . '/src/templates/oauth/authorize.twig',
+    );
+
+    expect($template)
+        ->toContain("<form method=\"POST\" action=\"{{ url('oauth/authorize') }}\">")
+        ->toContain('{% for key, value in query %}')
+        ->toContain('<input type="hidden" name="{{ key }}" value="{{ value }}">');
+
+    // No `url('oauth/authorize', ...)` two-argument form anywhere — that
+    // would append the parameters as a query string.
+    expect($template)->not->toContain("url('oauth/authorize',");
+});
+
 it('POST /oauth/authorize with approve=0 surfaces an access_denied error', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
@@ -425,26 +503,106 @@ it('POST /oauth/authorize with approve=0 surfaces an access_denied error', funct
         'token_endpoint_auth_method' => 'none',
     ]);
 
-    $controller = _herald_oauth_request(
-        method: 'POST',
-        queryParams: [
-            'response_type' => 'code',
-            'client_id' => $client['client_id'],
-            'redirect_uri' => 'https://example.com/cb',
-            'code_challenge' => $pkce['challenge'],
-            'code_challenge_method' => 'S256',
-            'scope' => 'read',
-            'state' => 'xyz',
-        ],
-        bodyParams: ['approve' => '0'],
-        url: 'https://test.invalid/oauth/authorize',
-    );
+    $controller = _herald_consent_post([
+        'response_type' => 'code',
+        'client_id' => $client['client_id'],
+        'redirect_uri' => 'https://example.com/cb',
+        'code_challenge' => $pkce['challenge'],
+        'code_challenge_method' => 'S256',
+        'scope' => 'read',
+        'state' => 'xyz',
+    ], approve: '0');
 
     $response = $controller->actionAuthorize();
     // Denial → 302 back to redirect_uri with error=access_denied.
     expect($response->statusCode)->toBe(302);
     $location = $response->headers->get('Location');
     expect($location)->toContain('error=access_denied');
+});
+
+it('refuses a redirect_uri the client never registered on the consent POST', function() {
+    // The consent resume trusts the resubmitted body parameters, so the
+    // guarantee that makes that safe needs its own test: league re-runs
+    // full validation on the resume, so a substituted `redirect_uri`
+    // must be rejected against the client's registered URIs rather than
+    // used to deliver the authorization code elsewhere.
+    //
+    // league 9.4.1: `AuthCodeGrant::validateAuthorizationRequest()` calls
+    // `AbstractGrant::validateRedirectUri()`, which runs
+    // `RedirectUriValidator::validateRedirectUri()` against
+    // `$client->getRedirectUri()` and throws `invalid_client` on a miss.
+    Craft::$app->getUser()->setIdentity($this->admin);
+
+    $pkce = _herald_pkce();
+    $client = Herald::getInstance()->oauth->registerClient([
+        'client_name' => '_test_/redirect-substitution',
+        'redirect_uris' => ['https://example.com/cb'],
+        'token_endpoint_auth_method' => 'none',
+    ]);
+
+    $controller = _herald_consent_post([
+        'response_type' => 'code',
+        'client_id' => $client['client_id'],
+        // Registered URI swapped for an attacker-controlled one.
+        'redirect_uri' => 'https://attacker.example/steal',
+        'code_challenge' => $pkce['challenge'],
+        'code_challenge_method' => 'S256',
+        'scope' => 'read',
+        'state' => 'xyz',
+    ], approve: '1');
+
+    $response = $controller->actionAuthorize();
+
+    // Refused outright, not redirected: no code is minted and nothing
+    // points at the substituted host. The status and error code pin the
+    // rejection to the redirect-URI check specifically — a 400
+    // `invalid_request` would mean the request died earlier, before
+    // league ever compared the URI.
+    expect($response->statusCode)->toBe(401);
+    expect((string) $response->content)->toContain('"error":"invalid_client"');
+    expect($response->headers->get('Location'))->toBeNull();
+    expect((string) $response->content)
+        ->not->toContain('code=')
+        ->not->toContain('attacker.example');
+    expect(_herald_code_count($client['client_id']))->toBe(0);
+});
+
+it('renders the pending-approval page on the consent POST for an unapproved client', function() {
+    // The DCR approval gate reads `client_id` off the authorize request.
+    // On the consent POST that parameter is in the body, so a query-only
+    // read resolves null and the gate is silently skipped — an
+    // unapproved client would sail through the resume.
+    Craft::$app->getUser()->setIdentity($this->admin);
+
+    $settings = Herald::getInstance()->getSettings();
+    $settings->dcrAutoApprove = false;
+
+    $pkce = _herald_pkce();
+    $client = Herald::getInstance()->oauth->registerClient([
+        'client_name' => '_test_/pending-on-post',
+        'redirect_uris' => ['https://example.com/cb'],
+        'token_endpoint_auth_method' => 'none',
+    ]);
+
+    $record = OauthClientRecord::findOne(['clientId' => $client['client_id']]);
+    expect($record)->not->toBeNull();
+    expect((bool) $record->approved)->toBeFalse();
+
+    $controller = _herald_consent_post([
+        'response_type' => 'code',
+        'client_id' => $client['client_id'],
+        'redirect_uri' => 'https://example.com/cb',
+        'code_challenge' => $pkce['challenge'],
+        'code_challenge_method' => 'S256',
+        'scope' => 'read',
+        'state' => 'xyz',
+    ], approve: '1');
+
+    $response = $controller->actionAuthorize();
+
+    expect($response->statusCode)->toBe(403);
+    expect((string) $response->content)->toContain('Awaiting approval');
+    expect(_herald_code_count($client['client_id']))->toBe(0);
 });
 
 // -----------------------------------------------------------------------------
@@ -495,7 +653,7 @@ it('leaves token / register / revoke CSRF-exempt in beforeAction', function(stri
 // /oauth/token + full PKCE round-trip
 // -----------------------------------------------------------------------------
 
-it('full PKCE flow: register → authorize → token → MCP call', function() {
+it('full PKCE flow in the shipped consent shape: authorize → code → token → MCP call', function() {
     Craft::$app->getUser()->setIdentity($this->admin);
 
     $pkce = _herald_pkce();
@@ -507,25 +665,26 @@ it('full PKCE flow: register → authorize → token → MCP call', function() {
 
     $resource = 'https://test.invalid/herald/mcp';
 
-    // Step 1: POST /oauth/authorize with approve=1 captures the code
-    // in the redirect.
-    $authController = _herald_oauth_request(
-        method: 'POST',
-        queryParams: [
-            'response_type' => 'code',
-            'client_id' => $client['client_id'],
-            'redirect_uri' => 'https://example.com/cb',
-            'code_challenge' => $pkce['challenge'],
-            'code_challenge_method' => 'S256',
-            'scope' => 'read',
-            'state' => 'abc',
-            'resource' => $resource,
-        ],
-        bodyParams: ['approve' => '1'],
-        url: 'https://test.invalid/oauth/authorize',
-    );
+    // Step 1: the consent POST in the shape `oauth/authorize.twig`
+    // actually submits — authorization parameters in the BODY, empty
+    // query string — captures the code in the redirect.
+    $authController = _herald_consent_post([
+        'response_type' => 'code',
+        'client_id' => $client['client_id'],
+        'redirect_uri' => 'https://example.com/cb',
+        'code_challenge' => $pkce['challenge'],
+        'code_challenge_method' => 'S256',
+        'scope' => 'read',
+        'state' => 'abc',
+        'resource' => $resource,
+    ], approve: '1');
 
     $authResponse = $authController->actionAuthorize();
+    // league reads every authorization parameter from the query string
+    // only, so without the controller's consent-resume merge this comes
+    // back as a 400 carrying league's own
+    // "Check the `response_type` parameter" hint instead of a redirect.
+    expect((string) $authResponse->content)->not->toContain('response_type');
     expect($authResponse->statusCode)->toBe(302);
     $location = $authResponse->headers->get('Location');
     expect($location)->toBeString();
@@ -577,22 +736,18 @@ it('code re-use returns invalid_grant on the second exchange', function() {
         'token_endpoint_auth_method' => 'none',
     ]);
 
-    $authController = _herald_oauth_request(
-        method: 'POST',
-        queryParams: [
-            'response_type' => 'code',
-            'client_id' => $client['client_id'],
-            'redirect_uri' => 'https://example.com/cb',
-            'code_challenge' => $pkce['challenge'],
-            'code_challenge_method' => 'S256',
-            'scope' => 'read',
-            'state' => 'abc',
-            'resource' => 'https://test.invalid/herald/mcp',
-        ],
-        bodyParams: ['approve' => '1'],
-        url: 'https://test.invalid/oauth/authorize',
-    );
+    $authController = _herald_consent_post([
+        'response_type' => 'code',
+        'client_id' => $client['client_id'],
+        'redirect_uri' => 'https://example.com/cb',
+        'code_challenge' => $pkce['challenge'],
+        'code_challenge_method' => 'S256',
+        'scope' => 'read',
+        'state' => 'abc',
+        'resource' => 'https://test.invalid/herald/mcp',
+    ], approve: '1');
     $authResponse = $authController->actionAuthorize();
+    expect($authResponse->statusCode)->toBe(302);
     parse_str((string) parse_url((string) $authResponse->headers->get('Location'), PHP_URL_QUERY), $params);
     $code = (string) $params['code'];
 
@@ -638,21 +793,17 @@ it('PKCE S256 verifier mismatch rejects at the token endpoint', function() {
         'token_endpoint_auth_method' => 'none',
     ]);
 
-    $authController = _herald_oauth_request(
-        method: 'POST',
-        queryParams: [
-            'response_type' => 'code',
-            'client_id' => $client['client_id'],
-            'redirect_uri' => 'https://example.com/cb',
-            'code_challenge' => $pkce['challenge'],
-            'code_challenge_method' => 'S256',
-            'scope' => 'read',
-            'state' => 'abc',
-        ],
-        bodyParams: ['approve' => '1'],
-        url: 'https://test.invalid/oauth/authorize',
-    );
+    $authController = _herald_consent_post([
+        'response_type' => 'code',
+        'client_id' => $client['client_id'],
+        'redirect_uri' => 'https://example.com/cb',
+        'code_challenge' => $pkce['challenge'],
+        'code_challenge_method' => 'S256',
+        'scope' => 'read',
+        'state' => 'abc',
+    ], approve: '1');
     $authResponse = $authController->actionAuthorize();
+    expect($authResponse->statusCode)->toBe(302);
     parse_str((string) parse_url((string) $authResponse->headers->get('Location'), PHP_URL_QUERY), $params);
     $code = (string) $params['code'];
 

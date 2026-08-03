@@ -3,10 +3,17 @@
  # OAuth 2.1 consent screen.
  #
  # Rendered by `OauthController::actionAuthorize()` when the request
- # is a GET. POST back to the same URL with `approve=1` (Authorize)
- # or `approve=0` (Deny). Hidden form fields carry the full original
- # query string so league's `validateAuthorizationRequest()` sees the
- # same parameters on the POST resume as on the initial GET.
+ # is a GET. POSTs back to the bare `oauth/authorize` action URL with
+ # `approve=1` (Authorize) or `approve=0` (Deny).
+ #
+ # The action URL carries no query string on purpose: an HTML form
+ # action replaces the entire URL, so keeping the parameters out of it
+ # keeps `client_id`, `redirect_uri`, `scope` and `state` out of any URL
+ # on the POST. Every original query parameter is re-emitted as a
+ # hidden BODY field instead, and the controller's
+ # `_buildAuthorizePsrRequest()` merges them back into the PSR
+ # request's query params on the resume, which is the only place
+ # league's `validateAuthorizationRequest()` reads them from.
  #
  # Strict template isolation per craft-twig-guidelines — every
  # variable consumed is explicitly declared in the controller's

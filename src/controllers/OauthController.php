@@ -58,9 +58,20 @@ use yii\web\Response;
  * "approve this client for *your* Craft account" form, so it IS
  * CSRF-vulnerable (PKCE protects the code→token exchange, not the
  * consent grant). `beforeAction()` re-enables CSRF validation for that
- * one action; league's `validateAuthorizationRequest()` reads the OAuth
- * parameters from the query string (not the body), so the consent
- * GET→POST round-trip still resolves with CSRF on.
+ * one action.
+ *
+ * **The consent resume bridges a body/query split.** League's
+ * `validateAuthorizationRequest()` reads every authorization parameter
+ * from the query string only — `AbstractGrant::getQueryStringParameter()`
+ * has no parsed-body fallback — while the consent template posts them
+ * back as hidden body fields against a bare `oauth/authorize` action URL,
+ * so nothing client-identifying is re-exposed in a URL on the POST.
+ * Those two facts do not meet on their own, and validation runs before
+ * the GET/POST branch. `_buildAuthorizePsrRequest()` closes the gap by
+ * merging the resubmitted authorization parameters into the PSR request's
+ * query params for the consent POST only. Scoped deliberately: the token
+ * endpoint resolves client credentials from the parsed body via
+ * `getRequestParameter()` and keeps the unmerged `_buildPsrRequest()`.
  *
  * Extends `AbstractOauthController` for the shared `httpEnabled` kill
  * switch — every action returns 503 before any DB work or DCR insert
@@ -72,6 +83,39 @@ use yii\web\Response;
  */
 class OauthController extends AbstractOauthController
 {
+    // Const Properties
+    // =========================================================================
+
+    /**
+     * The authorization-request parameters the consent screen re-submits as
+     * hidden body fields, and which league reads from the query string
+     * only. `_buildAuthorizePsrRequest()` copies these into the PSR
+     * request's query params on the consent POST.
+     *
+     * Derived from league's authorization path, not guessed:
+     * `AuthorizationServer::validateAuthorizationRequest()` gates on
+     * `response_type`, and `AuthCodeGrant::validateAuthorizationRequest()`
+     * reads `client_id`, `redirect_uri`, `state`, `scope`,
+     * `code_challenge` and `code_challenge_method`. `resource` is RFC
+     * 8707's audience indicator, consumed by `_resourceParam()`.
+     *
+     * An explicit list rather than a blanket body merge: only these keys
+     * can change league's view of the request, and `approve` plus Craft's
+     * CSRF token stay out of the query params entirely.
+     *
+     * @var string[]
+     */
+    private const AUTHORIZE_RESUME_PARAMS = [
+        'client_id',
+        'code_challenge',
+        'code_challenge_method',
+        'redirect_uri',
+        'resource',
+        'response_type',
+        'scope',
+        'state',
+    ];
+
     // Protected Properties
     // =========================================================================
 
@@ -194,7 +238,7 @@ class OauthController extends AbstractOauthController
             return $pendingResponse;
         }
 
-        $psrRequest = $this->_buildPsrRequest();
+        $psrRequest = $this->_buildAuthorizePsrRequest();
 
         try {
             $authRequest = $oauth->getAuthorizationServer()->validateAuthorizationRequest($psrRequest);
@@ -552,6 +596,76 @@ class OauthController extends AbstractOauthController
     }
 
     /**
+     * Build the PSR-7 request for `actionAuthorize()`, merging the
+     * resubmitted authorization parameters into the query params on the
+     * consent POST.
+     *
+     * On the consent POST those parameters arrive in the BODY: the consent
+     * template posts to a bare `oauth/authorize` action URL, deliberately,
+     * because an HTML form action replaces the whole URL and putting them
+     * back would re-expose `client_id`, `redirect_uri`, `scope` and
+     * `state` in a URL. League reads all of them from the query string
+     * only (`AbstractGrant::getQueryStringParameter()` has no body
+     * fallback), and `AuthorizationServer::validateAuthorizationRequest()`
+     * gates on `getQueryParams()['response_type']` before any grant is
+     * consulted — so without this merge the resume dies with a 400 and
+     * league's own "Check the response_type parameter" hint.
+     *
+     * The merge is additive and one-directional: a parameter already
+     * present in the query string always wins, so a request that carried
+     * its parameters in the URL behaves exactly as it did before. Only the
+     * keys in `AUTHORIZE_RESUME_PARAMS` are copied, so `approve` and
+     * Craft's CSRF token never reach league's query params.
+     *
+     * Scoped to this action on purpose. `actionToken()` keeps the plain
+     * `_buildPsrRequest()`: league resolves client credentials there
+     * through `getRequestParameter()`, which reads the parsed body, and
+     * merging body into query on that endpoint could change which
+     * credentials it picks up.
+     *
+     * **Why trusting the resubmitted values is safe.** League re-runs its
+     * full validation on the resume rather than replaying a stored
+     * request: `client_id` is resolved against the client repository via
+     * `AbstractGrant::getClientEntityOrFail()`, which throws
+     * `invalid_client` for an unknown *or* unapproved client, and a
+     * supplied `redirect_uri` is matched against that client's registered
+     * URIs by `AbstractGrant::validateRedirectUri()` →
+     * `RedirectUriValidator::validateRedirectUri()` (exact match, or
+     * port-insensitive for RFC 8252 loopback URIs), which also throws
+     * `invalid_client` on a miss. So a substituted `redirect_uri` cannot
+     * steer the authorization code anywhere the client did not register,
+     * and `completeAuthorizationRequest()` only ever redirects to the
+     * value that survived that check. The consent POST is CSRF-gated on
+     * top of that, so the parameters cannot be forged cross-site either.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _buildAuthorizePsrRequest(): ServerRequestInterface
+    {
+        $psrRequest = $this->_buildPsrRequest();
+
+        if (strtoupper($this->request->getMethod()) !== 'POST') {
+            return $psrRequest;
+        }
+
+        $queryParams = $psrRequest->getQueryParams();
+
+        foreach (self::AUTHORIZE_RESUME_PARAMS as $param) {
+            if (isset($queryParams[$param])) {
+                continue;
+            }
+
+            $value = $this->request->getBodyParam($param);
+            if (is_string($value) && $value !== '') {
+                $queryParams[$param] = $value;
+            }
+        }
+
+        return $psrRequest->withQueryParams($queryParams);
+    }
+
+    /**
      * Pipe a league PSR-7 response back onto Yii's response object.
      *
      * @author Craftpulse
@@ -655,20 +769,50 @@ class OauthController extends AbstractOauthController
     }
 
     /**
-     * Read the `resource=` request parameter (query for GET on
-     * authorize, body for POST on token / authorize). Returns null
-     * when absent.
+     * Read a non-empty string request parameter from the query string,
+     * falling back to the parsed body. Returns null when absent from both.
+     *
+     * The fallback matters for every parameter the consent screen owns:
+     * the authorize GET carries them in the query string, the consent POST
+     * re-submits them as hidden body fields, and a query-only read
+     * silently resolves null on the POST.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _queryOrBodyParam(string $name): ?string
+    {
+        $value = $this->request->getQueryParam($name);
+        if (!is_string($value) || $value === '') {
+            $value = $this->request->getBodyParam($name);
+        }
+        return is_string($value) && $value !== '' ? $value : null;
+    }
+
+    /**
+     * Read the `resource=` request parameter — RFC 8707's audience
+     * indicator (query for GET on authorize, body for POST on token /
+     * authorize). Returns null when absent.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
     private function _resourceParam(): ?string
     {
-        $resource = $this->request->getQueryParam('resource');
-        if (!is_string($resource) || $resource === '') {
-            $resource = $this->request->getBodyParam('resource');
-        }
-        return is_string($resource) && $resource !== '' ? $resource : null;
+        return $this->_queryOrBodyParam('resource');
+    }
+
+    /**
+     * Read the `client_id` request parameter (query on the authorize GET,
+     * body on the consent POST, where the template re-submits it as a
+     * hidden field). Returns null when absent from both.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _clientIdParam(): ?string
+    {
+        return $this->_queryOrBodyParam('client_id');
     }
 
     /**
@@ -679,6 +823,12 @@ class OauthController extends AbstractOauthController
      * league's own validation is left to run and produce the right
      * OAuth error.
      *
+     * Reads `client_id` from both the query string and the body via
+     * `_clientIdParam()`. A query-only read would resolve null on the
+     * consent POST, where the template submits it as a hidden body field,
+     * and the gate would be silently skipped on the one request that
+     * actually mints the authorization code.
+     *
      * The plaintext-safe `clientName` is rendered through the consent
      * template's escaping; no client-controlled value is emitted raw.
      *
@@ -687,8 +837,8 @@ class OauthController extends AbstractOauthController
      */
     private function _rejectIfClientPendingApproval(): ?Response
     {
-        $clientId = $this->request->getQueryParam('client_id');
-        if (!is_string($clientId) || $clientId === '') {
+        $clientId = $this->_clientIdParam();
+        if ($clientId === null) {
             return null;
         }
 
