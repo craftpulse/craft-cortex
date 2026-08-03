@@ -2,6 +2,7 @@
     "name": "craftpulse/craft-herald",
     "description": "MCP (Model Context Protocol) server for Craft CMS 5. Exposes Craft internals to AI agents over stdio (Free) and Streamable HTTP (Pro).",
     "type": "craft-plugin",
+    "version": "5.0.0-alpha.1",
     "license": "proprietary",
     "support": {
         "email": "support@craft-pulse.com",
