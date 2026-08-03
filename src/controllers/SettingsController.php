@@ -4,7 +4,6 @@ namespace craftpulse\herald\controllers;
 
 use Craft;
 use craft\elements\User;
-use craft\helpers\AdminTable;
 use craft\helpers\DateTimeHelper;
 use craft\helpers\Db;
 use craft\web\Controller;
@@ -14,6 +13,8 @@ use craftpulse\herald\models\Token;
 use craftpulse\herald\records\OauthClient as OauthClientRecord;
 use craftpulse\herald\tools\support\InvocationLogger;
 use craftpulse\herald\web\cp\RowSerializer;
+use craftpulse\herald\web\cp\TableData;
+use craftpulse\herald\web\cp\TableParams;
 use yii\base\Exception;
 use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
@@ -232,12 +233,7 @@ class SettingsController extends Controller
         $this->requireAcceptsJson();
         $this->requireAdmin(false);
 
-        $page = max(1, (int) $this->request->getParam('page', 1));
-        $perPage = (int) $this->request->getParam('per_page', 50);
-        $perPage = max(1, min($perPage, 100));
-        $search = trim((string) $this->request->getParam('search', ''));
-        $sortField = (string) $this->request->getParam('sort.0.field', '');
-        $sortDir = $this->request->getParam('sort.0.direction') === 'desc' ? SORT_DESC : SORT_ASC;
+        $params = $this->_tableParams();
 
         // `getAll()` returns non-deleted tokens, newest first. Map to the
         // serialised row tuple up front so search / sort operate on the
@@ -247,42 +243,15 @@ class SettingsController extends Controller
             Herald::getInstance()->tokens->getAll(),
         );
 
-        if ($search !== '') {
-            $needle = mb_strtolower($search);
-            $rows = array_values(array_filter(
-                $rows,
-                static function(array $row) use ($needle): bool {
-                    $haystack = mb_strtolower((string) $row['name'] . ' ' . (string) $row['tokenPrefix']);
-                    return str_contains($haystack, $needle);
-                },
-            ));
-        }
-
-        // Sort. Default ordering: dateCreated DESC (newest first) — most
-        // operators want the row they just issued at the top.
-        $orderColumn = match ($sortField) {
+        $rows = TableData::search($rows, ['name', 'tokenPrefix'], $params->search);
+        $rows = TableData::sort($rows, $params, [
             'name' => 'name',
             'expiresAt' => 'expiresAt',
             'lastUsedAt' => 'lastUsedAt',
             'dateCreated' => 'dateCreated',
-            default => 'dateCreated',
-        };
-        $defaultDir = $sortField === '' ? SORT_DESC : $sortDir;
-        usort($rows, static function(array $a, array $b) use ($orderColumn, $defaultDir): int {
-            $av = (string) ($a[$orderColumn] ?? '');
-            $bv = (string) ($b[$orderColumn] ?? '');
-            $cmp = strcmp($av, $bv);
-            return $defaultDir === SORT_DESC ? -$cmp : $cmp;
-        });
+        ], 'dateCreated');
 
-        $total = count($rows);
-        $offset = ($page - 1) * $perPage;
-        $slice = array_slice($rows, $offset, $perPage);
-
-        return $this->asJson([
-            'pagination' => AdminTable::paginationLinks($page, $total, $perPage),
-            'data' => array_values($slice),
-        ]);
+        return $this->asJson(TableData::page($rows, $params));
     }
 
     /**
@@ -550,12 +519,7 @@ class SettingsController extends Controller
         $this->requireAcceptsJson();
         $this->requirePermission(self::PERMISSION_MANAGE_GRANTS);
 
-        $page = max(1, (int) $this->request->getParam('page', 1));
-        $perPage = (int) $this->request->getParam('per_page', 50);
-        $perPage = max(1, min($perPage, 100));
-        $search = trim((string) $this->request->getParam('search', ''));
-        $sortField = (string) $this->request->getParam('sort.0.field', '');
-        $sortDir = $this->request->getParam('sort.0.direction') === 'desc' ? SORT_DESC : SORT_ASC;
+        $params = $this->_tableParams();
 
         // Raw rows — already filtered to non-deleted, includes expired
         // so operators can audit/cull expired entries until gc reaps them.
@@ -579,46 +543,22 @@ class SettingsController extends Controller
             }));
         }
 
-        if ($search !== '') {
-            $needle = mb_strtolower($search);
-            $rows = array_values(array_filter(
-                $rows,
-                static function(array $row) use ($needle): bool {
-                    $haystack = mb_strtolower((string) ($row['pattern'] ?? '') . ' ' . (string) ($row['note'] ?? ''));
-                    return str_contains($haystack, $needle);
-                },
-            ));
-        }
+        $rows = TableData::search($rows, ['pattern', 'note'], $params->search);
 
-        // Sort. Default ordering: dateCreated DESC (newest first) — most
-        // operators want the row they just issued at the top. The
-        // service already orders by `expiresAt ASC`; we override here
-        // when the caller asks, otherwise apply the newest-first default.
-        $orderColumn = match ($sortField) {
+        // The service already orders by `expiresAt ASC`; the sort below
+        // overrides that when the caller asks, and otherwise applies the
+        // newest-first default.
+        $rows = TableData::sort($rows, $params, [
             'pattern' => 'pattern',
             'expiresAt' => 'expiresAt',
             'dateCreated' => 'dateCreated',
-            default => 'dateCreated',
-        };
-        $defaultDir = $sortField === '' ? SORT_DESC : $sortDir;
-        usort($rows, static function(array $a, array $b) use ($orderColumn, $defaultDir): int {
-            $av = (string) ($a[$orderColumn] ?? '');
-            $bv = (string) ($b[$orderColumn] ?? '');
-            $cmp = strcmp($av, $bv);
-            return $defaultDir === SORT_DESC ? -$cmp : $cmp;
-        });
+        ], 'dateCreated');
 
-        $total = count($rows);
-        $offset = ($page - 1) * $perPage;
-        $slice = array_slice($rows, $offset, $perPage);
-
-        return $this->asJson([
-            'pagination' => AdminTable::paginationLinks($page, $total, $perPage),
-            'data' => array_map(
-                fn(array $row): array => $this->_rows()->serializeOverride($row),
-                $slice,
-            ),
-        ]);
+        return $this->asJson(TableData::page(
+            $rows,
+            $params,
+            fn(array $row): array => $this->_rows()->serializeOverride($row),
+        ));
     }
 
     /**
@@ -728,12 +668,8 @@ class SettingsController extends Controller
         $this->requireAcceptsJson();
         $this->requirePermission(Herald::PERMISSION_VIEW_ACTIVITY);
 
-        $page = max(1, (int) $this->request->getParam('page', 1));
-        $perPage = (int) $this->request->getParam('per_page', 50);
-        $perPage = max(1, min($perPage, 100));
-        $search = trim((string) $this->request->getParam('search', ''));
-        $sortField = (string) $this->request->getParam('sort.0.field', '');
-        $sortDir = $this->request->getParam('sort.0.direction') === 'asc' ? SORT_ASC : SORT_DESC;
+        $params = $this->_tableParams();
+        $search = $params->search;
 
         $filters = $this->request->getParam('filters', []);
         if (!is_array($filters)) {
@@ -792,7 +728,10 @@ class SettingsController extends Controller
             ]);
         }
 
-        $orderColumn = match ($sortField) {
+        // Unlike the other three tables this one pages in SQL — the audit
+        // log is append-only with no upper bound, so the full set is never
+        // materialised.
+        $orderColumn = match ($params->sortField) {
             'tool' => 'toolName',
             'kind' => 'kind',
             'durationMs' => 'durationMs',
@@ -801,21 +740,21 @@ class SettingsController extends Controller
         };
 
         $total = (int) (clone $query)->count();
-        $offset = ($page - 1) * $perPage;
 
         $rows = $query
-            ->orderBy([$orderColumn => $sortDir])
-            ->offset($offset)
-            ->limit($perPage)
+            ->orderBy([$orderColumn => $params->sortDir(SORT_DESC)])
+            ->offset(($params->page - 1) * $params->perPage)
+            ->limit($params->perPage)
             ->all();
 
-        return $this->asJson([
-            'pagination' => AdminTable::paginationLinks($page, $total, $perPage),
-            'data' => array_map(
+        return $this->asJson(TableData::envelope(
+            array_map(
                 fn(array $row): array => $this->_rows()->serializeActivity($row),
                 $rows,
             ),
-        ]);
+            $total,
+            $params,
+        ));
     }
 
     /**
@@ -939,35 +878,18 @@ class SettingsController extends Controller
         $this->requireAcceptsJson();
         $this->requireAdmin(false);
 
-        $page = max(1, (int) $this->request->getParam('page', 1));
-        $perPage = (int) $this->request->getParam('per_page', 50);
-        $perPage = max(1, min($perPage, 100));
-        $search = trim((string) $this->request->getParam('search', ''));
+        $params = $this->_tableParams();
 
         $rows = array_map(
             fn(OauthClientRecord $client): array => $this->_rows()->serializeClient($client),
             Herald::getInstance()->oauth->getAllClients(),
         );
 
-        if ($search !== '') {
-            $needle = mb_strtolower($search);
-            $rows = array_values(array_filter(
-                $rows,
-                static function(array $row) use ($needle): bool {
-                    $haystack = mb_strtolower((string) $row['clientName'] . ' ' . (string) $row['clientId']);
-                    return str_contains($haystack, $needle);
-                },
-            ));
-        }
+        // No sort: the service already returns clients in a stable order
+        // and the Clients table ships no sortable columns.
+        $rows = TableData::search($rows, ['clientName', 'clientId'], $params->search);
 
-        $total = count($rows);
-        $offset = ($page - 1) * $perPage;
-        $slice = array_slice($rows, $offset, $perPage);
-
-        return $this->asJson([
-            'pagination' => AdminTable::paginationLinks($page, $total, $perPage),
-            'data' => array_values($slice),
-        ]);
+        return $this->asJson(TableData::page($rows, $params));
     }
 
     /**
@@ -1582,5 +1504,25 @@ class SettingsController extends Controller
     private function _rows(): RowSerializer
     {
         return $this->_rows ??= new RowSerializer();
+    }
+
+    /**
+     * Read the standard `Craft.VueAdminTable` request params off this
+     * request. The only place in the controller that touches them, so the
+     * page floor and the per-page ceiling cannot drift between the four
+     * data endpoints.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private function _tableParams(): TableParams
+    {
+        return TableParams::normalise(
+            page: $this->request->getParam('page', 1),
+            perPage: $this->request->getParam('per_page', TableParams::DEFAULT_PER_PAGE),
+            search: $this->request->getParam('search', ''),
+            sortField: $this->request->getParam('sort.0.field', ''),
+            sortDirection: $this->request->getParam('sort.0.direction', ''),
+        );
     }
 }
