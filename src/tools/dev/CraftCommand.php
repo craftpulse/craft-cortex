@@ -3,6 +3,7 @@
 namespace craftpulse\herald\tools\dev;
 
 use Craft;
+use craft\elements\User;
 use craftpulse\herald\attributes\IsDestructive;
 use craftpulse\herald\attributes\IsIdempotent;
 use craftpulse\herald\attributes\IsOpenWorld;
@@ -61,6 +62,28 @@ use craftpulse\herald\tools\ToolException;
 #[IsOpenWorld(false)]
 class CraftCommand extends AbstractTool implements ContextAwareToolInterface
 {
+    // Constants
+    // =========================================================================
+
+    /**
+     * Permission a caller must hold before this tool is visible in
+     * `tools/list` or dispatchable through `tools/call`. Declared here
+     * because this class is the enforcement point: `filterFor()` reads
+     * it for visibility, `execute()` re-reads it as the defence-in-depth
+     * gate, and `PluginTrait::_registerHeraldPermissions()` registers it
+     * from this constant so the registration and the two gates cannot
+     * drift.
+     *
+     * Running a console route reaches Craft's own controllers, so this is
+     * an operator-grade authority in its own right, separate from
+     * `herald:manage-grants` (which widens *which* routes are
+     * allowlisted for a user, not *whether* the user may dispatch at
+     * all). A caller needs both to benefit from a temporary grant.
+     *
+     * @since 5.0.0
+     */
+    public const PERMISSION_RUN_COMMANDS = 'herald:run-commands';
+
     // Private Properties
     // =========================================================================
 
@@ -91,6 +114,32 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
     public function setInvocationContext(InvocationContext $ctx): void
     {
         $this->_invocationContext = $ctx;
+    }
+
+    /**
+     * @inheritdoc
+     *
+     * Hides the tool from `tools/list` (and refuses `tools/call` with
+     * the same "Unknown tool" shape) for any caller that does not hold
+     * `PERMISSION_RUN_COMMANDS`.
+     *
+     * A null user is the stdio path and passes: the security boundary
+     * is the HTTP transport, and the stdio caller already holds a shell
+     * plus the `craft` console, so gating them buys nothing (ruled
+     * 2026-08-02). Admins pass through Craft's own `can()` semantics,
+     * but the branch is explicit so a reconfigured permission system
+     * cannot quietly lock out admins.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    public function filterFor(?User $user = null): bool
+    {
+        if ($user === null) {
+            return true;
+        }
+
+        return $user->admin || $user->can(self::PERMISSION_RUN_COMMANDS);
     }
 
     /**
@@ -151,6 +200,8 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
      */
     public function execute(array $arguments): array
     {
+        $this->_assertMayRunCommands();
+
         $mode = $this->_mode($arguments) ?? 'run';
         $effective = $this->_allowlist();
 
@@ -175,6 +226,15 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
 
         // Normalise: strip leading slashes that the LLM might tack on.
         $command = ltrim($command, '/');
+
+        // Classify the ROUTE, not the bucket the matching pattern came
+        // from. A runtime grant lands in the content-level bucket, and
+        // the content-level bucket is admitted unconditionally — so
+        // before this gate existed, granting `migrate/up` laundered an
+        // admin-level route straight past `allowAdminChanges`. Asking
+        // `Allowlist::isAdminLevelRoute()` about the resolved route
+        // closes that regardless of which list admitted it.
+        $this->_assertAdminChangesForRoute($command);
 
         // Content-level patterns admit regardless of `allowAdminChanges`;
         // admin-level patterns admit only when the host flag is true.
@@ -230,6 +290,93 @@ class CraftCommand extends AbstractTool implements ContextAwareToolInterface
 
     // Private Methods
     // =========================================================================
+
+    /**
+     * Defence-in-depth permission gate, independent of the `tools/list`
+     * filtering `filterFor()` performs. `filterFor()` exists for the
+     * LLM's tool-selection UX; this exists for security, and both fail
+     * closed. A caller that reaches `execute()` by any route other than
+     * the filtered dispatcher is still refused here.
+     *
+     * Gates every mode, `list` included: the allowlist itself describes
+     * which console routes this install will run, which is reconnaissance
+     * for a caller that is not allowed to run any of them.
+     *
+     * No Craft identity means stdio (the trusted local transport), which
+     * skips the check — same rule `PermissionedToolTrait::_assertPermission()`
+     * applies, and the same ruling behind it.
+     *
+     * @throws ToolException when an identified caller lacks `PERMISSION_RUN_COMMANDS`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _assertMayRunCommands(): void
+    {
+        $user = Craft::$app->getUser()->getIdentity();
+        if ($user === null) {
+            return;
+        }
+
+        if ($user->admin || $user->can(self::PERMISSION_RUN_COMMANDS)) {
+            return;
+        }
+
+        throw new ToolException(sprintf(
+            'permission denied: running Craft console commands requires `%s`.',
+            self::PERMISSION_RUN_COMMANDS,
+        ));
+    }
+
+    /**
+     * Refuse an admin-level console route when the host install has
+     * `allowAdminChanges` off, whichever allowlist bucket would have
+     * admitted it.
+     *
+     * Classification comes from `Allowlist::isAdminLevelRoute()` — the
+     * canonical set of routes that mutate project config, schema,
+     * scaffolding or fixtures. That deliberately ignores which bucket
+     * matched, because the runtime-grant surface writes into the
+     * content-level bucket and the content-level bucket is admitted
+     * unconditionally.
+     *
+     * The message names the pattern that *would* have admitted the
+     * route, preferring the admin-level list so the operator sees the
+     * configured pattern rather than the grant that shadowed it.
+     *
+     * A no-match route falls through untouched: the "not in the
+     * allowlist" rejection in `execute()` is the better error for it.
+     *
+     * @throws ToolException when the route is admin-level and `allowAdminChanges` is false.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _assertAdminChangesForRoute(string $command): void
+    {
+        if (Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+            return;
+        }
+
+        if (!Herald::getInstance()->allowlist->isAdminLevelRoute($command)) {
+            return;
+        }
+
+        $wouldMatch = $this->_matchPattern($command, $this->_adminPatterns())
+            ?? $this->_matchPattern($command, $this->_contentPatterns());
+
+        if ($wouldMatch === null) {
+            return;
+        }
+
+        throw new ToolException(
+            "Command '{$command}' matches admin-level pattern '{$wouldMatch}', but " .
+            '`allowAdminChanges` is false on this install. Admin-level routes ' .
+            '(project-config, migrations, scaffolding, schema DDL) refuse to dispatch ' .
+            'unless `allowAdminChanges = true` in `config/general.php`. A temporary ' .
+            'grant cannot widen this boundary.',
+        );
+    }
 
     /**
      * Effective allowlist for the current request — the union of

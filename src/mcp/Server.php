@@ -12,6 +12,7 @@ use craftpulse\herald\tools\support\AttributeReader;
 use craftpulse\herald\tools\support\CancellationToken;
 use craftpulse\herald\tools\support\InvocationContext;
 use craftpulse\herald\tools\support\InvocationLogger;
+use craftpulse\herald\tools\support\SchemaValidator;
 use craftpulse\herald\tools\support\SecretRedactor;
 use craftpulse\herald\tools\ToolException;
 use craftpulse\herald\tools\ToolInterface;
@@ -914,11 +915,28 @@ class Server
      * array]` slot the caller can drive into either the JSON-mode or
      * the streaming path.
      *
-     * Centralises the four checks both dispatch paths need: name
+     * Centralises the five checks both dispatch paths need: name
      * presence, registry lookup with per-user filtering, stdio-only
-     * enforcement, and argument-shape validation. Pulled out of
+     * enforcement, argument-shape validation, and validation of the
+     * arguments against the tool's declared JSON Schema. Pulled out of
      * `_handleToolsCall()` so the streaming dispatcher shares the
      * exact same gate ordering.
+     *
+     * The schema check runs here, at the dispatcher, rather than inside
+     * each tool: a tool that forgets to validate is the default failure
+     * mode, and until 2026-08-02 this method checked only `is_array()`,
+     * which made every schema in the plugin decorative. Validating
+     * against `inputSchemaFor()` (not the static `getInputSchema()`)
+     * means per-user schema rewrites — the mode-enum narrowing that
+     * `drafts_and_revisions`, `content_audit`, `import_export` and
+     * `system_diagnostics` perform — are enforced too, so a caller
+     * cannot name a mode their permissions had removed from the enum.
+     *
+     * A schema failure surfaces as a tool-error envelope (`isError:
+     * true`) at HTTP 200, never a JSON-RPC error code. That is SEP-1303
+     * ("input-validation errors are tool-execution errors, not protocol
+     * errors"), which is also what `SUPPORTED_PROTOCOL_VERSIONS`
+     * documents as already-honoured behaviour.
      *
      * Returns a uniform shape with `error` always present (null when
      * validation passed) so PHPStan can narrow without union gymnastics
@@ -972,6 +990,16 @@ class Server
         $arguments = $params['arguments'] ?? [];
         if (!is_array($arguments)) {
             $miss['error'] = $this->_errorResponse($id, self::ERR_INVALID_PARAMS, 'Invalid params: tools/call `arguments` must be an object');
+            return $miss;
+        }
+
+        $schemaErrors = SchemaValidator::validate($tool->inputSchemaFor($this->_resolveUser()), $arguments);
+        if ($schemaErrors !== []) {
+            $miss['error'] = $this->_successResponse($id, $this->_toolErrorEnvelope(sprintf(
+                "Invalid arguments for tool `%s`:\n- %s",
+                $name,
+                implode("\n- ", $schemaErrors),
+            )));
             return $miss;
         }
 

@@ -90,6 +90,24 @@ class Scopes extends Component
     public const SYSTEM_READ = 'system:read';
 
     /**
+     * Dispatch a Craft console route through the `craft_command` tool.
+     *
+     * Its own scope because a console route reaches Craft's own
+     * controllers: `users/create`, `resave/*`, `migrate/*` and anything
+     * else the operator allowlists. Folding that into `system:read`
+     * (where it sat until the 2026-08-02 remediation) meant a read-only
+     * OAuth grant carried arbitrary command execution, which is the
+     * broadest possible capability wearing the narrowest possible label.
+     *
+     * Grants of this scope are still subject to the `craft_command`
+     * permission gate and the command allowlist — the scope widens
+     * nothing on its own.
+     *
+     * @since 5.0.0
+     */
+    public const SYSTEM_WRITE = 'system:write';
+
+    /**
      * Read user records (subject to the per-field PII gating the
      * `users` tool already enforces).
      *
@@ -206,8 +224,14 @@ class Scopes extends Component
         'graphql' => self::SYSTEM_READ,
         'clear_caches' => self::SYSTEM_READ,
         'resave' => self::SYSTEM_READ,
-        'craft_command' => self::SYSTEM_READ,
-        'craft_exec' => self::SYSTEM_READ,
+
+        // Console dispatch. `system:write`, never `system:read` — both
+        // of these run arbitrary allowlisted code inside the Craft
+        // process, so a read grant must not carry them. `craft_exec`
+        // stays mapped for completeness but is refused at the HTTP
+        // transport boundary regardless of the scope a token carries.
+        'craft_command' => self::SYSTEM_WRITE,
+        'craft_exec' => self::SYSTEM_WRITE,
 
         // Workflow & audit (read-or-write modes — gated to the broader
         // write cluster because their write modes mutate content).
@@ -238,6 +262,7 @@ class Scopes extends Component
             self::ASSETS_WRITE,
             self::SCHEMA_READ,
             self::SYSTEM_READ,
+            self::SYSTEM_WRITE,
             self::USERS_READ,
             self::USERS_WRITE,
         ];
@@ -367,6 +392,7 @@ class Scopes extends Component
             self::ASSETS_WRITE => 'Upload and modify assets and address records.',
             self::SCHEMA_READ => 'Read schema: sections, fields, entry types, volumes, and sites.',
             self::SYSTEM_READ => 'Read system configuration, plugins, routes, and diagnostics.',
+            self::SYSTEM_WRITE => 'Run allowlisted Craft console commands.',
             self::USERS_READ => 'Read user records (subject to PII gating).',
             self::USERS_WRITE => 'Create, update, and delete users.',
             self::LEGACY_READ => 'Read content, schema, and configuration. No writes.',

@@ -6,6 +6,80 @@ All notable changes to Herald are documented here. Format follows
 
 ## [Unreleased]
 
+### Security - authorization hardening on the Pro HTTP transport
+
+> [!WARNING]
+> **Every existing bearer token stops working and must be re-minted.**
+> Tokens were issued with an empty `scope` column, and the transport now
+> refuses a credential that carries no capability scope: a token minted
+> before this release returns `403` on its first request. Re-issue each
+> one with the scopes it needs, from **Herald** &rarr; **Tokens** in the
+> control panel or with
+> `php craft herald/token/issue <user> --scopes=schema:read,content:read`,
+> and revoke the old row. Do this before deploying, not after, or the
+> first thing an operator sees is an agent that stopped working.
+
+- **Tool arguments are validated against their declared JSON Schema.**
+  `craftpulse\herald\mcp\Server` validated only that `arguments` was an
+  array, so every input schema in the plugin was advisory: declared
+  types, enums, `required` lists, and the implicit
+  `additionalProperties: false` were all unenforced. Validation now runs
+  at the dispatcher, against `inputSchemaFor()` rather than the static
+  schema, so per-user mode-enum narrowing is enforced too. Non-conforming
+  calls come back as a tool-error envelope (`isError: true`) at HTTP 200,
+  per the spec's rule that input-validation errors are tool-execution
+  errors. Adds `craftpulse\herald\tools\support\SchemaValidator`; no new
+  runtime dependency.
+- **Fixed a bug where the `orderBy` argument on the `entries`, `assets`,
+  `categories`, and `tags` tools was forwarded into the element query
+  verbatim.** Yii leaves a column reference unquoted once it contains
+  `(`, so any authenticated caller could read arbitrary columns one bit
+  at a time through the result ordering. Each tool now declares a
+  `SORTABLE_FIELDS` allowlist and accepts only `<field> [asc|desc]`,
+  comma-separated. Sorting by an undeclared field, or by any expression,
+  is refused. Schema validation alone does not cover this: the payload
+  was a valid string.
+- **`craft_command` requires the new `herald:run-commands` permission.**
+  The tool had no `filterFor()` and no permission assertion, so any
+  authenticated caller reached Craft's console runner and every route the
+  allowlist admitted. It is now hidden from `tools/list` for callers
+  without the permission and re-checks it inside `execute()`
+  independently. stdio is unaffected: that caller already holds a shell
+  and the `craft` console.
+- **`craft_command` now requires the `system:write` scope.** It was
+  mapped to `system:read`, so a read-only OAuth grant carried arbitrary
+  allowlisted command execution. `system:write` joins the advertised
+  scope vocabulary; a legacy coarse `read` grant no longer covers the
+  tool.
+- **Bearer-token scopes are recorded and enforced.**
+  `craftpulse\herald\services\Tokens::issue()` takes a `$scopes`
+  argument, persists it, and the transport gates `tools/list` and
+  `tools/call` on it exactly as it already did for OAuth tokens. A null
+  or empty scope set denies rather than granting everything. See the
+  warning above.
+- **Fixed a bug where a suspended, locked, pending, or inactive user kept
+  full access for as long as their token lived.** Account state is now
+  re-read on every authenticated request rather than trusted from
+  issuance, and an unusable account gets `401`.
+- **Fixed a bug where a temporary grant could dispatch an admin-level
+  console route on an install with `allowAdminChanges` disabled.** Grants
+  are stored alongside the content-level allowlist, which is admitted
+  unconditionally, so granting `migrate/up` or `project-config/*`
+  bypassed the flag. `craft_command` now classifies the resolved route
+  instead of trusting which list matched it, and
+  `craftpulse\herald\services\Allowlist::getEffective()` stops
+  advertising a laundered pattern so `get_initial_context` agrees with
+  the dispatch gate.
+- **Bearer-token issuance is Pro-gated at the service layer.**
+  `Tokens::issue()` refuses Free installs, which could previously mint a
+  token that no transport would ever accept: the Streamable HTTP
+  transport is Pro-only. The control panel screen and its actions were
+  already gated; the console `herald/token/issue` command was not.
+- **`herald/token/issue` and the control panel issuance form now require
+  scopes.** The command takes `--scopes=<a,b>` and lists the vocabulary
+  when it is missing; the slideout carries a scope checkbox group and
+  refuses an empty selection.
+
 ### Changed - tool error messages no longer use em-dashes
 
 - **Every tool error message MCP clients receive is reworded** to use a

@@ -163,9 +163,10 @@ class Allowlist extends Component
     public function getEffective(?int $userId = null): array
     {
         $settings = Herald::getInstance()->getSettings();
+        $allowAdminChanges = Craft::$app->getConfig()->getGeneral()->allowAdminChanges;
         $defaults = $settings->allowedCommands;
 
-        if (Craft::$app->getConfig()->getGeneral()->allowAdminChanges) {
+        if ($allowAdminChanges) {
             $defaults = array_merge($defaults, $settings->adminLevelCommands);
         }
 
@@ -173,6 +174,26 @@ class Allowlist extends Component
             static fn(array $row): string => (string) $row['pattern'],
             $this->getActiveOverrides($userId),
         );
+
+        // A runtime grant may not advertise an admin-level route while
+        // the host forbids admin changes. Grants are stored in the
+        // content-level bucket, so without this filter a grant of
+        // `migrate/up` showed up as available in `craft_command`'s
+        // `list` mode and in `get_initial_context.allowlist` even
+        // though the dispatch gate refuses it.
+        //
+        // Pattern-level classification is best-effort by construction: a
+        // deliberately broad grant (`*`) matches no admin-level pattern
+        // and therefore still appears here. That is a cosmetic gap only.
+        // `CraftCommand::_assertAdminChangesForRoute()` classifies the
+        // resolved route at dispatch and is the authoritative gate.
+        if (!$allowAdminChanges) {
+            $overridePatterns = array_filter(
+                $overridePatterns,
+                fn(string $pattern): bool => !$this->isAdminLevelRoute($pattern),
+            );
+        }
+
         return array_values(array_unique(array_merge($defaults, $overridePatterns)));
     }
 

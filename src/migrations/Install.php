@@ -217,8 +217,9 @@ class Install extends Migration
      * (`tokenHash`, indexed unique for lookup) and the first 8 chars of
      * the plaintext (`tokenPrefix`, surfaced in the CP listing). The
      * `userId` FK cascades on user delete — a user disappearing takes
-     * their tokens with them. The `scope` JSON column is reserved for a
-     * future fine-grained scope mechanism.
+     * their tokens with them. The `scope` column holds the token's
+     * space-delimited capability scopes; null means the token authorises
+     * nothing and the HTTP transport refuses it.
      *
      * @return void
      *

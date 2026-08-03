@@ -307,6 +307,7 @@ class SettingsController extends Controller
         $view = Craft::$app->getView();
         $html = $view->renderTemplate('herald/_cp/_token-issue-slideout', [
             'settings' => Herald::getInstance()->getSettings(),
+            'scopeOptions' => $this->_scopeOptions(),
         ]);
 
         return $this->asJson([
@@ -379,8 +380,18 @@ class SettingsController extends Controller
         $ttl = $request->getBodyParam('ttlSeconds');
         $ttlSeconds = is_numeric($ttl) && (int) $ttl > 0 ? (int) $ttl : null;
 
+        // Scopes bound the credential's capability and are refused at the
+        // transport when empty, so an unscoped token is a dead token.
+        // Reject here with something the operator can act on rather than
+        // minting one and letting them discover it as a 403.
+        $postedScopes = $request->getBodyParam('scopes');
+        $scopes = Herald::getInstance()->scopes->filterKnown(is_array($postedScopes) ? $postedScopes : []);
+        if ($scopes === []) {
+            return $this->asFailure(Craft::t('herald', 'Select at least one scope for the token.'));
+        }
+
         try {
-            $issued = Herald::getInstance()->tokens->issue($userId, $name, $ttlSeconds);
+            $issued = Herald::getInstance()->tokens->issue($userId, $name, $ttlSeconds, $scopes);
         } catch (Exception $e) {
             Craft::error($e->getMessage(), 'herald');
             return $this->asFailure(Craft::t('herald', 'Could not issue token.'));
@@ -1051,8 +1062,7 @@ class SettingsController extends Controller
      * locked decision 1.
      *
      * Body-param shape mirrors Craft's standard plugin-settings save —
-     * `settings[xxx]` under a single `settings` map per
-     * `~/.claude-eng/skills/craftcms/references/cp.md` line 583.
+     * `settings[xxx]` under a single `settings` map.
      * `setAttributes($posted, false)` runs without scenario filtering
      * so all settings fields are assignable; `savePluginSettings`
      * persists through project config.
@@ -1519,6 +1529,36 @@ class SettingsController extends Controller
         if (!Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             throw new ForbiddenHttpException('This feature requires the Herald Pro edition.');
         }
+    }
+
+    /**
+     * Capability-scope options for the token-issuance slideout's checkbox
+     * group, in the vocabulary's own display order.
+     *
+     * The label pairs the scope identifier with its plain-English
+     * description because the identifier alone (`assets:write`) does not
+     * tell an operator what it unlocks, and the description alone gives
+     * them nothing to match against a client's requested scope string.
+     * Descriptions come from `Scopes::describe()`, the same source the
+     * OAuth consent screen renders, so the two surfaces cannot drift.
+     *
+     * @return array<int,array{label:string,value:string}>
+     * @throws \yii\base\InvalidConfigException from `Herald::getInstance()`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _scopeOptions(): array
+    {
+        $scopes = Herald::getInstance()->scopes;
+
+        return array_map(
+            static fn(string $scope): array => [
+                'label' => sprintf('%s (%s)', $scope, $scopes->describe($scope)),
+                'value' => $scope,
+            ],
+            $scopes->all(),
+        );
     }
 
     /**

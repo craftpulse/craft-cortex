@@ -47,6 +47,34 @@ class Assets extends AbstractTool
 
     public const MAX_LIMIT = 1000;
 
+    /**
+     * Sortable fields for the `orderBy` argument, mapped to the
+     * fully-qualified column each alias resolves to. Nothing outside
+     * this map reaches the SQL `ORDER BY` clause — see
+     * `AbstractTool::_orderBy()` for why the control is a value
+     * allowlist and not a type declaration.
+     *
+     * @var array<string,string>
+     *
+     * @since 5.0.0
+     */
+    public const SORTABLE_FIELDS = [
+        'id' => 'elements.id',
+        'uid' => 'elements.uid',
+        'title' => 'elements_sites.title',
+        'filename' => 'assets.filename',
+        'kind' => 'assets.kind',
+        'size' => 'assets.size',
+        'width' => 'assets.width',
+        'height' => 'assets.height',
+        'volumeId' => 'assets.volumeId',
+        'folderId' => 'assets.folderId',
+        'dateModified' => 'assets.dateModified',
+        'enabled' => 'elements.enabled',
+        'dateCreated' => 'elements.dateCreated',
+        'dateUpdated' => 'elements.dateUpdated',
+    ];
+
     // Public Methods
     // =========================================================================
 
@@ -95,7 +123,11 @@ class Assets extends AbstractTool
             'relatedTo' => Schema::any()->description('Craft relation syntax.'),
             'search' => Schema::string(),
             'with' => Schema::array(Schema::string()),
-            'orderBy' => Schema::string(),
+            'orderBy' => Schema::string()
+                ->description(
+                    'Sort expression: `<field> [asc|desc]`, comma-separated for multiple ' .
+                    'fields. Sortable fields: ' . implode(', ', array_keys(self::SORTABLE_FIELDS)) . '.',
+                ),
             'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
             'offset' => Schema::integer()->minimum(0),
             'site' => Schema::any()->description('Site handle, id, or "*".'),
@@ -239,6 +271,7 @@ class Assets extends AbstractTool
 
     /**
      * @param string[] $eagerHandles
+     * @throws ToolException from `_orderBy()` when the sort expression is not allowlisted.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -247,15 +280,22 @@ class Assets extends AbstractTool
     {
         $query = Asset::find();
 
+        // `orderBy` is deliberately absent from this pass-through list —
+        // it lands in the SQL ORDER BY clause unquoted and goes through
+        // the `SORTABLE_FIELDS` allowlist below instead.
         foreach ([
             'id', 'uid', 'filename', 'title',
             'volume', 'folderId', 'kind',
             'relatedTo', 'search',
-            'orderBy',
         ] as $param) {
             if (array_key_exists($param, $arguments)) {
                 $query->{$param}($arguments[$param]);
             }
+        }
+
+        $orderBy = $this->_orderBy($arguments, self::SORTABLE_FIELDS);
+        if ($orderBy !== null) {
+            $query->orderBy($orderBy);
         }
 
         if (isset($arguments['site'])) {

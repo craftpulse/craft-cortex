@@ -14,7 +14,7 @@ use yii\helpers\Console;
  * OAuth 2.1 for delegated / self-service flows.
  *
  * Usage:
- *   herald/token/issue <user> [--name=<name>] [--ttl=<seconds>]
+ *   herald/token/issue <user> --scopes=<a,b> [--name=<name>] [--ttl=<seconds>]
  *   herald/token/revoke <id>
  *   herald/token/list [--user=<email-or-username>]
  *
@@ -51,6 +51,16 @@ class TokenController extends Controller
     public ?int $ttl = null;
 
     /**
+     * @var string|null Comma-separated capability scopes the issued
+     * token carries (for example
+     * content:read,schema:read). Required: a token
+     * with no scopes is refused by the HTTP
+     * transport. Run without it to see the list of
+     * available scopes.
+     */
+    public ?string $scopes = null;
+
+    /**
      * @var string|null List action only. Restrict output to one
      * user (email or username).
      */
@@ -68,7 +78,7 @@ class TokenController extends Controller
     public function options($actionID): array
     {
         return match ($actionID) {
-            'issue' => array_merge(parent::options($actionID), ['name', 'ttl']),
+            'issue' => array_merge(parent::options($actionID), ['name', 'scopes', 'ttl']),
             'list' => array_merge(parent::options($actionID), ['user']),
             default => parent::options($actionID),
         };
@@ -92,6 +102,21 @@ class TokenController extends Controller
             return ExitCode::USAGE;
         }
 
+        $scopeService = Herald::getInstance()->scopes;
+        $requested = $this->scopes === null
+            ? []
+            : (preg_split('/\s*,\s*/', trim($this->scopes), -1, PREG_SPLIT_NO_EMPTY) ?: []);
+        $scopes = $scopeService->filterKnown($requested);
+
+        if ($scopes === []) {
+            $this->stderr(
+                "--scopes is required and must name at least one known scope.\n"
+                . 'Available: ' . implode(', ', $scopeService->all()) . "\n",
+                Console::FG_RED,
+            );
+            return ExitCode::USAGE;
+        }
+
         $name = $this->name ?? ('cli-' . time());
 
         try {
@@ -99,6 +124,7 @@ class TokenController extends Controller
                 userId: (int) $resolved->id,
                 name: $name,
                 ttlSeconds: $this->ttl,
+                scopes: $scopes,
             );
         } catch (\Throwable $e) {
             $this->stderr("Failed to issue token: {$e->getMessage()}\n", Console::FG_RED);
@@ -117,6 +143,8 @@ class TokenController extends Controller
         $this->stdout("{$model->name}\n");
         $this->stdout("  user:      ", Console::FG_GREY);
         $this->stdout(sprintf("%s (#%d)\n", $resolved->username ?? $resolved->email, $model->userId));
+        $this->stdout("  scopes:    ", Console::FG_GREY);
+        $this->stdout(implode(' ', $scopes) . "\n");
         $this->stdout("  expiresAt: ", Console::FG_GREY);
         $this->stdout(($model->expiresAt ?? 'never') . "\n");
         $this->stdout("\n");

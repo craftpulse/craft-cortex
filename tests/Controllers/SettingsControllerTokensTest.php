@@ -31,6 +31,7 @@
 use craftpulse\herald\controllers\SettingsController;
 use craftpulse\herald\db\Table;
 use craftpulse\herald\Herald;
+use craftpulse\herald\services\Scopes;
 use yii\web\Response;
 
 // -----------------------------------------------------------------------------
@@ -417,6 +418,7 @@ it('actionIssueToken returns the plaintext once and creates a row', function() {
         'userId' => (int) $user->id,
         'name' => 'integration-test',
         'ttlSeconds' => 86400,
+        'scopes' => [Scopes::SCHEMA_READ],
     ]);
 
     $response = $controller->actionIssueToken();
@@ -455,7 +457,10 @@ it('actionIssueToken auto-names the token when name is omitted', function() {
     $user = _heraldTokenTestUser();
 
     $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
-    $controller->withParams(['userId' => (int) $user->id]);
+    $controller->withParams([
+        'userId' => (int) $user->id,
+        'scopes' => [Scopes::SCHEMA_READ],
+    ]);
 
     $response = $controller->actionIssueToken();
 
@@ -468,12 +473,51 @@ it('actionIssueToken accepts the elementSelect array form for userId', function(
 
     $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
     // The `elementSelectField` macro posts `userId[]`.
-    $controller->withParams(['userId' => [(int) $user->id], 'name' => 'array-form']);
+    $controller->withParams([
+        'userId' => [(int) $user->id],
+        'name' => 'array-form',
+        'scopes' => [Scopes::SCHEMA_READ],
+    ]);
 
     $response = $controller->actionIssueToken();
 
     expect($response->statusCode)->toBe(200);
     expect($response->data['model']['user']['id'])->toBe((int) $user->id);
+});
+
+it('actionIssueToken with no scopes returns 400 and mints nothing', function() {
+    // An unscoped token is refused at the transport, so issuing one is a
+    // dead credential and a support ticket. Fail at the form instead.
+    $user = _heraldTokenTestUser();
+
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
+    $controller->withParams(['userId' => (int) $user->id, 'name' => 'unscoped']);
+
+    $response = $controller->actionIssueToken();
+
+    expect($response->statusCode)->toBe(400);
+    expect($response->data)->toBeArray()
+        ->toHaveKey('message', 'Select at least one scope for the token.');
+    expect(Herald::getInstance()->tokens->getAll())->toHaveCount(0);
+});
+
+it('actionIssueToken records the selected scopes on the row', function() {
+    $user = _heraldTokenTestUser();
+
+    $controller = new _HeraldTokensHarness('settings', Herald::getInstance());
+    $controller->withParams([
+        'userId' => (int) $user->id,
+        'name' => 'scoped',
+        'scopes' => [Scopes::SCHEMA_READ, Scopes::CONTENT_READ, 'bogus'],
+    ]);
+
+    $response = $controller->actionIssueToken();
+
+    expect($response->statusCode)->toBe(200);
+
+    $rows = Herald::getInstance()->tokens->getAll();
+    expect($rows)->toHaveCount(1);
+    expect($rows[0]->scope)->toBe(Scopes::SCHEMA_READ . ' ' . Scopes::CONTENT_READ);
 });
 
 it('actionIssueToken missing user returns 400', function() {

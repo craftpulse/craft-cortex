@@ -63,10 +63,15 @@ class Token extends Model
     public int $userId = 0;
 
     /**
-     * @var string|null Reserved for fine-grained scope strings in a
-     *                  future sub-gate (7.3 OAuth and 7.4 per-user
-     *                  filter both want this column). 7.2 writes
-     *                  null unconditionally.
+     * @var string|null Space-delimited capability scopes this token
+     *                  carries, matching the shape an OAuth access
+     *                  token's `scope` claim uses so both credential
+     *                  paths parse identically.
+     *
+     *                  Null is the DENY sentinel, not "unscoped": the
+     *                  HTTP transport refuses a credential with no
+     *                  scope. Tokens issued before scope enforcement
+     *                  landed all carry null and have to be re-minted.
      */
     public ?string $scope = null;
 

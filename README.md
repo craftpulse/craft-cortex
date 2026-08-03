@@ -102,7 +102,7 @@ Herald's security model treats the transport as the boundary. The stdio transpor
 
 Highlights:
 
-- **OAuth 2.1 with capability scopes.** The HTTP transport authenticates via OAuth 2.1 (Authorization Code + PKCE) or long-lived bearer tokens. Authorization is the conjunction of **scope ∧ Craft-permission ∧ edition**, and capability scopes (`content:read`, `content:write`, `content:publish`, `content:delete`, `assets:write`, `schema:read`, `system:read`, `users:read`, `users:write`) gate which tools a token can reach.
+- **OAuth 2.1 with capability scopes.** The HTTP transport authenticates via OAuth 2.1 (Authorization Code + PKCE) or long-lived bearer tokens. Authorization is the conjunction of **scope ∧ Craft-permission ∧ edition**, and capability scopes (`content:read`, `content:write`, `content:publish`, `content:delete`, `assets:write`, `schema:read`, `system:read`, `system:write`, `users:read`, `users:write`) gate which tools a token can reach.
 - **Dynamic Client Registration with an approval gate.** Self-registered clients start unapproved; an admin approves them on the **Clients** CP screen before they can connect (or auto-approve for trusted installs).
 - **Refresh-token rotation + theft detection.** Refresh tokens rotate on every exchange and carry family-lineage tracking, so replaying a consumed refresh token revokes the entire token family and logs a security event (RFC 6819 / OAuth 2.1 BCP).
 - **In-band elevation for high-stakes operations.** Credential / admin mutations and content publish / delete over HTTP require a fresh re-authentication via `/oauth/elevate`. Code execution (`craft_exec`) stays stdio-only **always**, and elevation never unlocks it.

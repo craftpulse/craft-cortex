@@ -195,6 +195,87 @@ abstract class AbstractTool implements ToolInterface
     }
 
     /**
+     * Resolve the caller-supplied `orderBy` argument into a validated
+     * Yii order-by map, or null when the caller did not ask for a sort
+     * (leaving Craft's per-element-type default order in place).
+     *
+     * **This is a value allowlist, and it is load-bearing.** Element
+     * queries forward `orderBy` into the SQL `ORDER BY` clause, and
+     * Yii's `quoteColumnName()` returns a string verbatim once it
+     * contains `(` — so a forwarded caller string is a blind-boolean
+     * oracle over every table in the database, `users.password`
+     * included. Declaring `orderBy` as a JSON Schema string does not
+     * help: the payload IS a string. Only an allowlist of the accepted
+     * *values* closes it, which is why this stays even with dispatcher-
+     * level schema validation in place (`Server::_validateToolCall()`).
+     *
+     * Accepted grammar, deliberately minimal:
+     *
+     *     <alias>[ asc|desc][, <alias>[ asc|desc]]*
+     *
+     * `$sortable` maps caller-facing aliases to fully-qualified column
+     * names (`'postDate' => 'entries.postDate'`). Qualifying the column
+     * mirrors Craft core's own `defaultOrderBy` declarations and avoids
+     * "ambiguous column" errors on the joined element queries. Anything
+     * not in the map — including a bare column that happens to exist —
+     * is refused with a `ToolException` naming the accepted aliases, so
+     * the calling agent can correct itself in one round trip.
+     *
+     * @param array<string,mixed> $arguments
+     * @param array<string,string> $sortable Alias → qualified column.
+     * @return array<string,int>|null
+     * @throws ToolException when the value is not a string, is empty, or names an alias outside `$sortable`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    protected function _orderBy(array $arguments, array $sortable): ?array
+    {
+        if (!array_key_exists('orderBy', $arguments)) {
+            return null;
+        }
+
+        $raw = $arguments['orderBy'];
+        $name = static::getName();
+        $accepted = implode(', ', array_keys($sortable));
+
+        if (!is_string($raw) || trim($raw) === '') {
+            throw new ToolException("{$name}: `orderBy` must be a non-empty string. Sortable fields: {$accepted}.");
+        }
+
+        $orderBy = [];
+
+        foreach (explode(',', $raw) as $term) {
+            $parts = preg_split('/\s+/', trim($term), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+
+            if (count($parts) > 2) {
+                throw new ToolException(
+                    "{$name}: `orderBy` term `" . trim($term) . '` is not `<field> [asc|desc]`. ' .
+                    "Sortable fields: {$accepted}.",
+                );
+            }
+
+            $alias = $parts[0] ?? '';
+            if (!isset($sortable[$alias])) {
+                throw new ToolException(
+                    "{$name}: `orderBy` field `{$alias}` is not sortable. Sortable fields: {$accepted}.",
+                );
+            }
+
+            $direction = strtolower($parts[1] ?? 'asc');
+            $orderBy[$sortable[$alias]] = match ($direction) {
+                'asc' => SORT_ASC,
+                'desc' => SORT_DESC,
+                default => throw new ToolException(
+                    "{$name}: `orderBy` direction `{$direction}` is invalid. Use `asc` or `desc`.",
+                ),
+            };
+        }
+
+        return $orderBy;
+    }
+
+    /**
      * Return the caller-supplied `with` argument as a list of eager-load
      * handles. Strings are trimmed of empties; non-array `with` is
      * normalised to `[]`. Content tools forward this list to the

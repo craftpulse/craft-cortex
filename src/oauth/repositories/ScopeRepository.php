@@ -56,6 +56,7 @@ class ScopeRepository implements ScopeRepositoryInterface
         'assets:write',
         'schema:read',
         'system:read',
+        'system:write',
         'users:read',
         'users:write',
     ];

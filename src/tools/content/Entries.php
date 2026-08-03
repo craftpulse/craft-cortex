@@ -56,6 +56,42 @@ class Entries extends AbstractTool
 
     public const MAX_LIMIT = 1000;
 
+    /**
+     * Sortable fields for the `orderBy` argument, mapped to the
+     * fully-qualified column each alias resolves to.
+     *
+     * Nothing outside this map reaches the SQL `ORDER BY` clause — see
+     * `AbstractTool::_orderBy()` for why a value allowlist rather than a
+     * type declaration is the control here. Columns are qualified the
+     * way Craft's own `EntryQuery::$defaultOrderBy` qualifies them, so
+     * `id` and `dateCreated` cannot come out ambiguous across the
+     * `elements` / `elements_sites` / `entries` joins.
+     *
+     * Structure order is intentionally absent: `structureelements` is
+     * only joined for structure sections, so exposing it would turn a
+     * sort request on a channel section into a SQL error. Structure
+     * sections already come back in structure order by default, which
+     * is what a caller asking for it actually wants.
+     *
+     * @var array<string,string>
+     *
+     * @since 5.0.0
+     */
+    public const SORTABLE_FIELDS = [
+        'id' => 'elements.id',
+        'uid' => 'elements.uid',
+        'title' => 'elements_sites.title',
+        'slug' => 'elements_sites.slug',
+        'uri' => 'elements_sites.uri',
+        'postDate' => 'entries.postDate',
+        'expiryDate' => 'entries.expiryDate',
+        'sectionId' => 'entries.sectionId',
+        'typeId' => 'entries.typeId',
+        'enabled' => 'elements.enabled',
+        'dateCreated' => 'elements.dateCreated',
+        'dateUpdated' => 'elements.dateUpdated',
+    ];
+
     // Public Methods
     // =========================================================================
 
@@ -108,7 +144,12 @@ class Entries extends AbstractTool
             'search' => Schema::string(),
             'with' => Schema::array(Schema::string())
                 ->description('Eager-loaded relational field handles. Without this, relational fields appear as `{loaded: false}` stubs to prevent N+1.'),
-            'orderBy' => Schema::string(),
+            'orderBy' => Schema::string()
+                ->description(
+                    'Sort expression: `<field> [asc|desc]`, comma-separated for multiple ' .
+                    'fields. Sortable fields: ' . implode(', ', array_keys(self::SORTABLE_FIELDS)) . '. ' .
+                    'Structure sections are returned in structure order when no sort is given.',
+                ),
             'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
             'offset' => Schema::integer()->minimum(0),
             'before' => Schema::any()->description('postDate < this value (Craft date string).'),
@@ -183,6 +224,7 @@ class Entries extends AbstractTool
 
     /**
      * @param string[] $eagerHandles
+     * @throws ToolException from `_orderBy()` when the sort expression is not allowlisted.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -193,11 +235,14 @@ class Entries extends AbstractTool
 
         // Apply optional filters in lock-step with the schema. Every Craft
         // setter accepts strings/ints/arrays where appropriate.
+        //
+        // `orderBy` is deliberately NOT in this pass-through list — it
+        // lands in the SQL ORDER BY clause unquoted and goes through the
+        // `SORTABLE_FIELDS` allowlist below instead.
         foreach ([
             'id', 'uid', 'slug', 'title',
             'section', 'type', 'status', 'enabled', 'authorId',
             'relatedTo', 'search',
-            'orderBy',
             'before', 'after',
             'level', 'hasDescendants', 'leaves',
             'descendantOf', 'ancestorOf', 'siblingOf',
@@ -205,6 +250,11 @@ class Entries extends AbstractTool
             if (array_key_exists($param, $arguments)) {
                 $query->{$param}($arguments[$param]);
             }
+        }
+
+        $orderBy = $this->_orderBy($arguments, self::SORTABLE_FIELDS);
+        if ($orderBy !== null) {
+            $query->orderBy($orderBy);
         }
 
         // `site` is a thin alias DSL: '*' = every site, else handle/id.

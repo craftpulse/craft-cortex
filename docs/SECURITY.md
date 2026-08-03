@@ -94,10 +94,11 @@ The scope vocabulary is capability-grained:
 | `assets:write` | Mutate assets and address records |
 | `schema:read` | Read sections, fields, entry types, volumes, sites |
 | `system:read` | Read config, plugins, routes, diagnostics |
+| `system:write` | Dispatch allowlisted Craft console commands (`craft_command`) |
 | `users:read` | Read user records (PII-gated) |
 | `users:write` | Create / update / delete users |
 
-Every registered tool maps to exactly one required scope in `services/Scopes.php` (the single source of truth). A tool absent from the map defaults to `system:read`, which is fail-safe: an unmapped tool is gated behind a read scope, never granted a write capability by default. stdio is not scope-gated (the trusted local transport). The legacy coarse `read` / `write` scopes are still accepted at the authorize / DCR boundary and expanded to their capability clusters at grant time, so pre-existing tokens keep working.
+Every registered tool maps to exactly one required scope in `services/Scopes.php` (the single source of truth). A tool absent from the map defaults to `system:read`, which is fail-safe: an unmapped tool is gated behind a read scope, never granted a write capability by default. stdio is not scope-gated (the trusted local transport). The legacy coarse `read` / `write` scopes are still accepted at the authorize / DCR boundary and expanded to their capability clusters at grant time. A credential carrying no scope at all is refused with `403`: bearer tokens issued before scope enforcement landed have to be re-minted with explicit scopes.
 
 `craft_exec` maps to a scope for completeness but stays stdio-only at the transport boundary regardless, so no scope can reach it over HTTP.
 

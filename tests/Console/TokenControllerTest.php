@@ -22,6 +22,7 @@
 use craftpulse\herald\console\controllers\TokenController;
 use craftpulse\herald\Herald;
 use craftpulse\herald\records\Token as TokenRecord;
+use craftpulse\herald\services\Scopes;
 
 // -----------------------------------------------------------------------------
 // Harness
@@ -70,9 +71,17 @@ beforeEach(function() {
     expect($admin)->not->toBeNull();
     $this->userId = (int) $admin->id;
     $this->userHandle = (string) ($admin->username ?? $admin->email);
+
+    // `Tokens::issue()` is Pro-gated: the HTTP transport that consumes a
+    // bearer token refuses Free installs, so minting one there would only
+    // produce a credential that can never authenticate. Pin Pro for the
+    // file so the cases below exercise issuance rather than the gate.
+    $this->originalEdition = Herald::getInstance()->edition;
+    Herald::getInstance()->edition = Herald::EDITION_PRO;
 });
 
 afterEach(function() {
+    Herald::getInstance()->edition = $this->originalEdition;
     TokenRecord::deleteAll(['like', 'name', '_test_/%', false]);
 });
 
@@ -81,7 +90,10 @@ afterEach(function() {
 // -----------------------------------------------------------------------------
 
 it('issue prints the plaintext exactly once and creates a row', function() {
-    $controller = _herald_token_harness(['name' => '_test_/issue-output']);
+    $controller = _herald_token_harness([
+        'name' => '_test_/issue-output',
+        'scopes' => 'schema:read,content:read',
+    ]);
     $exit = $controller->actionIssue($this->userHandle);
 
     expect($exit)->toBe(0);
@@ -101,10 +113,47 @@ it('issue with unknown user returns USAGE', function() {
     expect($controller->captured)->toContain('Unknown user');
 });
 
+it('issue without --scopes returns USAGE and names the available scopes', function() {
+    // A token with no scopes is refused at the transport, so minting one
+    // is never the helpful outcome. Fail with the vocabulary in hand.
+    $controller = _herald_token_harness(['name' => '_test_/issue-no-scopes']);
+    $exit = $controller->actionIssue($this->userHandle);
+
+    expect($exit)->toBe(64); // ExitCode::USAGE
+    expect($controller->captured)->toContain('--scopes is required');
+    expect($controller->captured)->toContain(Scopes::SCHEMA_READ);
+    expect((int) TokenRecord::find()->where(['name' => '_test_/issue-no-scopes'])->count())->toBe(0);
+});
+
+it('issue rejects an unknown scope identifier', function() {
+    $controller = _herald_token_harness([
+        'name' => '_test_/issue-bogus-scope',
+        'scopes' => 'not-a-scope',
+    ]);
+    $exit = $controller->actionIssue($this->userHandle);
+
+    expect($exit)->toBe(64);
+    expect((int) TokenRecord::find()->where(['name' => '_test_/issue-bogus-scope'])->count())->toBe(0);
+});
+
+it('issue records the granted scopes on the row', function() {
+    $controller = _herald_token_harness([
+        'name' => '_test_/issue-scopes',
+        'scopes' => 'schema:read, content:read',
+    ]);
+    $exit = $controller->actionIssue($this->userHandle);
+
+    expect($exit)->toBe(0);
+    $row = TokenRecord::findOne(['name' => '_test_/issue-scopes']);
+    expect($row)->not->toBeNull();
+    expect((string) $row->scope)->toBe('schema:read content:read');
+});
+
 it('issue honours --ttl and writes a future expiry on the row', function() {
     $controller = _herald_token_harness([
         'name' => '_test_/issue-ttl',
         'ttl' => 60,
+        'scopes' => 'schema:read',
     ]);
     $exit = $controller->actionIssue($this->userHandle);
 
@@ -115,7 +164,7 @@ it('issue honours --ttl and writes a future expiry on the row', function() {
 });
 
 it('issue defaults the name when --name is omitted', function() {
-    $controller = _herald_token_harness();
+    $controller = _herald_token_harness(['scopes' => 'schema:read']);
     $exit = $controller->actionIssue($this->userHandle);
 
     expect($exit)->toBe(0);
@@ -137,7 +186,11 @@ it('issue defaults the name when --name is omitted', function() {
 // -----------------------------------------------------------------------------
 
 it('list shows the row by prefix and name, but never the plaintext', function() {
-    $issued = Herald::getInstance()->tokens->issue($this->userId, '_test_/list-row');
+    $issued = Herald::getInstance()->tokens->issue(
+        userId: $this->userId,
+        name: '_test_/list-row',
+        scopes: [Scopes::SCHEMA_READ],
+    );
 
     $controller = _herald_token_harness();
     $exit = $controller->actionList();

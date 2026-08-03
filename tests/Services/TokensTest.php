@@ -31,9 +31,17 @@ beforeEach(function() {
     $admin = herald_admin_user();
     expect($admin)->not->toBeNull();
     $this->userId = (int) $admin->id;
+
+    // `Tokens::issue()` is Pro-gated: the HTTP transport that consumes a
+    // bearer token refuses Free installs, so minting one there would only
+    // produce a credential that can never authenticate. Pin Pro for the
+    // file so the cases below exercise issuance rather than the gate.
+    $this->originalEdition = Herald::getInstance()->edition;
+    Herald::getInstance()->edition = Herald::EDITION_PRO;
 });
 
 afterEach(function() {
+    Herald::getInstance()->edition = $this->originalEdition;
     TokenRecord::deleteAll(['like', 'name', '_test_/%', false]);
 });
 

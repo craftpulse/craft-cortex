@@ -22,15 +22,19 @@
  * @since  5.0.0
  */
 
+use craft\elements\User as UserElement;
+use craft\helpers\Db;
 use craftpulse\herald\controllers\McpController;
 use craftpulse\herald\Herald;
 use craftpulse\herald\mcp\Server;
 use craftpulse\herald\mcp\transport\Http;
 use craftpulse\herald\oauth\entities\AccessTokenEntity;
 use craftpulse\herald\oauth\entities\ClientEntity;
+use craftpulse\herald\oauth\entities\ScopeEntity;
 use craftpulse\herald\records\OauthClient as OauthClientRecord;
 use craftpulse\herald\records\OauthToken as OauthTokenRecord;
 use craftpulse\herald\records\Token as TokenRecord;
+use craftpulse\herald\services\Scopes;
 use League\OAuth2\Server\CryptKey;
 use yii\web\HeaderCollection;
 use yii\web\Response;
@@ -203,6 +207,57 @@ function _herald_decode_response(Response $response): array
     return $decoded;
 }
 
+/**
+ * Create a non-admin user for the account-state tests (remediation
+ * 1.5). Saved as `pending` so callers can choose whether to activate,
+ * suspend, or lock it. Username carries the caller-supplied prefix so
+ * `afterEach()` can sweep every fixture in one pattern match.
+ */
+function _herald_mcp_state_user(string $prefix): ?UserElement
+{
+    $user = new UserElement();
+    $user->username = $prefix . bin2hex(random_bytes(4));
+    $user->email = $user->username . '@example.test';
+    $user->admin = false;
+    $user->pending = true;
+
+    if (!Craft::$app->getElements()->saveElement($user)) {
+        return null;
+    }
+
+    return $user;
+}
+
+/**
+ * Mint a scoped bearer token for the given user and drive one
+ * `initialize` POST through the harness. Scoped on purpose so the
+ * account-state gate (1.5) is exercised independently of the
+ * null-scope gate (1.4).
+ */
+function _herald_mcp_state_probe(int $userId): Response
+{
+    $issued = Herald::getInstance()->tokens->issue(
+        userId: $userId,
+        name: '_test_/state-' . bin2hex(random_bytes(3)),
+        scopes: [Scopes::SCHEMA_READ],
+    );
+
+    $body = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+
+    return _herald_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => 'Bearer ' . $issued['token'],
+    ], $body)->runIndex();
+}
+
 // -----------------------------------------------------------------------------
 // Setup
 // -----------------------------------------------------------------------------
@@ -228,11 +283,20 @@ beforeEach(function() {
     // Auth scaffolding — issue a fresh bearer token bound to the
     // playground's admin user for the majority of tests. Tests that
     // exercise the no-auth / bad-auth paths swap the header out.
+    //
+    // The token is minted with the full capability vocabulary because
+    // the transport now refuses an unscoped credential outright
+    // (remediation 1.4). Tests that care about the unscoped path mint
+    // their own token.
     $admin = herald_admin_user();
     expect($admin)->not->toBeNull();
     $this->userId = (int) $admin->id;
 
-    $issued = Herald::getInstance()->tokens->issue($this->userId, '_test_/controller-bearer');
+    $issued = Herald::getInstance()->tokens->issue(
+        userId: $this->userId,
+        name: '_test_/controller-bearer',
+        scopes: Herald::getInstance()->scopes->all(),
+    );
     $this->bearerToken = $issued['token'];
     $this->bearerTokenId = (int) $issued['model']->id;
     $this->bearerHeader = 'Bearer ' . $this->bearerToken;
@@ -252,6 +316,26 @@ afterEach(function() {
     $settings->rateLimitPerSecond = $this->originalRateLimitPerSecond;
     Herald::getInstance()->rateLimiter->clear($this->userId);
     TokenRecord::deleteAll(['like', 'name', '_test_/%', false]);
+
+    // Account-state fixtures (remediation 1.5). The per-test transaction
+    // rolls the rows back, but the elements service memoizes what it
+    // saved, so the hard delete keeps a later test in the same process
+    // from resolving a stale instance.
+    $stateUsers = UserElement::find()
+        ->status(null)
+        ->trashed(null)
+        ->site('*')
+        ->andWhere(['like', 'users.username', '_herald_mcpstate_%', false])
+        ->all();
+    foreach ($stateUsers as $stateUser) {
+        Craft::$app->getElements()->deleteElement($stateUser, hardDelete: true);
+    }
+
+    // The controller binds the resolved bearer's user as the Craft
+    // identity, so a state-fixture test leaves a non-admin (and, after
+    // the sweep above, deleted) identity bound. Restore the admin, or
+    // every later permission-gated test in the run inherits it.
+    Craft::$app->getUser()->setIdentity(herald_admin_user());
 
     // Cleanup OAuth fixtures from Gate 7.3 tests too. The clientId
     // pattern `_test_/mcp-oauth-*` is unique to this file's
@@ -848,8 +932,10 @@ it('mid-session token swap with a different user terminates the session and retu
     // user rather than creating one because the playground's
     // afterSave hooks (craft-cockpit, etc.) attach side effects that
     // are awkward to satisfy from a unit test.
+    // Active only: an unusable account 401s at the account-state gate
+    // (remediation 1.5) before the swap detection this case is about.
     $otherUser = \craft\elements\User::find()
-        ->status(null)
+        ->status(UserElement::STATUS_ACTIVE)
         ->andWhere(['not', ['users.id' => $this->userId]])
         ->one();
 
@@ -865,6 +951,7 @@ it('mid-session token swap with a different user terminates the session and retu
         $createdOtherUser->email = $createdOtherUser->username . '@example.test';
         $createdOtherUser->pending = true;
         expect(Craft::$app->getElements()->saveElement($createdOtherUser))->toBeTrue();
+        Craft::$app->getUsers()->activateUser($createdOtherUser);
         $otherUser = $createdOtherUser;
     }
     expect($otherUser)->not->toBeNull();
@@ -886,7 +973,11 @@ it('mid-session token swap with a different user terminates the session and retu
     $initResponse = $initController->runIndex();
     $sessionId = (string) $initResponse->headers->get(Http::HEADER_SESSION_ID);
 
-    $otherIssued = Herald::getInstance()->tokens->issue((int) $otherUser->id, '_test_/swap-other-token');
+    $otherIssued = Herald::getInstance()->tokens->issue(
+        userId: (int) $otherUser->id,
+        name: '_test_/swap-other-token',
+        scopes: Herald::getInstance()->scopes->all(),
+    );
 
     // POST tools/call with the OTHER bearer + the SAME session id.
     // `Sessions::touch()` should detect the userId mismatch,
@@ -983,8 +1074,14 @@ it('audit log line carries user=<id> when authenticated over HTTP', function() {
  * Mint an OAuth access-token JWT bound to the playground admin user
  * with the given audience. Persists a matching token row so league's
  * resource server doesn't see it as revoked.
+ *
+ * Scopes default to the full capability vocabulary: the transport
+ * refuses a credential that carries none (remediation 1.4), and these
+ * cases are about the OAuth lookup path rather than about scoping.
+ *
+ * @param string[]|null $scopes
  */
-function _herald_mint_oauth_access_token(int $userId, string $audience, int $expiresIn = 3600): array
+function _herald_mint_oauth_access_token(int $userId, string $audience, int $expiresIn = 3600, ?array $scopes = null): array
 {
     $client = new OauthClientRecord();
     $client->clientId = bin2hex(random_bytes(16));
@@ -1005,6 +1102,13 @@ function _herald_mint_oauth_access_token(int $userId, string $audience, int $exp
     $entity->setUserIdentifier((string) $userId);
     $entity->setExpiryDateTime(new \DateTimeImmutable('@' . (time() + $expiresIn)));
     $entity->setAudience($audience);
+
+    foreach ($scopes ?? Herald::getInstance()->scopes->all() as $identifier) {
+        $scopeEntity = new ScopeEntity();
+        $scopeEntity->setIdentifier($identifier);
+        $entity->addScope($scopeEntity);
+    }
+
     $entity->setPrivateKey(new CryptKey('file://' . Herald::getInstance()->oauth->getPrivateKeyPath()));
 
     $record = new OauthTokenRecord();
@@ -1520,8 +1624,31 @@ it('a throttled call does NOT dispatch: no tool-execution audit row, only the th
 // -----------------------------------------------------------------------------
 
 /**
+ * Scope authority that maps the streaming fixture tool to a real
+ * capability scope.
+ *
+ * `Scopes::TOOL_SCOPES` is a constant covering the built-in tools, and
+ * an unmapped tool resolves to the ungrantable `NONE` sentinel so it
+ * fails closed over HTTP — correct for production, fatal for a fixture
+ * tool registered at runtime, because no token can ever carry `NONE`.
+ * Overriding the single lookup method is the narrowest test-only seam;
+ * production behaviour for real tools stays untouched.
+ */
+class _HeraldScopesWithStreamingFixture extends Scopes
+{
+    public function scopeForTool(string $toolName): string
+    {
+        if ($toolName === '_streaming_test') {
+            return self::SYSTEM_READ;
+        }
+
+        return parent::scopeForTool($toolName);
+    }
+}
+
+/**
  * Register the streaming fixture tool for one test's lifetime. Returns
- * the bookkeeping pair the caller must restore in `finally`.
+ * the bookkeeping triple the caller must restore in `finally`.
  */
 function _herald_register_streaming_fixture(): array
 {
@@ -1539,13 +1666,17 @@ function _herald_register_streaming_fixture(): array
     $fresh->init();
     Herald::getInstance()->set('tools', $fresh);
 
-    return [$original, $listener];
+    $originalScopes = Herald::getInstance()->scopes;
+    Herald::getInstance()->set('scopes', new _HeraldScopesWithStreamingFixture());
+
+    return [$original, $listener, $originalScopes];
 }
 
 function _herald_restore_streaming_fixture(array $context): void
 {
-    [$original, $listener] = $context;
+    [$original, $listener, $originalScopes] = $context;
     Herald::getInstance()->set('tools', $original);
+    Herald::getInstance()->set('scopes', $originalScopes);
     \yii\base\Event::off(
         \craftpulse\herald\services\Tools::class,
         \craftpulse\herald\services\Tools::EVENT_REGISTER_TOOLS,
@@ -1786,4 +1917,168 @@ it('a tools/call without Accept: text/event-stream keeps the JSON response path'
     } finally {
         _herald_restore_streaming_fixture($ctx);
     }
+});
+
+// -----------------------------------------------------------------------------
+// Remediation 1.4 — bearer-token scope enforcement (null scope means DENY)
+//
+// Before the fix `Tokens::issue()` wrote `scope = null` unconditionally
+// and `_resolveBearer()` returned `scopes: null`, which
+// `Scopes::grantsTool()` reads as the trusted-local all-access path.
+// Every bearer token therefore carried unlimited capability while the
+// column that was supposed to bound it stayed empty.
+//
+// Ruled 2026-08-02: enforce, and a null scope DENIES. Existing tokens
+// stop working and have to be re-minted.
+// -----------------------------------------------------------------------------
+
+it('returns 403 for a bearer token carrying no scopes', function() {
+    $issued = Herald::getInstance()->tokens->issue($this->userId, '_test_/unscoped-token');
+
+    $body = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+    $controller = _herald_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => 'Bearer ' . $issued['token'],
+    ], $body);
+    $response = $controller->runIndex();
+
+    expect($response->statusCode)->toBe(403);
+    expect($response->data)->toBeArray();
+    expect($response->data['error'] ?? '')->toContain('scope');
+});
+
+it('confines a scoped bearer token to the tools its scopes cover', function() {
+    $issued = Herald::getInstance()->tokens->issue(
+        userId: $this->userId,
+        name: '_test_/schema-only-token',
+        scopes: [Scopes::SCHEMA_READ],
+    );
+    $header = 'Bearer ' . $issued['token'];
+
+    $initBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 1,
+        'method' => 'initialize',
+        'params' => [
+            'protocolVersion' => Server::PROTOCOL_VERSION,
+            'clientInfo' => ['name' => 'pest', 'version' => '0'],
+        ],
+    ]);
+    $initController = _herald_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        'Authorization' => $header,
+    ], $initBody);
+    $initResponse = $initController->runIndex();
+    expect($initResponse->statusCode)->toBe(200);
+    $sessionId = (string) $initResponse->headers->get(Http::HEADER_SESSION_ID);
+
+    // In scope: `sections` requires `schema:read`.
+    $allowedBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 2,
+        'method' => 'tools/call',
+        'params' => ['name' => 'sections'],
+    ]);
+    $allowedResponse = _herald_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        Http::HEADER_SESSION_ID => $sessionId,
+        'Authorization' => $header,
+    ], $allowedBody)->runIndex();
+    expect($allowedResponse->statusCode)->toBe(200);
+    expect(_herald_decode_response($allowedResponse))->toHaveKey('result');
+
+    // Out of scope: `entries` requires `content:read`, which this token
+    // does not carry. Fails closed as "Unknown tool".
+    $deniedBody = (string) json_encode([
+        'jsonrpc' => '2.0',
+        'id' => 3,
+        'method' => 'tools/call',
+        'params' => ['name' => 'entries'],
+    ]);
+    $deniedResponse = _herald_mcp_harness('POST', [
+        Http::HEADER_PROTOCOL_VERSION => Server::PROTOCOL_VERSION,
+        Http::HEADER_SESSION_ID => $sessionId,
+        'Authorization' => $header,
+    ], $deniedBody)->runIndex();
+    expect($deniedResponse->statusCode)->toBe(200);
+    $deniedEnvelope = _herald_decode_response($deniedResponse);
+    expect($deniedEnvelope)->toHaveKey('error');
+    expect($deniedEnvelope['error']['message'])->toContain('Unknown tool');
+
+    Herald::getInstance()->sessions->terminate($sessionId);
+});
+
+// -----------------------------------------------------------------------------
+// Remediation 1.5 — account state is honoured on every authenticated request
+//
+// Before the fix the controller resolved the bearer's user and bound it
+// as the Craft identity without ever asking whether the account was
+// still usable. A suspended, pending, inactive or locked user kept full
+// access for as long as their token lived.
+// -----------------------------------------------------------------------------
+
+it('returns 401 when the bearer token belongs to a suspended user', function() {
+    $user = _herald_mcp_state_user('_herald_mcpstate_suspended_');
+    expect($user)->not->toBeNull();
+    Craft::$app->getUsers()->activateUser($user);
+    Craft::$app->getUsers()->suspendUser($user);
+
+    $response = _herald_mcp_state_probe((int) $user->id);
+
+    expect($response->statusCode)->toBe(401);
+});
+
+it('returns 401 when the bearer token belongs to a locked user', function() {
+    $user = _herald_mcp_state_user('_herald_mcpstate_locked_');
+    expect($user)->not->toBeNull();
+    Craft::$app->getUsers()->activateUser($user);
+
+    // Craft has no public `lockUser()`; the state is a side effect of
+    // repeated invalid logins. Writing the columns directly is the
+    // cheap equivalent — and `lockoutDate` is not optional here:
+    // `User::init()` auto-unlocks a locked account whose cooldown has
+    // already elapsed, so a bare `locked = 1` is silently undone the
+    // moment the element hydrates.
+    Craft::$app->getDb()->createCommand()
+        ->update('{{%users}}', [
+            'locked' => true,
+            'lockoutDate' => Db::prepareDateForDb(new DateTime()),
+        ], ['id' => (int) $user->id])
+        ->execute();
+
+    $reloaded = Craft::$app->getUsers()->getUserById((int) $user->id);
+    expect($reloaded)->not->toBeNull();
+    expect($reloaded->locked)->toBeTrue();
+
+    $response = _herald_mcp_state_probe((int) $user->id);
+
+    expect($response->statusCode)->toBe(401);
+});
+
+it('returns 401 when the bearer token belongs to a pending user', function() {
+    $user = _herald_mcp_state_user('_herald_mcpstate_pending_');
+    expect($user)->not->toBeNull();
+
+    $response = _herald_mcp_state_probe((int) $user->id);
+
+    expect($response->statusCode)->toBe(401);
+});
+
+it('still authenticates an active, unlocked user', function() {
+    $user = _herald_mcp_state_user('_herald_mcpstate_active_');
+    expect($user)->not->toBeNull();
+    Craft::$app->getUsers()->activateUser($user);
+
+    $response = _herald_mcp_state_probe((int) $user->id);
+
+    expect($response->statusCode)->toBe(200);
+    Herald::getInstance()->sessions->terminate((string) $response->headers->get(Http::HEADER_SESSION_ID));
 });

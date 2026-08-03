@@ -13,8 +13,8 @@
    the view (a bare-fragment response would ship the user picker dead).
 
    Two states share one fragment:
-     1. `[data-herald-issue-form]` — the issue form (name, user, TTL).
-        Visible on open.
+     1. `[data-herald-issue-form]` — the issue form (name, user, scopes,
+        TTL). Visible on open.
      2. `[data-herald-reveal]`     — the one-time plaintext reveal.
         Hidden on open; the JS un-hides it and injects the plaintext
         into `[data-herald-token]` after `herald/settings/issue-token` returns
@@ -58,6 +58,15 @@
                 limit: 1,
                 required: true,
                 selectionLabel: 'Choose a user'|t('herald'),
+            }) }}
+
+            {{ forms.checkboxSelectField({
+                label: 'Scopes'|t('herald'),
+                instructions: 'What this token may do. A token with no scopes authorises nothing and is refused at the transport, so pick at least one. Craft permissions and the command allowlist still apply on top.'|t('herald'),
+                id: 'herald-token-scopes',
+                name: 'scopes',
+                options: scopeOptions,
+                required: true,
             }) }}
 
             {{ forms.textField({

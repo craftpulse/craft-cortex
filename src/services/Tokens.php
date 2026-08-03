@@ -8,6 +8,7 @@ use craftpulse\herald\models\Token;
 use craftpulse\herald\records\Token as TokenRecord;
 use yii\base\Component;
 use yii\base\Exception;
+use yii\web\ForbiddenHttpException;
 
 /**
  * =========================================================================
@@ -71,20 +72,52 @@ class Tokens extends Component
      * any other method on this service. `$ttlSeconds` defaults to
      * `Settings::$tokenTtlDefault` (null → no expiry) when omitted.
      *
+     * `$scopes` is the capability set the token carries, drawn from
+     * `Scopes::all()`. Unknown identifiers are dropped by
+     * `Scopes::filterKnown()`; the surviving set is persisted
+     * space-delimited in `scope`, matching the shape an OAuth access
+     * token's `scope` claim uses so `McpController::_resolveBearer()`
+     * parses both paths identically.
+     *
+     * **A token with no scopes is refused at the transport.** Passing
+     * `null` or an empty list therefore mints a token that can never
+     * authorise anything — deliberately, so an operator that forgets to
+     * choose scopes gets a hard 403 naming the omission rather than a
+     * token with silent unlimited authority. See the account-state and
+     * scope gates in `McpController::beforeAction()`.
+     *
      * Implementation note: `bin2hex(random_bytes(32))` produces a
      * 64-char lowercase hex string. The SHA-256 hex digest of that
      * string is also 64 chars by coincidence — the lookup compares
      * the hash of the caller-supplied plaintext against the stored
      * `tokenHash`, never the plaintext itself.
      *
+     * **Pro only.** The Streamable HTTP transport is the only thing that
+     * consumes a bearer token and it refuses Free installs at
+     * `McpController::beforeAction()` before any bearer work, so a token
+     * minted on Free could never authenticate anywhere. The CP screen and
+     * its issue action are already Pro-gated; this is the service-level
+     * gate, which is what the console `herald/token/issue` command hits.
+     * Refusing here rather than minting a dead credential is the
+     * difference between a clear error and a support ticket.
+     *
+     * @param string[]|null $scopes
      * @return array{token: string, model: Token}
      * @throws Exception when the underlying record fails validation or save.
+     * @throws ForbiddenHttpException when the install is not licensed for the HTTP transport.
+     * @throws \yii\base\InvalidConfigException from `Herald::getInstance()`.
      *
      * @author Craftpulse
      * @since  5.0.0
      */
-    public function issue(int $userId, string $name, ?int $ttlSeconds = null): array
+    public function issue(int $userId, string $name, ?int $ttlSeconds = null, ?array $scopes = null): array
     {
+        if (!Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
+            throw new ForbiddenHttpException(
+                'Bearer tokens require the Herald Pro edition: the HTTP transport that consumes them is Pro-only.',
+            );
+        }
+
         $ttl = $ttlSeconds ?? Herald::getInstance()->getSettings()->getTokenTtlDefault();
 
         $plaintext = $this->_generatePlaintext();
@@ -96,7 +129,7 @@ class Tokens extends Component
         $record->tokenHash = $hash;
         $record->tokenPrefix = $prefix;
         $record->userId = $userId;
-        $record->scope = null;
+        $record->scope = $this->_normalizeScopes($scopes);
         $record->expiresAt = $ttl !== null
             ? Carbon::now()->addSeconds($ttl)->toDateTimeString()
             : null;
@@ -272,6 +305,33 @@ class Tokens extends Component
 
     // Private Methods
     // =========================================================================
+
+    /**
+     * Normalise a caller-supplied scope list into the space-delimited
+     * string the `scope` column stores, or null when nothing grantable
+     * survives filtering.
+     *
+     * Null is the deny sentinel, not an "unscoped" one: the HTTP
+     * transport refuses a token whose stored scope is null. Returning
+     * null for an empty or wholly-unknown list therefore fails closed
+     * instead of minting silent unlimited authority.
+     *
+     * @param string[]|null $scopes
+     * @throws \yii\base\InvalidConfigException from `Herald::getInstance()`.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _normalizeScopes(?array $scopes): ?string
+    {
+        if ($scopes === null) {
+            return null;
+        }
+
+        $known = Herald::getInstance()->scopes->filterKnown($scopes);
+
+        return $known === [] ? null : implode(' ', $known);
+    }
 
     /**
      * Generate a fresh plaintext token. 32 bytes from the CSPRNG →

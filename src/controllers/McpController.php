@@ -3,6 +3,7 @@
 namespace craftpulse\herald\controllers;
 
 use Craft;
+use craft\elements\User;
 use craft\helpers\UrlHelper;
 use craft\web\Controller;
 use craftpulse\herald\exceptions\RateLimitExceededException;
@@ -199,9 +200,12 @@ class McpController extends Controller
         //   4. DELETE early-exit (no bearer required — see below).
         //   5. Method check (GET = 405, non-POST = 405).
         //   6. MCP-Protocol-Version header.
-        //   7. Authorization: Bearer lookup + identity binding.
-        //   8. Per-user rate limit consume (Gate 7.6).
-        //   9. parent::beforeAction() — now sees an authenticated user.
+        //   7. Authorization: Bearer lookup.
+        //   8. Account state of the bound user (401 when unusable).
+        //   9. Granted-scope presence (403 when the credential is
+        //      unscoped) + identity binding.
+        //  10. Per-user rate limit consume (Gate 7.6).
+        //  11. parent::beforeAction() — now sees an authenticated user.
 
         $settings = Herald::getInstance()->getSettings();
 
@@ -294,27 +298,54 @@ class McpController extends Controller
 
         $this->_authenticatedUserId = $resolved['userId'];
         $this->_authenticatedTokenId = $resolved['tokenId'] ?? null;
-        $this->_grantedScopes = $resolved['scopes'] ?? null;
+        $this->_grantedScopes = $resolved['scopes'];
+
+        // Gate 6b — account state. A token proves who minted it, never
+        // that the account is still allowed in: suspension, locking and
+        // deactivation all happen long after issuance, and until this
+        // gate existed they left a live token untouched. Re-checked on
+        // every authenticated request, not only at issue time.
+        //
+        // Ordered before the scope gate on purpose: "this account can no
+        // longer authenticate" (401) is the more accurate answer than
+        // "this credential grants nothing" (403) when both hold.
+        $user = $resolved['userId'] !== null
+            ? Craft::$app->getUsers()->getUserById($resolved['userId'])
+            : null;
+
+        if ($user === null || !$this->_isUsableAccount($user)) {
+            $this->_unauthorized('The account bound to this credential can no longer authenticate.');
+            return false;
+        }
+
+        // Gate 6c — the credential must carry at least one capability
+        // scope. An absent scope DENIES, it never means "unscoped,
+        // therefore allow": every bearer token minted before the
+        // 2026-08-02 remediation stored `scope = null`, so reading that
+        // as unlimited authority would have shipped the appearance of
+        // enforcement. `_parseScopes()` normalises a null column to the
+        // empty set, so a legacy row arrives here as `[]` and is refused.
+        // Those tokens have to be re-minted, which the changelog calls
+        // out as a deliberate break.
+        if ($this->_grantedScopes === []) {
+            $this->_status(403, 'This credential carries no capability scope and authorises nothing. Re-mint the token with the scopes it needs.');
+            return false;
+        }
+
         // WS2 elevation: an OAuth request is elevated only when the bound
         // user holds a live marker (minted by the `/oauth/elevate` fresh-
         // re-auth flow, keyed by user id). Resolved here server-side —
         // never from a client claim, and never from a URL-borne token.
-        $this->_elevated = $this->_authenticatedUserId !== null
-            && Herald::getInstance()->oauth->isElevated($this->_authenticatedUserId);
+        $this->_elevated = Herald::getInstance()->oauth->isElevated((int) $user->id);
 
         // Bind the resolved user onto Craft's auth surface so the
         // parent `_enforceAllowAnonymous` gate sees a non-guest, and
         // downstream permission checks (Gate 7.4 per-user filtering
         // and Pro tools that gate on Craft permissions) see the
         // bearer's identity.
-        if ($resolved['userId'] !== null) {
-            $user = Craft::$app->getUsers()->getUserById($resolved['userId']);
-            if ($user !== null) {
-                Craft::$app->getUser()->setIdentity($user);
-            }
-        }
+        Craft::$app->getUser()->setIdentity($user);
 
-        // Gate 6b — per-user rate limit. One token per authenticated
+        // Gate 6d — per-user rate limit. One token per authenticated
         // POST dispatch. DELETE already returned above, so the consume
         // only runs on the dispatch path. The HTTP rate limit is the
         // backstop against runaway agents that loop `tools/call`
@@ -458,6 +489,37 @@ class McpController extends Controller
      * Validate the `MCP-Protocol-Version` header. Returns true to
      * continue, false (with the response populated) to short-circuit.
      *
+     * ## WARNING: the response shape here is load-bearing. Do not "fix" it.
+     *
+     * Both reject paths return **HTTP 400 with a plain JSON body**
+     * (`{"error": "…"}`) via `_status()`. That is NOT a JSON-RPC error
+     * object, and it must never become one.
+     *
+     * Herald speaks the handshake-era revisions in
+     * `Server::SUPPORTED_PROTOCOL_VERSIONS` and deliberately does not
+     * implement `2026-07-28` (resolved 2026-08-02: the spec puts the
+     * entire dual-era compatibility burden on clients, and no
+     * modern-only client exists). Dual-era clients reach a legacy server
+     * by probing modern-first and falling back, and the spec's
+     * compatibility matrix defines the fallback trigger precisely:
+     *
+     *   "HTTP: the modern request returns a `4xx` without a recognized
+     *    modern error body, and the client falls back to `initialize`."
+     *   "If the body is empty or is not a recognized modern JSON-RPC
+     *    error, fall back to `initialize`."
+     *
+     * A 400 carrying an unrecognisable body is therefore exactly the
+     * signal that makes every dual-era client retry the legacy way. This
+     * handler produces it by accident, not by design.
+     *
+     * Promote it to a well-formed JSON-RPC error carrying a modern error
+     * code and those clients will classify Herald as a modern server,
+     * stop falling back, and **every one of them breaks** — with no
+     * failing test to catch it, because the suite exercises Herald's own
+     * handshake rather than a foreign client's probe. If a future change
+     * genuinely needs a JSON-RPC-shaped rejection here, it has to land
+     * together with real `2026-07-28` support, not before it.
+     *
      * @author Craftpulse
      * @since  5.0.0
      */
@@ -477,6 +539,34 @@ class McpController extends Controller
             return false;
         }
         return true;
+    }
+
+    /**
+     * Whether the account bound to a presented credential may still
+     * authenticate.
+     *
+     * A bearer token or OAuth access token is a snapshot of an
+     * authorisation decision taken at issue time. Suspension, locking
+     * and deactivation all happen afterwards, so the state has to be
+     * re-read on every request or a revoked human keeps a working
+     * machine credential for the token's whole lifetime.
+     *
+     * `getStatus()` covers suspended / pending / inactive / archived /
+     * disabled in one read. `locked` is checked separately because a
+     * locked account still reports `active` — Craft's lockout is a
+     * login-attempt counter, not a status, so relying on the status
+     * alone would let a locked account straight through.
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _isUsableAccount(User $user): bool
+    {
+        if ($user->getStatus() !== User::STATUS_ACTIVE) {
+            return false;
+        }
+
+        return !$user->locked;
     }
 
     /**
@@ -879,18 +969,23 @@ class McpController extends Controller
      * and the audit table's single `tokenId` FK slot is bearer-only
      * per the locked schema decision in the migration's docblock.
      *
-     * The OAuth path additionally carries the token's capability
-     * `scopes` (parsed from the space-delimited `scope` claim) so the
-     * dispatcher can gate `tools/list` / `tools/call` on the granted
-     * set. The bearer path leaves `scopes` null — long-lived bearer
-     * tokens are admin-issued and not scope-gated (their gating is the
-     * user-permission + edition path).
+     * Both paths carry the credential's capability `scopes`, parsed
+     * from the same space-delimited representation — the `scope` claim
+     * for OAuth, the `scope` column for bearer rows.
+     *
+     * A null or empty set is the DENY sentinel and `beforeAction()`
+     * refuses the request with 403. Bearer tokens were previously
+     * returned with `scopes: null` and read as "not scope-gated", which
+     * meant an admin-issued token carried Herald's entire tool surface
+     * while the column meant to bound it was never written. Enforcing
+     * it is the ruled behaviour; every token minted before that ruling
+     * has to be re-minted.
      *
      * The OAuth path also carries the token's `jti` so the controller
      * can check the WS2 elevation cache; the bearer path leaves it null
      * (bearer tokens have no elevation handshake).
      *
-     * @return array{userId:?int, tokenId:?int, scopes:?array<int,string>, jti:?string}|null
+     * @return array{userId:?int, tokenId:?int, scopes:array<int,string>, jti:?string}|null
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -914,13 +1009,10 @@ class McpController extends Controller
                 return null;
             }
 
-            $scopeClaim = is_string($oauthHit['scope'] ?? null) ? $oauthHit['scope'] : '';
-            $scopes = preg_split('/\s+/', trim($scopeClaim), -1, PREG_SPLIT_NO_EMPTY) ?: [];
-
             return [
                 'userId' => $oauthHit['userId'],
                 'tokenId' => null,
-                'scopes' => $scopes,
+                'scopes' => $this->_parseScopes($oauthHit['scope'] ?? null),
                 'jti' => $oauthHit['jti'] ?? null,
             ];
         }
@@ -929,7 +1021,34 @@ class McpController extends Controller
         if ($token === null) {
             return null;
         }
-        return ['userId' => $token->userId, 'tokenId' => $token->id, 'scopes' => null, 'jti' => null];
+
+        return [
+            'userId' => $token->userId,
+            'tokenId' => $token->id,
+            'scopes' => $this->_parseScopes($token->scope),
+            'jti' => null,
+        ];
+    }
+
+    /**
+     * Split a space-delimited scope representation into a list. Shared
+     * by both credential paths so an OAuth `scope` claim and a bearer
+     * row's `scope` column are read identically — divergent parsing
+     * between two auth paths is exactly how one of them ends up
+     * unenforced.
+     *
+     * @return array<int,string>
+     *
+     * @author Craftpulse
+     * @since  5.0.0
+     */
+    private function _parseScopes(mixed $raw): array
+    {
+        if (!is_string($raw) || trim($raw) === '') {
+            return [];
+        }
+
+        return preg_split('/\s+/', trim($raw), -1, PREG_SPLIT_NO_EMPTY) ?: [];
     }
 
     /**

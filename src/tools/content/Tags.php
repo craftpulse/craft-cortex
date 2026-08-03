@@ -33,6 +33,28 @@ class Tags extends AbstractTool
 
     public const MAX_LIMIT = 1000;
 
+    /**
+     * Sortable fields for the `orderBy` argument, mapped to the
+     * fully-qualified column each alias resolves to. Nothing outside
+     * this map reaches the SQL `ORDER BY` clause — see
+     * `AbstractTool::_orderBy()` for why the control is a value
+     * allowlist and not a type declaration.
+     *
+     * @var array<string,string>
+     *
+     * @since 5.0.0
+     */
+    public const SORTABLE_FIELDS = [
+        'id' => 'elements.id',
+        'uid' => 'elements.uid',
+        'title' => 'elements_sites.title',
+        'slug' => 'elements_sites.slug',
+        'groupId' => 'tags.groupId',
+        'enabled' => 'elements.enabled',
+        'dateCreated' => 'elements.dateCreated',
+        'dateUpdated' => 'elements.dateUpdated',
+    ];
+
     // Public Methods
     // =========================================================================
 
@@ -79,7 +101,11 @@ class Tags extends AbstractTool
             'relatedTo' => Schema::any()->description('Craft relation syntax.'),
             'search' => Schema::string(),
             'with' => Schema::array(Schema::string()),
-            'orderBy' => Schema::string(),
+            'orderBy' => Schema::string()
+                ->description(
+                    'Sort expression: `<field> [asc|desc]`, comma-separated for multiple ' .
+                    'fields. Sortable fields: ' . implode(', ', array_keys(self::SORTABLE_FIELDS)) . '.',
+                ),
             'limit' => Schema::integer()->minimum(1)->maximum(self::MAX_LIMIT),
             'offset' => Schema::integer()->minimum(0),
             'site' => Schema::any()->description('Site handle, id, or "*".'),
@@ -144,6 +170,7 @@ class Tags extends AbstractTool
 
     /**
      * @param string[] $eagerHandles
+     * @throws ToolException from `_orderBy()` when the sort expression is not allowlisted.
      *
      * @author Craftpulse
      * @since  5.0.0
@@ -152,14 +179,22 @@ class Tags extends AbstractTool
     {
         $query = Tag::find();
 
+        // `orderBy` is deliberately absent from this pass-through list —
+        // it lands in the SQL ORDER BY clause unquoted and goes through
+        // the `SORTABLE_FIELDS` allowlist below instead.
         foreach ([
             'id', 'uid', 'slug', 'title',
             'group', 'status', 'enabled',
-            'relatedTo', 'search', 'orderBy',
+            'relatedTo', 'search',
         ] as $param) {
             if (array_key_exists($param, $arguments)) {
                 $query->{$param}($arguments[$param]);
             }
+        }
+
+        $orderBy = $this->_orderBy($arguments, self::SORTABLE_FIELDS);
+        if ($orderBy !== null) {
+            $query->orderBy($orderBy);
         }
 
         if (isset($arguments['site'])) {

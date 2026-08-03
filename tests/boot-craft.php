@@ -183,3 +183,20 @@ $composerLoader = require CRAFT_VENDOR_PATH . '/autoload.php';
 if (is_object($composerLoader) && method_exists($composerLoader, 'addPsr4')) {
     $composerLoader->addPsr4('craftpulse\\herald\\tests\\', __DIR__ . '/');
 }
+
+// Materialise Herald's tool registry now, at the install's real edition.
+//
+// Herald's services are lazy Yii component definitions, so the registry
+// is built on FIRST access and memoized for the rest of the process —
+// and `Tools::init()` bakes in the edition it saw, because
+// `shouldRegister()` gates Pro tools. If the first access happens inside
+// a test that has pinned Pro (`McpControllerTest` pins it for the whole
+// file), every later test in the run inherits a Pro registry, including
+// the ones asserting that Pro tools are absent on Free. The suite was
+// order-dependent as a result: green or red depending on which file Pest
+// collected first.
+//
+// Touching it here makes "the registry is built at boot" literally true
+// under test, matching what the dispatcher already assumes. Tests that
+// need a Pro registry still opt in via `herald_with_pro_registry()`.
+\craftpulse\herald\Herald::getInstance()?->tools->getCount();

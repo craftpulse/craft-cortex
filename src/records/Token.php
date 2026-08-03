@@ -15,9 +15,10 @@ use craftpulse\herald\db\Table;
  * first 8 chars of the plaintext so operators can identify a row in the
  * CP listing without exposing the secret.
  *
- * Soft-delete via `dateDeleted` mirrors `RuntimeOverride`. `scope` is
- * reserved for a future fine-grained scopes mechanism (Gate 7.3 OAuth
- * + 7.4 per-user filter); the 7.2 surface ignores it and writes null.
+ * Soft-delete via `dateDeleted` mirrors `RuntimeOverride`. `scope` holds
+ * the space-delimited capability scopes the token carries and IS
+ * enforced: `McpController` refuses a credential whose scope is null or
+ * empty, so a null here denies rather than granting everything.
  * =========================================================================
  *
  * @property int $id

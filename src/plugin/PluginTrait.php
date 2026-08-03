@@ -19,6 +19,7 @@ use craftpulse\herald\generator\Tool as ToolGenerator;
 use craftpulse\herald\Herald;
 use craftpulse\herald\services\Invocations;
 use craftpulse\herald\services\Skills;
+use craftpulse\herald\tools\dev\CraftCommand;
 use craftpulse\herald\tools\support\InvocationLogger;
 use Throwable;
 use yii\base\Event;
@@ -39,10 +40,9 @@ use yii\base\Event;
  * each registration is testable in isolation if a future regression
  * forces it.
  *
- * Per `.claude/rules/architecture.md`, event registrations live here
- * rather than inline in the plugin class — keeping `Herald.php` to
- * the Plugin Store contract (`config`, `editions`, settings) and the
- * trait composition.
+ * Event registrations live here rather than inline in the plugin
+ * class, keeping `Herald.php` to the Plugin Store contract
+ * (`config`, `editions`, settings) and the trait composition.
  * =========================================================================
  *
  * @author Craftpulse
@@ -246,6 +246,12 @@ trait PluginTrait
      *   - `Herald::PERMISSION_VIEW_ACTIVITY` (`herald:view-activity`) —
      *     gates the Activity tab (Gate 9.3); the controller scopes
      *     queries to the caller's own rows when the user is non-admin.
+     *   - `CraftCommand::PERMISSION_RUN_COMMANDS` (`herald:run-commands`)
+     *     — gates the `craft_command` tool over the HTTP transport, both
+     *     its `tools/list` visibility (`filterFor()`) and its dispatch
+     *     (`execute()`). Separate from `manage-grants`, which controls
+     *     which routes are allowlisted for a user rather than whether
+     *     that user may dispatch at all.
      *
      * Shape verified against
      * `vendor/craftcms/cms/src/services/UserPermissions.php:85-96`.
@@ -288,6 +294,13 @@ trait PluginTrait
                             'info' => Craft::t(
                                 'herald',
                                 'Allows viewing the Activity tab in Herald CP. Non-admins only see their own invocations; admins see every row.',
+                            ),
+                        ],
+                        CraftCommand::PERMISSION_RUN_COMMANDS => [
+                            'label' => Craft::t('herald', 'Run Craft console commands'),
+                            'info' => Craft::t(
+                                'herald',
+                                'Allows the craft_command tool to dispatch allowlisted Craft console commands for this user over the HTTP transport. The command allowlist and allowAdminChanges still apply.',
                             ),
                         ],
                     ],
