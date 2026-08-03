@@ -17,7 +17,7 @@
      - Revoke     : POST herald/settings/revoke-token (VueAdminTable
                                                 deleteAction) → JSON {message}
 
-   The row shape is locked in `SettingsController::_serializeTokenRow`:
+   The row shape is locked in `RowSerializer::serializeToken`:
    `{id, name, tokenPrefix, user, expiresAt, lastUsedAt, dateCreated}`.
    ========================================================================= #}
 

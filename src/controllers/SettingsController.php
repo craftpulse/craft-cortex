@@ -53,6 +53,21 @@ use yii\web\Response;
  * (403 on Free) BEFORE its permission gates. Settings + Allowlist stay
  * Free. The tab map in `_cp/_layout.twig` hides the Pro tabs on Free,
  * but these gates are the enforcement; the tabs are UX.
+ *
+ * The controller is the HTTP boundary only: it gates, reads params off the
+ * request, delegates, and responds. The work sits in `web/cp/`:
+ *
+ *   - `RowSerializer`            — the four locked VueAdminTable row tuples.
+ *   - `TableParams` / `TableData` — the shared paging / search / sort path.
+ *   - `ActivityFilter`           — the audit-log filter bar plus the
+ *                                  fail-closed own-rows scope.
+ *   - `CommandToggleSubmission`  — the Settings toggle-browser payload.
+ *   - `GrantSubmission`          — the grants slideout payload.
+ *
+ * The permission handles, the edition gate and the config-file override
+ * check deliberately stay here — they are the boundary's own contract, and
+ * `tests/Controllers/SettingsControllerScaffoldingTest.php` asserts by
+ * source inspection that every action still opens with its gate.
  * =========================================================================
  *
  * @author CraftPulse
@@ -1193,6 +1208,41 @@ class SettingsController extends Controller
     // =========================================================================
 
     /**
+     * The Activity-log query filter, which also owns the fail-closed
+     * own-rows scope. Held here rather than open-coded so the scope cannot
+     * be applied out of order.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private function _activity(): ActivityFilter
+    {
+        return $this->_activity ??= new ActivityFilter();
+    }
+
+    /**
+     * Write a structured audit line for a grant issue / revoke. The MCP
+     * invocation-audit pipeline covers tool calls, not CP admin actions,
+     * so grant lifecycle events are logged here through Craft's logger
+     * under the `herald` category (the same channel `Invocations` uses as
+     * its secondary trail), capturing the actor, subject, and scope.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private function _auditGrant(string $action, int $grantId, ?string $pattern, ?int $subjectUserId, ?int $actorId): void
+    {
+        Craft::info(sprintf(
+            'grant %s: id=%d pattern=%s subjectUserId=%s actorUserId=%s',
+            $action,
+            $grantId,
+            $pattern ?? '-',
+            $subjectUserId === null ? 'global' : (string) $subjectUserId,
+            $actorId === null ? '-' : (string) $actorId,
+        ), 'herald');
+    }
+
+    /**
      * Throw unless the install is Pro. Tokens / Activity / Connection
      * are Pro surfaces (PLANNING.md §4 — they exist to operate the
      * Pro-only HTTP transport); the registry's `shouldRegister()` gate
@@ -1213,6 +1263,19 @@ class SettingsController extends Controller
         if (!Herald::getInstance()->is(Herald::EDITION_PRO, '>=')) {
             throw new ForbiddenHttpException('This feature requires the Herald Pro edition.');
         }
+    }
+
+    /**
+     * The VueAdminTable view-model mapper. Every locked row tuple the CP
+     * tables consume is built there, not here, so the controller stays an
+     * HTTP boundary and each table shape is asserted in one place.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    private function _rows(): RowSerializer
+    {
+        return $this->_rows ??= new RowSerializer();
     }
 
     /**
@@ -1243,54 +1306,6 @@ class SettingsController extends Controller
             ],
             $scopes->all(),
         );
-    }
-
-    /**
-     * Write a structured audit line for a grant issue / revoke. The MCP
-     * invocation-audit pipeline covers tool calls, not CP admin actions,
-     * so grant lifecycle events are logged here through Craft's logger
-     * under the `herald` category (the same channel `Invocations` uses as
-     * its secondary trail), capturing the actor, subject, and scope.
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _auditGrant(string $action, int $grantId, ?string $pattern, ?int $subjectUserId, ?int $actorId): void
-    {
-        Craft::info(sprintf(
-            'grant %s: id=%d pattern=%s subjectUserId=%s actorUserId=%s',
-            $action,
-            $grantId,
-            $pattern ?? '-',
-            $subjectUserId === null ? 'global' : (string) $subjectUserId,
-            $actorId === null ? '-' : (string) $actorId,
-        ), 'herald');
-    }
-
-    /**
-     * The VueAdminTable view-model mapper. Every locked row tuple the CP
-     * tables consume is built there, not here, so the controller stays an
-     * HTTP boundary and each table shape is asserted in one place.
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _rows(): RowSerializer
-    {
-        return $this->_rows ??= new RowSerializer();
-    }
-
-    /**
-     * The Activity-log query filter, which also owns the fail-closed
-     * own-rows scope. Held here rather than open-coded so the scope cannot
-     * be applied out of order.
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _activity(): ActivityFilter
-    {
-        return $this->_activity ??= new ActivityFilter();
     }
 
     /**

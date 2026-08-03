@@ -16,7 +16,7 @@
      - Revoke     : POST herald/settings/revoke-client (VueAdminTable
                                                 deleteAction) → JSON {message}
 
-   The row shape is locked in `SettingsController::_serializeClientRow`:
+   The row shape is locked in `RowSerializer::serializeClient`:
    `{id, clientName, clientId, type, approved, redirectUris, dateCreated}`.
    ========================================================================= #}
 

@@ -15,7 +15,7 @@
      - Table data : GET herald/settings/activity-table-data → JSON {pagination, data}
      - Row detail : GET herald/settings/activity-row?id=<id> → JSON {html}
 
-   The row shape is locked in `SettingsController::_serializeActivityRow`:
+   The row shape is locked in `RowSerializer::serializeActivity`:
    `{id, tool: {id, tool, mode}, kind, user, durationMs, dateCreated}` —
    the tool cell is a composite because VueAdminTable column callbacks
    receive only the cell value, never the row.

@@ -236,7 +236,7 @@ it('the activity detail slideout partial compiles and renders the redacted colum
     // The slideout partial is the console-renderable surface (no
     // `_layouts/cp` chrome). `mode` / `argsPretty` / `responsePretty`
     // are pre-computed by `actionActivityRow` (PHP-side tolerant decode
-    // — see `_prettyRedactedColumn`), so they are passed here the same
+    // — see `RowSerializer::prettyJson`), so they are passed here the same
     // way. The full-page index template is browser-smoke-verified per
     // the gate-9.3 plan (it depends on `_layouts/cp`, which needs a web
     // request the console harness cannot supply).

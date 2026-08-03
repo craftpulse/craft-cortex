@@ -20,7 +20,7 @@
    Internal route paths, permission names, controller action names, and the
    `herald_runtime_overrides` table keep the `allowlist` / `override`
    wording. The row shape is locked in
-   `SettingsController::_serializeOverrideRow`:
+   `RowSerializer::serializeOverride`:
    `{id, pattern, note, expiresAt, createdBy, subject, dateCreated}`.
 
    Data path:

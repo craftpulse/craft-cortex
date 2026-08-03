@@ -180,7 +180,7 @@ it('declares the four Allowlist endpoints', function() {
 it('actionAllowlistTableData returns the locked {pagination, data} contract', function() {
     // Seed three overrides: one active, one expired, one with a null
     // expiry ("never expires"). Exercises every branch of
-    // _serializeOverrideRow.
+    // RowSerializer::serializeOverride.
     Herald::getInstance()->allowlist->add(pattern: 'resave/*', userId: null, note: 'baseline', ttlSeconds: 3600);
     Herald::getInstance()->allowlist->add(pattern: 'mailer/test', userId: null, note: 'ticket-1', ttlSeconds: 3600);
     Herald::getInstance()->allowlist->add(pattern: 'up', userId: null, note: null, ttlSeconds: 3600);
