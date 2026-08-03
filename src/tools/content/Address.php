@@ -10,6 +10,8 @@ use craftpulse\herald\attributes\IsDestructive;
 use craftpulse\herald\attributes\IsIdempotent;
 use craftpulse\herald\attributes\Title;
 use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\ContextAwareToolInterface;
+use craftpulse\herald\tools\ElevationGatedToolTrait;
 use craftpulse\herald\tools\IdempotencyTrait;
 use craftpulse\herald\tools\PermissionedToolTrait;
 use craftpulse\herald\tools\ProToolTrait;
@@ -75,8 +77,9 @@ use Throwable;
 #[IsDestructive]
 #[IsIdempotent(false)]
 #[Title('Address — list / get / create / update / delete (user-owned)')]
-class Address extends AbstractTool
+class Address extends AbstractTool implements ContextAwareToolInterface
 {
+    use ElevationGatedToolTrait;
     use IdempotencyTrait;
     use PermissionedToolTrait;
     use ProToolTrait;
@@ -554,6 +557,7 @@ class Address extends AbstractTool
     private function _delete(array $arguments): array
     {
         $this->_assertPermission($arguments);
+        $this->_assertElevated('deleting an address');
 
         $element = $this->_resolveAddress($arguments);
 

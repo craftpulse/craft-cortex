@@ -15,6 +15,8 @@ use craftpulse\herald\attributes\IsDestructive;
 use craftpulse\herald\attributes\IsIdempotent;
 use craftpulse\herald\attributes\Title;
 use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\ContextAwareToolInterface;
+use craftpulse\herald\tools\ElevationGatedToolTrait;
 use craftpulse\herald\tools\IdempotencyTrait;
 use craftpulse\herald\tools\PermissionedToolTrait;
 use craftpulse\herald\tools\ProToolTrait;
@@ -103,8 +105,9 @@ use Throwable;
 #[IsDestructive]
 #[IsIdempotent(false)]
 #[Title('Bulk Entries — query-driven set_status / update_fields / relate / migrate')]
-class BulkEntries extends AbstractTool implements StreamableToolInterface
+class BulkEntries extends AbstractTool implements ContextAwareToolInterface, StreamableToolInterface
 {
+    use ElevationGatedToolTrait;
     use IdempotencyTrait;
     use PermissionedToolTrait;
     use ProToolTrait;
@@ -338,7 +341,14 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
      */
     public function execute(array $arguments): array
     {
-        $ctx = new InvocationContext();
+        // Reuse the context the dispatcher injected. `InvocationContext`
+        // defaults to stdio, and stdio is implicitly elevated, so
+        // fabricating a fresh one here would hand an un-elevated HTTP
+        // JSON `tools/call` a free pass through the elevation gate on
+        // `set_status`. Null is a direct call that bypassed the
+        // dispatcher entirely (tests, console), which keeps the stdio
+        // default.
+        $ctx = $this->_dispatchContext() ?? new InvocationContext();
         $gen = $this->stream($arguments, $ctx);
 
         // Drain progress frames — they're for the streaming surface.
@@ -532,6 +542,9 @@ class BulkEntries extends AbstractTool implements StreamableToolInterface
         }
 
         $this->_assertCoarsePermission($arguments);
+        // Explicit context: the dispatcher hands a streaming tool its
+        // context through `stream()`, not `setInvocationContext()`.
+        $this->_assertElevated('changing the publication status of content', $ctx);
 
         $query = $this->_buildQuery($arguments);
         $total = $this->_preflightCount($query);

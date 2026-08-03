@@ -28,7 +28,9 @@
 use craft\elements\Category as CategoryElement;
 use craft\elements\User;
 use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
 use craftpulse\herald\tools\content\Category;
+use craftpulse\herald\tools\support\InvocationContext;
 use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
@@ -62,10 +64,21 @@ afterEach(function() {
 
 /**
  * Direct instantiation sidesteps the boot-time registry gate.
+ *
+ * A stdio context is injected so the shared elevation gate on the
+ * `delete` mode has a transport signal. stdio is the trusted local
+ * transport and is implicitly elevated, matching how the dispatcher
+ * behaves for stdio dispatch. HTTP tests pass the transport (which is
+ * un-elevated) or `elevated: true` explicitly.
  */
-function _herald_category_tool(): Category
-{
-    return new Category();
+function _herald_category_tool(
+    string $transport = Server::TRANSPORT_STDIO,
+    bool $elevated = false,
+): Category {
+    $tool = new Category();
+    $tool->setInvocationContext(new InvocationContext(transport: $transport, elevated: $elevated));
+
+    return $tool;
 }
 
 /**
@@ -477,4 +490,60 @@ it('create mode throws ToolException for a user without saveCategories permissio
         Craft::$app->getUser()->setIdentity($this->admin);
         Craft::$app->getElements()->deleteElement($user, hardDelete: true);
     }
+});
+
+// -----------------------------------------------------------------------------
+// Elevation gate on delete
+// -----------------------------------------------------------------------------
+
+it('refuses a delete over un-elevated HTTP', function() {
+    $group = _herald_category_group();
+    if ($group === null) {
+        $this->markTestSkipped('No category groups in the playground.');
+    }
+
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
+        $created = _herald_category_tool()->execute([
+            'mode' => 'create',
+            'groupHandle' => $group->handle,
+            'title' => $this->fixturePrefix . 'elev',
+        ]);
+        $id = $created['category']['id'];
+
+        $caught = null;
+        try {
+            _herald_category_tool(Server::TRANSPORT_HTTP)->execute(['mode' => 'delete', 'id' => $id]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->toBeInstanceOf(ToolException::class);
+        expect($caught->getMessage())
+            ->toContain('requires elevation')
+            ->toContain('/oauth/elevate');
+
+        expect(CategoryElement::find()->id($id)->status(null)->one())
+            ->toBeInstanceOf(CategoryElement::class);
+    });
+});
+
+it('allows a delete over elevated HTTP', function() {
+    $group = _herald_category_group();
+    if ($group === null) {
+        $this->markTestSkipped('No category groups in the playground.');
+    }
+
+    herald_with_edition(Herald::EDITION_PRO, function() use ($group) {
+        $created = _herald_category_tool()->execute([
+            'mode' => 'create',
+            'groupHandle' => $group->handle,
+            'title' => $this->fixturePrefix . 'elevok',
+        ]);
+        $id = $created['category']['id'];
+
+        $deleted = _herald_category_tool(Server::TRANSPORT_HTTP, elevated: true)
+            ->execute(['mode' => 'delete', 'id' => $id]);
+
+        expect($deleted['success'])->toBeTrue();
+    });
 });

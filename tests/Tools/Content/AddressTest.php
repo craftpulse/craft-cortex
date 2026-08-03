@@ -32,7 +32,9 @@
 use craft\elements\Address as AddressElement;
 use craft\elements\User;
 use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
 use craftpulse\herald\tools\content\Address;
+use craftpulse\herald\tools\support\InvocationContext;
 use craftpulse\herald\tools\ToolException;
 
 // -----------------------------------------------------------------------------
@@ -82,10 +84,21 @@ afterEach(function() {
 
 /**
  * Direct instantiation sidesteps the boot-time registry gate.
+ *
+ * A stdio context is injected so the shared elevation gate on the
+ * `delete` mode has a transport signal. stdio is the trusted local
+ * transport and is implicitly elevated, matching how the dispatcher
+ * behaves for stdio dispatch. HTTP tests pass the transport (which is
+ * un-elevated) or `elevated: true` explicitly.
  */
-function _herald_address_tool(): Address
-{
-    return new Address();
+function _herald_address_tool(
+    string $transport = Server::TRANSPORT_STDIO,
+    bool $elevated = false,
+): Address {
+    $tool = new Address();
+    $tool->setInvocationContext(new InvocationContext(transport: $transport, elevated: $elevated));
+
+    return $tool;
 }
 
 /**
@@ -631,4 +644,41 @@ it('create mode throws ToolException for a user without editUsers permission', f
     } finally {
         Craft::$app->getUser()->setIdentity($this->admin);
     }
+});
+
+// -----------------------------------------------------------------------------
+// Elevation gate on delete
+// -----------------------------------------------------------------------------
+
+it('refuses a delete over un-elevated HTTP', function() {
+    $owner = _herald_address_user($this->fixturePrefix);
+    if ($owner === null) {
+        $this->markTestSkipped('Could not create fixture user for the elevation test.');
+    }
+
+    herald_with_edition(Herald::EDITION_PRO, function() use ($owner) {
+        $created = _herald_address_tool()->execute([
+            'mode' => 'create',
+            'title' => $this->fixturePrefix . 'label',
+            'ownerId' => $owner->id,
+            'countryCode' => 'US',
+            'addressLine1' => $this->fixturePrefix . 'elev',
+        ]);
+        $id = $created['address']['id'];
+
+        $caught = null;
+        try {
+            _herald_address_tool(Server::TRANSPORT_HTTP)->execute(['mode' => 'delete', 'id' => $id]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->toBeInstanceOf(ToolException::class);
+        expect($caught->getMessage())
+            ->toContain('requires elevation')
+            ->toContain('/oauth/elevate');
+
+        expect(AddressElement::find()->id($id)->status(null)->one())
+            ->toBeInstanceOf(AddressElement::class);
+    });
 });

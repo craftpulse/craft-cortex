@@ -10,6 +10,8 @@ use craftpulse\herald\attributes\IsDestructive;
 use craftpulse\herald\attributes\IsIdempotent;
 use craftpulse\herald\attributes\Title;
 use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\ContextAwareToolInterface;
+use craftpulse\herald\tools\ElevationGatedToolTrait;
 use craftpulse\herald\tools\IdempotencyTrait;
 use craftpulse\herald\tools\ProToolTrait;
 use craftpulse\herald\tools\support\ElementSerializer;
@@ -54,8 +56,9 @@ use craftpulse\herald\tools\ToolException;
 #[IsDestructive]
 #[IsIdempotent(false)]
 #[Title('Tag — create / update / delete (admin only)')]
-class Tag extends AbstractTool
+class Tag extends AbstractTool implements ContextAwareToolInterface
 {
+    use ElevationGatedToolTrait;
     use IdempotencyTrait;
     use ProToolTrait;
 
@@ -341,6 +344,8 @@ class Tag extends AbstractTool
      */
     private function _delete(array $arguments): array
     {
+        $this->_assertElevated('deleting a tag');
+
         $element = $this->_resolveTag($arguments);
 
         $hardDelete = (bool) ($arguments['hardDelete'] ?? false);

@@ -32,7 +32,7 @@
 - Added capability scopes on every HTTP credential: `content:read`, `content:write`, `assets:write`, `schema:read`, `system:read`, `system:write`, `users:read`, and `users:write`. A credential carrying no scope authorises nothing.
 - Added refresh-token rotation with family-lineage theft detection, so presenting an already-consumed refresh token revokes the whole family and records a security audit row.
 - Added an approval gate for self-registered OAuth clients, which start unapproved until an admin approves them on the **Clients** screen, with `dcrAutoApprove` to opt out.
-- Added an in-band `/oauth/elevate` re-authentication flow, required over HTTP for password, email, and admin-status changes on the `users` tool and for publishing or deleting content. It never unlocks `craft_exec`.
+- Added an in-band `/oauth/elevate` re-authentication flow, required over HTTP for password, email, and admin-status changes on the `users` tool, for publication-status changes on `entry` and `bulk_entries`, and for the `delete` mode of every write tool. It never unlocks `craft_exec`.
 - Added dispatcher-level validation of tool arguments against each tool's declared JSON Schema, evaluated against `inputSchemaFor()` so per-user mode narrowing is enforced too. Non-conforming calls return an `isError: true` envelope.
 - Added account-state re-checking on every authenticated request, so a suspended, locked, pending, or inactive account is refused with `401` rather than trusted from issuance.
 - Added per-user rate limiting on the HTTP transport, with a `kind=rate_limited` audit row and a `Retry-After` header on exhaustion.

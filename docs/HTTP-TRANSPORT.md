@@ -148,7 +148,7 @@ Per RFC 7009 §2.2 the endpoint returns 200 whether or not the token was known, 
 
 Craft's control panel guards credential and destructive operations behind an elevated session, meaning the user re-enters their password. Herald brings the same posture to HTTP with an in-band elevation flow, because the HTTP transport has no other re-authentication step.
 
-The operations that require elevation over HTTP are password, email and admin-flag changes on the `users` tool, toggling an entry's publication status, and deleting an element. Attempting one without elevation returns a tool error naming the flow.
+Three families of operation require elevation over HTTP. Credential and privilege changes: password, email and admin-flag changes on the `users` tool. Publication-status changes: the `enabled` flag on the `entry` tool's `create` and `update` modes, and the `bulk_entries` tool's `set_status` mode. Element deletes: the `delete` mode on every write tool, which is `entry`, `category`, `tag`, `address`, `skill` and `users`. Attempting one without elevation returns a tool error naming the flow.
 
 To elevate, the user opens `/oauth/elevate` in a browser, where Herald requires a live Craft session, calls Craft's own `requireElevatedSession()` for a fresh password re-entry, verifies the credential belongs to the signed-in user, and mints a short-lived elevation marker held server-side for `elevationTtl` seconds (300 by default).
 

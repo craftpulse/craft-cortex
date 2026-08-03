@@ -12,13 +12,12 @@ use craftpulse\herald\attributes\IsDestructive;
 use craftpulse\herald\attributes\IsIdempotent;
 use craftpulse\herald\attributes\Title;
 use craftpulse\herald\Herald;
-use craftpulse\herald\mcp\Server;
 use craftpulse\herald\tools\AbstractTool;
 use craftpulse\herald\tools\ContextAwareToolInterface;
+use craftpulse\herald\tools\ElevationGatedToolTrait;
 use craftpulse\herald\tools\IdempotencyTrait;
 use craftpulse\herald\tools\PermissionedToolTrait;
 use craftpulse\herald\tools\ProToolTrait;
-use craftpulse\herald\tools\support\InvocationContext;
 use craftpulse\herald\tools\support\Schema;
 use craftpulse\herald\tools\ToolException;
 use DateTimeInterface;
@@ -97,10 +96,10 @@ use Throwable;
  * Self-edit carve-outs:
  *   - `User::canSave` returns true for self at line 1798. The
  *     sensitive-field gate excludes `email`/`username` for self-edit
- *     (mirroring `UsersController::actionSaveUser` line 1650). The
- *     elevated-session model that Craft's CP wraps around self-email
- *     and self-password mutations does not exist on the MCP HTTP
- *     transport — documented as a follow-up gap.
+ *     (mirroring `UsersController::actionSaveUser` line 1650). Over
+ *     HTTP the same mutations additionally require elevation, the
+ *     transport-level stand-in for the elevated session Craft's CP
+ *     wraps around them.
  *   - `newPassword` on self does NOT require `administrateUsers`
  *     (mirroring `UsersController::actionSaveUser` line 1703). Non-
  *     self `newPassword` does.
@@ -121,10 +120,6 @@ use Throwable;
  *     Pro tool.
  *
  * Known gaps documented for future work:
- *   - HTTP transport has no elevated-session model. Craft's CP
- *     requires elevation for email / password / admin-promotion
- *     mutations — Herald accepts this for 8.5 and defers the
- *     elevation model to a later gate.
  *   - `inheritorOnDelete` is deprecated in Craft 5.10.0 with no
  *     replacement yet shipped. Single seam in `_delete()` — swap when
  *     the successor lands.
@@ -138,6 +133,7 @@ use Throwable;
 #[Title('Users — list / get / create / update / delete with PII gating')]
 class Users extends AbstractTool implements ContextAwareToolInterface
 {
+    use ElevationGatedToolTrait;
     use IdempotencyTrait;
     use PermissionedToolTrait;
     use ProToolTrait;
@@ -225,32 +221,8 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      */
     public const ELEVATION_REQUIRED_FIELDS = ['newPassword', 'email', 'admin'];
 
-    // Private Properties
-    // =========================================================================
-
-    /**
-     * @var InvocationContext|null Per-invocation context injected by the
-     *                             dispatcher via `setInvocationContext()`
-     *                             immediately before `execute()`. Null on
-     *                             call paths that bypass the dispatcher
-     *                             injection — those are treated as HTTP
-     *                             (fail closed) by the transport gate.
-     */
-    private ?InvocationContext $_invocationContext = null;
-
     // Public Methods
     // =========================================================================
-
-    /**
-     * @inheritdoc
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    public function setInvocationContext(InvocationContext $ctx): void
-    {
-        $this->_invocationContext = $ctx;
-    }
 
     /**
      * @inheritdoc
@@ -324,7 +296,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
             'suspended' => Schema::boolean()->description('Suspend / unsuspend. Requires administrateUsers; silently ignored on `create` without it.'),
             'pending' => Schema::boolean()->description('Pending state. Requires administrateUsers; silently ignored on `create` without it (defaults to pending=true).'),
             'newPassword' => Schema::string()
-                ->description('Set a new password. Update only; never returned. Self-edit allowed without administrateUsers (matches UsersController::actionSaveUser line 1703); non-self requires administrateUsers. Elevated-session caveat: Craft\'s CP requires elevation for self-password changes — MCP HTTP transport has no elevation today, documented as a follow-up gap.'),
+                ->description('Set a new password. Update only; never returned. Self-edit allowed without administrateUsers (matches UsersController::actionSaveUser line 1703); non-self requires administrateUsers. Over the HTTP transport this field additionally requires elevation via the /oauth/elevate flow; stdio is implicitly elevated.'),
 
             // Group membership (replacement list).
             'groupUids' => Schema::array(Schema::string())
@@ -497,12 +469,11 @@ class Users extends AbstractTool implements ContextAwareToolInterface
      * `/oauth/elevate` fresh-re-auth flow); otherwise they are refused
      * with an error naming the elevation flow.
      *
-     * Keys on the real `InvocationContext` threaded from the dispatcher
-     * — never inferred from a proxy. stdio is implicitly elevated
-     * (`InvocationContext::$elevated` is true for stdio), so it always
-     * passes. Fails closed: when no context was injected (transport
-     * indeterminate) the request is treated as un-elevated HTTP and
-     * refused.
+     * This method resolves *whether* the gate applies; the gate itself
+     * is `ElevationGatedToolTrait::_assertElevated()`, shared with the
+     * `entry` tool's publish and delete paths. It used to be
+     * hand-copied here, which meant two implementations of the same
+     * fail-closed rule and one of them free to drift.
      *
      * No-op when none of the guarded fields are present, so non-
      * sensitive create / update operations (custom fields, name
@@ -526,19 +497,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
             return;
         }
 
-        // Fail closed — only an elevated context is exempt. stdio is the
-        // trusted local transport and is implicitly elevated; HTTP
-        // requires the elevation marker minted by `/oauth/elevate`.
-        $ctx = $this->_invocationContext;
-        if ($ctx !== null && ($ctx->elevated || $ctx->transport === Server::TRANSPORT_STDIO)) {
-            return;
-        }
-
-        throw new ToolException(
-            'users: changing password/email/admin status over the HTTP transport requires ' .
-                'elevation. Re-authenticate via the /oauth/elevate flow, then retry. ' .
-                '(Over the trusted stdio transport this is always permitted.)'
-        );
+        $this->_assertElevated('changing a password, email address, or admin status');
     }
 
     /**
@@ -825,6 +784,7 @@ class Users extends AbstractTool implements ContextAwareToolInterface
     private function _delete(array $arguments): array
     {
         $this->_assertPermission($arguments);
+        $this->_assertElevated('deleting a user');
 
         $element = $this->_resolveUser($arguments);
         $caller = Craft::$app->getUser()->getIdentity();

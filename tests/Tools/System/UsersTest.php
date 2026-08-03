@@ -1258,3 +1258,49 @@ it('does not refuse a non-sensitive create over the HTTP transport', function() 
         }
     });
 });
+
+// -----------------------------------------------------------------------------
+// Elevation gate on delete
+// -----------------------------------------------------------------------------
+
+it('refuses a delete over un-elevated HTTP', function() {
+    // Deleting a user is at least as high-stakes as changing that user's
+    // email, which has required elevation since WS2. The asymmetry was
+    // closed on 2026-08-03; this is its regression anchor.
+    $target = _herald_users_user($this->fixturePrefix, 'elevdelete');
+    if ($target === null) {
+        $this->markTestSkipped('Could not create elevation-test target.');
+    }
+    $id = (int) $target->id;
+
+    herald_with_edition(Herald::EDITION_PRO, function() use ($id) {
+        $caught = null;
+        try {
+            _herald_users_tool(Server::TRANSPORT_HTTP)->execute(['mode' => 'delete', 'id' => $id]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->toBeInstanceOf(ToolException::class);
+        expect($caught->getMessage())
+            ->toContain('requires elevation')
+            ->toContain('/oauth/elevate');
+
+        expect(User::find()->id($id)->status(null)->one())->toBeInstanceOf(User::class);
+    });
+});
+
+it('allows a delete over elevated HTTP', function() {
+    $target = _herald_users_user($this->fixturePrefix, 'elevdeleteok');
+    if ($target === null) {
+        $this->markTestSkipped('Could not create elevation-test target.');
+    }
+    $id = (int) $target->id;
+
+    herald_with_edition(Herald::EDITION_PRO, function() use ($id) {
+        $result = _herald_users_tool(Server::TRANSPORT_HTTP, elevated: true)
+            ->execute(['mode' => 'delete', 'id' => $id]);
+
+        expect($result['success'])->toBeTrue();
+    });
+});

@@ -150,7 +150,7 @@ The OAuth access-token and refresh-token lifetimes. Refresh tokens rotate on eve
 
 **Type:** `int` (seconds) &nbsp;&nbsp; **Default:** `300` (5 minutes)
 
-Lifetime of an elevation marker minted by the in-band `/oauth/elevate` re-authentication flow. After a fresh Craft re-auth, high-stakes operations over HTTP (credential, email and admin-status mutations on `users`, plus content publish and delete) are permitted for this window. Tracked server-side, never trusted from a client claim. `craft_exec` is **never** unlocked by elevation. See [SECURITY.md](SECURITY.md).
+Lifetime of an elevation marker minted by the in-band `/oauth/elevate` re-authentication flow. After a fresh Craft re-auth, high-stakes operations over HTTP (credential, email and admin-status mutations on `users`, publication-status changes on `entry` and `bulk_entries`, and the `delete` mode on every write tool) are permitted for this window. Tracked server-side, never trusted from a client claim. `craft_exec` is **never** unlocked by elevation. See [SECURITY.md](SECURITY.md).
 
 ### `tokenTtlDefault`
 

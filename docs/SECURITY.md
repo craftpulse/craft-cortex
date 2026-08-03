@@ -85,12 +85,12 @@ List filtering is tool-selection UX. The `execute()` check is the security bound
 Craft's own control panel guards certain operations behind an **elevated session**, meaning the user re-enters their password. The HTTP transport has no other re-authentication step, so Herald adds an in-band elevation flow and gates the same operations behind it:
 
 - **`users` credential and privilege fields**: changing a password (`newPassword`), changing an email address (`email`), or granting or modifying admin status (`admin`).
-- **Content publication status**: toggling `enabled` on the `entry` tool's `create` and `update` modes.
-- **Content deletes**: the `entry` tool's `delete` mode.
+- **Content publication status**: toggling `enabled` on the `entry` tool's `create` and `update` modes, and the `bulk_entries` tool's `set_status` mode.
+- **Element deletes**: the `delete` mode on every write tool, which is `entry`, `category`, `tag`, `address`, `skill` and `users`. Deleting a user is at least as high-stakes as changing that user's email, so the gate covers the whole family rather than content entries alone.
 
 Attempting one of these over HTTP without elevation returns a tool error naming the flow:
 
-> `users: changing password/email/admin status over the HTTP transport requires elevation. Re-authenticate via the /oauth/elevate flow, then retry.`
+> `Deleting a user over the HTTP transport requires elevation. Re-authenticate via the /oauth/elevate flow, then retry. (Over the trusted stdio transport this is always permitted.)`
 
 The flow itself is documented in [HTTP transport](HTTP-TRANSPORT.md#elevation-for-high-stakes-operations). Elevation is tracked server-side and never trusted from a client claim. When the invocation context cannot be determined, the request is treated as un-elevated HTTP and refused. stdio is implicitly elevated and never gated.
 

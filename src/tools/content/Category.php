@@ -10,6 +10,8 @@ use craftpulse\herald\attributes\IsDestructive;
 use craftpulse\herald\attributes\IsIdempotent;
 use craftpulse\herald\attributes\Title;
 use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\ContextAwareToolInterface;
+use craftpulse\herald\tools\ElevationGatedToolTrait;
 use craftpulse\herald\tools\IdempotencyTrait;
 use craftpulse\herald\tools\PermissionedToolTrait;
 use craftpulse\herald\tools\ProToolTrait;
@@ -67,8 +69,9 @@ use craftpulse\herald\tools\ToolException;
 #[IsDestructive]
 #[IsIdempotent(false)]
 #[Title('Category — create / update / delete')]
-class Category extends AbstractTool
+class Category extends AbstractTool implements ContextAwareToolInterface
 {
+    use ElevationGatedToolTrait;
     use IdempotencyTrait;
     use PermissionedToolTrait;
     use ProToolTrait;
@@ -477,6 +480,7 @@ class Category extends AbstractTool
         $group = $element->getGroup();
 
         $this->_assertPermission($arguments + ['groupUid' => $group->uid]);
+        $this->_assertElevated('deleting a category');
 
         $hardDelete = (bool) ($arguments['hardDelete'] ?? false);
 

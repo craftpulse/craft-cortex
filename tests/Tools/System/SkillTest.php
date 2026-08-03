@@ -33,6 +33,8 @@
 use craft\elements\User;
 use craftpulse\herald\elements\Skill as SkillElement;
 use craftpulse\herald\Herald;
+use craftpulse\herald\mcp\Server;
+use craftpulse\herald\tools\support\InvocationContext;
 use craftpulse\herald\tools\system\Skill;
 use craftpulse\herald\tools\ToolException;
 
@@ -79,9 +81,23 @@ afterEach(function() {
 // Helpers
 // -----------------------------------------------------------------------------
 
-function _herald_skill_tool(): Skill
-{
-    return new Skill();
+/**
+ * Direct instantiation sidesteps the boot-time registry gate.
+ *
+ * A stdio context is injected so the shared elevation gate on the
+ * `delete` mode has a transport signal. stdio is the trusted local
+ * transport and is implicitly elevated, matching how the dispatcher
+ * behaves for stdio dispatch. HTTP tests pass the transport (which is
+ * un-elevated) or `elevated: true` explicitly.
+ */
+function _herald_skill_tool(
+    string $transport = Server::TRANSPORT_STDIO,
+    bool $elevated = false,
+): Skill {
+    $tool = new Skill();
+    $tool->setInvocationContext(new InvocationContext(transport: $transport, elevated: $elevated));
+
+    return $tool;
 }
 
 // -----------------------------------------------------------------------------
@@ -633,5 +649,31 @@ it('appears in the Pro registry tools/list payload with annotations', function()
         expect($payload)->toBeMcpToolListItem();
         expect($payload['inputSchema']['properties']['mode']['enum'])
             ->toContain('list', 'get', 'create', 'update', 'delete');
+    });
+});
+
+// -----------------------------------------------------------------------------
+// Elevation gate on delete
+// -----------------------------------------------------------------------------
+
+it('refuses a delete over un-elevated HTTP', function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $handle = $this->fixturePrefix . 'elev';
+        $created = _herald_skill_tool()->execute(['mode' => 'create', 'handle' => $handle, 'title' => 'elev']);
+        $id = $created['skill']['id'];
+
+        $caught = null;
+        try {
+            _herald_skill_tool(Server::TRANSPORT_HTTP)->execute(['mode' => 'delete', 'id' => $id]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->toBeInstanceOf(ToolException::class);
+        expect($caught->getMessage())
+            ->toContain('requires elevation')
+            ->toContain('/oauth/elevate');
+
+        expect(SkillElement::find()->status(null)->id($id)->one())->toBeInstanceOf(SkillElement::class);
     });
 });

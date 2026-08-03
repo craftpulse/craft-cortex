@@ -964,3 +964,63 @@ it('partial section permission with onPermissionDenied=fail aborts on first deni
         }
     });
 });
+
+// -----------------------------------------------------------------------------
+// Elevation gate on set_status
+// -----------------------------------------------------------------------------
+
+it('refuses set_status over un-elevated HTTP', function() {
+    // A bulk publish is the single-entry `entry` publish gate applied N
+    // times, so it carries the same elevation requirement. The gate reads
+    // the context threaded through `stream()`, not a fabricated one.
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(2);
+
+        $tool = _herald_bulk_tool();
+        $tool->setInvocationContext(new InvocationContext(transport: Server::TRANSPORT_HTTP));
+
+        $caught = null;
+        try {
+            $tool->execute([
+                'mode' => 'set_status',
+                'status' => 'disabled',
+                'query' => ['ids' => $ids],
+            ]);
+        } catch (ToolException $e) {
+            $caught = $e;
+        }
+
+        expect($caught)->toBeInstanceOf(ToolException::class);
+        expect($caught->getMessage())
+            ->toContain('requires elevation')
+            ->toContain('/oauth/elevate');
+
+        // Nothing was written — the gate runs before the loop.
+        foreach ($ids as $id) {
+            $entry = EntryElement::find()->id($id)->status(null)->one();
+            expect($entry)->toBeInstanceOf(EntryElement::class);
+            expect($entry->enabled)->toBeTrue();
+        }
+    });
+});
+
+it('allows set_status over elevated HTTP', function() {
+    herald_with_edition(Herald::EDITION_PRO, function() {
+        $ids = _herald_bulk_first_ids(2);
+
+        $tool = _herald_bulk_tool();
+        $tool->setInvocationContext(new InvocationContext(
+            transport: Server::TRANSPORT_HTTP,
+            elevated: true,
+        ));
+
+        $result = $tool->execute([
+            'mode' => 'set_status',
+            'status' => 'disabled',
+            'query' => ['ids' => $ids],
+        ]);
+
+        expect($result['success'])->toBeTrue();
+        expect($result['succeeded'])->toBe(2);
+    });
+});

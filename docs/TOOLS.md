@@ -1494,7 +1494,7 @@ Write tool for Craft users with PII gating. Modes: list / get / create / update 
         },
         "newPassword": {
             "type": "string",
-            "description": "Set a new password. Update only; never returned. Self-edit allowed without administrateUsers (matches UsersController::actionSaveUser line 1703); non-self requires administrateUsers. Elevated-session caveat: Craft's CP requires elevation for self-password changes \u2014 MCP HTTP transport has no elevation today, documented as a follow-up gap."
+            "description": "Set a new password. Update only; never returned. Self-edit allowed without administrateUsers (matches UsersController::actionSaveUser line 1703); non-self requires administrateUsers. Over the HTTP transport this field additionally requires elevation via the /oauth/elevate flow; stdio is implicitly elevated."
         },
         "groupUids": {
             "type": "array",

@@ -35,6 +35,12 @@ use craftpulse\herald\tools\support\InvocationContext;
  * A tool using this trait MUST declare
  * `implements ContextAwareToolInterface` so the dispatcher injects the
  * context.
+ *
+ * Streaming tools are the exception to that injection: the dispatcher
+ * hands a streaming tool its context as a `stream()` argument and does
+ * NOT call `setInvocationContext()` on that path. Those tools pass the
+ * context to `_assertElevated()` explicitly instead of relying on the
+ * stored one.
  * =========================================================================
  *
  * @author CraftPulse
@@ -73,6 +79,23 @@ trait ElevationGatedToolTrait
     // =========================================================================
 
     /**
+     * The context the dispatcher injected, or null on a call path that
+     * bypassed the injection.
+     *
+     * Exposed for streaming tools, whose `execute()` has to drive
+     * `stream()` with a context: fabricating a fresh one there would
+     * silently downgrade an HTTP request to the `InvocationContext`
+     * default of stdio and hand it stdio's implicit elevation.
+     *
+     * @author CraftPulse
+     * @since  5.0.0
+     */
+    protected function _dispatchContext(): ?InvocationContext
+    {
+        return $this->_invocationContext;
+    }
+
+    /**
      * Throw a `ToolException` naming the elevation flow unless the
      * current request is elevated. stdio is implicitly elevated and
      * always passes; HTTP requires the `/oauth/elevate` marker.
@@ -80,14 +103,19 @@ trait ElevationGatedToolTrait
      * @param string $operation Short label for the gated operation
      *                          (e.g. "deleting content", "publishing
      *                          content") woven into the error message.
+     * @param InvocationContext|null $ctx Explicit context, for streaming
+     *                                    tools that receive theirs as a
+     *                                    `stream()` argument rather than
+     *                                    through `setInvocationContext()`.
+     *                                    Defaults to the stored one.
      * @throws ToolException When the request is not elevated.
      *
      * @author CraftPulse
      * @since  5.0.0
      */
-    protected function _assertElevated(string $operation): void
+    protected function _assertElevated(string $operation, ?InvocationContext $ctx = null): void
     {
-        $ctx = $this->_invocationContext;
+        $ctx ??= $this->_invocationContext;
         if ($ctx !== null && ($ctx->elevated || $ctx->transport === Server::TRANSPORT_STDIO)) {
             return;
         }

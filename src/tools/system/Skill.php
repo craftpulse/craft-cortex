@@ -10,6 +10,8 @@ use craftpulse\herald\attributes\Title;
 use craftpulse\herald\elements\Skill as SkillElement;
 use craftpulse\herald\Herald;
 use craftpulse\herald\tools\AbstractTool;
+use craftpulse\herald\tools\ContextAwareToolInterface;
+use craftpulse\herald\tools\ElevationGatedToolTrait;
 use craftpulse\herald\tools\IdempotencyTrait;
 use craftpulse\herald\tools\PermissionedToolTrait;
 use craftpulse\herald\tools\ProToolTrait;
@@ -73,8 +75,9 @@ use Michtio\CraftCmsClaudeSkills\Skills as BundledSkills;
 #[IsDestructive]
 #[IsIdempotent(false)]
 #[Title('Skill — list / get / create / update / delete (Herald skills)')]
-class Skill extends AbstractTool
+class Skill extends AbstractTool implements ContextAwareToolInterface
 {
+    use ElevationGatedToolTrait;
     use IdempotencyTrait;
     use PermissionedToolTrait;
     use ProToolTrait;
@@ -537,6 +540,7 @@ class Skill extends AbstractTool
     private function _delete(array $arguments): array
     {
         $this->_assertPermission($arguments);
+        $this->_assertElevated('deleting a skill');
 
         $element = $this->_resolveSkillElement($arguments);
 
