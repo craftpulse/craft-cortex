@@ -11,6 +11,8 @@ use craftpulse\herald\models\Token;
 use craftpulse\herald\records\OauthClient as OauthClientRecord;
 use craftpulse\herald\tools\support\InvocationLogger;
 use craftpulse\herald\web\cp\ActivityFilter;
+use craftpulse\herald\web\cp\CommandToggleSubmission;
+use craftpulse\herald\web\cp\GrantSubmission;
 use craftpulse\herald\web\cp\RowSerializer;
 use craftpulse\herald\web\cp\TableData;
 use craftpulse\herald\web\cp\TableParams;
@@ -986,10 +988,15 @@ class SettingsController extends Controller
         // — the file value wins regardless, and that section rendered
         // read-only, so there is nothing meaningful to fold.
         if (!$this->isSettingOverridden('allowedCommands')) {
+            $content = CommandToggleSubmission::fromPosted(
+                groups: $this->request->getBodyParam('heraldCommandGroups'),
+                actions: $this->request->getBodyParam('heraldCommandActions'),
+                customRows: $posted['allowedCommands'] ?? [],
+            );
             $posted['allowedCommands'] = $plugin->allowlist->patternsFromToggleState(
-                fullGroups: $this->_postedToggleMap('heraldCommandGroups'),
-                actionIds: $this->_postedToggleMap('heraldCommandActions'),
-                customPatterns: $this->_postedCustomPatterns('allowedCommands'),
+                fullGroups: $content->fullGroups,
+                actionIds: $content->actionIds,
+                customPatterns: $content->customPatterns,
                 adminLevel: false,
             );
         } else {
@@ -997,10 +1004,15 @@ class SettingsController extends Controller
         }
 
         if (!$this->isSettingOverridden('adminLevelCommands')) {
+            $adminLevel = CommandToggleSubmission::fromPosted(
+                groups: $this->request->getBodyParam('heraldAdminCommandGroups'),
+                actions: $this->request->getBodyParam('heraldAdminCommandActions'),
+                customRows: $posted['adminLevelCommands'] ?? [],
+            );
             $posted['adminLevelCommands'] = $plugin->allowlist->patternsFromToggleState(
-                fullGroups: $this->_postedToggleMap('heraldAdminCommandGroups'),
-                actionIds: $this->_postedToggleMap('heraldAdminCommandActions'),
-                customPatterns: $this->_postedCustomPatterns('adminLevelCommands'),
+                fullGroups: $adminLevel->fullGroups,
+                actionIds: $adminLevel->actionIds,
+                customPatterns: $adminLevel->customPatterns,
                 adminLevel: true,
             );
         } else {
@@ -1048,46 +1060,45 @@ class SettingsController extends Controller
         $this->requirePermission(self::PERMISSION_MANAGE_GRANTS);
 
         $request = $this->request;
+        $submission = GrantSubmission::fromPosted(
+            patterns: $request->getBodyParam('patterns'),
+            pattern: $request->getBodyParam('pattern'),
+            note: $request->getBodyParam('note'),
+            ttlSeconds: $request->getBodyParam('ttlSeconds'),
+            durationPreset: $request->getBodyParam('durationPreset'),
+            customTtlSeconds: $request->getBodyParam('customTtlSeconds'),
+            subjectUserId: $request->getBodyParam('subjectUserId'),
+        );
 
-        // Command scope: one or more fnmatch patterns. The guided slideout
-        // posts `patterns[]` from the grouped command picker; the legacy
-        // single-field path posts `pattern`. Normalise to a de-duped list.
-        $patterns = $this->_postedGrantPatterns();
-        if ($patterns === []) {
+        if ($submission->patterns === []) {
             return $this->asFailure(Craft::t('herald', 'At least one command pattern is required.'));
         }
 
-        // Subject: the user the grant is for. Optional — null issues a
-        // global grant (applies to every caller). When present it MUST
+        // Subject: the user the grant is for. Optional — no subject issues a
+        // global grant (applies to every caller). When one is posted it MUST
         // resolve to a real user; a crafted id fails closed.
         $subjectUserId = null;
-        $subjectParam = $request->getBodyParam('subjectUserId');
-        if (is_array($subjectParam)) {
-            $subjectParam = reset($subjectParam);
-        }
-        if ($subjectParam !== null && $subjectParam !== '') {
-            $candidate = (int) $subjectParam;
-            if ($candidate <= 0 || User::find()->id($candidate)->status(null)->one() === null) {
+        if ($submission->hasSubject) {
+            if (
+                $submission->subjectUserId <= 0
+                || User::find()->id($submission->subjectUserId)->status(null)->one() === null
+            ) {
                 return $this->asFailure(Craft::t('herald', 'The selected user could not be found.'));
             }
-            $subjectUserId = $candidate;
+            $subjectUserId = $submission->subjectUserId;
         }
-
-        $note = $request->getBodyParam('note');
-        $note = is_string($note) && $note !== '' ? trim($note) : null;
-        $ttlSeconds = $this->_resolveGrantTtl();
 
         $grantorId = Craft::$app->getUser()->getId();
         $grantorId = is_int($grantorId) ? $grantorId : null;
 
         $created = [];
         try {
-            foreach ($patterns as $pattern) {
+            foreach ($submission->patterns as $pattern) {
                 $override = Herald::getInstance()->allowlist->add(
                     pattern: $pattern,
                     userId: $grantorId,
-                    note: $note,
-                    ttlSeconds: $ttlSeconds,
+                    note: $submission->note,
+                    ttlSeconds: $submission->ttlSeconds,
                     subjectUserId: $subjectUserId,
                 );
                 $created[] = $this->_rows()->serializeOverride($override->toArray());
@@ -1182,65 +1193,6 @@ class SettingsController extends Controller
     // =========================================================================
 
     /**
-     * Read a posted toggle map (`heraldCommandGroups` /
-     * `heraldCommandActions`) and keep only the keys whose lightswitch is
-     * on. Craft's lightswitch macro posts a hidden input for every switch
-     * — `'1'` when on, an empty string when off — so a raw read would
-     * report every group/action as present. Filtering to truthy values
-     * leaves only the enabled keys, which is what
-     * `Allowlist::patternsFromToggleState()` expects. Non-array payloads
-     * (none posted) normalise to an empty map.
-     *
-     * @return array<string,mixed>
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _postedToggleMap(string $param): array
-    {
-        $value = $this->request->getBodyParam($param, []);
-        if (!is_array($value)) {
-            return [];
-        }
-
-        return array_filter(
-            $value,
-            static fn($v): bool => $v === '1' || $v === 1 || $v === true,
-        );
-    }
-
-    /**
-     * Read a "Custom patterns" editable-table payload posted under
-     * `settings[<setting>]` and flatten it to trimmed, non-empty pattern
-     * strings. The editable-table macro posts a 2D array
-     * (`settings[<setting>][N][pattern]`); the toggle browser folds these
-     * back in verbatim so power-user globs survive a round-trip. Used for
-     * both buckets — `allowedCommands` (content) and `adminLevelCommands`
-     * (admin-level).
-     *
-     * @return string[]
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _postedCustomPatterns(string $setting): array
-    {
-        $settings = $this->request->getBodyParam('settings', []);
-        $rows = is_array($settings) ? ($settings[$setting] ?? []) : [];
-        if (!is_array($rows)) {
-            return [];
-        }
-
-        return array_values(array_filter(
-            array_map(
-                static fn($row) => is_array($row) ? trim((string) ($row['pattern'] ?? '')) : '',
-                $rows,
-            ),
-            static fn(string $pattern) => $pattern !== '',
-        ));
-    }
-
-    /**
      * Throw unless the install is Pro. Tokens / Activity / Connection
      * are Pro surfaces (PLANNING.md §4 — they exist to operate the
      * Pro-only HTTP transport); the registry's `shouldRegister()` gate
@@ -1291,76 +1243,6 @@ class SettingsController extends Controller
             ],
             $scopes->all(),
         );
-    }
-
-    /**
-     * Resolve the grant TTL (seconds) from the posted duration control. A
-     * raw `ttlSeconds` param wins (the API / legacy path and the controller
-     * tests post it directly); otherwise the guided slideout's
-     * `durationPreset` is read as a second-count, or `custom` plus
-     * `customTtlSeconds`. Null falls through to the plugin default in
-     * `Allowlist::add()`.
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _resolveGrantTtl(): ?int
-    {
-        $request = $this->request;
-
-        // A raw `ttlSeconds` wins when posted (the API / legacy path and the
-        // controller tests use it directly).
-        $direct = $request->getBodyParam('ttlSeconds');
-        if (is_numeric($direct) && (int) $direct > 0) {
-            return (int) $direct;
-        }
-
-        // Otherwise resolve the guided slideout's duration control: a preset
-        // whose value is a second-count, or `custom` + `customTtlSeconds`.
-        $preset = $request->getBodyParam('durationPreset');
-        if ($preset === 'custom') {
-            $custom = $request->getBodyParam('customTtlSeconds');
-            return is_numeric($custom) && (int) $custom > 0 ? (int) $custom : null;
-        }
-        if (is_numeric($preset) && (int) $preset > 0) {
-            return (int) $preset;
-        }
-
-        // Null falls through to the plugin default in `Allowlist::add()`.
-        return null;
-    }
-
-    /**
-     * Normalise the posted command scope into a de-duped, order-preserving
-     * list of non-empty fnmatch patterns. Accepts either `patterns` (the
-     * array the guided slideout's grouped command picker posts) or a single
-     * `pattern` string (the legacy field).
-     *
-     * @return string[]
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _postedGrantPatterns(): array
-    {
-        $raw = $this->request->getBodyParam('patterns');
-        if (!is_array($raw)) {
-            $single = $this->request->getBodyParam('pattern');
-            $raw = is_string($single) ? [$single] : [];
-        }
-
-        $patterns = [];
-        foreach ($raw as $value) {
-            if (!is_string($value)) {
-                continue;
-            }
-            $trimmed = trim($value);
-            if ($trimmed !== '' && !in_array($trimmed, $patterns, true)) {
-                $patterns[] = $trimmed;
-            }
-        }
-
-        return $patterns;
     }
 
     /**
