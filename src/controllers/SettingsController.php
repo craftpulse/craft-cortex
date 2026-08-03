@@ -7,16 +7,14 @@ use craft\elements\User;
 use craft\helpers\AdminTable;
 use craft\helpers\DateTimeHelper;
 use craft\helpers\Db;
-use craft\helpers\Json;
 use craft\web\Controller;
 use craftpulse\herald\db\InvocationQuery;
 use craftpulse\herald\Herald;
 use craftpulse\herald\models\Token;
 use craftpulse\herald\records\OauthClient as OauthClientRecord;
-use craftpulse\herald\records\RuntimeOverride;
 use craftpulse\herald\tools\support\InvocationLogger;
+use craftpulse\herald\web\cp\RowSerializer;
 use yii\base\Exception;
-use yii\base\InvalidArgumentException;
 use yii\web\ForbiddenHttpException;
 use yii\web\NotFoundHttpException;
 use yii\web\Response;
@@ -98,6 +96,16 @@ class SettingsController extends Controller
      * @since 5.0.0
      */
     public const PERMISSION_MANAGE_GRANTS = 'herald:manage-grants';
+
+    // Private Properties
+    // =========================================================================
+
+    /**
+     * @var RowSerializer|null Memoized view-model mapper for the
+     * VueAdminTable feeds. Built lazily so the actions that render no table
+     * never construct it.
+     */
+    private ?RowSerializer $_rows = null;
 
     // Public Methods
     // =========================================================================
@@ -235,7 +243,7 @@ class SettingsController extends Controller
         // serialised row tuple up front so search / sort operate on the
         // shape the table consumes.
         $rows = array_map(
-            fn(Token $token): array => $this->_serializeTokenRow($token),
+            fn(Token $token): array => $this->_rows()->serializeToken($token),
             Herald::getInstance()->tokens->getAll(),
         );
 
@@ -401,7 +409,7 @@ class SettingsController extends Controller
             message: Craft::t('herald', 'Token issued.'),
             data: [
                 'token' => $issued['token'],
-                'model' => $this->_serializeTokenRow($issued['model']),
+                'model' => $this->_rows()->serializeToken($issued['model']),
             ],
         );
     }
@@ -607,7 +615,7 @@ class SettingsController extends Controller
         return $this->asJson([
             'pagination' => AdminTable::paginationLinks($page, $total, $perPage),
             'data' => array_map(
-                fn(array $row): array => $this->_serializeOverrideRow($row),
+                fn(array $row): array => $this->_rows()->serializeOverride($row),
                 $slice,
             ),
         ]);
@@ -804,7 +812,7 @@ class SettingsController extends Controller
         return $this->asJson([
             'pagination' => AdminTable::paginationLinks($page, $total, $perPage),
             'data' => array_map(
-                fn(array $row): array => $this->_serializeActivityRow($row),
+                fn(array $row): array => $this->_rows()->serializeActivity($row),
                 $rows,
             ),
         ]);
@@ -858,31 +866,19 @@ class SettingsController extends Controller
             throw new NotFoundHttpException('Invocation not found.');
         }
 
-        $user = null;
-        $userId = $row['userId'] ?? null;
-        if (is_int($userId) || (is_string($userId) && ctype_digit($userId))) {
-            $boundUser = User::find()->id((int) $userId)->status(null)->one();
-            if ($boundUser instanceof User) {
-                $user = [
-                    'id' => (int) $boundUser->id,
-                    'label' => $boundUser->getName(),
-                    'cpEditUrl' => $boundUser->getCpEditUrl(),
-                ];
-            }
-        }
-
         // Decode + pretty-print the redacted columns PHP-side. The
         // `responseExcerpt` column is clipped to a fixed length by the
         // logger, so the stored string is frequently NOT valid JSON —
         // Twig's `|json_decode` (`Json::decode`) throws on it instead of
         // falling through (a truncated excerpt 500'd the slideout; caught
         // by the gate-9 browser smoke).
+        $rows = $this->_rows();
         $html = $this->getView()->renderTemplate('herald/_cp/_activity-detail-slideout', [
             'row' => $row,
-            'user' => $user,
-            'mode' => $this->_extractMode($row['argsRedacted'] ?? null),
-            'argsPretty' => $this->_prettyRedactedColumn($row['argsRedacted'] ?? null),
-            'responsePretty' => $this->_prettyRedactedColumn($row['responseExcerpt'] ?? null),
+            'user' => $rows->resolveUser($row['userId'] ?? null),
+            'mode' => $rows->extractMode($row['argsRedacted'] ?? null),
+            'argsPretty' => $rows->prettyJson($row['argsRedacted'] ?? null),
+            'responsePretty' => $rows->prettyJson($row['responseExcerpt'] ?? null),
         ]);
 
         return $this->asJson(['html' => $html]);
@@ -949,7 +945,7 @@ class SettingsController extends Controller
         $search = trim((string) $this->request->getParam('search', ''));
 
         $rows = array_map(
-            fn(OauthClientRecord $client): array => $this->_serializeClientRow($client),
+            fn(OauthClientRecord $client): array => $this->_rows()->serializeClient($client),
             Herald::getInstance()->oauth->getAllClients(),
         );
 
@@ -1223,7 +1219,7 @@ class SettingsController extends Controller
                     ttlSeconds: $ttlSeconds,
                     subjectUserId: $subjectUserId,
                 );
-                $created[] = $this->_serializeOverrideRow($override->toArray());
+                $created[] = $this->_rows()->serializeOverride($override->toArray());
                 $this->_auditGrant('issue', (int) $override->id, $pattern, $subjectUserId, $grantorId);
             }
         } catch (Exception $e) {
@@ -1431,85 +1427,6 @@ class SettingsController extends Controller
     }
 
     /**
-     * Serialise a `herald_invocations` row into the locked Activity
-     * VueAdminTable data tuple. Shared by `actionActivityTableData` so the
-     * table shape is asserted in exactly one place.
-     *
-     * Row shape:
-     *   - `id`          — int primary key.
-     *   - `tool`        — `{id, tool, mode}` composite. VueAdminTable
-     *                      column callbacks receive ONLY the cell value
-     *                      (never the row), so everything the tool cell
-     *                      renders — including the detail-slideout
-     *                      trigger id — must travel inside the value.
-     *   - `kind`        — string audit kind (status pill colour).
-     *   - `user`        — `{id, label, cpEditUrl}` or null (anonymous /
-     *                      deleted user).
-     *   - `durationMs`  — int wall-clock duration.
-     *   - `dateCreated` — string|null offset-bearing ISO-8601 (see
-     *                      `_serializeDate`).
-     *
-     * Never surfaces `argsRedacted` / `responseExcerpt` / error payloads —
-     * those live only in the detail slideout (locked decision 11).
-     *
-     * @param array<string,mixed> $row The raw DB row from `InvocationQuery::all`.
-     * @return array<string,mixed>
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _serializeActivityRow(array $row): array
-    {
-        $user = null;
-        $userId = $row['userId'] ?? null;
-        if (is_int($userId) || (is_string($userId) && ctype_digit($userId))) {
-            $boundUser = User::find()->id((int) $userId)->status(null)->one();
-            if ($boundUser instanceof User) {
-                $user = [
-                    'id' => (int) $boundUser->id,
-                    'label' => $boundUser->getName(),
-                    'cpEditUrl' => $boundUser->getCpEditUrl(),
-                ];
-            }
-        }
-
-        return [
-            'id' => (int) ($row['id'] ?? 0),
-            'tool' => [
-                'id' => (int) ($row['id'] ?? 0),
-                'tool' => (string) ($row['toolName'] ?? ''),
-                'mode' => $this->_extractMode($row['argsRedacted'] ?? null),
-            ],
-            'kind' => (string) ($row['kind'] ?? ''),
-            'user' => $user,
-            'durationMs' => (int) ($row['durationMs'] ?? 0),
-            'dateCreated' => $this->_serializeDate($row['dateCreated'] ?? null),
-        ];
-    }
-
-    /**
-     * Best-effort extraction of the `mode` key from a redacted-args JSON
-     * column. Returns null when the column is absent, not JSON, or carries
-     * no `mode`. The args are already redacted in the DB — this only reads
-     * the (non-sensitive) routing discriminator most Herald tools carry.
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _extractMode(mixed $argsRedacted): ?string
-    {
-        if (!is_string($argsRedacted) || $argsRedacted === '') {
-            return null;
-        }
-        $decoded = json_decode($argsRedacted, true);
-        if (!is_array($decoded)) {
-            return null;
-        }
-        $mode = $decoded['mode'] ?? null;
-        return is_string($mode) && $mode !== '' ? $mode : null;
-    }
-
-    /**
      * Throw unless the install is Pro. Tokens / Activity / Connection
      * are Pro surfaces (PLANNING.md §4 — they exist to operate the
      * Pro-only HTTP transport); the registry's `shouldRegister()` gate
@@ -1560,153 +1477,6 @@ class SettingsController extends Controller
             ],
             $scopes->all(),
         );
-    }
-
-    /**
-     * Pretty-print a redacted JSON audit column for the detail slideout.
-     * The `responseExcerpt` column is clipped to a fixed length by the
-     * logger, so the stored string is frequently NOT valid JSON — fall
-     * back to the raw text instead of letting `Json::decode` throw (a
-     * truncated excerpt 500'd the slideout; gate-9 browser smoke).
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _prettyRedactedColumn(mixed $raw): ?string
-    {
-        if (!is_string($raw) || $raw === '') {
-            return null;
-        }
-
-        try {
-            $decoded = Json::decode($raw);
-        } catch (InvalidArgumentException) {
-            return $raw;
-        }
-
-        if (!is_array($decoded)) {
-            return $raw;
-        }
-
-        return Json::encode($decoded, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-    }
-
-    /**
-     * Serialise a `RuntimeOverride` row into the locked VueAdminTable
-     * data tuple. Shared by `actionAllowlistTableData` and the success
-     * branch of `actionAddOverride` so the row returned by the issue
-     * flow has the same shape the table refresh would render.
-     *
-     * Row shape:
-     *   - `id`           — int primary key.
-     *   - `pattern`      — `{pattern, isExpired}` composite. VueAdminTable
-     *                       column callbacks receive ONLY the cell value
-     *                       (never the row), so the expired flag the cell
-     *                       renderer mutes on must travel inside the value.
-     *   - `note`         — string|null (admin freeform).
-     *   - `expiresAt`    — `{value, isExpired}` composite; `value` is
-     *                       string|null offset-bearing ISO-8601, null =
-     *                       never.
-     *   - `createdBy`    — `{id, label, cpEditUrl}` or null when the
-     *                       issuing user record is missing.
-     *   - `dateCreated`  — string|null offset-bearing ISO-8601 (see
-     *                       `_serializeDate`).
-     *
-     * @param array<string,mixed> $row The raw DB row from `Allowlist::getAllOverrides`
-     *                                 or `RuntimeOverride::toArray()`.
-     * @return array<string,mixed>
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _serializeOverrideRow(array $row): array
-    {
-        $expiresAt = $row['expiresAt'] ?? null;
-        $isExpired = false;
-        if (is_string($expiresAt) && $expiresAt !== '') {
-            $exp = DateTimeHelper::toDateTime($expiresAt);
-            $isExpired = $exp !== false && $exp < DateTimeHelper::now();
-        }
-
-        $createdBy = $this->_resolveRowUser($row['createdByUserId'] ?? null);
-
-        // Subject: the user this grant is for. Null = a global grant that
-        // applies to every caller (rendered distinctly in the table).
-        $subject = $this->_resolveRowUser($row['subjectUserId'] ?? null);
-
-        return [
-            'id' => (int) ($row['id'] ?? 0),
-            'pattern' => [
-                'pattern' => (string) ($row['pattern'] ?? ''),
-                'isExpired' => $isExpired,
-            ],
-            'note' => isset($row['note']) && $row['note'] !== '' ? (string) $row['note'] : null,
-            'expiresAt' => [
-                'value' => $this->_serializeDate($expiresAt),
-                'isExpired' => $isExpired,
-            ],
-            'createdBy' => $createdBy,
-            'subject' => $subject,
-            'dateCreated' => $this->_serializeDate($row['dateCreated'] ?? null),
-        ];
-    }
-
-    /**
-     * Render a datetime cell for a VueAdminTable row as an offset-bearing
-     * ISO-8601 string, or null when the value is absent.
-     *
-     * Every datetime column in Herald's tables stores a **naive** UTC
-     * string (`Y-m-d H:i:s`, no offset) because that is what
-     * `Db::prepareDateForDb()` writes. Handing that string to the table
-     * unchanged is not ISO-8601, and the browser's `new Date(...)` parses
-     * an offset-less datetime as **local** time — so every rendered
-     * timestamp landed shifted by the viewer's UTC offset, and the
-     * client-side "expired" comparison in `tokens.twig` flipped by the
-     * same amount. Naming the offset on the wire fixes both at the source
-     * and keeps the cell renderers free of timezone logic.
-     *
-     * @throws \Exception from `DateTimeHelper::toDateTime()` when the
-     *         system timezone cannot be resolved.
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _serializeDate(mixed $value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-
-        return DateTimeHelper::toIso8601($value) ?: null;
-    }
-
-    /**
-     * Resolve a raw user-id cell into the `{id, label, cpEditUrl}` shape
-     * the VueAdminTable cells consume, or null when the id is absent or the
-     * user record is missing (deleted). Shared by the `createdBy` (grantor)
-     * and `subject` (grantee) columns of a grant row.
-     *
-     * @return array{id:int,label:string,cpEditUrl:string|null}|null
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _resolveRowUser(mixed $userId): ?array
-    {
-        if (!is_int($userId) && !(is_string($userId) && ctype_digit($userId))) {
-            return null;
-        }
-
-        $user = User::find()->id((int) $userId)->status(null)->one();
-        if (!$user instanceof User) {
-            return null;
-        }
-
-        return [
-            'id' => (int) $user->id,
-            'label' => $user->getName(),
-            'cpEditUrl' => $user->getCpEditUrl(),
-        ];
     }
 
     /**
@@ -1802,100 +1572,15 @@ class SettingsController extends Controller
     }
 
     /**
-     * Serialise an `OauthClient` record into the locked Clients
-     * VueAdminTable data tuple. Shared by `actionClientsTableData` so
-     * the table shape is asserted in exactly one place.
-     *
-     * Row shape:
-     *   - `id`           — int primary key.
-     *   - `clientName`   — string operator-facing label.
-     *   - `clientId`     — string public client identifier.
-     *   - `type`         — `public` (PKCE-only) or `confidential`.
-     *   - `approved`     — bool; the DCR approval gate state.
-     *   - `redirectUris` — string[] decoded from the JSON column.
-     *   - `dateCreated`  — string|null offset-bearing ISO-8601 (see
-     *                      `_serializeDate`).
-     *
-     * Never surfaces `clientSecretHash` — the hashed secret is internal.
-     *
-     * @return array<string,mixed>
+     * The VueAdminTable view-model mapper. Every locked row tuple the CP
+     * tables consume is built there, not here, so the controller stays an
+     * HTTP boundary and each table shape is asserted in one place.
      *
      * @author CraftPulse
      * @since  5.0.0
      */
-    private function _serializeClientRow(OauthClientRecord $client): array
+    private function _rows(): RowSerializer
     {
-        $redirectUris = [];
-        $decoded = json_decode((string) $client->redirectUris, true);
-        if (is_array($decoded)) {
-            $redirectUris = array_values(array_filter($decoded, 'is_string'));
-        }
-
-        return [
-            'id' => (int) $client->id,
-            'clientName' => (string) $client->clientName,
-            'clientId' => (string) $client->clientId,
-            'type' => (bool) $client->isPublic ? 'public' : 'confidential',
-            'approved' => (bool) $client->approved,
-            // VueAdminTable column callbacks receive only the cell value,
-            // never the row — so the inline approve button needs both the
-            // id and the approval flag projected into its own cell value.
-            'approveAction' => [
-                'id' => (int) $client->id,
-                'approved' => (bool) $client->approved,
-            ],
-            'redirectUris' => $redirectUris,
-            'dateCreated' => $this->_serializeDate($client->dateCreated),
-        ];
-    }
-
-    /**
-     * Serialise a `Token` model into the locked VueAdminTable data tuple.
-     * Shared by `actionTokensTableData` and the success branch of
-     * `actionIssueToken` so the row returned by the issue flow has the
-     * same shape the table refresh would render.
-     *
-     * The plaintext is NEVER part of this tuple — only the operator-safe
-     * `tokenPrefix` hint surfaces. The plaintext exists exactly once, in
-     * `actionIssueToken`'s separate `token` response key.
-     *
-     * Row shape:
-     *   - `id`          — int primary key.
-     *   - `name`        — string operator label.
-     *   - `tokenPrefix` — string (first 8 chars of the plaintext, a hint).
-     *   - `user`        — `{id, label, cpEditUrl}` or null when the bound
-     *                      user record is missing.
-     *   - `expiresAt`   — string|null offset-bearing ISO-8601, null = never.
-     *   - `lastUsedAt`  — string|null offset-bearing ISO-8601, null = never
-     *                      used.
-     *   - `dateCreated` — string|null offset-bearing ISO-8601 (see
-     *                      `_serializeDate`).
-     *
-     * @return array<string,mixed>
-     *
-     * @author CraftPulse
-     * @since  5.0.0
-     */
-    private function _serializeTokenRow(Token $token): array
-    {
-        $user = null;
-        $boundUser = $token->getUser();
-        if ($boundUser instanceof User) {
-            $user = [
-                'id' => (int) $boundUser->id,
-                'label' => $boundUser->getName(),
-                'cpEditUrl' => $boundUser->getCpEditUrl(),
-            ];
-        }
-
-        return [
-            'id' => (int) $token->id,
-            'name' => $token->name,
-            'tokenPrefix' => $token->tokenPrefix,
-            'user' => $user,
-            'expiresAt' => $this->_serializeDate($token->expiresAt),
-            'lastUsedAt' => $this->_serializeDate($token->lastUsedAt),
-            'dateCreated' => $this->_serializeDate($token->dateCreated),
-        ];
+        return $this->_rows ??= new RowSerializer();
     }
 }
